@@ -1,0 +1,20 @@
+# Rust build artifacts
+/target/
+
+# OS files
+**/.DS_Store
+
+# mp CLI runtime state (not part of the repo)
+.mp-scratch/
+master-plan/.mp/
+master-plan/.mp-write.lock
+.mp-project-write.lock
+
+# Session tooling state (not part of the repo)
+.pi-subagents/
+.zcode/
+docs-old/code-review/
+.scratch/
+
+# Empty install stub dir (rsync artifact)
+_install_stub/
