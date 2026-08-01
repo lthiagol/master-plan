@@ -3,7 +3,7 @@
 //!
 //! These commands are the agent-friendly read path: when an agent only needs one
 //! AC (e.g. "what's the verification for AC-03?"), it must not load the whole
-//! milestone document. See docs/concepts/01 - Agent Integration/AGENT-READINESS.md.
+//! milestone document. See docs/agent-guide/ and docs/mp/commands.md.
 
 use crate::common::{lib_api, TestEnv};
 

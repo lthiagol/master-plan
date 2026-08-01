@@ -13,7 +13,7 @@
 #
 # Top-5 suites are the M162 AC-02 list (in scope). Suites on the
 # "MUST stay subprocess" list (install, doctor, watch, TUI) are not
-# included — see docs/concepts/03 - Testing/test-taxonomy.md.
+# included — see CONTRIBUTING.md (Testing section).
 
 set -euo pipefail
 

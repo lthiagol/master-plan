@@ -62,9 +62,9 @@ Humans use `raul` separately for status and review views.
   Treat the log as triage input for the next dogfood pass. Do NOT patch the symptom
   in `master-plan/` files or in code without recording the finding first.
 - **Consumer-surface hygiene — no internal provenance.** Files that ship to
-  adopters (`templates/skills/**`, `docs/**` except `docs-old/`, user-facing
-  READMEs) must be self-contained: no internal milestone IDs (`M\d+`), no
-  lesson codes (`L\d`), and no pointers to repo-internal files
+  adopters (`templates/skills/**`, `docs/**`, user-facing READMEs) must be
+  self-contained: no internal milestone IDs (`M\d+`), no lesson codes
+  (`L\d`), and no pointers to repo-internal files
   (`docs/code-review-lessons.md`, `docs/dogfood/…`). Name the *capability*
   (`mp config get agent.automation.branch_strategy`), not the milestone that
   introduced it. Milestone IDs remain the native vocabulary inside
@@ -261,4 +261,3 @@ on long-running commands.
 - `docs/milestone-lifecycle/` — lifecycle state machine + gates
 - `docs/milestone-details/` — data model & field reference
 
-> The previous `docs/concepts/` tree is archived under `docs-old/` (unmaintained).

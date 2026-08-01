@@ -28,9 +28,7 @@ When you add a test, you need to pick **subprocess vs in-process**.
   `crates/mp/tests/common/lib_api.rs`. Calls `mp::…` directly from the
   test process, ~1 ms per call.
 
-The boundary rule and the decision tree live in
-[**docs-old/concepts/03 - Testing/test-taxonomy.md**](docs-old/concepts/03%20-%20Testing/test-taxonomy.md)
-(archived; the summary below is current). Read that doc before adding a test. Summary:
+Test taxonomy summary (read before adding a test):
 
 | Category | Surface | Why |
 |----------|---------|-----|

@@ -10,12 +10,11 @@ For deeper reference material that does not duplicate this content:
 
 | Need | Go to |
 |------|-------|
-| Command reference | `docs/concepts/06 - Reference/MP-COMMANDS.md` |
-| Data model / gates | `docs/SPEC.md` |
-| State transitions | `docs/concepts/01 - Agent Integration/AGENT-PLAYBOOK.md` |
-| What's implemented | `docs/concepts/01 - Agent Integration/AGENT-READINESS.md` |
-| Brownfield routing | `docs/concepts/05 - Technical/BROWNFIELD.md` |
-| Install / harness | `docs/concepts/02 - Getting Started/INSTALL.md` |
+| Command reference | `docs/mp/commands.md` |
+| Lifecycle / gates | `docs/milestone-lifecycle/` |
+| Milestone fields | `docs/milestone-details/` |
+| Agent workflows | `docs/agent-guide/` |
+| Install / harness | `docs/mp/getting-started.md` |
 
 ## CLI contract
 
@@ -36,13 +35,13 @@ For deeper reference material that does not duplicate this content:
 | Edit one WP | `mp milestone wp add/update/remove <id> [<wp-id>]` (fragment-only) |
 | After writes | `mp validate` |
 | Toolkit health | `mp doctor` |
-| **State updates** | See `docs/AGENT-PLAYBOOK.md` — start/done/block/complete |
+| **State updates** | See `docs/agent-guide/executing.md` — start/done/block/complete |
 | **Findings** | `mp reviews finding list/resolve` — not `milestone update` |
 
 **Fragment-first rule:** agents edit by id (`ac/step/wp show|add|update|remove`)
 and read small JSON slices. `mp milestone update --json` rejects `acceptance_criteria`
 and `steps` arrays by default; pass `--replace-arrays` only for migration scripts.
-See `docs/concepts/01 - Agent Integration/AGENT-READINESS.md` for the full matrix.
+See `docs/agent-guide/` and `docs/mp/commands.md` for the full surface.
 
 **Session start:** `mp doctor` → `mp config show` → `mp execution status` → `mp next` or `mp inbox`.
 

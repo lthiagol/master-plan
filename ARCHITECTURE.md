@@ -212,10 +212,6 @@ archive/           # soft-deleted milestones, backlog items
 | `docs/raul/` | `raul` TUI — lanes, keybinds, settings |
 | `docs/skills/` | Shipped skills (`mp-flow` / `mp-runner` / `mp-coordinator` + catalog) |
 
-> The previous `docs/concepts/` tree is archived under `docs-old/` (unmaintained).
-> `docs-old/concepts/06 - Reference/` still holds the `mp docgen` generated
-> command reference, pinned by `crates/mp/tests/docgen.rs`.
-
 ---
 
 ## 9. Maintenance

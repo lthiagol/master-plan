@@ -1,5 +1,5 @@
 # Master Plan — developer & install targets
-# See: docs/concepts/02 - Getting Started/INSTALL.md
+# See: docs/mp/getting-started.md
 
 ROOT           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 CARGO          ?= cargo
@@ -214,7 +214,7 @@ install: build-release ## Full install: toolkit + OpenCode + Cursor + Pi (v1 har
 	@codesign --force --deep --sign - "$(INSTALL_DIR)/bin/raul" 2>/dev/null || true
 	@echo ""
 	@echo "Done. Verify: mp doctor"
-	@echo "Docs: docs/concepts/02 - Getting Started/INSTALL.md"
+	@echo "Docs: docs/mp/getting-started.md"
 
 uninstall: build-release ## Remove global install (toolkit + all harness artifacts)
 	@$(MP_INSTALL_ENV) $(TARGET) uninstall --purge --format json

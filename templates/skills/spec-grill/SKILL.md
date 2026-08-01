@@ -98,7 +98,7 @@ The milestone is now ready for decomposition (Phase 2).
 
 ## References
 
-- `mp interview` docs: `docs/concepts/06 - Reference/MP-COMMANDS.md`
+- `mp interview` docs: `docs/mp/commands.md`
 - Gap analysis: `mp interview gaps --help`
-- Spec model: `docs/SPEC.md`
+- Spec model: `docs/agent-guide/planning-specs.md`
 - Planning sub-mode: `templates/skills/mp-coordinator/planning.md` (stages 1-4 deep-dive, including the Stage 1 milestone interview)

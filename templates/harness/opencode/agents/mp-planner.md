@@ -85,4 +85,5 @@ Stop after Approve. Do NOT execute — that's the runner's domain.
 - `~/.agents/skills/mp-flow/SKILL.md` — 12-stage timeline + hand-off protocol.
 - `~/.agents/skills/mp-coordinator/SKILL.md` — coordinator role (you
   are a planner sub-mode of the coordinator role).
-- [`docs/concepts/01 - Agent Integration/AGENT-READINESS.md`](../docs/concepts/01%20-%20Agent%20Integration/AGENT-READINESS.md) — what `mp` commands work today.
+- Toolkit `docs/mp/commands.md` — command reference.
+- Toolkit `docs/agent-guide/` — agent workflows.

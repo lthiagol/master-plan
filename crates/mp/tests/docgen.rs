@@ -1,6 +1,6 @@
 //! M173 S3: `mp docgen` smoke test. The generator is exercised
 //! against a per-test output dir so concurrent runs don't race on
-//! the canonical `docs/concepts/06 - Reference/generated/` location.
+//! generated command fragments (default under a temp out-dir in tests).
 //! Tests cover: (a) every top-level subcommand emits a `.md` file,
 //! (b) each file is non-empty, (c) leaf commands carry an Options
 //! table, (d) parent commands carry a Subcommands table, (e) the
@@ -124,38 +124,24 @@ fn docgen_group_filter_emits_only_one_file() {
     assert_eq!(entries, vec!["install.md".to_string()]);
 }
 
-/// mp:include markers in MP-COMMANDS.md resolve to files emitted by
-/// docgen under `docs/concepts/06 - Reference/generated/`. We pin
-/// that the markers the M173 deliverable added (install, milestone,
-/// reviews) all resolve.
-///
-/// NOTE: the `concepts/` doc tree was archived to `docs-old/` when the
-/// repo adopted the `docs-revisited` tree as the official docs. The
-/// generated command reference still lives there; this test pins the
-/// marker-resolution logic against those archived files. The active
-/// command reference is now hand-authored at `docs/mp/commands.md`.
+/// Live command reference is hand-authored at `docs/mp/commands.md`
+/// (replaces the retired generated MP-COMMANDS / docs-old tree).
 #[test]
-fn mp_include_markers_resolve_to_generated_files() {
+fn live_commands_md_covers_core_surfaces() {
     let root = common::repo_root();
-    let md = std::fs::read_to_string(root.join("docs-old/concepts/06 - Reference/MP-COMMANDS.md"))
-        .unwrap();
-    let generated = root.join("docs-old/concepts/06 - Reference/generated");
-    for fragment in ["install", "milestone", "reviews"] {
-        let marker = format!("<!-- mp:include generated/{fragment}.md -->");
+    let md = std::fs::read_to_string(root.join("docs/mp/commands.md"))
+        .expect("docs/mp/commands.md must exist");
+    for needle in [
+        "mp init",
+        "mp install",
+        "mp doctor",
+        "mp milestone",
+        "mp reviews",
+        "mp validate",
+    ] {
         assert!(
-            md.contains(&marker),
-            "MP-COMMANDS.md missing marker {marker}"
-        );
-        let path = generated.join(format!("{fragment}.md"));
-        assert!(
-            path.is_file(),
-            "marker {marker} points at {} which must exist",
-            path.display()
-        );
-        let content = std::fs::read_to_string(&path).unwrap();
-        assert!(
-            content.contains(&format!("# `mp {fragment}`")),
-            "generated {fragment}.md must have a top-level heading"
+            md.contains(needle),
+            "docs/mp/commands.md missing coverage for `{needle}`"
         );
     }
 }

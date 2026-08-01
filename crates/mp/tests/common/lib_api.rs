@@ -8,7 +8,7 @@
 //!
 //! Background: milestones **M162** / **M175**
 //! (`master-plan/milestones/162-*.json`, `175-*.json`).
-//! Taxonomy / decision tree: [`docs/concepts/03 - Testing/test-taxonomy.md`](../../../docs/concepts/03%20-%20Testing/test-taxonomy.md).
+//! Taxonomy: see CONTRIBUTING.md (Testing section).
 //!
 //! ## When to use `lib_api` vs `env.run`
 //!
@@ -16,8 +16,7 @@
 //!   read-only command, or a fragment read/write that goes through
 //!   `mp::milestone::*` / `mp::step::*` / `mp::validate::*`.
 //! - **Use `env.run`** for install / uninstall / doctor / watch / TUI /
-//!   init / end-to-end smoke. Those categories MUST stay subprocess —
-//!   see the taxonomy doc for the full list and the rationale.
+//!   init / end-to-end smoke. Those categories MUST stay subprocess.
 //!
 //! ## Surface
 //!

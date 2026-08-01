@@ -8,18 +8,18 @@ description: Lesson-pattern code review — pre-screen changes against the runna
 > **Repository-internal skill.** This skill is NOT part of the consumer
 > catalog. Its runnable patterns are coupled to master-plan's own
 > fixtures (`crates/mp/tests/code_review_patterns.rs`) and the
-> archived lessons catalog (`docs-old/code-review-lessons.md`); it
+> lessons catalog (`crates/mp/tests/fixtures/code-review-lessons.md`); it
 > does not deploy to adopters via `mp install`. The references to
 > `M\d+` and `L\d+` tokens below are intentional and are part of the
 > master-plan repo's internal vocabulary — they are NOT
 > consumer-surface provenance.
 
 This skill is the per-change pre-screen. It walks the lessons catalog
-in `docs-old/code-review-lessons.md` (L1–L63), runs the runnable patterns
-for the lessons that have them (L6, L8, L13, L14, L15 per M173 S1),
-and files findings for any matches or suspected violations. The
-canonical lessons live in `docs-old/code-review-lessons.md`; the runnable
-patterns live in `crates/mp/tests/code_review_patterns.rs`.
+in `crates/mp/tests/fixtures/code-review-lessons.md` (L1–L63), runs the
+runnable patterns for the lessons that have them (L6, L8, L13, L14, L15
+per M173 S1), and files findings for any matches or suspected violations.
+The canonical lessons live in that fixture file; the runnable patterns
+live in `crates/mp/tests/code_review_patterns.rs`.
 
 The skill is **read-only** — it never modifies code. It writes to the
 plan via `mp reviews finding add` (audit trail) and surfaces matches
@@ -62,10 +62,11 @@ to surface violations.
    Scope the review to changed files; the lesson patterns apply
    selectively.
 
-2. **Walk the lessons catalog.** Open `docs-old/code-review-lessons.md`
-   and read the L6/L8/L13/L14/L15 sections. For each lesson, run the
-   Positive-fixture command; if it fails, the lesson's contract has
-   regressed and you have a finding.
+2. **Walk the lessons catalog.** Open
+   `crates/mp/tests/fixtures/code-review-lessons.md` and read the
+   L6/L8/L13/L14/L15 sections. For each lesson, run the Positive-fixture
+   command; if it fails, the lesson's contract has regressed and you
+   have a finding.
 
 3. **Grep for the Negative fixtures.** The Negative-fixture text in
    each Pattern block names the grep. Run it; matches are findings.
@@ -111,10 +112,9 @@ to surface violations.
 
 ## Embed / link map
 
-This skill embeds (and references) the lessons catalog so a reviewer
-without repo access can still run the patterns. The canonical home is
-`docs-old/code-review-lessons.md` (relative to the repo root); the
-runnable fixtures are pinned in
+This skill embeds (and references) the lessons catalog. The canonical
+home is `crates/mp/tests/fixtures/code-review-lessons.md` (relative to
+the repo root); the runnable fixtures are pinned in
 `crates/mp/tests/code_review_patterns.rs`. Since this skill is
 repository-internal and does not deploy to adopters, all paths here
 are repo-relative. The lesson-contract check is:
@@ -128,10 +128,10 @@ This skill is **not** installable via `mp install` (manifest
 
 ## See also
 
-- `docs-old/code-review-lessons.md` — canonical lesson-pattern library
-  (L1–L63; L6/L8/L13/L14/L15 have runnable Pattern: blocks).
+- `crates/mp/tests/fixtures/code-review-lessons.md` — lesson-pattern
+  library (L1–L63; L6/L8/L13/L14/L15 have runnable Pattern: blocks).
 - `crates/mp/tests/code_review_patterns.rs` — runnable fixtures for the
   M173 S1 lessons.
 - `mp-coordinator` (M121) — coordinator role skill (stages 1-4, 8, 10-12).
 - `mp-runner` (M122) — runner role skill (stages 5-7, 9).
-- `docs-old/dogfood/M110-s5-audit.md` — dogfood-log audit triage pattern.
+- `mp-dogfood-log.md` — dogfood-log triage notes.

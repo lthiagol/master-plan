@@ -1,9 +1,9 @@
 //! M173 S1: runnable Pattern: blocks for code-review lessons L6/L8/L13/L14/L15.
 //!
-//! Each lesson in `docs-old/code-review-lessons.md` gets a `**Pattern:**` block
-//! with three sections: Pattern (description), Positive fixture (must match),
-//! Negative fixture (must not match). These tests pin the docs structure and
-//! drive the greps that surface matches/violations.
+//! Each lesson in `crates/mp/tests/fixtures/code-review-lessons.md` gets a
+//! `**Pattern:**` block with three sections: Pattern (description), Positive
+//! fixture (must match), Negative fixture (must not match). These tests pin
+//! the catalog structure and drive the greps that surface matches/violations.
 
 mod common;
 
@@ -14,11 +14,11 @@ fn repo_root() -> PathBuf {
     common::repo_root()
 }
 
-/// Resolve `docs-old/code-review-lessons.md` from the repo root.
-/// Canonical home after the docs/ restructure; consumer surface treats
-/// `docs/code-review-lessons.md` as a dead path.
+/// Maintainer-only lessons catalog (not under public `docs/`).
 fn lessons_path() -> PathBuf {
-    repo_root().join("docs-old").join("code-review-lessons.md")
+    repo_root()
+        .join("crates/mp/tests/fixtures")
+        .join("code-review-lessons.md")
 }
 
 /// Parse the lessons file into per-lesson sections keyed by lesson id

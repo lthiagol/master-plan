@@ -39,10 +39,9 @@ the remediation loop.
 
 ## Quick reference
 
-> **M81: pick the smallest artifact first.** One-line bug → `mp track add bugfix …`,
-> not a milestone. Read the full routing decision matrix in the toolkit's
-> `docs/concepts/02 - Getting Started/SIZE-ROUTING.md` (track vs milestone vs
-> idea vs backlog) before deciding which flow below applies.
+> **Pick the smallest artifact first.** One-line bug → `mp track add bugfix …`,
+> not a milestone. Prefer track / idea / backlog over a full milestone when the
+> work is small; see the toolkit `docs/agent-guide/core-principles.md`.
 
 | Goal | Approach |
 |------|----------|
@@ -54,5 +53,5 @@ the remediation loop.
 | See status | `mp status` |
 
 Full instructions: [master-plan/AGENTS.md](master-plan/AGENTS.md).
-Command reference: toolkit `docs/AGENT-READINESS.md`.
-Routing matrix (smallest-artifact-first): toolkit `docs/concepts/02 - Getting Started/SIZE-ROUTING.md`.
+Command reference: toolkit `docs/mp/commands.md`.
+Agent workflows: toolkit `docs/agent-guide/`.

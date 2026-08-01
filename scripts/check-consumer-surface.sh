@@ -36,16 +36,14 @@ PATTERNS=(
 )
 
 # Paths scanned. Repo-relative (the script cd's to the repo root above).
-# `docs-old/` is archived and excluded; `mp-code-review/` is
-# repository-internal and excluded. Adopter-facing entrypoints (root
-# README.md) are included alongside templates/skills + docs.
+# `mp-code-review/` is repository-internal and excluded. Adopter-facing
+# entrypoints (root README.md) are included alongside templates/skills + docs.
 SCAN_PATHS=(
     "templates/skills"
     "docs"
     "README.md"
 )
 EXCLUDE_PATHS=(
-    "docs-old"
     "templates/skills/mp-code-review"
 )
 

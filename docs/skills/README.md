@@ -114,7 +114,7 @@ deployed by `mp install`.
 
 | Skill | Audience | Notes |
 |-------|----------|-------|
-| `mp-code-review` | Master-plan maintainers only | Manifest `category: internal` — excluded from `mp install` / `--list-skills`. Lesson-pattern pre-screen + runnable fixtures in `crates/mp/tests/code_review_patterns.rs`; lessons catalog at `docs-old/code-review-lessons.md`. Load from the repo tree, not via install. |
+| `mp-code-review` | Master-plan maintainers only | Manifest `category: internal` — excluded from `mp install` / `--list-skills`. Lesson-pattern pre-screen + runnable fixtures in `crates/mp/tests/code_review_patterns.rs`; lessons catalog at `crates/mp/tests/fixtures/code-review-lessons.md`. Load from the repo tree, not via install. |
 
 The consumer-surface de-internalization rules (no `M\d+` IDs, no `L\d+`
 codes, no dead `docs/` pointers) do **not** apply to repository-internal
@@ -153,19 +153,17 @@ evolves. Rewrite to the capability:
 ### 2. No pointers to repo-internal files
 
 A skill that says "read `docs/code-review-lessons.md`" hands the consumer a
-broken link — that file lives in this repo (and has in fact been archived to
-`docs-old/`). Either inline the content the agent needs, or link to a file that
-*does* ship (another skill in the same bundle, resolved by relative path).
-Treat any `docs/…` or `crates/…` path in a skill as suspect unless it is part
-of the deployed bundle.
+broken link — that path is not part of the shipped docs tree. Either inline
+the content the agent needs, or link to a file that *does* ship (another skill
+in the same bundle, resolved by relative path). Treat any `docs/…` or
+`crates/…` path in a skill as suspect unless it is part of the deployed bundle.
 
 ### Where milestone IDs *are* allowed
 
 Inside `master-plan/` (the plan zone) and repo-internal dogfood notes
-(`mp-dogfood-log.md`, `docs-old/`, plan JSON), milestone IDs are the native
+(`mp-dogfood-log.md`, plan JSON, test fixtures), milestone IDs are the native
 vocabulary and stay. The ban is specifically the **consumer surface**:
-`templates/skills/**`, `docs/**` (except `docs-old/`), and any README an
-adopter reads.
+`templates/skills/**`, `docs/**`, and any README an adopter reads.
 
 ### Vendored third-party skills
 
