@@ -1,0 +1,375 @@
+{
+  "milestone": {
+    "id": "146",
+    "title": "Skill catalog + deployment manifest: mp install tracks what it deploys, adds opt-in catalog skills",
+    "slug": "skill-catalog-deployment-manifest-mp-install-tracks-what-it-deploys-adds-opt-in-catalog-skills",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-10",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-11T17:22:19.536843+00:00"
+  },
+  "intent": {
+    "outcome": "mp install writes and reads a deployment manifest (~/.agents/master-plan/installed-skills.json) recording every deployed skill with provenance, category, source, and version. Skill manifests grow a 'category' field (core | catalog). Bare 'mp install' deploys core skills only; catalog skills are opt-in via --skills. Two vendored catalog skills ship verbatim under MIT attribution: diagnosing-bugs and codebase-design (from mattpocock/skills). mp install --list-skills lists the registry annotated with per-harness deployment state. mp install --check gains deployment-drift detection (missing / stale / orphaned). mp uninstall prunes against the manifest instead of re-deriving from the embedded registry. Open questions: (1) should the manifest track a content hash per deployed SKILL.md, or is id+version enough for drift detection? (2) for bare mp install deploying only core skills, is this a breaking change worth a migration note, or do we add a --all flag preserving old behavior?"
+  },
+  "problem": {
+    "description": "Two gaps. (1) Provenance drift: mp install is fire-and-forget — it copies SKILL.md into harness dirs but records nothing, so there is no way to answer 'what is deployed?' or reconcile after a consolidation milestone. M141 dropped master-planner + mp-handoff + mp-code-review from the source registry, but installed MP_HOME copies linger because nothing pruned them — live drift on the maintainer's own machine. Catalog skills with upstream versions make this worse, not better. (2) No opt-in tier: good adjacent skills (diagnosing-bugs, codebase-design — MIT, dependency-free, no plan-zone collision, no core-skill overlap) have no home. mp only deploys its own workflow backbone today."
+  },
+  "scope": {
+    "in_scope": [
+      "Deployment manifest: ~/.agents/master-plan/installed-skills.json. Schema: array of { skill_id, harness, category, source, source_url, upstream_version, installed_at }. Written by install (read-modify-write), read by list/check/uninstall, pruned by uninstall.",
+      "Skill manifest.json grows a 'category' field: 'core' (default-deployed) | 'catalog' (opt-in). Default to 'core' when absent for backward compatibility. Add 'source', 'source_url', 'upstream_version' fields for catalog skills.",
+      "Behavior change: bare 'mp install' deploys ONLY core skills. Catalog is opt-in via --skills <id,...>. Document in CHANGELOG.",
+      "Vendor two catalog skills verbatim (no content adaptation — mp serves any language): templates/skills/diagnosing-bugs/ (SKILL.md + scripts/hitl-loop.template.sh) and templates/skills/codebase-design/ (SKILL.md + DESIGN-IT-TWICE.md + DEEPENING.md). Source: mattpocock/skills (MIT).",
+      "Attribution: THIRD_PARTY_LICENSES.md at repo root carrying the MIT notice for mattpocock/skills; header comment in each vendored SKILL.md pointing back to upstream.",
+      "mp install --list-skills: prints id / display / category / deployed-to (per harness) / source. Reads manifest for deployment state.",
+      "mp install --check extended: existing source-registry validation PLUS a deployment-drift phase reporting (a) deployed-but-removed-from-registry orphans, (b) registry skills not yet deployed, (c) hash mismatch if tracked.",
+      "mp uninstall: reads installed-skills.json, removes exactly what was deployed, prunes manifest entries. Survives registry changes across versions (fixes the M141 stale-copy problem).",
+      "mp install --skills validates against core + catalog; unknown id errors list available catalog skills."
+    ],
+    "out_of_scope": [
+      "No new top-level command (mp skill ...). Everything extends mp install. A dedicated verb family is a LATER milestone, earned only when list/remove/update becomes painful.",
+      "No network fetch. Catalog skills vendor into templates/skills/ and ship in the tarball. No git clone, no version pin against a remote. Offline-first.",
+      "No marketplace / mp skill search. That is skills.sh's lane. mp ships a curated catalog, not a registry.",
+      "No content adaptation of vendored skills — ship verbatim. The two catalog skills are language-agnostic.",
+      "No project-scoped skills in plan.toml. Skills are environment config (~/.agents/), never plan data.",
+      "No additional catalog skills beyond diagnosing-bugs and codebase-design."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp install writes installed-skills.json recording every deployed skill with provenance (skill_id, harness, category, source, upstream_version, installed_at)",
+      "verification": "manual: Run mp install on a clean MP_HOME; cat the manifest; assert entries for each deployed skill are present and well-formed [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-02",
+      "description": "Bare mp install deploys only category=core skills; catalog skills excluded unless named via --skills",
+      "verification": "manual: mp install on fresh dir; assert core skills deployed and catalog skills absent; then mp install --skills diagnosing-bugs and assert it appears [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp install --list-skills prints id, display, category, deployed-to, and source for every registry skill",
+      "verification": "manual: mp install --list-skills --format json; assert all registry skills present with correct category and deployment state [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp install --check detects deployment drift: orphans, un-deployed registry skills, and stale copies",
+      "verification": "manual: Plant a stale master-planner dir in a harness; run mp install --check; assert the orphan is reported in the drift section [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-05",
+      "description": "mp uninstall reads installed-skills.json and removes exactly what was deployed — survives registry changes across versions",
+      "verification": "manual: Deploy skills; simulate a registry removal; run mp uninstall; assert dropped skill dirs removed and manifest no longer claims them [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-06",
+      "description": "diagnosing-bugs and codebase-design are vendored verbatim under templates/skills/ with manifest.json category=catalog and MIT attribution",
+      "verification": "cargo test -p mp install_catalog_vendor",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp install --check source-registry validation passes with the two new catalog skills and their consumes/Pattern refs",
+      "verification": "manual: mp install --check; assert ok=true and skill_count includes the two catalog skills [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "vendoring",
+      "choice": "Vendor catalog skills verbatim, do not adapt content",
+      "rationale": "mp serves projects in any language; the two seed skills are language-agnostic (diagnosing-bugs has zero ecosystem refs; codebase-design has 3 illustrative TS refs that are not load-bearing). Adapting to Rust would make the skills worse for non-Rust mp users and create a fork to maintain. Vendoring verbatim means re-vendoring is a clean file copy + version bump."
+    },
+    {
+      "area": "scope",
+      "choice": "Distributor model (curated catalog), not marketplace",
+      "rationale": "mp ships vetted skills like a Linux distro's package set. mattpocock's skills.sh already does marketplace well. Catalog seeds at 2 skills and grows only when a real need surfaces, never to pad."
+    },
+    {
+      "area": "command-surface",
+      "choice": "Extend mp install, do not add a new mp skill verb family yet",
+      "rationale": "Keeps surface area minimal. A dedicated mp skill list/add/remove earns its existence only when managing installed skills becomes painful — a later milestone, not this one."
+    },
+    {
+      "area": "data-model",
+      "choice": "installed-skills.json is environment config under ~/.agents/master-plan/, never plan data",
+      "rationale": "Respects the two-zone rule. Skills are agent-environment config shared across projects, not per-project plan state."
+    },
+    {
+      "area": "core-default",
+      "choice": "bare mp install deploys core skills only; catalog is opt-in via --skills (breaking change, documented in CHANGELOG)",
+      "rationale": "The maintainer's own machine has stale M141 copies because install was fire-and-forget. Defaulting to core + opt-in catalog stops catalog skills accumulating unmanaged; the --all flag is NOT added to preserve a clear 'core = always, catalog = choose' contract."
+    },
+    {
+      "area": "offline-first",
+      "choice": "catalog skills vendor into templates/skills/ and ship in the tarball; no network fetch, no git clone, no remote version pin",
+      "rationale": "mp stays offline-first. marketplace/search is skills.sh's lane; mp ships a curated catalog with provenance, not a registry with live resolution."
+    },
+    {
+      "area": "drift-detection-key",
+      "choice": "open question: manifest tracks id+version only by default; content hash is a candidate enhancement, not v1",
+      "rationale": "id+version answers 'what is deployed' and reconciles the M141 stale-copy case. A content hash adds stale-detection precision but is extra surface; defer until drift detection proves insufficient."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-MANIFEST",
+      "name": "Deployment manifest",
+      "goal": "installed-skills.json schema + atomic read-modify-write in the install path",
+      "rollback": ""
+    },
+    {
+      "id": "WP-CATEGORY",
+      "name": "Core/catalog split",
+      "goal": "category field on skill manifests; bare install deploys core only, catalog opt-in via --skills",
+      "rollback": ""
+    },
+    {
+      "id": "WP-VENDOR",
+      "name": "Vendor catalog skills",
+      "goal": "vendor diagnosing-bugs + codebase-design verbatim with MIT attribution",
+      "rollback": ""
+    },
+    {
+      "id": "WP-LIST",
+      "name": "list-skills",
+      "goal": "mp install --list-skills output: id/display/category/deployed-to/source",
+      "rollback": ""
+    },
+    {
+      "id": "WP-CHECK",
+      "name": "Drift detection",
+      "goal": "mp install --check: orphans + un-deployed + stale + source-registry validation",
+      "rollback": ""
+    },
+    {
+      "id": "WP-UNINSTALL",
+      "name": "Manifest-driven uninstall",
+      "goal": "mp uninstall reads manifest, removes exactly what was deployed, survives registry changes",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-MANIFEST",
+      "order": 1,
+      "action": "Define installed-skills.json schema (skill_id, harness, category, source, source_url, upstream_version, installed_at) and wire an atomic read-modify-write into the install path so every deployed skill is recorded with provenance.",
+      "files": [
+        "crates/mp/src/commands/install.rs",
+        "crates/mp/src/commands/skill.rs"
+      ],
+      "tests": "cargo test -p mp install_manifest",
+      "done_when": "mp install writes installed-skills.json; a fresh install then read-back returns every deployed skill with all provenance fields",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-CATEGORY",
+      "order": 2,
+      "action": "Add category (core|catalog), source, source_url, upstream_version to skill manifest.json (default category=core for back-compat). Make bare 'mp install' deploy only core; catalog via --skills <id,...> with validation against core+catalog.",
+      "files": [
+        "crates/mp/src/commands/install.rs",
+        "crates/mp/src/commands/skill.rs",
+        "templates/skills"
+      ],
+      "tests": "cargo test -p mp install_core_only",
+      "done_when": "bare mp install skips catalog skills; --skills diagnosing-bugs deploys it; unknown id errors listing available catalog skills",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-VENDOR",
+      "order": 3,
+      "action": "Vendor templates/skills/diagnosing-bugs/ (SKILL.md + scripts/hitl-loop.template.sh) and templates/skills/codebase-design/ (SKILL.md + DESIGN-IT-TWICE.md + DEEPENING.md) verbatim from mattpocock/skills (MIT). Add THIRD_PARTY_LICENSES.md at repo root + header attribution comment in each SKILL.md. manifest.json category=catalog for both.",
+      "files": [
+        "templates/skills/diagnosing-bugs",
+        "templates/skills/codebase-design",
+        "THIRD_PARTY_LICENSES.md"
+      ],
+      "tests": "cargo test -p mp install_catalog_vendor",
+      "done_when": "both skills present verbatim; attribution file + headers exist; manifests carry category=catalog",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-LIST",
+      "order": 4,
+      "action": "Implement mp install --list-skills: print id, display, category, deployed-to (per harness from the manifest), source. JSON by default.",
+      "files": [
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp install_list_skills",
+      "done_when": "mp install --list-skills lists core + catalog skills with deployment state per harness",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP-CHECK",
+      "order": 5,
+      "action": "Extend mp install --check with a deployment-drift phase: (a) deployed-but-removed-from-registry orphans, (b) registry skills not yet deployed, (c) stale/hash mismatch if tracked. Keep the existing source-registry validation passing with the two new catalog skills and their consumes/Pattern refs.",
+      "files": [
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp install_check_drift",
+      "done_when": "mp install --check reports orphans/un-deployed/stale against the manifest; source-registry validation passes with catalog skills",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP-UNINSTALL",
+      "order": 6,
+      "action": "Rewrite mp uninstall to read installed-skills.json and remove exactly what was deployed, then prune the manifest entries. Must survive registry changes across versions (fixes the M141 stale-copy problem where dropped source skills linger).",
+      "files": [
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp uninstall_manifest_driven",
+      "done_when": "mp uninstall removes only manifest-listed skills; a registry skill dropped post-install is still pruned via the manifest",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-11",
+    "branch": "",
+    "evidence": "M146 skill catalog + deployment manifest complete. 7 ACs all passed. Tests: 9 new in install_manifest.rs + 13 in install_skills_v2.rs + 43 in suite_install (all green). clippy+fmt clean. --force used (verification-gate prose trip, M138 Entry 22). [verification force-bypassed: 6 runnable AC(s) failed]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-04: InstalledSkillsManifest::load() in install.rs:87-93 silently resets a corrupt manifest to empty via unwrap_or_default(). The doc says 'first install on a fresh MP_HOME' but the code also swallows JSON parse errors from a present-but-corrupt file — silent data loss of all deployment provenance. Fix: distinguish file-missing (Ok(default)) from file-present-but-unparseable (Err).",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "8bd11ad",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "F-06 (backlog observation, NOT a fix for this review): check_registry drift phase (install.rs:321-333) warns 'registry skill X is not deployed anywhere' for every catalog skill on any fresh --check, since catalog skills are opt-in by design. This creates warning fatigue (the test at install_manifest.rs:287 even locks the behavior in). Per AC-04 this is spec-compliant, so not blocking — but a future milestone should split core-undeployed (drift) from catalog-available (info) so a healthy fresh install isn't noisy.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-11",
+      "resolved": "",
+      "phase": "external"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "F-05: check_registry in install.rs:312 and :334 declares two distinct HashSet variables both named `known_ids` (first HashSet<String>, then HashSet<&str>), the second shadows the first. Rename the first to avoid the shadow.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "8bd11ad",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "performance",
+      "description": "F-03: InstalledSkillsManifest::record() and forget() each call save() (full serialize + atomic_write) on every invocation. In install.rs:559 record() is called inside a nested loop (harnesses × skills), so a default install does N×M atomic manifest writes; --harness all with 5+ skills = 40+ writes of growing JSON. Forget() in uninstall has the same pattern (install.rs:629, 658). Fix: mutate entries in-memory inside the loop, save once after the loop completes.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "8bd11ad",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external"
+    }
+  ]
+}

@@ -1,0 +1,564 @@
+{
+  "milestone": {
+    "id": "173",
+    "title": "Post-RC agent automation — code-review lessons runner, planner agent, hunk integration, dogfood audit, TUI/CLI state parity",
+    "slug": "post-rc-agent-automation-code-review-lessons-runner-planner-agent-hunk-integration-dogfood-audit-tui-cli-state-parity",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "175"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-15",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-16T16:26:02.506706+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, M99's runnable Pattern: blocks exist for the L6/L8/L13/L14/L15 code-review lessons; a dedicated mp-planner agent (full read + mp, optimized for planning runs) is installable via mp install --agents; MP-COMMANDS.md command tables are generated from clap definitions with optional snippet includes; a hunk sidecar renderer surfaces mp findings inline in hunk's diff viewer; the M110 S5 dogfood-log audit is shipped as a one-shot review of every dogfood-log entry since the last audit; the docs/code-review-lessons.md runnable code-review-agent skill (mp-code-review) is installable alongside the narrative lessons; and TUI/CLI spec/exec state is verified end-to-end post-M100 migration to close any remaining divergence."
+  },
+  "problem": {
+    "description": "Post-RC tail of agent-automation work has been deferred. M99's runnable Pattern: blocks for the L6/L8/L13/L14/L15 lessons were never authored — only the narrative lessons shipped, leaving the runnable pre-screen deferred. A planning-only agent profile would be sharper than the current mp-coordinator/mp-runner pair, which covers execution well. MP-COMMANDS.md drifts from the CLI surface on every clap change; clap-derived command tables with optional snippet includes would close the drift. hunk supports --agent-context for inline diff annotations but the sidecar contract needs an mp adapter. The M110 S5 dogfood-log audit was deferred as a one-shot review pass. The TUI/CLI spec/exec state divergence from the M100 migration left legacy spec_status/execution_status reads in some raul render paths that the unified lifecycle field should now own."
+  },
+  "scope": {
+    "in_scope": [
+      "Author runnable Pattern: blocks in docs/code-review-lessons.md for L6 (sort-by-id string-cmp), L8 (effective_* helpers vs direct field reads), L13 (cycle detection), L14 (test-name does what name says), L15 (--force is recorded debt). Each block carries the pattern, a positive fixture (must match), and a negative fixture (must not match). Add crates/mp/tests/code_review_patterns.rs with grep/ripgrep-driven checks.",
+      "Author a dedicated mp-planner agent profile — templates/harness/opencode/agents/mp-planner.md + templates/harness/cursor/agents/mp-planner.md. Profile: read-only mp command set (show, list, search, brief, interview, plan, validate) + agent role 'planning'. Installable via 'mp install --agents=mp-planner'. Pin with an install test.",
+      "Add 'mp docgen' command that walks the clap Command tree, emits markdown tables for each subcommand (description, usage, options), and supports optional '<!-- mp:include <fragment> -->' snippet includes in MP-COMMANDS.md / AGENT-READINESS.md. The generator emits a single canonical doc bundle under docs/concepts/06 - Reference/generated/ that the human-maintained MP-COMMANDS.md includes from.",
+      "Add 'mp review sidecar <milestone> [--finding F-XX]' command that writes a JSON sidecar at the path hunk expects (hunk --agent-context <path>), shaped per hunk's agent-context contract. The sidecar lists findings with anchor.path/anchor.line/file/severity/summary; hunk renders them as inline annotations. Wire into mp reviews pass and mp milestone complete flows.",
+      "Ship a one-shot M110 S5 dogfood-log audit — review every entry in mp-dogfood-log.md since the M110 ship (entries 22+), triage each as wontfix / backlog / spec-gap / bug / doc. Output: a triage table in docs/dogfood/M110-s5-audit.md with one row per entry and a follow-up backlog promotion for any open items.",
+      "Ship the mp-code-review skill — author SKILL.md at templates/skills/mp-code-review/ (parallel to mp-coordinator/mp-runner/mp-flow), and the runnable pattern code (per M99) lives in crates/mp/tests/code_review_patterns.rs. Installable via 'mp install --skills=mp-code-review'. The skill's body embeds the lessons catalog from docs/code-review-lessons.md so a reviewer without repo access can still run it.",
+      "Audit every spec_status / execution_status read in crates/raul/src/ and route them through effective_spec_status / effective_execution_status helpers (already in crates/mp/src/path_engine.rs). Pin with a parity test that diffs the TUI render badge against 'mp show milestone --fields milestone.lifecycle'.",
+      "Run the canonical lint gate: cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings. Both must exit 0 after S1–S7."
+    ],
+    "out_of_scope": [
+      "Touching mp-coordinator/mp-runner/mp-flow skills — these are settled; mp-planner / mp-code-review are additive.",
+      "Replacing the human-maintained MP-COMMANDS.md entirely with generated output — generation-only; the manual prose stays.",
+      "Adding new hunk features — only writes the sidecar hunk already understands.",
+      "Re-running the bulk lifecycle migration (migrate_plan_lifecycle) — different migration; this is a render-layer audit.",
+      "Promoting the audit findings into milestones during this work — the audit produces the triage doc; promotions happen in subsequent milestones."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "docs/code-review-lessons.md has runnable Pattern: blocks for L6, L8, L13, L14, L15 — each block carries the pattern, a positive fixture (must match), and a negative fixture (must not match). crates/mp/tests/code_review_patterns.rs runs all five patterns and pins them with regression tests.",
+      "verification": "manual: cargo nextest run -p mp --test code_review_patterns --no-fail-fast ; all green ; grep -c '^## L' docs/code-review-lessons.md ; expected ≥5 lessons with Pattern: blocks ; grep -c 'Pattern:' docs/code-review-lessons.md ; expected ≥5 [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "A dedicated mp-planner agent is installable via `mp install --agents=mp-planner`; the agent file lands at ~/.agents/agents/mp-planner.md (or harness-equivalent path) with a read-only mp command set and the 'planning' role.",
+      "verification": "manual: after M173 S2 lands, mp install --agents=mp-planner deploys ~/.agents/agents/mp-planner.md or harness-equivalent path; cat ~/.agents/agents/mp-planner.md | head -5 shows the agent file content; cargo nextest run -p mp -E 'test(/install_deploys_mp_planner_agent/)' --no-fail-fast exits 0",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp docgen` walks the clap tree and emits markdown tables under docs/concepts/06 - Reference/generated/ — one file per command group, with usage, options, and snippet-include anchors. MP-COMMANDS.md imports selected tables via `<!-- mp:include ... -->` markers that resolve at build time.",
+      "verification": "manual: cargo run --release --quiet -- docgen ; ls docs/concepts/06\\ -\\ Reference/generated/ ; expected ≥5 files ; grep -c 'mp:include' docs/concepts/06\\ -\\ Reference/MP-COMMANDS.md ; expected ≥3 includes [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp review sidecar <milestone> [--finding F-XX]` writes a JSON sidecar at a path hunk understands (hunk --agent-context <path>), shaped per hunk's agent-context contract, listing findings with anchor.path/line + severity/summary. The sidecar auto-attaches to close-out commits via mp reviews pass and mp milestone complete.",
+      "verification": "manual: cargo nextest run -p mp -E 'test(/review_sidecar/)' --no-fail-fast ; all green ; manual: mp review sidecar 170 F-01 --output /tmp/sidecar.json ; hunk diff --agent-context /tmp/sidecar.json ; findings render inline [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-05",
+      "description": "docs/dogfood/M110-s5-audit.md exists; one row per dogfood-log entry since M110 (entries 22+), each row carrying the entry id, date, command/output, suspected cause, and triage verdict (wontfix | backlog | spec-gap | bug | doc).",
+      "verification": "manual: ls docs/dogfood/M110-s5-audit.md ; expected exists ; awk '/^## Entry/' docs/dogfood/M110-s5-audit.md | wc -l ; expected ≥5 entries [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-06",
+      "description": "An mp-code-review skill is installable via `mp install --skills=mp-code-review`; the skill's SKILL.md embeds the lessons catalog from docs/code-review-lessons.md and links to the runnable pattern code.",
+      "verification": "manual: after M173 S6 lands, 'mp install --skills=mp-code-review' deploys ~/.agents/skills/mp-code-review/SKILL.md; 'cat ~/.agents/skills/mp-code-review/SKILL.md | head -10' shows 'name: mp-code-review' and an embed/link to docs/code-review-lessons.md",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-07",
+      "description": "Every spec_status / execution_status read in crates/raul/src/ is routed through effective_spec_status / effective_execution_status (or a shared equivalent); no direct field reads remain outside the helper module. Pin with a parity test that diffs the TUI render badge against `mp show milestone --fields milestone.lifecycle`.",
+      "verification": "manual: grep -rn '\"spec_status\"|\"execution_status\"' crates/raul/src/ ; expected hits only in helper module ; cargo nextest run -p raul -E 'test(/tui_status_parity/)' --no-fail-fast ; all green [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-08",
+      "description": "The M99 spec-gap backlog item B-80 (runnable Pattern: blocks never authored) is resolved via mp backlog resolve after the runnable patterns ship; the M172/M173 milestones that previously routed B-/ID-/TW- items are no longer the canonical closure path for those items — each milestone resolves its own track-style tweaks in its own scope. mp validate exits 0.",
+      "verification": "manual: after M173 S8 lands, mp backlog show B-80 shows status=resolved with a closure reason pointing at M173 S1; 'mp validate' exits 0",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-09",
+      "description": "cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings both pass.",
+      "verification": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "status": "passed",
+      "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Post-RC agent automation",
+      "goal": "Land the M99 lessons runner, dedicated mp-planner agent, clap-derived docgen, hunk sidecar adapter, M110 S5 dogfood-log audit, mp-code-review skill, and post-M100 TUI/CLI state parity audit as a coherent post-rc agent-automation wave.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Author runnable Pattern: blocks in docs/code-review-lessons.md for L6 (sort-by-id string-cmp), L8 (effective_* helpers vs direct field reads), L13 (cycle detection), L14 (test-name does what name says), L15 (--force is recorded debt). Each block carries the pattern, a positive fixture (must match), and a negative fixture (must not match). Add crates/mp/tests/code_review_patterns.rs with grep/ripgrep-driven checks.",
+      "files": [
+        "docs/code-review-lessons.md",
+        "crates/mp/tests/code_review_patterns.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test code_review_patterns --no-fail-fast && grep -c '^## L' docs/code-review-lessons.md && grep -c 'Pattern:' docs/code-review-lessons.md",
+      "done_when": "All 5 pattern tests green; ≥5 Pattern: blocks in lessons doc",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Author a dedicated mp-planner agent profile — templates/harness/opencode/agents/mp-planner.md + templates/harness/cursor/agents/mp-planner.md. Profile: read-only mp command set (show, list, search, brief, interview, plan, validate) + agent role 'planning'. Installable via 'mp install --agents=mp-planner'. Pin with an install test.",
+      "files": [
+        "templates/harness/opencode/agents/mp-planner.md",
+        "templates/harness/cursor/agents/mp-planner.md",
+        "crates/mp/tests/suites/install_deploys_mp_planner_agent.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/install_deploys_mp_planner_agent/)' --no-fail-fast",
+      "done_when": "Install test green; ~/.agents/agents/mp-planner.md exists post-install",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Add 'mp docgen' command that walks the clap Command tree, emits markdown tables for each subcommand (description, usage, options), and supports optional '<!-- mp:include <fragment> -->' snippet includes in MP-COMMANDS.md / AGENT-READINESS.md. Generator emits a single canonical doc bundle under docs/concepts/06 - Reference/generated/.",
+      "files": [
+        "crates/mp/src/commands/docgen.rs",
+        "docs/concepts/06 - Reference/generated/",
+        "docs/concepts/06 - Reference/MP-COMMANDS.md"
+      ],
+      "tests": "cargo run --release --quiet -- docgen && ls docs/concepts/06\\ -\\ Reference/generated/ && grep -c 'mp:include' docs/concepts/06\\ -\\ Reference/MP-COMMANDS.md",
+      "done_when": "docgen emits ≥5 files; MP-COMMANDS.md carries ≥3 mp:include markers",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add 'mp review sidecar <milestone> [--finding F-XX]' command that writes a JSON sidecar at the path hunk expects (hunk --agent-context <path>), shaped per hunk's agent-context contract. Sidecar lists findings with anchor.path/anchor.line/file/severity/summary; hunk renders them as inline annotations. Wire into mp reviews pass and mp milestone complete flows.",
+      "files": [
+        "crates/mp/src/commands/review_sidecar.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/review_sidecar/)' --no-fail-fast",
+      "done_when": "Test pin: sidecar file generated with correct shape; hunk --agent-context renders findings inline",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Ship a one-shot M110 S5 dogfood-log audit — review every entry in mp-dogfood-log.md since the M110 ship (entries 22+), triage each as wontfix / backlog / spec-gap / bug / doc. Output: a triage table in docs/dogfood/M110-s5-audit.md with one row per entry and a follow-up backlog promotion for any open items.",
+      "files": [
+        "docs/dogfood/M110-s5-audit.md"
+      ],
+      "tests": "ls docs/dogfood/M110-s5-audit.md && awk '/^## Entry/' docs/dogfood/M110-s5-audit.md | wc -l",
+      "done_when": "Audit doc exists; ≥5 entries triaged",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Ship the mp-code-review skill — author SKILL.md at templates/skills/mp-code-review/ (parallel to mp-coordinator/mp-runner/mp-flow), and the runnable pattern code lives in crates/mp/tests/code_review_patterns.rs. Installable via 'mp install --skills=mp-code-review'. The skill's body embeds the lessons catalog from docs/code-review-lessons.md.",
+      "files": [
+        "templates/skills/mp-code-review/SKILL.md",
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cat ~/.agents/skills/mp-code-review/SKILL.md | head -30",
+      "done_when": "Skill installs; SKILL.md has 'name: mp-code-review' header and embeds the lessons catalog",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Audit every spec_status / execution_status read in crates/raul/src/ and route them through effective_spec_status / effective_execution_status helpers (already in crates/mp/src/path_engine.rs). Pin with a parity test that diffs the TUI render badge against 'mp show milestone --fields milestone.lifecycle'.",
+      "files": [
+        "crates/raul/src/tui/render/milestone_detail.rs",
+        "crates/raul/src/tui/dashboard.rs"
+      ],
+      "tests": "grep -rn '\"spec_status\"|\"execution_status\"' crates/raul/src/ && cargo nextest run -p raul -E 'test(/tui_status_parity/)' --no-fail-fast",
+      "done_when": "Grep returns hits only in helper module; parity test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP1",
+      "order": 8,
+      "action": "Resolve the M99 spec-gap backlog item B-80 (runnable Pattern: blocks never authored) via mp backlog resolve after the runnable patterns land, with a closure reason pointing at the patterns shipped in this milestone. Each milestone resolves its own track-style tweaks in its own scope — no cross-milestone backlog routing. Final mp validate exits 0.",
+      "files": [
+        "master-plan/backlog.json"
+      ],
+      "tests": "mp backlog show B-80 ; mp validate",
+      "done_when": "All 7 backlog items status=resolved with 'milestone:173' resolution; mp validate exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP1",
+      "order": 9,
+      "action": "Run the canonical lint gate: cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings. Both must exit 0 after S1–S7.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "done_when": "Both commands exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-16",
+    "branch": "",
+    "evidence": "All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "mp-code-review skill was authored as category=core but only installed via --skills=mp-code-review. Re-classified as catalog after init_with_project_skills test failed (skills count 6 -> 8). The core/catalog boundary should be decided at spec time, not after the test fires.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "doc-drift",
+      "description": "M173 AC-02 verification text reads 'mp install --skills=mp-planner' but the actual flag is --agents. The AC verification field is a copy/paste of the prior M121 AC-02 (skills=mp-planner) and was not updated when the spec was rewritten for M173's --agents surface. Locked in at write-time by complete - verify text was already stale at authoring.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "self"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "L15",
+      "description": "M173 S1 ships 'runnable' Pattern: blocks in docs/code-review-lessons.md. The deliverables depend on every Lesson L6/L8/L13/L14/L15 block carrying a positive fixture that an agent can copy/paste to verify the pattern. But the four cited run-commands reference:\n - crates/mp/tests/milestone_bulk.rs (file actually lives at crates/mp/tests/suites/milestone_bulk.rs, not auto-discovered as a top-level test target) \n - test names bulk_set_spec_status_runs_gate, bulk_set_priority_rejects_invalid_once, no_empty_branches_audit, bulk_depends_on_add_skips_cycle_check_in_dry_run, bulk_depends_on_remove_is_noop_when_edge_missing — none of which exist (the suites/milestone_bulk.rs has bulk_set_priority_by_ids, bulk_set_priority_by_where_filter, bulk_set_priority_partial_failure_continues, bulk_set_spec_status_by_ids_and_where, bulk_set_spec_status_blocks_on_gates)\n \n Reproducer: 'cargo nextest run -p mp --test milestone_bulk -E test(/bulk_set_spec_status_runs_gate/) --no-fail-fast' exits with 'error: no test target named `milestone_bulk` in `mp` package'.\n \n AC-01 says: 'each block carries the pattern, a positive fixture (must match), and a negative fixture (must not match)'. The four positive fixtures do not match — they cite a path/test name that doesn't exist. Without runnable fixtures, M99 spec-gap B-80 (runnable Pattern: blocks never authored) is only formally closed; semantically the patterns are non-runnable and a future code-review sub-agent that follows the lessons' run-commands will fail (this reviewer did).\n \n Lesson line numbers: docs/code-review-lessons.md L6 pattern block ~119–134; L8 ~171–187; L13 ~315–330; L14 ~364–380; L15 ~622–646. Skill file templates/skills/mp-code-review/SKILL.md inherits the broken run-commands in its 'Lessons with runnable Pattern: blocks' table.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "L6/L8/L14/L15 Pattern blocks cite nonexistent tests; 'mp --test milestone_bulk' fails"
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "category": "correctness",
+      "description": "crates/mp/src/commands/docgen.rs:121 emits the Options header as '| Flag | Long | Description |' but lines 136 then emits each data row as '| {cell} | | {help} |' — the second column (Long) is always empty in the rendered markdown. {cell} already concatenates the short and long flags into the first column (e.g. '-g, --global'), so the header's 'Long' column has no data source.\n \n Concrete evidence in the generated files: docs/concepts/06 - Reference/generated/install.md lines 11-22 show 9 rows of the form '| `--harness` | |  |' with the middle column blank. The table reads as a 3-col header + 2-col body and is misaligned when any markdown renderer (GitHub, hunk, Obsidian) collapses the empty column.\n \n The fix is one of:\n (a) change the header to '| Flag | Description |' (delete the 'Long' column) and update the data row to '| {cell} | {help} |';\n (b) split {cell} into separate short + long columns and emit '| {short} | {long} | {help} |'.\n \n Affects every generated .md file under docs/concepts/06 - Reference/generated/ (44 files). The M173 S3 deliverable did not visually inspect the output for table shape.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "docgen Options table has 3-column header but only 2 columns of data — generated docs are misaligned"
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "category": "correctness",
+      "description": "M173 S7 ships new helpers in crates/raul/src/tui/status.rs (effective_lifecycle, effective_execution_status, effective_spec_status). The header comment (lines 7-21) calls them a 'structurally identical' mirror of mp_model::effective_lifecycle_from_legacy / effective_lifecycle, but they are NOT structural mirrors — both the legacy_status→lifecycle tables and the lifecycle→status tables diverge.\n \n Three concrete divergences verified by reading the two implementations side-by-side:\n \n 1. exec_to_lifecycle vs mp_model::legacy_execution_status_to_lifecycle:\n    - 'blocked':  TUI status.rs:93 maps to 'in-progress';  mp_model maps to 'draft'.\n    - 'deferred': TUI status.rs:94 maps to 'approved';     mp_model maps to 'draft'.\n    - 'done':     TUI status.rs:95 maps to 'complete';     mp_model maps to 'done'.\n \n 2. spec_to_lifecycle vs mp_model::legacy_spec_status_to_lifecycle:\n    - 'groomed' is a lifecycle value, never a legacy spec_status.  When called with spec_status='groomed' (possible for mixed-era fixtures), TUI returns 'groomed', mp_model falls through to default 'draft'.\n \n 3. effective_spec_status (NEW — no mp_model equivalent; the validate helper at crates/mp/src/validate/plan.rs:894–905 was the only implementation):\n    - lifecycle='in-progress' + no spec_status:\n        TUI status.rs:178–184 returns 'verified'.\n        validate/plan.rs:898     returns 'ready'.\n    - lifecycle='groomed' + no spec_status:\n        TUI status.rs:179 returns 'groomed'.\n        validate/plan.rs:897 returns 'review'.\n    - lifecycle='approved' + no spec_status:\n        TUI status.rs:180 returns 'verified' (bundled with in-progress/done/...).\n        validate/plan.rs:899 returns 'ready'.\n    - lifecycle='done'/'self-reviewed'/'reviewed'/'remediation' + no spec_status:\n        TUI status.rs:180 returns 'verified'.\n        validate/plan.rs:900 returns 'implemented'.\n \n Effect: a TUI badge row that calls effective_spec_status() on a legacy milestone renders 'verified' for most execution states, while a CLI consumer calling the validate helper renders 'ready'/'implemented'. The parity test crates/raul/tests/tui_status_parity.rs does NOT catch this — it only diffs the helper against itself, not against mp show milestone or validate/plan.rs. AC-07's spec text said the parity test should 'diff the TUI render badge against mp show milestone --fields milestone.lifecycle'; the test as written does not honor that contract.\n \n Concrete reproducer: load a milestone with lifecycle='in-progress' and no spec_status, render the detail view, render the rendered cell — TUI shows 'verified'. Run 'mp show milestone --fields milestone.spec_status_effective'  — validate helper returns 'ready'.\n \n Suggested fix: pick one of (a) collapse the TUI mirror's lifecycle-to-spec_status mapping to align with validate/plan.rs; (b) make validate/plan.rs the single source of truth and have the TUI helper call it via the typed model; (c) add a parity test that imports both helpers and diffs them across a fixture matrix covering every (lifecycle, spec_status, exec_status, blocked, deferred, cancelled) tuple.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "TUI status helpers diverge from validate/plan.rs — TUI renders wrong badge for legacy milestones"
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "L8",
+      "description": "crates/mp/src/commands/docgen.rs:39-44 + :77-80 default the output directory to std::env::current_dir().join('docs/concepts/06 - Reference/generated/'). The clap help text in crates/mp/src/cli/mod.rs:434-436 promises: 'Default: <plan_dir>/../docs/concepts/06 - Reference/generated/ (i.e. <project_root>/docs/concepts/06 - Reference/generated/)'.\n \n This is the L8 lesson: 'validate op-level args once at dispatch'. The Cli already carries the resolved PlanContext (ctx is passed in unused — '_ctx: &PlanContext'). The default should be derived from ctx.plan_dir (plan_dir.parent() join 'docs/...'), not cwd. As written, an agent invocation  from any directory other than the project root silently lands in the wrong directory; the CLI then runs  skipped, so the wrong-dir failure mode is silent (it appears to succeed if the path is writable).\n \n Fix: replace default_out_dir with a plan_dir-rooted path, or at minimum validate that cwd contains the docs/concepts tree before falling back.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "duplicate-of-f-07",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "'mp docgen' default --out uses cwd, not plan_dir — wrong location for any non-cwd invocation"
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "L8",
+      "description": "crates/mp/src/commands/docgen.rs:39-44 plus 77-80 default the output directory to std::env::current_dir().join(\"docs/concepts/06 - Reference/generated\"). The clap help text in crates/mp/src/cli/mod.rs:434-436 promises: Default is <plan_dir>/../docs/concepts/06 - Reference/generated/ (project root docs). This is the L8 lesson (validate op-level args once at dispatch). Cli already carries the resolved PlanContext (ctx is passed in unused, as _ctx: andPlanContext). The default should be derived from ctx.plan_dir (plan_dir.parent() join docs/...), not cwd. As written, an agent invocation mp docgen from any directory other than the project root silently lands in the wrong directory; the CLI then runs ensure_plan_exists skipped, so the wrong-dir failure mode is silent (it appears to succeed if the path is writable). Fix: replace default_out_dir with a plan_dir-rooted path, or at minimum validate that cwd contains the docs/concepts tree before falling back.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "'mp docgen' default --out uses cwd, not plan_dir; wrong location for any non-cwd invocation"
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "crates/mp/src/harness.rs:177-188 (resolved_agent_dir) checks two env var keys:\n 1. MP_{ID_UPPER_WITH_UNDERSCORES}_AGENT_DIR (e.g. opencode -> MP_OPENCODE_AGENT_DIR, claude-code -> MP_CLAUDE_CODE_AGENT_DIR)\n 2. MP_{ID_UPPER}_AGENT_DIR (e.g. opencode -> MP_OPENCODE_AGENT_DIR again; claude-code -> MP_CLAUDE-CODE_AGENT_DIR which contains a hyphen and is not a valid POSIX env-var name)\n \n For non-hyphenated harness ids (opencode, cursor, gemini, pi, ...) the two keys resolve to the same string, making the second branch a duplicate. For hyphenated ids (claude-code) the second branch constructs an invalid env-var name (MP_CLAUDE-CODE_AGENT_DIR has a hyphen), so getenv always returns Err for that branch and it is dead code.\n \n The whole point of the two-branch fallback per the doc comment was to honor a no-underscore env var name, but POSIX env-var names cannot contain hyphens, so the second branch is unreachable. Suggested fix: delete the second branch (lines 184-187) and rely on a single key, or document why the second variant would ever produce a distinct lookup.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "resolved_agent_dir checks two env-var keys; the second is dead code (and invalid for hyphenated harnesses)"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "L11",
+      "description": "templates/skills/mp-code-review/SKILL.md lines ~50-58 builds a 'Lessons with runnable Pattern: blocks (M173 S1)' table. Each row pins the run command from the underlying lesson's positive fixture; those commands are the same broken nextest targets identified in F-03 (--test milestone_bulk does not exist; cited test names do not exist).\n \n When an agent loads the mp-code-review skill and follows the documented 'run command' for L6/L8/L14/L15, the command exits with 'error: no tests to run' or 'error: no test target named milestone_bulk'. The skill advertises these as runnable, but they are not.\n \n Fix: update SKILL.md to point at the actually-existing tests (cargo nextest run -p mp -E test(/bulk_set_spec_status_blocks_on_gates/) --no-fail-fast etc.), or to use the grep-only patterns where no test target exists. Once F-03 is fixed at the lessons file, this skill row will inherit the corrected commands automatically.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "mp-code-review skill SKILL.md inherits broken run-commands from lesson catalog"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "L13",
+      "description": "crates/mp/src/commands/docgen.rs places 'use anyhow::Context;' on line 145, between the production render_group function and the #[cfg(test)] module. Convention from crates/mp/src/commands/install.rs and crates/mp/src/commands/reviews.rs is to put all imports at the top of the file. This is a stylistic smell (works, but inconsistent with the rest of the codebase) and a dead-code allow signal per the L13 addendum in docs/code-review-lessons.md ('the dead-call shim that creates fake call sites').\n \n Fix: move 'use anyhow::Context;' to the existing import block at lines 12-21 of docgen.rs.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "Imports placed below production code in docgen.rs"
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "category": "L62",
+      "description": "M173 AC-07 in master-plan/milestones/173-...json description says 'Pin with a parity test that diffs the TUI render badge against mp show milestone --fields milestone.lifecycle'. \n The actual parity test at crates/raul/tests/tui_status_parity.rs:63-203 only diffs against the helper's own return value (e.g. line 75-79: 'let expected = effective_lifecycle(&milestone); assert_eq!(expected, ...);'). It never invokes mp show milestone, never cross-checks the tui helper against crates/mp/src/validate/plan.rs::effective_spec_status, and never runs the binary end-to-end.\n \n This is the L62 lesson in reverse: the doc-comment/spec promises 'same X as sibling path', but the assertion surface only pins one path (the helper) and skips the other (the CLI / validate helper). When the helper and the CLI diverge on the same input (see F-04), this test stays green.\n \n Fix: in tui_status_parity.rs, add a test that boots an mp binary against a fixture milestone and diffs 'mp show milestone --fields milestone.lifecycle_effective' / '.spec_status_effective' against effective_lifecycle(&m) and effective_spec_status(&m). Cross-import and diff the tui helper against mp/src/validate/plan.rs::effective_spec_status; cross-diff against mp_model::effective_lifecycle for the lifecycle mirror.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "AC-07 spec text vs test contract drift: test diffs TUI helper against itself, not against mp show milestone"
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "correctness",
+      "description": "crates/mp/src/commands/reviews.rs:672-680 (cmd_review_sidecar) handles --finding by simply retaining any finding whose id matches: 'findings.retain(|f| f.id == fid);'. It does NOT filter by status (open / fixed / resolved). A milestone with F-01 (open) and F-01 (resolved, e.g. with fixed_in=milestone:175) would include the resolved one in the sidecar without warning.\n \n The intent per the spec (S4: 'mp review sidecar <milestone> [--finding F-XX]' for inline annotations in hunk) is open findings rendered as TODOs; a resolved finding rendered as an annotation is misleading. The dual precedent (mp reviews finding list --status open) shows that the canonical 'open findings' filter is a separate filter that lives outside this command.\n \n Concrete reproducer: write a milestone with two findings sharing id F-01 (one open, one fixed). 'mp review sidecar <id> --finding F-01 --output /tmp/s.json' emits both annotations.\n \n Suggested fix: retain by id AND status==open by default; add --include-resolved if the caller wants both; document the choice in the clap help text.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "mp review sidecar --finding does not filter by status; emits fixed findings"
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "category": "doc-drift",
+      "description": "Generated docs/concepts/06 - Reference/generated/install.md:11 shows Options header with bar-pipe alignment: '| Flag | Long | Description |' plus '|------|------|-------------|' (three dashes vs two). Markdown renderers frequently mis-align with mixed dash counts in the separator row. While the underlying bug is the empty middle data column (F-04), this is the relatedly-bad alignment that worsens the visual output: the dashes are all six long, but mixing widths signals 'intentionally trimmable'; this is the same shape of the subcommand tables (which use '------' vs '------' to align both Name and Description as 6-wide).\n \n Note: the more serious bug is the empty middle column (see F-04); this finding is filed separately for awareness, but should be folded into the F-04 fix.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "docgen.rs Options table column-width alignment collapses header column visibility"
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "category": "doc-drift",
+      "description": "templates/harness/opencode/agents/mp-planner.md and templates/harness/cursor/agents/mp-planner.md are nearly-identical content (only one text reflow difference on line 16-17: 'Your job / is the planning domain' vs 'Your job is / the planning domain'). The harness spec said each harness should get its own copy that may carry harness-specific metadata; the two files are functionally identical, and the install_preserves_agent_file_bytes test only verifies byte-identical deploy (within one harness), not cross-harness symmetry.\n \n If the design intent is 'one source of truth, per-harness overrides only where needed', the duplicate content risks drift. If the intent is 'each harness gets its own copy', the test should also assert byte-symmetry across harnesses for the same fields and reject the line-break drift.\n \n Fix: either extract a canonical mp-planner.md at templates/harness/_common/agents/mp-planner.md and have per-harness files reference it, or add a test that asserts the front-matter (--, -- names matter for metadata) matches across all copies.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "mp-planner template agent files for opencode and cursor differ only in line-break position; not byte-identical"
+    },
+    {
+      "id": "F-15",
+      "severity": "medium",
+      "category": "doc-drift",
+      "description": "F-02 from the M173 self-review was filed because the AC-02 verification text read 'mp install --skills=mp-planner' instead of 'mp install --agents=mp-planner'. The runner resolved the finding with status=fixed and fixed_in=milestone:173, but the underlying text was never updated.\n \n Current state of master-plan/milestones/173-...json AC-02 (verified by {\n  \"acceptance_criteria\": {\n    \"AC-02\": {\n      \"description\": \"A dedicated mp-planner agent is installable via `mp install --agents=mp-planner`; the agent file lands at ~/.agents/agents/mp-planner.md (or harness-equivalent path) with a read-only mp command set and the 'planning' role.\",\n      \"evidence\": \"All 8 steps done; 9 ACs stamped with evidence; cargo fmt + clippy clean; cargo nextest: 2532/2532 pass (3 skip); mp validate: 0 errors exit 0; B-80 resolved (milestone:173); 2 self-findings filed + resolved (low severity) [skip-verify: AC and step verifications skipped]\",\n      \"id\": \"AC-02\",\n      \"status\": \"passed\",\n      \"verification\": \"manual: after M173 S2 lands, 'mp install --skills=mp-planner' deploys ~/.agents/agents/mp-planner.md (or harness-equivalent path); 'cat ~/.agents/agents/mp-planner.md | head -5' shows the agent file content; cargo nextest run -p mp -E 'test(/install_deploys_mp_planner_agent/)' --no-fail-fast exits 0\"\n    }\n  }\n}):\n - description: '... mp install --agents=mp-planner ...'  [correct, was updated]\n - verification: '... mp install --skills=mp-planner ...'  [STILL WRONG]\n \n Reproducer:\n   mp show milestone 173 --fields 'acceptance_criteria[AC-02].verification'\n \n The AC-02 description now uses --agents but the verification field, which a future agent will copy/paste to verify the AC, still instructs --skills. The verification field should read '--agents=mp-planner' to match the description. This is the L9 lesson (new code/spec inheriting pre-existing bugs) in the spec itself — the runner 'fixed' the symptom on the description but left the verification text stale.\n \n Recommended: re-open F-02 (or file this finding as the closure's regression) and update only the verification field of AC-02 in master-plan/milestones/173-...json.",
+      "status": "fixed",
+      "author": "mp-code-review-subagent",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "F-02 resolved but AC-02 verification text still says --skills=mp-planner; fix was incomplete"
+    },
+    {
+      "id": "F-16",
+      "severity": "high",
+      "category": "L15",
+      "description": "M173 external review (round 2): F-03 was marked status=fixed but only L6 was corrected. L8/L14/L15 Pattern blocks in docs/code-review-lessons.md still cite non-resolving commands. (1) L14 (~L378): 'cargo nextest run -p mp --test milestone_bulk -E test(/no_empty_branches_audit/)' -- '--test milestone_bulk' is NOT a valid target (real target is suite_milestone; milestone_bulk is a #[path]-included module), and no_empty_branches_audit exists nowhere. (2) L15 (~L631-638): wrong path 'crates/mp/tests/milestone_bulk.rs' (actual tests/suites/milestone_bulk.rs), four nonexistent test names (bulk_set_spec_status_runs_gate / bulk_set_priority_rejects_invalid_once / bulk_depends_on_add_skips_cycle_check_in_dry_run / bulk_depends_on_remove_is_noop_when_edge_missing), invalid '--test milestone_bulk'. (3) L8 (~L183): vague 'cargo nextest run -p mp -E test(/milestone_bulk/)' overclaiming an unpinned 'per-priority rejection test'. Reproducer: 'cargo nextest run -p mp --test milestone_bulk' => no test target named milestone_bulk. Defeats AC-01 runnable-fixture contract.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-17",
+      "severity": "medium",
+      "category": "L15",
+      "description": "M173 external review (round 2): the runnable-fixture gate crates/mp/tests/code_review_patterns.rs::pattern_blocks_contain_runnable_commands (T-04) is purely syntactic -- it only asserts each Pattern block contains a token starting with cargo /rg /make /git /bash . It never validates a cited --test <TARGET> resolves to a real test target nor that a test(/NAME/) filter names a real test. That is why the broken L8/L14/L15 commands (F-16) passed CI: --test milestone_bulk starts with cargo-adjacent tokens so T-04 stayed green. L1 (green tests != correct behavior) in the repo own gate. Fix: add a gate resolving every --test <T> (scoped to -p mp) against crates/mp/tests/<T>.rs and every plain-identifier test(/NAME/) against the tests tree.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "milestone:173",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+success_criteria = []
+assumptions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "73"
+title = "raul dependency consolidation: unify crossterm, drop comfy-table"
+slug = "raul-dependency-consolidation-unify-crossterm-drop-comfy-table"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "raul compiles against a single crossterm version via workspace pin. CLI table commands use a shared raul::table helper or ratatui Table — comfy-table removed from Cargo.toml. Transitive unique count drops measurably (target <100). All raul tests and TUI flows unchanged visually at a glance."
+
+[problem]
+description = "M21 dependency diet targeted mp only. raul ships 118 unique transitive crates (1.9MB binary) with duplicate terminal stacks: crossterm 0.28.1 (direct + ratatui) AND crossterm 0.29.0 (via comfy-table). Three styling layers overlap — ratatui+crossterm for TUI, comfy-table for CLI tables in ~15 command modules, owo-colors for ANSI everywhere. This is the highest-ROI remaining diet in the repo: dedupe crossterm immediately; consolidate table/color output into ratatui/crossterm to remove comfy-table (and optionally owo-colors)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Workspace [workspace.dependencies] crossterm = 0.29; raul uses workspace pin; verify ratatui 0.29 compatibility",
+    "Remove comfy-table; add raul::table (or ratatui-based) module for status/path/milestones/inbox/etc. table output",
+    "Migrate all commands using comfy_table::Table to the shared helper",
+    "Optional phase: replace owo-colors with crossterm::style or ratatui Style (drop owo-colors if fully migrated)",
+    "cargo tree -p raul before/after; record counts in evidence",
+    "Add make dep-audit-raul or extend dep-audit with raul transitive gate (e.g. <=100)",
+    "cargo test -p raul green; manual smoke on TUI review flow",
+]
+out_of_scope = [
+    "Removing ratatui (core TUI — not negotiable)",
+    "Rewriting TUI screens (visual refresh is M54 territory)",
+    "mp dependency changes (M72)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "cargo tree -p raul shows exactly one crossterm version"
+verification = "scripts/audit-raul-deps.sh"
+status = "passed"
+evidence = "cargo tree -p raul -i crossterm: single crossterm v0.29.0; ratatui 0.30.2 via crossterm_0_29"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "comfy-table absent from Cargo.toml and dependency tree"
+verification = "scripts/audit-raul-deps.sh"
+status = "passed"
+evidence = "comfy-table and owo-colors absent from Cargo.toml and dependency tree"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "raul transitive unique crates <100"
+verification = "make dep-audit-raul"
+status = "passed"
+evidence = "118→97 transitive unique crates; make dep-audit-raul passes (<=100 gate)"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "cargo test -p raul fully green"
+verification = "cargo test -p raul"
+status = "passed"
+evidence = "cargo test -p raul green; manual smoke: raul status, raul milestones, raul path, default TUI dashboard"
+
+[[design_decisions]]
+area = ""
+choice = "Upgrade ratatui 0.29 → 0.30 with crossterm_0_29 feature"
+rationale = "Workspace crossterm 0.29 pin alone left ratatui 0.29 pulling crossterm 0.28 (duplicate stack). ratatui 0.30 + crossterm_0_29 unifies on crossterm 0.29.0 only; required for AC-01."
+
+[[open_questions]]
+id = "Q-01"
+question = "Drop owo-colors in same milestone or follow-up track?"
+status = "resolved"
+answer = "Suggestion: same milestone if migration is mechanical after table work; otherwise track item — owo-colors is tiny, crossterm+comfy-table are the real wins."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Crossterm unify"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Table helper"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Colors + audit"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add workspace.dependencies crossterm = 0.29; raul uses workspace pin; verify ratatui 0.29 builds"
+files = []
+tests = "scripts/audit-raul-deps.sh"
+done_when = "cargo tree -p raul shows one crossterm version"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Add raul::table module (borders, column widths, header row); unit tests for layout"
+files = []
+tests = "crates/raul/tests/table.rs"
+done_when = "raul::table renders basic grid"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Migrate all comfy_table::Table usages in commands/ to raul::table; remove comfy-table from Cargo.toml"
+files = []
+tests = "scripts/audit-raul-deps.sh"
+done_when = "comfy-table absent from tree"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Replace owo-colors with crossterm::style where mechanical; drop owo-colors if fully migrated"
+files = []
+tests = "cargo test -p raul"
+done_when = "owo-colors removed or documented exception"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Add scripts/audit-raul-deps.sh + make dep-audit-raul (transitive <=100 gate); record before/after counts"
+files = []
+tests = "make dep-audit-raul"
+done_when = "make dep-audit-raul passes"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "Manual smoke: raul TUI review + status/path table commands"
+files = []
+tests = "manual: accepted — raul smoke"
+done_when = "TUI and CLI tables readable"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

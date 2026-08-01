@@ -1,0 +1,48 @@
+{
+  "workflow": {
+    "profile": "hybrid",
+    "artifacts": {
+      "brief": false,
+      "backlog": false,
+      "milestones": "session",
+      "tracks": true,
+      "ideas": true,
+      "decisions": true
+    },
+    "plan": {
+      "in_repo": false,
+      "location": ".mp"
+    },
+    "gates": {
+      "strictness": "relaxed"
+    },
+    "session": {
+      "auto_bind_branch": true,
+      "archive_on_merge": true
+    }
+  },
+  "archive": {
+    "auto_purge_days": 0,
+    "archive_on_milestone_delete": true,
+    "archive_on_track_cancel": true
+  },
+  "git": {
+    "auto_commit": false
+  },
+  "next": {
+    "prefer": "track"
+  },
+  "planning": {
+    "require_min_out_of_scope": 1,
+    "require_min_acceptance_criteria": 1
+  },
+  "keybinds": {},
+  "agent": {
+    "automation": {
+      "commit_after_execute": false,
+      "push_after_review": false,
+      "branch_strategy": "current",
+      "auto_remediate": "none"
+    }
+  }
+}

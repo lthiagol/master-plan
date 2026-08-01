@@ -1,0 +1,215 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "31"
+title = "Backlog execution"
+slug = "backlog-execution"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-26"
+updated = "2026-06-27"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Deliver 6 deferred CLI features from the active backlog, covering brownfield bootstrap and CLI ergonomics."
+
+[problem]
+description = "Six backlog items (B-30 through B-35) accumulated across the M-series. They add new CLI surface that users expect: brownfield import flows, session cheat sheets, and step/path ergonomics."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "B-30: mp brief import --from-file handoff.md — bootstrap brief from existing handoff doc",
+    "B-31: mp milestone create --from-handoff — extract phases into milestone stubs",
+    "B-32: mp skill context --format markdown — session-tailored cheat sheet from live plan state",
+    "B-33: step add --after S4 — ergonomic step ordering helper",
+    "B-34: Infer depends_on_steps on decompose from work-package order",
+    "B-35: Path grooming/coverage flags (--include grooming, --prioritize coverage, --include coverage-gaps)",
+]
+out_of_scope = [
+    "P4/P5 deferred items (B-17 through B-29) — portfolio dashboard, sprint iterations, multi-writer locks",
+    "GUI/dashboard work",
+    "Backwards-incompatible CLI changes",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp brief import --from-file <path> creates a brief from a handoff markdown file"
+verification = "cargo test -p mp --test brief_import"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone create --from-handoff parses handoff phases into milestone stubs"
+verification = "cargo test -p mp --test milestone_from_handoff"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp skill context --format markdown outputs a session cheat sheet reflecting current plan state"
+verification = "cargo test -p mp --test skill_context"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp step add --after <id> inserts a step at the correct position and renumbers siblings"
+verification = "cargo test -p mp --test step_after"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp milestone decompose infers depends_on_steps from work-package ordering"
+verification = "cargo test -p mp --test decompose_depends"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "mp path honors --include grooming, --prioritize coverage, --include coverage-gaps flags"
+verification = "cargo test -p mp --test path_flags"
+status = "passed"
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Main"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Path engine flags"
+goal = "Add grooming and coverage flags to mp path"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "CLI ergonomics"
+goal = "Improve step ordering, decompose inference, and session cheat sheets"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement mp milestone create --from-handoff to extract phases into milestone stubs"
+files = []
+tests = "cargo test -p mp --test milestone_from_handoff"
+done_when = "mp milestone create --from-handoff parses handoff phases into milestone stubs"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP3"
+order = 2
+action = "Add --include grooming, --prioritize coverage, --include coverage-gaps flags to mp path"
+files = []
+tests = "cargo test -p mp --test path_flags"
+done_when = "mp path honors --include grooming, --prioritize coverage, --include coverage-gaps"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Implement mp brief import --from-file to bootstrap brief from handoff markdown"
+files = []
+tests = "cargo test -p mp --test brief_import"
+done_when = "mp brief import --from-file parses handoff markdown and populates brief.toml"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Implement mp skill context --format markdown for session-tailored cheat sheet"
+files = []
+tests = "cargo test -p mp --test skill_context"
+done_when = "mp skill context --format markdown outputs plan-aware cheat sheet"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Implement step add --after <id> ergonomic ordering helper"
+files = []
+tests = "cargo test -p mp --test step_after"
+done_when = "step add --after inserts and renumbers siblings correctly"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Infer depends_on_steps on decompose from work-package order"
+files = []
+tests = "cargo test -p mp --test decompose_depends"
+done_when = "decompose sets depends_on_steps from WP ordering"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-27"
+branch = ""
+evidence = "All 6 steps implemented and tested. 22 new tests pass across 6 test files."
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

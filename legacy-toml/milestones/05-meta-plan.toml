@@ -1,0 +1,89 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "05"
+title = "Meta master-plan"
+slug = "meta-plan"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["04"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Track toolkit work in repo master-plan/; update handoff."
+
+[problem]
+description = "Work tracked only in handoff.md — dogfood the product."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "master-plan/",
+    "milestones",
+    "backlog",
+    "decisions",
+]
+out_of_scope = [
+    "release CI",
+    "npm publish",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp status reflects plan"
+verification = "mp status --format json"
+status = "passed"
+evidence = "meta plan bootstrapped; handoff points to master-plan/"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "meta plan bootstrapped; handoff points to master-plan/"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

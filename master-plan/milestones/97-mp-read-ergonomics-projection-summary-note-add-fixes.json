@@ -1,0 +1,481 @@
+{
+  "milestone": {
+    "id": "97",
+    "title": "mp read ergonomics — projection, summary, note add fixes",
+    "slug": "mp-read-ergonomics-projection-summary-note-add-fixes",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-03",
+    "updated": "2026-07-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Agents read mp state with `mp <cmd> --fields / --summary` consistently across every read command (unknown path is a hard error everywhere, never silently ignored) and never reach for python3 -c for common projections. `mp note add` accepts `--body @file` / `@-` and errors clearly on invalid destinations. `mp milestone create --json @file` round-trips `design_decisions` (mirroring acceptance_criteria); `update` stays fragment-first and keeps rejecting the array."
+  },
+  "problem": {
+    "description": "Verified audit of the current CLI: `--fields` is already honored by mp status, mp list milestones, mp reviews finding list, and mp reviews lifecycle (unknown path errors), but silently IGNORED by mp path and mp inbox — so the surface is inconsistent and an unknown path can pass silently. `--summary` exists on none of status / reviews finding list / reviews lifecycle. `mp note add` is undocumented in the master-planner skill, only accepts inline bodies (shell-backtick mangling on markdown), and has no @file/@- escape. `mp milestone create --json` silently drops a `design_decisions` array because CreateMilestoneInput has no such field (serde ignores unknown keys); `mp milestone update --json` correctly rejects it today with a hint to `mp milestone design-decision add`. All four frictions surfaced across the M93/M94/M95 sessions and the M97/M98/M99 creation pass."
+  },
+  "scope": {
+    "in_scope": [
+      "Close --fields gaps: mp path and mp inbox must honor --fields and error on unknown paths (parity with mp show milestone / status / list milestones / reviews commands)",
+      "Add --summary to: mp status (headline metrics, no path block), mp reviews finding list (open/fixed/total counts only), mp reviews lifecycle (bucket counts only)",
+      "--fields parity regression test: unknown path is a hard error across ALL read commands (status, path, inbox, list milestones, reviews finding list, reviews lifecycle, show milestone)",
+      "mp note add --body @<path> reads body from file; --body @- reads from stdin (avoids shell-backtick mangling of inline markdown)",
+      "mp note add --to <invalid> errors with the list of valid destinations",
+      "Add design_decisions field to CreateMilestoneInput so mp milestone create --json @file round-trips the field instead of silently dropping it (mirrors how acceptance_criteria is accepted at create time)",
+      "AGENT-READINESS.md and master-planner SKILL.md updated with the --fields parity, --summary modes, and --body @file/@- syntax",
+      "Integration tests in crates/mp/tests/read_ergonomics.rs and crates/mp/tests/note_add.rs"
+    ],
+    "out_of_scope": [
+      "Backward-compat shims for python3 -c patterns (callers can migrate)",
+      "Field projection on write commands (only reads need it)",
+      "design_decisions round-trip via mp milestone update --json — stays fragment-first (mp milestone design-decision add), consistent with acceptance_criteria being a guarded document array on update (M93 discipline)",
+      "Bulk read endpoints (covered by M94 bulk ops for writes)",
+      "JSON streaming / NDJSON mode (not needed at this size)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp path --fields '<dotted>' projects the slice; an unknown path is a hard error (was silently ignored)",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp inbox --fields '<dotted>' projects the slice; an unknown path is a hard error (was silently ignored)",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp status --summary returns headline metrics without the path block / suggested_path nesting",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp reviews finding list <m> --summary returns {open, fixed, total} counts without parsing the results array",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-05",
+      "description": "mp reviews lifecycle --summary returns [{review_state, count}] bucket list only",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-06",
+      "description": "Parity regression: an unknown --fields path exits non-zero on every read command (status, path, inbox, list milestones, reviews finding list, reviews lifecycle, show milestone)",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp note add --title X --body @file.txt reads the body from the file path",
+      "verification": "crates/mp/tests/note_add.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-08",
+      "description": "mp note add --body @- reads the body from stdin",
+      "verification": "crates/mp/tests/note_add.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-09",
+      "description": "mp note add --to <invalid> errors clearly listing valid destinations",
+      "verification": "crates/mp/tests/note_add.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-10",
+      "description": "mp milestone create --json @file with a design_decisions array produces an on-disk milestone whose design_decisions field is populated (not silently dropped) — mirrors acceptance_criteria at create time",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-11",
+      "description": "mp milestone update --json with design_decisions is still rejected with the hint pointing to mp milestone design-decision add (behavior locked; document arrays stay fragment-first on update)",
+      "verification": "crates/mp/tests/read_ergonomics.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-12",
+      "description": "AGENT-READINESS.md and master-planner SKILL.md document the --fields parity, --summary modes, and --body @file/@- syntax",
+      "verification": "manual: doc review",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    },
+    {
+      "id": "AC-13",
+      "description": "cargo test -p mp exits 0; existing read commands are unchanged for callers that do not pass --fields",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "design_decisions round-trips through create/update JSON inputs",
+      "rationale": "CreateMilestoneInput and UpdateMilestoneInput both accept the design_decisions array now. The on-disk milestone JSON shows the field populated instead of silently dropping it. Discovered during M97/M98/M99 creation — the input JSON had design_decisions entries but the on-disk file ended up with the field missing. The follow-on path (mp milestone design-decision add) still works for callers who want to add decisions one at a time."
+    },
+    {
+      "area": "",
+      "choice": "design_decisions round-trips at create time only; update stays fragment-first (supersedes the earlier past-tense wording)",
+      "rationale": "CreateMilestoneInput gains the design_decisions field so mp milestone create --json @file populates it (mirrors acceptance_criteria, which is also accepted at create time). The update path deliberately KEEPS rejecting design_decisions with a hint to mp milestone design-decision add, consistent with M93's fragment-first rule for document arrays (acceptance_criteria and steps are likewise guarded on update). The earlier DD text ('both accept the design_decisions array now') was aspirational and is corrected here: only create round-trips; update does not."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Read ergonomics: --fields parity + --summary",
+      "goal": "Close --fields gaps on path/inbox; add --summary to status/reviews finding list/reviews lifecycle; parity regression test (AC-01..AC-06)",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "note add @file / @- / --to validation",
+      "goal": "mp note add reads body from @file and @- stdin; invalid --to errors listing destinations (AC-07..AC-09)",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "design_decisions create round-trip + update lock",
+      "goal": "CreateMilestoneInput gains design_decisions (create round-trips); update stays fragment-first and keeps rejecting it (AC-10, AC-11)",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Docs + full suite",
+      "goal": "AGENT-READINESS + master-planner skill document new flags; cargo test -p mp green, no regression on callers without --fields (AC-12, AC-13)",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Wire --fields projection into mp path (honor dotted paths; unknown path is a hard error, parity with show milestone)",
+      "files": [
+        "crates/mp/src/commands/path.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "mp path --fields projects the slice and errors on unknown paths",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Wire --fields projection into mp inbox (unknown path hard error)",
+      "files": [
+        "crates/mp/src/commands/inbox.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "mp inbox --fields projects the slice and errors on unknown paths",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Add --summary to mp status (headline metrics only, no path block / suggested_path nesting)",
+      "files": [
+        "crates/mp/src/commands/status.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "mp status --summary returns compact headline metrics",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add --summary to mp reviews finding list (returns {open, fixed, total})",
+      "files": [
+        "crates/mp/src/commands/reviews.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "mp reviews finding list <m> --summary returns open/fixed/total counts",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Add --summary to mp reviews lifecycle (returns [{review_state, count}])",
+      "files": [
+        "crates/mp/src/commands/reviews.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "mp reviews lifecycle --summary returns bucket counts only",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Parity regression: unknown --fields path exits non-zero on every read command",
+      "files": [
+        "crates/mp/tests/read_ergonomics.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "one parity test asserts unknown-path failure across status, path, inbox, list milestones, reviews finding list, reviews lifecycle, show milestone",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "mp note add: support --body @<path> (read body from file) and --body @- (read from stdin); --to <invalid> errors listing valid destinations",
+      "files": [
+        "crates/mp/src/commands/note.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/note_add.rs",
+      "done_when": "@file and @- stdin both populate the body; an invalid --to exits non-zero with the destination list",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Add explicit test coverage for note add stdin path (@-) separate from @file",
+      "files": [
+        "crates/mp/tests/note_add.rs"
+      ],
+      "tests": "crates/mp/tests/note_add.rs",
+      "done_when": "dedicated @- stdin test passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP2",
+      "order": 9,
+      "action": "Add explicit test that note add --to <invalid> errors with the valid destination list",
+      "files": [
+        "crates/mp/tests/note_add.rs"
+      ],
+      "tests": "crates/mp/tests/note_add.rs",
+      "done_when": "invalid --to test exits non-zero and lists destinations",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Add design_decisions field to CreateMilestoneInput so mp milestone create --json @file round-trips it (mirrors acceptance_criteria at create time)",
+      "files": [
+        "crates/mp/src/milestone.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "on-disk milestone shows design_decisions populated from create input",
+      "status": "done",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP3",
+      "order": 11,
+      "action": "Lock the update path: mp milestone update --json with design_decisions still rejected with the hint to mp milestone design-decision add",
+      "files": [
+        "crates/mp/tests/read_ergonomics.rs"
+      ],
+      "tests": "crates/mp/tests/read_ergonomics.rs",
+      "done_when": "update rejection test passes (behavior unchanged, fragment-first preserved)",
+      "status": "done",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP-close",
+      "order": 12,
+      "action": "Update AGENT-READINESS.md and master-planner SKILL.md with the --fields parity, --summary modes, and --body @file/@- syntax",
+      "files": [
+        "docs/concepts/01 - Agent Integration/AGENT-READINESS.md",
+        "templates/skills/master-planner/SKILL.md"
+      ],
+      "tests": "manual: doc review",
+      "done_when": "both docs describe the new flags and the anti-pattern (external tools for mp reads)",
+      "status": "done",
+      "covers_ac": [
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP-close",
+      "order": 13,
+      "action": "Run full suite; confirm no regression on callers that do not pass --fields/--summary",
+      "files": [
+        "crates/mp"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "cargo test -p mp exits 0; existing read commands unchanged without the new flags",
+      "status": "done",
+      "covers_ac": [
+        "AC-13"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-03",
+    "branch": "",
+    "evidence": "cargo test -p mp green (10 read_ergonomics, 3 note_add, 5 json_shape_baseline); make test-scenarios green; --fields parity on path/inbox, --summary on status/reviews finding list/reviews lifecycle, note add @file/@-, design_decisions create round-trip + update rejection; docs updated in AGENT-READINESS.md + master-planner SKILL.md"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "resolve_body (note.rs:55-73) treats ANY --body value starting with '@' as a path/stdin sentinel, with no escape. A legitimate body that starts with '@' — '@username ping', '@channel fyi', a markdown '@decorator', an email-style handle — is silently reinterpreted as a file read and fails with 'could not read body file: username ping'. Reproducer: 'mp note add --title x --body \"@username ping\"' exits 1 with that error. There is no way to make a body whose first line starts with '@'. The spec (AC-07) says --body @file.txt, but didn't consider the collision with content. Conventional fix (jq --rawfile, git --output=, kubectl -f): add a separate --body-file <path> flag for the file/stdin path, and let --body always be literal inline text. Keeps AC-07/AC-08 working via the new flag and removes the ambiguity entirely. Backward-compat option: keep @file/@- on --body but add --body-file as the unambiguous path and document the @ escape (e.g. @@ for a literal leading @).",
+      "status": "fixed",
+      "author": "zcode-review",
+      "fixed_in": "db63821",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "correctness",
+      "description": "resolve_body uses std::path::Path::new(rest) which does NOT expand '~'. A natural '--body @~/notes.md' (quoted to prevent shell expansion, or in a script) fails with 'could not read body file: ~/notes.md' — confusing because the same path works unquoted on the shell. Reproducer: mp note add --title x --body '@~/note-test-marker' → exit 1. Rust std deliberately doesn't expand ~ (no HOME context at Path layer). Fix options: (a) document that @~/... is unsupported and the error message should hint 'tilde not expanded, use an absolute path'; (b) expand a leading '~/' manually via dirs::home_dir() or std::env::var(\"HOME\"). Low severity because absolute paths and shell-expanded ~ both work; only the quoted-tilde case is affected.",
+      "status": "fixed",
+      "author": "zcode-review",
+      "fixed_in": "db63821",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    }
+  ]
+}

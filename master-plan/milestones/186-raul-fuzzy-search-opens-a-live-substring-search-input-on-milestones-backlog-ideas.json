@@ -1,0 +1,420 @@
+{
+  "milestone": {
+    "id": "186",
+    "title": "raul fuzzy search — `/` opens a live substring search input on Milestones, Backlog, Ideas",
+    "slug": "raul-fuzzy-search-opens-a-live-substring-search-input-on-milestones-backlog-ideas",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-18",
+    "updated": "2026-07-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-18T21:36:43.262001+00:00"
+  },
+  "intent": {
+    "outcome": "Users can press / on Milestones, Backlog, or Ideas to open a search input, type a substring, and live-filter the list as they type. Esc cancels (restores prior filter), Enter commits (search term sticks as a secondary filter). Substring match covers the 90% case; full fuzzy is a follow-up if substring proves weak."
+  },
+  "problem": {
+    "description": "With Milestones, Backlog, and Ideas each potentially containing dozens of items, finding a specific one by eye is slow. No search functionality exists today — Action::ToggleFilter only flips a boolean open_only flag for annotations. The lifecycle filter (M185) and the per-lane sort (M182) are present, but there is no free-text search. The legacy table-based list renderers (Backlog) and the new table renderer (Milestones, post-M185) both need to participate."
+  },
+  "scope": {
+    "in_scope": [
+      "New mode: Mode::SearchInput — single-line text input at the bottom of the content area",
+      "New actions: OpenSearch, SearchInputChar, SearchInputBackspace, SearchInputCommit, SearchInputCancel",
+      "/ keybind on Milestones, Backlog, Ideas only — no-op on Path / Overview / Watch / Settings",
+      "Substring match (case-insensitive contains) against id and title",
+      "Live filter: list narrows as user types; no debounce needed for substring",
+      "Title bar shows search chip: 'Milestones · /<term> (n)' while input is active",
+      "Enter commits: search term becomes a persistent secondary filter; title bar shows 'Milestones · /<term> (n)' after input closes",
+      "Esc reverts: search input closes, prior filter restored",
+      "Search state is per-lane and persists across lane switches (cleared on raul restart)",
+      "v1: substring match only; full fuzzy (nucleo-matcher) deferred to v2",
+      "Pin tests: substring-match correctness against fixture sets; lane gating (/ no-op on Path)"
+    ],
+    "out_of_scope": [
+      "Full fuzzy matching (nucleo-matcher or similar) — deferred to v2",
+      "Search on Path, Overview, Watch, Settings (not list-surfacing tabs)",
+      "Search by lifecycle state, priority, or status fields (title + id only in v1)",
+      "Regex search",
+      "Search across multiple lanes (each lane has its own search state)",
+      "Search history / saved searches"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Pressing / on Milestones, Backlog, or Ideas opens a search input at the bottom of the content area. Pressing / on Path, Overview, Watch, or Settings is a no-op. A test pins the no-op on Path and the open-on-Milestones behavior.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_search_open_lane_gate --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-02",
+      "description": "Typing in the search input live-filters the visible list by case-insensitive substring match against id and title. Empty input shows the full list. A test pins substring-match correctness against a fixture milestone set: typing 'log' narrows the list to items whose id or title contains 'log' (case-insensitive).",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_search_substring_match --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-03",
+      "description": "Pressing Enter commits the search term: the input closes, the filter sticks. Title bar shows 'Milestones · /<term> (n)' where n is the filtered count. A test exercises the commit path.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_search_commit --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-04",
+      "description": "Pressing Esc cancels: input closes, prior filter restored. Title bar reverts to its prior state (without the /<term> chip). A test exercises the revert path.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_search_cancel --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-05",
+      "description": "Search state is per-lane and persists across lane switches: switching from Milestones to Backlog and back to Milestones preserves the Milestones search term (Backlog has its own independent search state). A test exercises the round-trip across lanes.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_search_per_lane_state --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-06",
+      "description": "cargo fmt --all -- --check passes; cargo clippy -p raul --tests --no-deps -- -D warnings passes.",
+      "verification": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp validate exits 0 with the new milestone file in master-plan/.",
+      "verification": "manual: after M186 lands, ls master-plan/milestones/186-*.json returns ≥1 hit; cargo nextest run -p raul --no-fail-fast exits 0; mp validate exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-08",
+      "description": "Pressing o on Milestones, Backlog, or Ideas cycles to the next sort key in the order Id → Lifecycle → Priority → Updated → Id. Pressing o on Overview, Path, Watch, or Settings is a no-op. A test pins both behaviors; the rendered list order changes immediately on each press without a reload. The choice is in-memory only (no MP_HOME persistence — that's still handled by the S sort-rebind menu on confirm).",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_cycle_sort --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-09",
+      "description": "The help overlay (modes/help.rs) lists / (search) and o (cycle sort) under Milestones, Backlog, and Ideas sections; / and o do not appear in the help overlay for Overview, Path, Watch, or Settings (lane gating). The Settings flat key list (modes/settings.rs::SETTINGS_KEYS) has entries for keybinds.search and keybinds.cycle_sort so users can rebind through the standard editor.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_help_overlay_sync_m186 --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "match-algorithm",
+      "choice": "v1 = substring (case-insensitive contains); v2 = nucleo-matcher or similar if v1 proves weak in dogfood",
+      "rationale": "Substring covers 90% of use cases; adding a fuzzy-match dep (nucleo) is a separate decision deferred until we have user feedback. The matcher is encapsulated in a single function so v2 is a swap, not a refactor."
+    },
+    {
+      "area": "search-fields",
+      "choice": "Match against id and title only; not against lifecycle, priority, or description",
+      "rationale": "id and title are what users remember. Enum-field filtering (lifecycle) is what M185's lifecycle filter modal is for. Mixing search-by-text with structured filters in the same input would create a UX conflict."
+    },
+    {
+      "area": "input-ui",
+      "choice": "Single-line text input at the bottom of the content area, similar to Settings' value editor",
+      "rationale": "Reuses the single-line input pattern already established for Settings (modes::settings). No new widget type — the existing text-input pattern is sufficient and avoids divergent input UIs."
+    },
+    {
+      "area": "search-state-lifetime",
+      "choice": "Per-lane in-memory state (cleared on raul restart); persisted alongside hide_done / lane_sort_key / milestone_filter",
+      "rationale": "Same in-memory persistence model as the other user preferences; MP_HOME persistence can land as a follow-up if it becomes a UX gap. Per-lane (not global) because the user is searching different data shapes on different tabs."
+    },
+    {
+      "area": "lane-gating",
+      "choice": "Milestones + Backlog + Ideas only; no / on Path / Overview / Watch / Settings",
+      "rationale": "Path is a tree (small, structural); Overview is a dashboard; Watch is a workflow surface; Settings is a config editor. None of them are list-surfacing tabs and adding search there would be dead weight."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "search mode + binding",
+      "goal": "SearchInput mode on Milestones/Backlog/Ideas; live substring filter; Enter commits, Esc cancels",
+      "rollback": "Remove Mode::SearchInput and the / keybind; drop per-lane search state from App; restore pre-search visible_milestones/visible_backlog."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add Mode::SearchInput(SearchInputState) variant (a dedicated mode, not a reuse of Mode::Input — the existing Mode::Input has different semantics for command input and reusing it would conflate two unrelated input flows). SearchInputState carries { cursor: usize, max_len: usize }; the per-lane search buffer lives on App as HashMap<Lane, String> (empty by default; cleared on raul restart). Add actions: OpenSearch, SearchInputChar, SearchInputBackspace, SearchInputCommit, SearchInputCancel. The search is per-lane, in-memory, persists across lane switches (same lifetime as hide_done/lane_sort_key/milestone_filter). Edge cases: switching lanes while Mode::SearchInput is active cancels the input (Esc-like) but preserves the per-lane buffer so reopening search on the original lane restores it.",
+      "files": [
+        "crates/raul/src/tui/mode.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_search_per_lane_state --no-fail-fast",
+      "done_when": "Mode::SearchInput exists; per-lane search state exists on App; actions are wired. A test exercises per-lane persistence across lane switches.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Bind the / keybind to OpenSearch. Gate the binding to Milestones, Backlog, Ideas only: when the active lane is Path/Overview/Watch/Settings, / is a no-op. Add the keybind entry to Keybinds::search and the dispatch in keybinds.rs.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_search_open_lane_gate --no-fail-fast",
+      "done_when": "Pressing / on Milestones/Backlog/Ideas opens search; pressing / on the other 4 lanes is a no-op. A test pins both behaviors.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement substring-match filter in app.rs: case-insensitive contains against id and title. Apply the filter inside the per-lane visible_* methods so it composes with milestone_filter (M185), hide_done, and the active sort key. Empty search term shows the full list. Empty-results state: when the per-lane visible list is empty AND a search term is active, show the message 'No matches for /<term> — press Esc to clear' instead of the legacy 'No milestones found. Run mp list milestones to check.' — the new message makes clear the search is the reason for the empty result. A test pins both the substring-match correctness and the empty-results message branching.",
+      "files": [
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_search_substring_match --no-fail-fast",
+      "done_when": "Typing 'log' narrows a fixture milestone set to items whose id or title contains 'log' (case-insensitive); the filter composes correctly with other filters. A test pins substring-match correctness.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Render the search input UI at the bottom of the content area when Mode::SearchInput is active: a single-line text input with the cursor and the typed prefix. Render the title bar chip while input is active: 'Milestones · /<term> (n)'. Render the committed chip (no input) after Enter: same chip. Revert chip on Esc. Implement in render/overlays.rs (parallel to the lifecycle filter modal pattern from M185). Chip composition: when both the lifecycle filter (M185) and the search term (M186) are active, the chip renders TWO segments separated by ' · ' — filter segment first (e.g. 'approved, in-progress'), search segment second (e.g. '/login'); example: 'Milestones · approved, in-progress · /login (2)'. When only one is active, only that segment renders. Filter and search segments use dim palette color; the lane title remains accent-colored.",
+      "files": [
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/src/tui/render/dashboard_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_search_commit --test tui_search_cancel --no-fail-fast",
+      "done_when": "Search input renders at the bottom of the content area; title bar shows the chip in both active and committed states; Esc reverts the chip. Tests pin commit and cancel paths.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Run the canonical lint gate and validate the plan: cargo fmt --all -- --check, cargo clippy -p raul --tests --no-deps -- -D warnings, and mp validate all pass.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "done_when": "All three commands exit 0 in sequence.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Add CycleSortNext action. Bind o (lowercase) to it — unbound today, so no conflict with existing keybinds (Ctrl-O is bound to open_settings, but plain o is free). The action reads the current lane_sort_key for the active lane, computes the next key in cycle order (Id → Lifecycle → Priority → Updated → Id), writes it back to app.lane_sort_key, and triggers a re-render. Lane-gating: the action is a no-op on Overview, Path, Watch, Settings (no sort menu); it applies on Milestones, Backlog, Ideas (the lanes that expose sort). The action does NOT persist to MP_HOME config (that's done by the S sort-rebind menu on confirm) — o cycles the in-memory choice for the session only. A test pins: (a) pressing o on Milestones cycles the sort key Id→Lifecycle→Priority→Updated→Id; (b) pressing o on Overview is a no-op.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_cycle_sort --no-fail-fast",
+      "done_when": "Pressing o on Milestones/Backlog/Ideas cycles to the next sort key immediately; pressing o on Overview/Path/Watch/Settings does nothing. A test pins both behaviors. The current sort key is reflected in the rendered list order without a reload.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Sync M186-introduced keybinds into the help overlay and the Settings flat key list. (1) Update crates/raul/src/tui/modes/help.rs to include / (search) and o (cycle sort) under the appropriate sections — / goes under Milestones, Backlog, and Ideas sections (since the keybind is lane-gated to those three); o goes under Milestones, Backlog, and Ideas sections (same lanes that have a sort menu). (2) Add entries to crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS under the keybinds section: 'keybinds.search' and 'keybinds.cycle_sort'. Both are optional (have defaults / and o respectively) and follow the existing pattern for keybind entries. Note: M185 already added entries for keybinds.lifecycle_filter and keybinds.grooming_preset; this step covers only the M186-specific keys.",
+      "files": [
+        "crates/raul/src/tui/modes/help.rs",
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_help_overlay_sync_m186 --no-fail-fast",
+      "done_when": "Pressing ? on Milestones/Backlog/Ideas shows / and o in the help overlay; pressing ? on Path/Overview/Watch/Settings does not show / (the keybind is lane-gated); opening Settings shows the two new keybinds in the flat list and they can be rebound through the standard keybind editor.",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-18",
+    "branch": "",
+    "evidence": "M186: / search modal + substring filter + per-lane state; o cycle-sort; help + settings keys; 749 tests; fmt+clippy clean"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-09 requires the help overlay to list / (search) under Milestones/Backlog/Ideas sections. Keybinds::help_entries() adds a 'Search (Milestones/Backlog/Ideas)' entry, but render_help_overlay (which renders from static k(label) lookups) never references it — pressing ? shows Cycle sort (via the globals line) but never mentions / search. Users have no way to discover the search keybind. Fix: add a Search entry under the Milestones section of the overlay.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/overlays.rs",
+        "new_range": {
+          "start_line": 280,
+          "end_line": 280
+        },
+        "side": "new"
+      },
+      "summary": "Help overlay omits / (search) keybind"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "S1 spec: 'switching lanes while Mode::SearchInput is active cancels the input (Esc-like) but preserves the per-lane buffer'. select_lane() and tab_move_*() change app.active_lane without touching app.active_mode. After Tab on Milestones with search open, the user lands on e.g. Settings with the search overlay still showing (search buffer 'a' still displayed in app.active_mode=SearchInput). Fix: select_lane should reset active_mode to Normal when leaving a list lane while SearchInput is active.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/app.rs",
+        "new_range": {
+          "start_line": 693,
+          "end_line": 693
+        },
+        "side": "new"
+      },
+      "summary": "Lane switch during Mode::SearchInput does not cancel the input"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "S3 spec: when the visible list is empty AND a search term is active, show 'No matches for /<term> — press Esc to clear' so the user knows the search (not mp data state) caused the empty result. render_milestones_table / render_backlog_list still show the generic 'No milestones found. Run mp list milestones...' regardless of search state. Fix: branch the empty message on lane_search_term() non-empty.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/lane_lists.rs",
+        "new_range": {
+          "start_line": 230,
+          "end_line": 230
+        },
+        "side": "new"
+      },
+      "summary": "Empty list with active search shows stale default message"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "milestones_filter_chip now handles Backlog/Ideas too (renamed scope in M186), but keeps the milestones_-prefixed name. Inside it computes 'count = visible_milestones.len() + visible_backlog.len()' which is wrong on Backlog lane (milestones list is not lane-gated, returns all) and is then discarded (let _ = count) in favor of real_count. The dead variable plus the misleading name + the false comment ('only one returns non-zero') are all noise. Fix: drop count; rename to list_lane_filter_chip; fix the comment.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/chrome.rs",
+        "new_range": {
+          "start_line": 277,
+          "end_line": 277
+        },
+        "side": "new"
+      },
+      "summary": "milestones_filter_chip has dead count + misleading name"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "search_push_char/search_backspace reset selected_index to 0 — good. But lane_search is a pub field, so any external mutation (e.g. persisted state restoration, future keybind) can narrow the list without clamping. visible_milestones/visible_backlog then return a shorter vec while selected_index is stale; list navigation clamps on next move, but rendering with REVERSED highlight on a non-existent row is wrong until then. Low: no current external mutator hits this; defensive fix only.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/app.rs",
+        "new_range": {
+          "start_line": 1358,
+          "end_line": 1358
+        },
+        "side": "new"
+      },
+      "summary": "selected_index not clamped when search narrows via direct state mutation"
+    }
+  ]
+}

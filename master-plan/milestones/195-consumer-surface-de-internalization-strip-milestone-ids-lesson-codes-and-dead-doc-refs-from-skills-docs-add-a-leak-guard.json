@@ -1,0 +1,300 @@
+{
+  "milestone": {
+    "id": "195",
+    "title": "Consumer-surface de-internalization — strip milestone IDs, lesson codes, and dead doc refs from skills + docs; add a leak guard",
+    "slug": "consumer-surface-de-internalization-strip-milestone-ids-lesson-codes-and-dead-doc-refs-from-skills-docs-add-a-leak-guard",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-24",
+    "updated": "2026-07-24",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-24T18:25:29.437669+00:00"
+  },
+  "intent": {
+    "outcome": "External adopters never see this repo's plan history on any shipped surface: skills (templates/skills/**), docs (docs/** except docs-old/), and adopter-facing READMEs carry no internal milestone IDs (M\\d+), no lesson codes (L\\d), and no pointers to repo-internal files. Every skill and doc directive keeps its exact meaning; only provenance tokens and dead links change. A ripgrep guard in `make lint` keeps the surface clean going forward."
+  },
+  "problem": {
+    "description": "The deployed skills and shipped docs leak this repo's internal vocabulary onto the consumer surface. An mp-runner execution flow lists 'M147 consult FIRST', 'M113 advisory lock', and 'L5' — provenance an external agent cannot resolve (it has no `mp show milestone M147` in its repo). Inventory: ~90 milestone-ID refs (M76-M173) and ~30 lesson-code/dead-link refs across 13 templates/skills files plus docs/. Worse, `docs/code-review-lessons.md` is referenced 13x but has been archived to docs-old/ (a dead link for consumers AND stale in-repo), and `docs/dogfood/M110-s5-audit.md` is referenced by mp-code-review but does not exist. Not a blocker today, but it causes documentation rot and gaps over time and undercuts the self-contained-toolkit mission. Complementary (not blocking): milestone 194 covers the mp-init-GENERATED AGENTS.md doc refs; this milestone covers the deployed skills + docs + READMEs surface."
+  },
+  "scope": {
+    "in_scope": [
+      "templates/skills/**: strip internal milestone IDs (M\\d+) and lesson codes (L\\d) from the consumer skill bundles (mp-runner, mp-coordinator, mp-flow, spec-grill, codebase-design, diagnosing-bugs); preserve every directive's meaning.",
+      "docs/** (excluding docs-old/): strip milestone IDs, lesson codes, and dead repo-internal file pointers.",
+      "Adopter-facing READMEs (root README, install/quickstart): same de-internalization pass.",
+      "Core skills (mp-runner/mp-coordinator/mp-flow): delete the dead docs/code-review-lessons.md and docs/dogfood/M110-s5-audit.md pointers and strip the L-code labels — the L1-L7 pre-screen prose is already inlined in reviewing.md/executing.md, so no redirect is needed (and core must not depend on an opt-in skill).",
+      "mp-code-review is master-plan-repo-only (Q-03 decision): remove it from the consumer catalog so `mp install` does not deploy it, and document it as repo-internal in docs/skills/README.md (NOT in the category table). As a repo-internal skill, the consumer-surface de-internalization rules do not apply; fix only its dead docs/code-review-lessons.md pointer.",
+      "Vendored skills (codebase-design, diagnosing-bugs): drop the internal M146: provenance prefix; keep the upstream mattpocock/skills MIT attribution.",
+      "Add a ripgrep leak guard (\\bM\\d{2,4}\\b, \\bL\\d{1,3}\\b, and the dead-link paths) over templates/skills/ + docs/, with a synthetic-ID allowlist (e.g. the mp path pin 42 --before 17 CLI example), wired into make lint.",
+      "crates/ source: judgment-call pass — remove gratuitous provenance refs, RETAIN genuinely-useful design-rationale pointers (audience = repo maintainers with plan access). Lower priority than the consumer surface."
+    ],
+    "out_of_scope": [
+      "master-plan/** — the plan zone; milestone IDs are the native vocabulary and stay.",
+      "docs-old/** — archived, intentionally frozen.",
+      "mp-dogfood-log.md and repo-internal dogfood notes — internal, not consumer.",
+      "Restoring or re-shipping docs/code-review-lessons.md as a consumer doc — the review checklist is canonically inlined in the mp-coordinator reviewing sub-mode; the doc stays archived.",
+      "Making core skills depend on mp-code-review (or any opt-in catalog skill) — core must stay self-contained or reference only other core skills.",
+      "Stripping M-codes/L-codes from mp-code-review — it is master-plan-repo-only, not a consumer surface.",
+      "Hard-banning milestone IDs in crates/ source — soft pass only (keep where genuinely needed)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Consumer surface is free of internal provenance and every directive's meaning is preserved (behavior drift is the top risk, so a guard alone is insufficient).",
+      "verification": "manual: accepted — consumer-surface diff review confirming behavior preservation (only provenance tokens and dead links removed; no directive changed semantics)",
+      "status": "passed",
+      "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+    },
+    {
+      "id": "AC-02",
+      "description": "Dead internal doc pointers are eliminated: core skills self-contained via inlined prose (no redirect); mp-code-review (opt-in) self-contained with its own dead links cleaned.",
+      "verification": "manual: rg 'docs/code-review-lessons.md|docs/dogfood' templates/skills docs returns no matches (dead pointers eliminated)",
+      "status": "passed",
+      "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+    },
+    {
+      "id": "AC-03",
+      "description": "Leak guard ships and is enforced in `make lint` with a synthetic-ID allowlist.",
+      "verification": "manual: make lint exits 0 with the leak guard wired in (only allowlisted hits)",
+      "status": "passed",
+      "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+    },
+    {
+      "id": "AC-04",
+      "description": "Vendored skills keep upstream attribution, drop internal provenance.",
+      "verification": "manual: accepted — codebase-design and diagnosing-bugs SKILL.md retain the mattpocock/skills MIT line with the M146 prefix removed",
+      "status": "passed",
+      "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+    },
+    {
+      "id": "AC-05",
+      "description": "crates/ source pass complete: gratuitous provenance removed, retained pointers justified.",
+      "verification": "manual: accepted — crates/ diff review; each retained M-code pointer has a documented design-rationale reason",
+      "status": "passed",
+      "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Scope boundary",
+      "choice": "Hard-ban internal provenance on the consumer surface (skills/docs/READMEs); soft-pass crates/ source.",
+      "rationale": "crates/ is read by repo maintainers who have plan access, so a milestone-ID pointer to design rationale can be legitimate there; the consumer surface has no such audience. Reconciles crates/ appearing both in- and out-of-scope during grilling."
+    },
+    {
+      "area": "Dead-link resolution",
+      "choice": "Core skills (mp-runner/mp-coordinator/mp-flow) stay self-contained: the L1-L7 pre-screen is already inlined in reviewing.md/executing.md — strip the L-code labels and the dead docs/code-review-lessons.md pointer; core never redirects to an external skill. mp-code-review (catalog/opt-in) is cleaned as a self-contained power-up, NOT a dependency.",
+      "rationale": "mp-code-review is category catalog (opt-in) while the core three deploy by default — pointing core at an opt-in skill would break for adopters who did not install it. The L1-L7 prose is already inlined in the core skills, so the dead pointer is deleted, not redirected. This finishes the migration M99 intended (subsume the review checklist into the mp-coordinator reviewing sub-mode); mp-code-review stays optional runnable-fixture automation."
+    },
+    {
+      "area": "Completion gate",
+      "choice": "Manual review sign-off is the completion gate, not the guard.",
+      "rationale": "The top risk is behavior drift — rewriting prose to strip tokens can subtly change agent behavior; a regex guard cannot detect semantic change, so a review comparing intent before/after is the real acceptance signal. The guard is prevention, not the gate."
+    },
+    {
+      "area": "Foundation",
+      "choice": "The AGENTS.md 'Consumer-surface hygiene' convention and the docs/skills/README.md 'Authoring rules' section (landed this session) are the foundation; this milestone is the cleanup + guard.",
+      "rationale": "The rule + docs prevent new leaks; this milestone clears the existing ~120 refs and adds enforcement."
+    },
+    {
+      "area": "Risk — behavior drift",
+      "choice": "Minimal edits: remove the provenance token, keep the directive; per-file review compares intent before/after.",
+      "rationale": "Stripping tokens must not alter what an agent does at execute/review time. Flagged as the top risk during grilling; the guard cannot catch it."
+    },
+    {
+      "area": "Risk — allowlist loophole",
+      "choice": "Allowlist entries are CLI-example synthetic IDs only (e.g. `mp path pin 42 --before 17`), documented inline at the guard.",
+      "rationale": "Unconstrained synthetic-ID exemptions could backdoor real leaks."
+    },
+    {
+      "area": "Core/opt-in dependency boundary",
+      "choice": "Core skills (default-deployed: mp-flow, mp-runner, mp-coordinator) must not depend on catalog/opt-in skills (spec-grill, mp-code-review, codebase-design, diagnosing-bugs).",
+      "rationale": "A default mp install deploys only the three core skills; an opt-in skill is absent unless explicitly requested. A core skill that points at an opt-in skill sends a default adopter to a missing target. Opt-in skills are additive power-ups; core stays self-contained or references only other core skills."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "mp-code-review self-containment may surface deeper dependencies — it refs crates/mp/tests/code_review_patterns.rs. Does that path ship in the deployed bundle, or must the pattern list be inlined into the skill before other skills repoint to it?",
+      "status": "resolved",
+      "answer": "Resolved by the cleaner-resolution redesign: core skills will NOT repoint to mp-code-review (it is opt-in catalog; core must stay self-contained). The dead pointers are deleted, not redirected; the L1-L7 prose is already inlined. mp-code-review is cleaned as a standalone opt-in skill."
+    },
+    {
+      "id": "Q-02",
+      "question": "mp-code-review is category catalog (opt-in) and is currently missing from the docs/skills/README.md category table. Should this milestone add it to the table (documenting it as an opt-in runnable-fixture runner), or is documenting it out of scope here?",
+      "status": "resolved",
+      "answer": "Resolved: yes — document mp-code-review in the docs/skills/README.md category table as a catalog (opt-in) entry. This milestone already rewrites that file and clarifies mp-code-review role (D2/D7). Folded into the amended mp-code-review in_scope bullet."
+    },
+    {
+      "id": "Q-03",
+      "question": "mp-code-review portability: its runnable patterns live in crates/mp/tests/code_review_patterns.rs (master-plan-repo-only). To make the skill self-contained for consumers, either (a) vendor the pattern list/run-commands into the skill, or (b) document mp-code-review as master-plan-repo-only and remove it from the consumer catalog. Decide before approval.",
+      "status": "resolved",
+      "answer": "Resolved per recommendation: mp-code-review is master-plan-repo-only. Its runnable patterns are coupled to this repo test fixtures (crates/mp/tests/code_review_patterns.rs) and the archived lessons doc, so it is not portable to consumer projects. Decision: remove mp-code-review from the consumer catalog so mp install does not deploy it, and document it as repo-internal in docs/skills/README.md rather than vendoring fixtures into the skill. Consequence: mp-code-review is no longer a consumer-surface de-internalization target; in_scope bullet 5 amended to repo-only treatment (only its dead docs/code-review-lessons.md pointer gets fixed)."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-24",
+    "branch": "",
+    "evidence": "All 5 ACs passed with evidence (AC-01 through AC-05). 7 self-review findings (F-01 pre-existing, F-02..F-07 from this runner's code review) all fixed. Consumer surface is clean: scripts/check-consumer-surface.sh shows 0 violations (3 matches absorbed by allowlist — 1 synthetic CLI example + 2 self-referential docs/skills/README.md teaching blocks). The guard is wired into 'make lint' (after clippy + fmt) and the standalone 'make consumer-surface-lint' target. Self-test mode catches 7 violations across the fixture. crates/ source soft-pass complete: 2767 M-code instances are all design-rationale pointers or test fixture data; no gratuitous terms found. Commit not landed (commit_after_execute=false default); worktree dirty for the operator to review and commit."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "mp-code-review SKILL.md references crates/mp/tests/code_review_patterns.rs and tells the agent to run cargo nextest -p mp --test code_review_patterns — a master-plan-repo-internal path absent from every consumer project. in_scope bullet 5 only enumerated docs/code-review-lessons.md and docs/dogfood as dead pointers; this crates/ ref is a third dead internal pointer and is not trivially deletable since it IS the skill core mechanism. Surfaced during challenge CH-195-01.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "consumer-surface lint allowlist was line-anchored only; adding a line above an allowlisted location silently breaks the exception. Fixed: allowlist entries now require a 'label:file:line:anchor:reason' 5th field (anchor substring), and is_allowlisted matches line+anchor. Verified with shifted-line and anchor-changed tests. (scripts/check-consumer-surface.sh)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "consumer-surface lint had no self-test; patterns could fall into disrepair without the main lint noticing. Fixed: added --self-test mode that creates a known-violation fixture in a temp dir, runs the guard against it, and asserts each pattern catches >=1 violation. Self-test output: 'caught 7 violation(s) across the fixture (milestone-id:3,lesson-code:2,dead-code-review-lessons:1,dead-dogfood:1)'. (scripts/check-consumer-surface.sh)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "consumer-surface lint used 'mapfile -t' (bash 4+) which fails on macOS bash 3.2. Fixed: rewrote the rg-excludes construction to a while-read loop on a process substitution. Verified on macOS bash 3.2. (scripts/check-consumer-surface.sh)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "consumer-surface lint used 'mktemp -d 2>/dev/null || mktemp -d -t ...' but the -t form is deprecated on BSD mktemp. Fixed: introduced mktemp_dir() and mktemp_file() helpers that try BSD/GNU-compatible templates first. (scripts/check-consumer-surface.sh)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "mp-coordinator SKILL.md Stage-8 auto_remediate section replaced 'see crates/mp/src/config.rs' with 'the install source for the parser' — vague. Fixed: dropped the path reference entirely and described the parser's contract inline. (templates/skills/mp-coordinator/SKILL.md)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "correctness",
+      "description": "AGENTS.md 'make consumer-surface-lint' description ended with '(M195)' — a leaked milestone ID, exactly the kind of provenance the lint forbids. Fixed: description rewritten to 'flags internal milestone IDs, lesson codes, and dead doc pointers'. (AGENTS.md)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "self"
+    },
+    {
+      "id": "F-08",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Q-03 incomplete: mp-code-review remains category=catalog and is still installable via `mp install --skills=mp-code-review` (templates/skills/mp-code-review/manifest.json; SKILL.md Install section; crates/mp/tests/install_skills_v2.rs still asserts deploy succeeds). Scope required removing it from the consumer catalog so adopters cannot receive a skill coupled to crates/mp/tests/code_review_patterns.rs and docs-old/. Docs mark it repository-internal, but the install path still ships it. Fix: make the skill non-selectable (e.g. category=internal + reject in validate_selection, or drop from SkillRegistry), remove the Install section, and update install_skills_v2 accordingly.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "external"
+    },
+    {
+      "id": "F-09",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Behavior drift in core skills: after deleting the docs/code-review-lessons.md pointer, reviewing.md/SKILL.md/planning.md/mp-runner still tell agents to 'read the lesson-pattern library directly' and call it the 'canonical source' / 'source of truth' (e.g. templates/skills/mp-coordinator/reviewing.md:5, :46, :91-94, :177) while D2 said the L1-L7 pre-screen is inlined and the dead pointer is deleted, not redirected. reviewing.md also asserts 'patterns are not duplicated' then lists key patterns. Agents will search for a missing doc. Fix: make the inlined pre-screen the sole source; drop external-library language.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "external"
+    },
+    {
+      "id": "F-10",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Allowlist F-02 incomplete in scripts/check-consumer-surface.sh: is_allowlisted still requires exact line_e == line AND anchor (lines 223-226), contradicting the header comment that line is a hint and anchor is authoritative. A one-line insert above an allowlisted site still breaks the exception (false-positive lint). Self-test covers pattern catch only, not allowlist shift/anchor. Fix: match on file+anchor (treat line as optional diagnostic), and extend --self-test to assert a shifted-line still allowlists when anchor matches.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "external"
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Guard scope gap: script header and milestone in_scope claim coverage of adopter-facing READMEs (root README, install/quickstart), but SCAN_PATHS only includes templates/skills and docs (scripts/check-consumer-surface.sh:41-44). Latent hole if a leak lands in README.md. Fix: add README.md (and any other adopter-facing entrypoints) to SCAN_PATHS, or narrow the documented scope to match the code.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "external"
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "dead-dogfood allowlist entry anchors on 'paths `docs/code-review-lessons.md`' rather than a docs/dogfood substring (ALLOWLIST line for docs/skills/README.md:191). It works only because both dead paths share one line; splitting the sentence would leave the dogfood match unallowlisted or over-allow unrelated lines. Fix: anchor on 'docs/dogfood' for the dead-dogfood label.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-24",
+      "resolved": "2026-07-24",
+      "phase": "external"
+    }
+  ]
+}

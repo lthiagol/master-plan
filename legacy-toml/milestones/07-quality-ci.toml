@@ -1,0 +1,169 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "07"
+title = "Quality and CI"
+slug = "quality-ci"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["06"]
+effort = "M"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "CLI writes are schema-validated; plan drift fails PRs via GitHub Actions."
+
+[problem]
+description = "ADR-004 accepted but serde-only writes skip JSON Schema; no GHA job runs mp validate on this repo."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "jsonschema crate + validate against schemas/*.json on plan writes",
+    "Milestone, brief, track, idea, challenge write paths (B-04)",
+    "workflow.gates.strictness=full surfaces schema errors; relaxed warns",
+    "GitHub Actions: cargo build mp + mp validate on PR (B-05)",
+    "Update docs/CI.md status to implemented",
+]
+out_of_scope = [
+    "Homebrew distribution",
+    "Session storage (M08)",
+    "Optimistic concurrency (M09)",
+    "Full MP-COMMANDS line-by-line rewrite",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Invalid milestone JSON rejected on write with schema error code"
+verification = "integration test in crates/mp/tests/"
+status = "passed"
+evidence = "crates/mp/tests/m07_m09_gaps.rs schema tests"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "GHA plan-validate job fails on gate errors, passes on main"
+verification = "workflow runs on PR + green main"
+status = "passed"
+evidence = ".github/workflows/plan.yml + docs/CI.md"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Work package 1"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Work package 2"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add jsonschema module loading schemas/*.json from MP_HOME"
+files = [
+    "crates/mp/Cargo.toml",
+    "crates/mp/src/schema.rs",
+]
+tests = "crates/mp/tests/schema_validate.rs"
+done_when = "Schema loader resolves milestone.schema.json"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Validate milestone/brief/track/idea/challenge writes (B-04)"
+files = [
+    "crates/mp/src/store.rs",
+    "crates/mp/src/milestone.rs",
+]
+tests = "dummy"
+done_when = "Invalid milestone JSON rejected with schema error"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "GitHub Actions plan-validate workflow (B-05)"
+files = [".github/workflows/plan.yml"]
+tests = "make adopt-check"
+done_when = "PR runs mp validate; fails on gate errors"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Update docs/CI.md to implemented status"
+files = ["docs/CI.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "CI.md reflects live workflow"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "JSON schema on write + GHA validate"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

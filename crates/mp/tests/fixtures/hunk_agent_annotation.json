@@ -1,0 +1,9 @@
+{
+  "summary": "Missed gate wiring — finding not promoted to remediation",
+  "rationale": "Helpers exist (has_open_self_findings, has_open_external_findings) but are not wired into the complete_milestone path. AC-01..AC-05 are marked passed in the milestone spec but the code path that fires the gate is absent.",
+  "oldRange": { "start": 12, "end": 18 },
+  "newRange": { "start": 24, "end": 30 },
+  "author": "external-review-2026-07-05",
+  "tags": ["m101", "gate", "review"],
+  "confidence": "high"
+}

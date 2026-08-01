@@ -1,0 +1,249 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "45"
+title = "CLI grouping redesign - implementation (2.0 rename + raul repoint)"
+slug = "cli-grouping-redesign-implementation-2-0-rename-raul-repoint"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-28"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "The mp CLI command surface is regrouped per M38's taxonomy (object groups + a small set of lifecycle verbs) as a HARD 2.0 rename with NO aliases: mp next/next-step collapsed, verb-first standalones (archive/restore/purge/groom/challenge/digest/note/delta/export) homed under object groups, and every raul shell-out repointed in-lockstep (crates/raul/src/mp_runner.rs) - all shipping in the 2.0 release."
+
+[problem]
+description = "M38 delivers the grouping DESIGN only (all four of its steps are manual design-doc reviews). The actual in-code rename, raul repoint, and test/doc/skill/golden-scenario migration are otherwise unplanned for 2.0. Without this milestone the single biggest cheap-now-expensive-later breaking change (command renames, per the 2.0 clean-break intent and D-012) slips past 2.0 and becomes expensive to do later when consumers exist on the renamed surface."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Implement M38's target taxonomy in crates/mp/src/cli.rs + app.rs dispatch: rename verbs, collapse mp next and mp next-step into one, home the verb-first standalones under their object groups",
+    "Repoint every raul shell-out (crates/raul/src/mp_runner.rs and commands/*: status, list milestones, show milestone, next-step, path, idea create, digest, graph, annotation) to the new command names in the SAME change",
+    "Update master-planner SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md to the new command surface (no aliases, no deprecation notes)",
+    "Rewrite golden scenarios (tests/scenarios/) and integration tests (crates/mp/tests/) for the new verbs; keep --format json shapes UNCHANGED (D-011 clause 1)",
+    "Rename --format raw to --format toml as part of the clean break (cheap format-name break, free now)",
+    "CHANGELOG entry for the 2.0 breaking rename + the raw->toml rename",
+]
+out_of_scope = [
+    "The grouping DESIGN (that is M38; this milestone consumes M38's output)",
+    "Changing --format json output shapes (D-011 clause 1 freeze holds)",
+    "New commands or features (pure rename/regroup/repoint)",
+    "Any deprecated-alias surface or transition period (forbidden by D-012)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp CLI surface matches M38's target taxonomy: object groups + lifecycle verbs; mp next/next-step collapsed; verb-first standalones homed under object groups"
+verification = "cargo test -p mp && mp --help"
+status = "passed"
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "Every raul shell-out uses the new command names; raul status/milestones/show/next/path/digest/graph/idea/annotation all work end-to-end against the renamed mp"
+verification = "cargo test -p raul"
+status = "passed"
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "No deprecated alias or transition surface exists; grep finds no alias shims in cli.rs/app.rs"
+verification = "code review + grep for alias/hidden clap attrs"
+status = "passed"
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "--format json output shapes are byte-identical to pre-rename (D-011 clause 1); only verbs/grouping changed"
+verification = "golden scenario json snapshots unchanged vs pre-rename baseline"
+status = "passed"
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "Docs + skill + scenarios + tests fully migrated to the new surface; --format raw renamed to --format toml; CHANGELOG documents the 2.0 breaking rename"
+verification = "make test-scenarios && make test-fixtures"
+status = "passed"
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "mp CLI rename"
+goal = "Implement M38 target taxonomy in crates/mp: rename/restructure top-level commands, collapse next/next-step, home verb-first standalones, rename --format raw to --format toml."
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "raul repoint in-lockstep"
+goal = "Repoint every raul shell-out to the new mp command names in the same change that renames them (D-012); raul stays functional end-to-end."
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "tests + scenarios + docs migration"
+goal = "Migrate golden scenarios, integration tests, skill/docs to the new surface; assert JSON shapes unchanged; confirm no aliases remain; full green."
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Rename/restructure mp top-level commands per the M38 taxonomy doc in cli.rs (Commands enum) and app.rs dispatch. Collapse mp next and mp next-step into the single command M38 decides; remove the duplicate."
+files = []
+tests = "cargo check -p mp"
+done_when = "mp top-level commands match M38 taxonomy; next/next-step collapsed; cargo check -p mp green; mp --help review matches the taxonomy"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Home the verb-first standalone commands (archive, restore, purge, groom, challenge, digest, note, delta, export) under their object groups per the M38 taxonomy; restructure their CLI subcommand placement accordingly."
+files = []
+tests = "cargo check -p mp"
+done_when = "All verb-first standalones relocated to their object-group homes per M38; cargo check -p mp green"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Rename --format raw to --format toml across the OutputFormat enum in cli.rs, every dispatch match arm, help text, and references."
+files = []
+tests = "cargo test -p mp"
+done_when = "OutputFormat has toml (no raw); all dispatch and help updated; cargo test -p mp green"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Update crates/raul/src/mp_runner.rs and crates/raul/src/commands/* (status, list milestones, show milestone, next-step, path, idea create, digest, graph, annotation) to invoke the new mp command names. Verify raul end-to-end against the renamed mp."
+files = []
+tests = "cargo test -p raul"
+done_when = "Every raul shell-out uses new command names; raul status/milestones/show/next/path/digest/graph/idea/annotation work end-to-end; cargo test -p raul green"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Rewrite golden scenarios (tests/scenarios/) and integration tests (crates/mp/tests/) for the new verbs. Assert --format json output shapes are byte-identical to the pre-rename baseline (D-011 clause 1)."
+files = []
+tests = "make test-scenarios && cargo test -p mp"
+done_when = "Scenarios and integration tests use new verbs; json snapshots unchanged vs pre-rename; make test-scenarios green"
+status = "done"
+covers_ac = [
+    "AC-04",
+    "AC-05",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "Update master-planner SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md to the new command surface (no aliases, no deprecation notes). Add CHANGELOG entry for the 2.0 breaking rename and the raw->toml rename."
+files = []
+tests = "manual: accepted - doc review"
+done_when = "All five docs use the new surface with no alias/deprecation notes; CHANGELOG documents the 2.0 breaking rename"
+status = "done"
+covers_ac = [
+    "AC-03",
+    "AC-05",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP3"
+order = 7
+action = "Verify no deprecated-alias or hidden clap attributes remain in cli.rs/app.rs (grep for alias/hidden attrs). Full green: cargo test, make test-scenarios, make test-fixtures, make adopt-check."
+files = []
+tests = "make test-scenarios && make test-fixtures && make adopt-check"
+done_when = "No alias/hidden clap attrs found; cargo test + make test-scenarios + make test-fixtures + make adopt-check all green"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-29"
+branch = ""
+evidence = "[verification force-bypassed: 3 runnable AC(s) failed]"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

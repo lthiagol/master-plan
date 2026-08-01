@@ -1,0 +1,172 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "19"
+title = "AGENTS.md simplification"
+slug = "agents-md-simplification"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["16"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-21"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "AGENTS.md files are concise, non-redundant, and agent-friendly: root is a tight session-start entry point, master-plan/AGENTS.md is the normative workflow reference."
+
+[problem]
+description = "Two AGENTS.md files (root 157 lines + master-plan 389 lines = 546 lines) overlap. Root repeats meta-plan detail that belongs in master-plan; master-plan has long workflow tables, repeated intake-routing text, and section 3.0-3.8 verbosity that bloats agent context without adding normative value."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Trim root AGENTS.md to: session start commands, project intro table, design principles (brief), dev commands, session log, pointers to master-plan/AGENTS.md and docs/",
+    "Trim master-plan/AGENTS.md to: non-negotiable rules, plan/code zone table, tooling table, core workflows (interview, decompose, execute, query, idea, backlog, track), spec lifecycle gates, output conventions, triggers, references; cut redundant intake-routing prose and long tables",
+    "Ensure cross-references between the two files and to docs/ are correct",
+    "No behavior or rule changes (normative content preserved, just de-duplicated)",
+]
+out_of_scope = [
+    "MP-COMMANDS.md or AGENT-READINESS.md content (M18)",
+    "Changing the spec-driven development rules themselves",
+    "Feature work",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "root AGENTS.md <= 100 lines, no workflow detail duplicated in master-plan/AGENTS.md"
+verification = "manual: wc -l AGENTS.md = 94 (<=100); root is a tight session-start entry, normative detail lives in master-plan/AGENTS.md"
+status = "passed"
+evidence = "verified this session"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "master-plan/AGENTS.md <= 250 lines, retains non-negotiable rules, plan/code zone, tooling, workflows, gates, conventions, triggers"
+verification = "manual: wc -l master-plan/AGENTS.md = 170 (<=250); all sections retained (condensed)"
+status = "passed"
+evidence = "verified this session"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "No broken cross-references (all referenced files exist)"
+verification = "manual: in-repo refs verified (docs/AGENT-READINESS.md, AGENTS.md, docs/MP-COMMANDS.md exist); toolkit docs resolve via mp-home"
+status = "passed"
+evidence = "verified this session"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp validate green"
+verification = "manual: mp validate ok=true (verified)"
+status = "passed"
+evidence = "verified this session"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Root AGENTS.md trim"
+goal = "Tight session-start entry point"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "master-plan AGENTS.md trim"
+goal = "Normative workflow reference, no redundancy"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Trim root AGENTS.md to <=100 lines: keep session-start commands block, project intro table, design principles (brief), dev commands, session log, pointers to master-plan/AGENTS.md and docs/. Remove meta-plan detail duplicated in master-plan/AGENTS.md (charter, meta master-plan table, flows we follow, references list)."
+files = ["AGENTS.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "wc -l AGENTS.md <= 100; no workflow detail duplicated in master-plan/AGENTS.md"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Trim master-plan/AGENTS.md to <=250 lines: keep section 1 non-negotiable rules, 1a plan/code zone table, 2 tooling table + intake routing, 3.1/3.1a/3.2/3.2a/3.2b/3.3/3.3a/3.4/3.5/3.6/3.7/3.8 workflows (condensed), 4 spec lifecycle gates, 5 output conventions, 6 triggers, 7 references. Cut redundant intake-routing prose, verbose workflow tables that restate commands, and section 3.0 brief workflow if covered by pointer."
+files = ["master-plan/AGENTS.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "wc -l master-plan/AGENTS.md <= 250; all non-negotiable rules + workflows 3.1-3.7 + gates + conventions + triggers retained"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Verify cross-references: every file path mentioned in either AGENTS.md exists (docs/AGENT-PLAYBOOK.md, docs/SPEC.md, docs/MP-COMMANDS.md, docs/WALKTHROUGH.md, master-plan/AGENTS.md, etc.). Fix any broken refs."
+files = [
+    "AGENTS.md",
+    "master-plan/AGENTS.md",
+]
+tests = "./scripts/check-docs.sh"
+done_when = "All referenced files exist; no broken links"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Run mp validate and confirm green"
+files = []
+tests = "make adopt-check"
+done_when = "mp validate --format json returns ok=true"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-25"
+branch = ""
+evidence = "AGENTS simplification: workflow instructions trimmed for clarity."
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

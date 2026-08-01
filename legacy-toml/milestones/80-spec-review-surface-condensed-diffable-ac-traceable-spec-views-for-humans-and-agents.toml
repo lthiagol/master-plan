@@ -1,0 +1,211 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "80"
+title = "Spec-review surface — condensed, diffable, AC-traceable spec views for humans and agents"
+slug = "spec-review-surface-condensed-diffable-ac-traceable-spec-views-for-humans-and-agents"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = [
+    "82",
+    "93",
+]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-01"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "Reviewing a milestone spec is fast and focused: a human (via raul) or an agent (via mp) gets a condensed, review-oriented view of a lean JSON spec — outcome, problem, scope, ACs with coverage and evidence status, open questions, and force-bypass flags — plus an AC-to-step-to-evidence traceability matrix and a what-changed-since-last-approval diff, without loading the full milestone document."
+
+[problem]
+description = "Spec review is the #1 pain point of SDD tooling. mp specs are dense structured documents; after M82 lean model and M92 JSON persistence, agents still lack a purpose-built review read path. During the 2026-07-01 review-backlog sweep, reviewing M48 and M62 required hand-slicing JSON. raul ships dashboards (M71) but no spec-review surface; mp has validate/challenge for spec quality but not review reading. This milestone closes that gap after M93 fragment reads exist — review view delegates to mp milestone ac show / --fields projections where possible."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "raul spec-review view (e.g. raul spec <id>): condensed render — outcome, problem, scope, ACs with coverage + evidence status, open questions, force-bypass flags — not raw full milestone JSON",
+    "AC-to-step-to-evidence traceability matrix in the review view, with force-bypassed ACs surfaced",
+    "Spec diff: what changed since the spec's last approval/revision (requires lightweight spec revision tracking — spike in grooming)",
+    "Agent-side review projection (mp spec review <id> or --review preset) reusing M79 --fields and M93 fragment reads",
+]
+out_of_scope = [
+    "Generic JSON projection / filtering / summary primitives (owned by M79)",
+    "Fragment write ops (owned by M93)",
+    "The post-completion execution review queue (owned by M64)",
+    "Code review gating (owned by M57)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "raul renders a condensed spec-review view (outcome, problem, scope, ACs with coverage + evidence status, open questions, force-bypass flags) without dumping the full milestone JSON document"
+verification = "crates/raul/tests/spec_review.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "The spec-review view includes an AC-to-step-to-evidence traceability matrix and visibly flags force-bypassed ACs"
+verification = "crates/raul/tests/spec_review.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "A diff view shows what changed in a spec since its last approval/revision"
+verification = "crates/raul/tests/spec_review.rs"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "raul spec-review view"
+goal = "Condensed spec render and AC traceability matrix in raul"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Spec diff & agent projection"
+goal = "What-changed-since-approval diff; mp spec review for agents"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement raul spec-review view: outcome, problem, scope, ACs with coverage/evidence, open questions, force-bypass flags"
+files = [
+    "crates/raul/src/commands",
+    "crates/raul/src/tui",
+]
+tests = "crates/raul/tests/spec_review.rs"
+done_when = "raul renders condensed review view without full milestone dump"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Add AC-to-step-to-evidence traceability matrix; flag force-bypassed ACs"
+files = ["crates/raul/src"]
+tests = "crates/raul/tests/spec_review.rs"
+done_when = "Traceability matrix visible in spec-review view"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Spike and implement spec revision tracking plus diff view since last approval"
+files = [
+    "crates/mp/src",
+    "crates/raul/src",
+]
+tests = "crates/raul/tests/spec_review.rs"
+done_when = "Diff view shows spec changes since last approval"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add mp spec review projection reusing M79 fields and M93 fragment reads"
+files = ["crates/mp/src/commands"]
+tests = "crates/raul/tests/spec_review.rs"
+done_when = "Agents can get review-oriented JSON without hand-slicing"
+status = "pending"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP-close"
+order = 5
+action = "cargo test -p raul; verify spec-review integration"
+files = []
+tests = "cargo test -p raul"
+done_when = "cargo test -p raul exit 0"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

@@ -1,0 +1,25 @@
+{
+  "track": {
+    "kind": "tweak",
+    "title": "Tweaks",
+    "perpetual": true,
+    "scope": "Small polish without milestone",
+    "created": "2026-06-17"
+  },
+  "items": [
+    {
+      "id": "TW-01",
+      "title": "Clarify error message on 401",
+      "status": "pending",
+      "effort": "S",
+      "problem": "Clients cannot distinguish expired token vs bad signature",
+      "done_when": "401 body includes error_code",
+      "verification": "cargo test auth_error_body",
+      "steps": ["Update auth middleware response"],
+      "evidence": "",
+      "created": "2026-06-17",
+      "completed": "",
+      "archived_at": ""
+    }
+  ]
+}

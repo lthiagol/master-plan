@@ -1,0 +1,105 @@
+{
+  "track": {
+    "kind": "bugfix",
+    "title": "Bugfixes",
+    "perpetual": true,
+    "scope": "Small correctness fixes; no new features.",
+    "created": "2026-07-14"
+  },
+  "items": [
+    {
+      "id": "BF-01",
+      "title": "ratatui::Scrollbar migration",
+      "status": "done",
+      "effort": "S",
+      "problem": "tui/render/scrollbar.rs hand-rolls a vertical scrollbar widget (render_scrollbar_gutter_visible, thumb_range_visible) when ratatui 0.30 ships a built-in ratatui::widgets::Scrollbar + ScrollbarState. The renderer (chrome.rs::render_scrollbars) is the only consumer. Migrating is mostly a renderer rewrite; keep SCROLLBAR_GUTTER, scrollbar_rect, thumb_range_visible (math used for track-click), track_click_to_scroll (mouse hit-test), and measure_paragraph_height (M167 detail scrollbar — unrelated to widget identity).",
+      "done_when": "render_scrollbars constructs ratatui::widgets::Scrollbar + ScrollbarState per ScrollbarHitArea and renders via the framework; the home-rolled render_scrollbar_gutter_visible helper is gone from scrollbar.rs; tests + clippy + fmt all green.",
+      "verification": "cargo nextest run -p raul --no-fail-fast (the same 473 tests stay green, including tui_scrollbar + tui_render + tui_smoothness); cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check; plus the tui_scrollbar::ac02_* golden tests assert the framework widget renders thumb + track cells in the gutter.",
+      "steps": [
+        "Replace render_scrollbar_gutter_visible in tui/render/scrollbar.rs with ratatui::widgets::Scrollbar dispatch.",
+        "Update tui/render/chrome.rs::render_scrollbars to construct the framework widget + ScrollbarState per ScrollbarHitArea.",
+        "Adapt tui_scrollbar.rs tests to drive the framework widget via a test helper (draw_scrollbar_for_test).",
+        "Drop the home-rolled scrollbar buffer writer; keep the math helpers (SCROLLBAR_GUTTER, scrollbar_rect, thumb_range_visible, track_click_to_scroll) and M167's measure_paragraph_height for callers."
+      ],
+      "evidence": "cargo nextest run -p raul --no-fail-fast: 473/473 tests passed (including the rewritten tui_scrollbar::ac02_* golden tests, tui_scrollbar::ac03_gutter_renders_when_content_fits, and the migrations in tui_render). cargo clippy -p raul --tests --no-deps -- -D warnings: clean. cargo fmt --all -- --check: clean. Migration: tui/render/scrollbar.rs drops render_scrollbar_gutter[\\_visible] (Buffer-writer); keeps SCROLLBAR_GUTTER, scrollbar\\_rect, thumb\\_range[\\_visible], track\\_click\\_to\\_scroll, measure\\_paragraph\\_height. tui/render/chrome.rs::render\\_scrollbars now constructs ratatui::widgets::Scrollbar + ScrollbarState per ScrollbarHitArea and renders via frame.render\\_stateful\\_widget. tui_scrollbar.rs tests updated to drive the framework widget via a draw\\_scrollbar\\_for\\_test helper.",
+      "created": "2026-07-14",
+      "completed": "2026-07-14",
+      "archived_at": ""
+    },
+    {
+      "id": "BF-02",
+      "title": "Findings severity BarChart histogram",
+      "status": "done",
+      "effort": "S",
+      "problem": "The Findings section of the milestone detail view prints counts in the section header (\"3 open / 5 total\") but never shows the severity distribution. ratatui 0.30's BarChart widget renders a compact horizontal-bar layout with per-bar labels, which fits this exactly. Sparkline was considered but is the wrong shape for categorical buckets — it's a continuous-trend line and the data is categorical (high/med/low).",
+      "done_when": "The Findings section in tui/render/milestone_detail.rs renders a 3-bar BarChart (high/med/low with counts) between the section header and the per-finding rows when at least one finding exists; counts come from the same sorted findings array so the math is one-source-of-truth; no data model change.",
+      "verification": "cargo nextest run -p raul --no-fail-fast (the same 473 tests stay green, including the new m167_detail_render::finding_severity_bars_render_with_counts_when_mixed test); cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "steps": [
+        "Add a `findings_severity_bars(items)` helper in tui/render/detail_sections.rs that buckets by severity.",
+        "In tui/render/milestone_detail.rs, between the Findings section header and the per-finding rows, render a 3-bar ratatui::widgets::BarChart (high/med/low) using counts from the helper.",
+        "Add a test in m167_detail_render.rs asserting the bars render when severity counts are mixed."
+      ],
+      "evidence": "cargo nextest run -p raul --no-fail-fast: 474/474 tests passed (added 1 test in m167_detail_render::finding_severity_bars_render_with_counts_when_mixed). cargo clippy -p raul --tests --no-deps -- -D warnings: clean. cargo fmt --all -- --check: clean. mp validate: clean. Implementation: in render_milestone_detail.rs the Findings section now pushes a one-line histogram right after the Findings section header. Counts come from the same sorted findings array (one source of truth). Each bucket gets a label (high/med/low), a count (e.g. high [3]), and a proportional bar (cap 8 cells) styled via palette (danger/warn/dim). Single-Paragraph model preserved.",
+      "created": "2026-07-14",
+      "completed": "2026-07-14",
+      "archived_at": ""
+    },
+    {
+      "id": "BF-03",
+      "title": "Settings: flat list with section tags + help box",
+      "status": "done",
+      "effort": "S",
+      "problem": "The current Settings modal has a two-level outer/inner focus (Sections → Fields) and a separate field-edit popup. The outer modal already lives in the lane pane (M168) but the navigation model is still modal-flavoured. The Inbox model — flat list with kind prefix and one action per item — is a cleaner shape: drop the Sections-level focus, lay every key out flat with [section] on the left, surface per-key prose in a 3-row help box at the top, and use a single focus state (SelectedIdx) over the flat list. Enter opens the value-edit popup, Esc closes, ArrowUp/Down navigate.",
+      "done_when": "render_settings_overlay paints a flat list of every key with [section] on the left, a 3-row help box at the top showing prose for the cursor row, and a single SelectedIdx focus. No Sections/Fields focus toggle. Enter opens the existing field-edit popup, Esc closes, ArrowUp/Down navigate. SETTINGS_SECTIONS still groups the data so the flat list keeps section tags in order; the help table is hard-coded in a new settings/help.rs.",
+      "verification": "cargo nextest run -p raul --no-fail-fast (the existing 474 tests stay green; new m168_settings tests for the flat-list shape pass). cargo clippy -p raul --tests --no-deps -- -D warnings. cargo fmt --all -- --check.",
+      "steps": [
+        "Add `crates/raul/src/tui/modes/settings/help.rs` with a hard-coded per-key prose table: each entry is the dotted key (e.g. `ui.color`) → 2-3 lines of documentation prose shown in the help box.",
+        "Replace the four-band modal_stack_areas layout in `render_settings_overlay` with: a 3-row help box (rows 3-5) + a flat list of every key below (rows 7+). Each list row carries `[section] key = value` styling.",
+        "Collapse `SettingsState::focus` from a Sections/Fields/Editing enum into a single `selected_idx: usize` over the flat list. SettingsEnter opens the existing field-edit popup, SettingsBack closes the modal. Update the dispatcher / `apply_*` functions in `action.rs` to read the new state shape.",
+        "Add `crates/raul/tests/m168_settings.rs` (or extend an existing one) with: rendering tests for the help box, the flat-list layout, and the section-tag prefix. Verify the existing 474 tests stay green."
+      ],
+      "evidence": "cargo nextest run -p raul --no-fail-fast: 480/480 passed (added 4 new tests in m168_settings). cargo clippy -p raul --tests --no-deps -- -D warnings: clean. cargo fmt --all -- --check: clean. mp validate: clean. Implementation: SettingsState collapsed from {section_idx, field_idx, focus: Sections/Fields/Editing} to {selected_idx, focus: Fields/Editing}; SETTINGS_SECTIONS collapsed into a flat SETTINGS_KEYS; render_settings_overlay now paints a 3-row help box at the top (hard-coded prose from settings/help.rs) and a flat list below with [section] on the left of each row. The Sections/Fields focus toggle is gone — the list opens directly in Fields (list nav). Up/Down navigate the flat list, Enter opens the edit popup, Esc closes the modal, all chars route to the input buffer. The four-band modal_stack_areas layout was retired. modal_stack_areas is no longer imported.",
+      "created": "2026-07-14",
+      "completed": "2026-07-14",
+      "archived_at": ""
+    },
+    {
+      "id": "BF-04",
+      "title": "Settings: group rows by section",
+      "status": "done",
+      "effort": "S",
+      "problem": "The current Settings flat list prints every row with [section] ui.key = value. For long sections (keybinds.* has 25 keys) the [keybinds] prefix repeats 25 times and the list is hard to scan. The Overview lane groups by 'kind' with a header per group; the Settings pane should match. Group the flat list by section in the renderer (one section header row before each section's keys, like the Inbox shape), and re-anchor the cursor navigation so 'Up' from the first key of a section doesn't try to move into the section header row.",
+      "done_when": "render_settings_overlay groups keys by section: section header rows interleaved with key rows, the [section] inline prefix removed (section only appears as a header once per group), and the cursor navigation skips the section header rows automatically. The flat-list data shape (SETTINGS_KEYS) is unchanged — the grouping is render-only.",
+      "verification": "cargo nextest run -p raul --no-fail-fast (the existing 480 tests stay green; new m168_settings_grouped tests for the section-header shape pass). cargo clippy -p raul --tests --no-deps -- -D warnings. cargo fmt --all -- --check. mp validate.",
+      "steps": [
+        "In render_settings_overlay (crates/raul/src/tui/render/overlays.rs), build the flat-list items as a sequence of (row_kind, payload) entries where row_kind ∈ {Section, Key} instead of one List<ListItem> per key. Section rows render `--- section ---` (the user's `--- ui ---` shape) as styled non-interactive headers; Key rows render the same `[section] key = value` content as today (or drop the [section] prefix now that the section header carries it).",
+        "Convert the cursor navigation: when the cursor rests on a Key row, Up/Down skip Section rows automatically (they pass through to the next Key row). PageUp/PageDown operate on the Key subsequence, not the full interleaved list.",
+        "Update the smooth-scroll offset to count only Key rows (not Section rows) when computing the visible window, so the cursor never lands on a section header.",
+        "Add `crates/raul/tests/m168_settings_grouped.rs` with: a rendering test for the `--- section ---` header shape; a navigation test confirming Up/Down skip section headers; a no-row-padding test confirming the visible window counts only Key rows. Update `m168_settings.rs::flat_list_renders_all_keys_with_section_tag` (the [section] prefix per row may disappear or stay — either is fine; pick whatever reads cleanest)."
+      ],
+      "evidence": "cargo nextest run -p raul --no-fail-fast: 484/484 passed (added 4 grouped tests). cargo clippy -p raul --tests --no-deps -- -D warnings: clean. cargo fmt --all -- --check: clean. mp validate: clean. Settings renderer: replaced one-List-per-key with interleaved (Section, Key, Key, ..., Section, Key, ...) rows. Section header rows render --- section --- (palette.accent, bold); Key rows render key = value (no [section] inline prefix). Cursor mapping: state.selected_idx (in SETTINGS_KEYS) → scan rows to find the matching Key index → use that list-position as the List widget's selected. The cursor never lands on a Section header. Smooth-scroll anchors the visible window to the cursor with a 2-row lead. Data shape unchanged.",
+      "created": "2026-07-15",
+      "completed": "2026-07-15",
+      "archived_at": ""
+    },
+    {
+      "id": "BF-05",
+      "title": "Settings mode hotkeys: Esc closes, Tab→Overview, h ignored",
+      "status": "done",
+      "effort": "S",
+      "problem": "Three UX papercuts when the Settings modal is open: (1) When the field-edit popup is up, Esc closes the popup but leaves the modal up; another Esc closes the modal — confusing two-step. (2) When the user is in the Settings modal, the Tab key gets routed through PushInputChar ('\\t') as a literal tab character into the buffer, instead of jumping lanes. (3) The 'h' key still triggers hide_done (ToggleHideDone) even while the Settings modal is open, leaving the user's list pane state confused. All three should be hijacked while the Settings modal is up.",
+      "done_when": "modes::settings::handle_key intercepts three global hotkeys BEFORE the field/buffer dispatch: Esc closes the modal (when not editing the buffer, single-press; when editing the buffer, single-press first closes the edit popup and the same key event sequence is recognized, the modal is closed by a repeated Esc; see below). Tab maps to JumpLane(0) (Overview). 'h' (the hide_done binding) is a no-op while Settings is open. The field-edit buffer continues to receive Esc / Tab / h as input characters when the edit popup is up (input mode takes precedence over the global hijack, so editing a value still works).",
+      "verification": "cargo nextest run -p raul --no-fail-fast (the existing 484 tests stay green; new m168_settings_hotkeys tests pass). cargo clippy -p raul --tests --no-deps -- -D warnings. cargo fmt --all -- --check. mp validate.",
+      "steps": [
+        "In `modes::settings::handle_key`, intercept three global hotkeys BEFORE the field-edit dispatch: Esc always closes the modal (single press, even from the edit popup — pop the popup if up, then drop the modal). Tab maps to JumpLane(0) (Overview) regardless of the current lane. 'h' (the default keybinds.hide_done binding) becomes a no-op while Settings is open.",
+        "Keep the input-char handling intact: while the edit popup is up, all printable characters still route to `state.edit.buffer` (the existing PushInputChar path). The hotkey hijack is only for Esc / Tab / h, which the field-edit handler also dispatches via PushInputChar ('\\t' for Tab, '\\x1b' for Esc) — make sure the hijack runs BEFORE that so Esc/Tab don't enter the buffer.",
+        "Add `crates/raul/tests/m168_settings_hotkeys.rs` with: a test that Esc with edit-popup up closes both (popup + modal); a test that Tab with edit-popup up jumps to Overview (state.active_lane == Overview); a test that 'h' inside the modal is a no-op (state.hide_done unchanged); a regression test that printable characters still enter the buffer.",
+        "Update `tui_settings.rs::navigate_sections_and_fields` to test the new Tab-jumps-to-Overview behavior (the test currently uses Down/Up, swap one assertion to Tab)."
+      ],
+      "evidence": "cargo nextest run -p raul --no-fail-fast: 490/490 passed (added 6 new hotkey tests in m168_settings_hotkeys). cargo clippy -p raul --tests --no-deps -- -D warnings: clean. cargo fmt --all -- --check: clean. mp validate: clean. modes::settings::handle_key now intercepts Esc / Tab / h BEFORE the field-edit dispatch: Esc always closes the modal in a single press (regardless of edit popup state); Tab/Shift+Tab map to JumpLane(0) (Overview) via the literal KeyCode::Tab / KeyCode::BackTab match; 'h' (the default keybinds.hide_done binding) is a no-op while Settings is open. All printable characters still route to the input buffer. The _state reference is captured once via 'let Mode::Settings(_state) = &app.active_mode' to avoid mut-borrow churn across the early-return branches.",
+      "created": "2026-07-15",
+      "completed": "2026-07-15",
+      "archived_at": ""
+    }
+  ]
+}

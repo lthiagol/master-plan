@@ -1,0 +1,97 @@
+{
+  "brief": {
+    "completed": "2026-06-30",
+    "created": "2026-06-18",
+    "status": "done"
+  },
+  "topics": [
+    {
+      "body": "Coding agents need a structured way to plan, track, and execute software engineering tasks. Existing project management tools are designed for humans, not agents. This toolkit provides a spec-driven pipeline where agents can autonomously decompose, implement, and verify work against a formal plan stored in JSON-canonical files co-located with the codebase.",
+      "builtin": true,
+      "id": "T01",
+      "key": "problem",
+      "order": 1,
+      "prompt": "What problem are you solving? Why does this project exist? Why now?",
+      "required": true,
+      "status": "filled",
+      "title": "Problem & motivation"
+    },
+    {
+      "body": "Primary audience: LLM-based coding agents (opencode, cursor, and similar AI coding assistants) that need to autonomously plan and execute multi-step software engineering work. Secondary audience: human developers who want to review, approve, or override agent plans. Explicitly NOT for: traditional project management (Jira/Linear users), non-technical stakeholders, or manual planning workflows.",
+      "builtin": true,
+      "id": "T02",
+      "key": "audience",
+      "order": 2,
+      "prompt": "Primary users or consumers. Who is explicitly NOT the audience?",
+      "required": true,
+      "status": "filled",
+      "title": "Who is it for?"
+    },
+    {
+      "body": "Plan initialization (mp init), milestone CRUD with spec-driven lifecycle, step-by-step execution tracking with dependency management, validation gates (G1-G13), spec authoring via interview or co-design, autonomous execution with agent handoff, brownfield analysis for existing projects, install and distribution via harness registry, fuzzy search across plan artifacts, milestone/step archival, configurable code review gate, annotation system for human-in-the-loop approval, raul TUI for human review and interaction, dogfooding the toolkit on itself.",
+      "builtin": true,
+      "id": "T03",
+      "key": "capabilities",
+      "order": 3,
+      "prompt": "What might it do? Brainstorm features or behaviors — rough is fine, no ordering yet.",
+      "required": true,
+      "status": "filled",
+      "title": "Rough capabilities"
+    },
+    {
+      "body": "Rust only (single language stack to minimize agent confusion). No external databases or services -- everything is filesystem-based JSON (mp plan artifacts are JSON-canonical since 2.0; v0/v1 plan.toml is no longer supported, this is a clean break with no back-compat shims). Must run on Linux and macOS with no extra runtime dependencies beyond the compiled binary. No network calls. Human interaction is read-only via raul TUI/CLI; all plan mutations are agent-driven through mp. Templates and schemas are embedded in the binary (zero-config install).",
+      "builtin": true,
+      "id": "T04",
+      "key": "constraints",
+      "order": 4,
+      "prompt": "Time, budget, stack preferences, platform, team size, legal, or technical limits.",
+      "required": true,
+      "status": "filled",
+      "title": "Constraints"
+    },
+    {
+      "body": "Inspired by: Spec-Driven Development patterns from AI coding agents (spec-first, verify-later), Docker CLI command nesting for discoverability, Cargo workspace/package structure for multi-crate Rust projects, and the Unix philosophy of small composable tools (mp + raul as separate binaries). Avoids: heavy web-based PM tools, config-as-code approaches that mix plan state with app config, and YAML-based specs.",
+      "builtin": true,
+      "id": "T05",
+      "key": "inspiration",
+      "order": 5,
+      "prompt": "Similar products, links, repos, or experiences you want to learn from or avoid.",
+      "required": false,
+      "status": "filled",
+      "title": "Inspiration & references"
+    },
+    {
+      "body": "Can mp handle concurrent agent sessions? What happens when two agents race on the same milestone? How should the dogfood plan version itself as the toolkit evolves? Is the brief format expressive enough for brownfield migrations? How do we handle plan-sync across branches? How should we handle corrupted or hand-edited plan files? These are tracked as open questions in specific milestones.",
+      "builtin": true,
+      "id": "T06",
+      "key": "unknowns",
+      "order": 6,
+      "prompt": "What don't you know yet? What needs research or a spike?",
+      "required": true,
+      "status": "filled",
+      "title": "Unknowns & open questions"
+    },
+    {
+      "body": "Agents can autonomously complete a full milestone lifecycle in this repo (dogfooding test passes). mp validate reports zero errors. CI pipeline is green. Another agent can pick up SESSION-HANDOFF.md and execute without human intervention. All 12 spec-ready milestones can be completed autonomously in order.",
+      "builtin": true,
+      "id": "T07",
+      "key": "success",
+      "order": 7,
+      "prompt": "How will you know this worked? Vague is OK — we'll sharpen this in the charter.",
+      "required": true,
+      "status": "filled",
+      "title": "What success looks like"
+    },
+    {
+      "body": "NOT a replacement for Jira/Linear or traditional PM dashboards. NOT a CI/CD pipeline or build system. NOT a code review tool. NOT a collaboration platform for distributed human teams. NOT a general-purpose task tracker. NOT a graphical tool -- all plan visualization is terminal-based.",
+      "builtin": true,
+      "id": "T08",
+      "key": "non_starters",
+      "order": 8,
+      "prompt": "What are you probably NOT doing in v1? Ideas to park, not reject forever.",
+      "required": true,
+      "status": "filled",
+      "title": "Explicit non-starters"
+    }
+  ]
+}

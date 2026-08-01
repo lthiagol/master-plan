@@ -1,0 +1,367 @@
+{
+  "milestone": {
+    "id": "169",
+    "title": "raul TUI — make Settings a real lane (replace modal, add Save/Cancel)",
+    "slug": "raul-tui-make-settings-a-real-lane-replace-modal-add-save-cancel",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-15",
+    "updated": "2026-07-15",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-15T16:05:30.346562+00:00"
+  },
+  "intent": {
+    "outcome": "Settings becomes a 5th lane with its own flat-list render, Save/Cancel affordance, and unchanged Tab/Shift+Tab cycle semantics. The double-Esc-out-of-modal workflow disappears; the BF-05 Tab hijack disappears; editing still dry-runs through `mp config set` before each write."
+  },
+  "problem": {
+    "description": "Today Settings opens as `Mode::Settings(SettingsState)` painted into `view.overlay_rect` (centered 70%×70% modal), with a centered popup layered on top for field editing. The BF-05 commit hijacks `Tab` and `BackTab` to `Action::JumpLane(0)` so they don't conflict with the field-edit buffer, which makes Tab from Settings go to Overview but Shift+Tab from Overview cannot reach Settings — the lane cycle is asymmetric. Esc has to be pressed once per layered overlay to escape (once for the popup, once for Settings), which is a real ergonomic cost. All of `crates/raul/src/tui/modes/settings.rs` (~219 lines), 8 Settings actions, the centered-popup overlay, and `tui_settings*`/`m168_settings*` tests exist only because Settings is a transient mode rather than a lane."
+  },
+  "scope": {
+    "in_scope": [
+      "Replace `Mode::Settings(SettingsState)` with a real lane: `Lane::Settings` already exists in `app.rs`'s `Lane::ordered()`; its render drops into the lane pane with the existing `Borders::ALL` chrome and the BF-03 grouped flat-list layout.",
+      "Add a footer-bar pair inside the Settings lane: `[Save (s)] [Cancel (Esc)]`. `s` writes the staged edits through `mp config set`, surfacing any dry-run / API failure in the footer flash; `Esc` discards them and stays on the lane (no lane change).",
+      "Drop the BF-05 Tab/BackTab hijack in `crates/raul/src/tui/modes/settings.rs:97-105`. Tab and Shift+Tab now use the default `next_lane` / `previous_lane` defaults — Settings is reached and left in both directions exactly like every other lane, with the default settings of Tab / Shift+Tab.",
+      "Remove `Mode::Settings(SettingsState)` and the 8 Settings-related actions: `OpenSettings`, `CloseSettings`, `SettingsEnter`, `SettingsSubmitEdit`, `SettingsBack`, `SettingsCancelEdit`, `PushInputChar`, `PopInputChar`. Replace with one new `Action::SettingsSave` carrying the staged-key writes.",
+      "Migrate `crates/raul/tests/tui_settings.rs`, `crates/raul/tests/tui_settings_automation.rs`, `crates/raul/tests/tui_settings_lane_smoke.rs`, `crates/raul/tests/m168_settings.rs`, `crates/raul/tests/m168_settings_grouped.rs`, `crates/raul/tests/m168_settings_hotkeys.rs`: keep the per-field dry-run + safety contract, port from modal-popup assertions to lane render assertions, drop the ones that asserted `Esc`-then-`Esc` semantics, and add a footer-bar assertion.",
+      "Replace the `SettingsState::new(config)` cache path with a lane-scoped ephemeral stage (App field or local variable): the lane reads the same `mp config show` payload, stages pending writes, and only commits them on `s`.",
+      "Update `crates/raul/src/tui/action.rs::apply_action`, `crates/raul/src/tui/runner.rs`, `crates/raul/src/tui/render/overlays.rs` to drop the Settings modal/overlay plumbing, and update `crates/raul/src/tui/keybinds.rs` to add an `open_settings` lane-activation default if needed (current `s` already works because `Lane::Settings` is already in the ordered list).",
+      "Update `crates/raul/src/tui/render/lane_lists.rs` (or wherever Settings ends up rendered) to surface the existing `SETTINGS_KEYS` enumeration under the new `[section]` group tags (BF-03) with the section header carrying the conventional `(total/visible)` count like other sections.",
+      "Update `docs/concepts/01 - Agent Integration/AGENT-READINESS.md` for the keybind change (`s` still opens, but now it's a lane transition rather than a modal; new `s` (save) reuses the same letter with different semantics — pick a different default or document the override).",
+      "Run `mp validate` after each plan write; keep dogfood-log entry inside this milestone's evidence."
+    ],
+    "out_of_scope": [
+      "New keybinds. The existing `keybinds.open_settings` (default `s`) and `keybinds.escape` (default Esc) keep their role; this milestone does not introduce a new top-level keybind.",
+      "New config keys. Everything writes through the existing schema; no `ui.settings.*` plumbing lands here.",
+      "Mouse/wheel handlers. Reuse the lane-list mouse path that exists for Milestones/Backlog.",
+      "Section-iconography changes (BF-03 introduced `◆` for the section header and `[section]` tags).",
+      "Persisting the staged edits across launches. Each launch loads from `mp config show` and stages fresh — if the user closes the TUI without `s`, the unsaved edits are lost. The agent-automation commit-after-execute path is unchanged.",
+      "Cross-platform / accessibility work — the footer-bar save/cancel pair is keyboard-driven exactly as the rest of raul.",
+      "Restoring the `BackTab → Settings` loop while keeping the BF-05 hijack anywhere — the hijack goes away. If someone wants a quick jump back to Settings later, the override lives on `next_lane` like every other default.",
+      "Touching M167's chrome findings (lane tab bar, M167 chrome pass) — they already landed clean and remain valid."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Pressing Tab while the active lane is Settings, Milestones, Backlog, Overview, or Path cycles app.active_lane along Lane::ordered() (wrapping at end). Pressing Shift+Tab cycles the same set in reverse. There is no BF-05 hijack: the literal Tab key inside Settings no longer reaches Action::JumpLane(0), and Shift+Tab from Overview reaches Settings rather than stalling.",
+      "verification": "cargo nextest run -p raul --test m167_keybinds --no-fail-fast",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-02",
+      "description": "Esc on the Settings lane is a no-op (same contract as every other list lane). No double-Esc is required, and the Settings modal pop + Settings lane pop layered escape is gone.",
+      "verification": "cargo nextest run -p raul --test m168_settings_hotkeys --no-fail-fast esc_closes_settings_twice_is_not_required",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-03",
+      "description": "Pressing s opens the Settings lane exactly once (single Lane::Settings activation on the first s; re-press is no-op while already on the lane). The lane renders the existing SETTINGS_KEYS flat list with [section] group tags.",
+      "verification": "cargo nextest run -p raul --test m168_settings --no-fail-fast s_opens_settings_lane_once",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-04",
+      "description": "Pressing Enter on a Settings row enters edit mode for that single field; editing accepts printable characters via the existing input-buffer path; Esc on an active edit cancels the staged value and leaves the lane; Enter again commits the staged value through mp config set. Repeated edit-and-save on different rows is idempotent.",
+      "verification": "cargo nextest run -p raul --test m168_settings --no-fail-fast enter_stages_value_then_enter_commits_via_mp_config_set",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-05",
+      "description": "Pressing the Save key (s once editing is done or with staged edits present) flushes every staged edit through mp config set --dry-run first. Any dry-run failure aborts the batch and surfaces the API error in the footer flash. A successful dry-run then commits each edit through mp config set and surfaces a success flash.",
+      "verification": "cargo nextest run -p raul --test tui_settings_automation --no-fail-fast save_dry_run_first_then_commit_per_staged_edit",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-06",
+      "description": "Leaving the Settings lane in any direction (Tab / Shift+Tab / mouse-click of another lane) discards any staged but unsaved edits. Reloading the lane calls mp config show again and presents fresh values from disk.",
+      "verification": "cargo nextest run -p raul --test m168_settings --no-fail-fast leaving_settings_lane_discards_staged_edits",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-07",
+      "description": "Settings lane footer shows [Save (s)] [Cancel (Esc)] (footer-bar affordance). The Save affordance is greyed/dimmed when no edits are staged; Esc and lane transitions are unaffected by the affordance state. Open Help / Settings / Annotation Thread use List::highlight_style for selection (M167 AC-41 preserved).",
+      "verification": "cargo nextest run -p raul --test m167_chrome --no-fail-fast settings_footer_affordance_and_list_highlight_style",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    },
+    {
+      "id": "AC-08",
+      "description": "All migrated and new tests pass; make test, cargo clippy --all-targets -- -D warnings, cargo fmt --all -- --check, make doctor, and make dep-audit-raul are clean; mp validate and mp milestone verify return ok: true.",
+      "verification": "make test && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && cargo fmt --all -- --check && make doctor && make dep-audit-raul && mp validate",
+      "status": "passed",
+      "evidence": "M169: Settings is Lane::Settings (no Mode::Settings modal). BF-05 removed. SettingsSave batch dry-run+commit. open_settings=Ctrl-O; s saves on Settings lane. 522 raul + 2328 full suite passed."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Settings as lane vs. modal",
+      "choice": "Replace the centered modal with a 5th lane rendering the existing SETTINGS_KEYS flat list inside the lane pane.",
+      "rationale": "Removes the layered Esc escape, removes the BF-05 Tab hijack, and unifies Settings with the lane cache, footer, header, and chrome — keeping Settings as a special case is what created the asymmetry. The lane already exists in Lane::ordered(); only the rendering plumbing needs to switch."
+    },
+    {
+      "area": "Save/Cancel affordance shape",
+      "choice": "Footer-bar pair [Save (s)] [Cancel (Esc)] plus an Action::SettingsSave for the save keymap.",
+      "rationale": "A footer affordance survives keymap changes, mirrors Milestone/Backlog footer hints, and makes Esc the only cancel path so we don't introduce a new keybind. s was previously open_settings; we keep it for save and document the override because rebinding open_settings would chase a different chord elsewhere."
+    },
+    {
+      "area": "Edit-buffer survival across the move",
+      "choice": "Replace the centered field-edit popup with an inline buffer rendered as a second row of the same group section (or as an ephemeral overlay on the lane). No permanent modal state; the buffer dies the moment the lane is left.",
+      "rationale": "Aligns with the edit-and-commit-after-execute model that the agent-automation block already proves out: staging stays in-memory, s flushes each stage through mp config set --dry-run then commits the whole batch, and leaving the lane (Esc → cancel / Tab + Shift+Tab → next lane) discards pending edits by construction."
+    },
+    {
+      "area": "Tab cycle semantics",
+      "choice": "Drop BF-05 entirely; Tab and Shift+Tab cycle both ways through Settings exactly like every other lane.",
+      "rationale": "BF-05 was a punt on the field-edit popup's keyboard collision. Once Settings is a lane with an inline edit buffer (or any buffered input stays inside one field at a time), the tab conflict disappears and the hijack is no longer load-bearing. The user's keyboard contract becomes uniform."
+    },
+    {
+      "area": "Dry-run safety",
+      "choice": "Keep the existing per-field mp config set --dry-run check. SettingsSave runs dry-run across every staged edit before commit; any failure aborts the batch and surfaces the API error in the footer flash. No new commits reach disk on a partial failure.",
+      "rationale": "Matches the BF-04 dry-run contract used by tui_settings_automation; the test fixture already exists."
+    },
+    {
+      "area": "Scope carve-out",
+      "choice": "Settings remains a single pane with the existing flat-list rendering; no group flattening (BF-03), no icon reworking, no new section vocabulary.",
+      "rationale": "BF-03 grouped settings with [section] tags (ui / workflow / git / next / agent / keybinds) and per-group section counts; that work is shipping-ready and the lane simply reuses it."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should s (the existing default open_settings) be rebound to settings_save and open_settings move to a new chord (e.g. Ctrl-S or :settings)?",
+      "status": "resolved",
+      "answer": "s stays as the save key. open_settings gets a new default chord Ctrl-O; the existing single-binding default s is re-bound via config.toml. Document both in AGENT-READINESS."
+    },
+    {
+      "id": "Q-02",
+      "question": "Tab keymap during an active inline edit buffer — should Tab still complete the edit (commit) instead of cycling lanes, mirroring modal-era semantics?",
+      "status": "resolved",
+      "answer": "Inside the Settings lane, Tab commits the active edit if there is a staged value (or moves to the next field when no edit is active); Tab cycles lanes only when no edit is active and no field is focused. Shift+Tab is the symmetric inverse."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Drop the modal",
+      "goal": "Replace Mode::Settings(SettingsState) with a real 5th lane render. Remove the BF-05 Tab/BackTab hijack and the 8 Settings actions, and update App state, dispatcher, and render so Settings behaves like every other lane.",
+      "rollback": "Revert settings.rs and the action/modes changes; restore Mode::Settings with the centered popup. Lane cache and footer changes are additive so no rollback needed there."
+    },
+    {
+      "id": "WP2",
+      "name": "Settings lane + inline edit buffer + Save/Cancel affordance",
+      "goal": "Render SETTINGS_KEYS inside the lane pane, stage per-field edits inline, expose a footer-bar [Save (s)] [Cancel (Esc)], and wire s (save) and Esc (cancel) to the existing mp config set path with the dry-run contract.",
+      "rollback": "Revert the new Action::SettingsSave and the staging buffer; revert App state additions; revert lane-render Settings code. Lane rendering reverts to the previous flat-list fallback or to the deleted modal."
+    },
+    {
+      "id": "WP3",
+      "name": "Test migration + close-out",
+      "goal": "Port the tui_settings* and m168_settings* integration tests from modal-popup assertions to lane-render assertions, drop tests that asserted Esc-then-Esc semantics, and pass make test, make doctor, make dep-audit-raul, mp validate, and mp milestone verify.",
+      "rollback": "Restore deleted test files from git; the new tests live alongside the originals so a revert of WP3 is just file deletion, not code changes in the other packages."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Move SettingsState from Mode::Settings to App.settings; remove Mode::Settings variant",
+      "files": [
+        "crates/raul/src/tui/mode.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "done_when": "Mode::Settings removed; settings state lives on App when active_lane is Settings",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Remove BF-05 Tab hijack and legacy Settings actions; add Action::SettingsSave; wire lane-based key dispatch in normal.rs and settings.rs",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/modes/normal.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test m167_keybinds --no-fail-fast",
+      "done_when": "Tab/Shift+Tab cycle through Settings both ways; OpenSettings/CloseSettings/etc removed",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Render Settings in lane pane (not overlay); drop modal plumbing from render/mod.rs and overlays.rs",
+      "files": [
+        "crates/raul/src/tui/render/mod.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test m168_settings --no-fail-fast",
+      "done_when": "Settings renders in content pane when Lane::Settings is active without Mode::Settings",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add staged_edits to SettingsState; implement Action::SettingsSave with dry-run batch commit; Tab-during-edit semantics per Q-02",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/mode.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_settings_automation --no-fail-fast save_dry_run_first_then_commit_per_staged_edit",
+      "done_when": "SettingsSave dry-runs all staged edits before batch commit",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Settings lane footer affordance [Save (s)] [Cancel (Esc)]; discard staged edits on lane leave",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test m167_chrome --no-fail-fast settings_footer_affordance_and_list_highlight_style",
+      "done_when": "Footer shows Save/Cancel; Save dimmed when no staged edits; lane leave discards",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Rebind open_settings to Ctrl-O default; s on Settings lane triggers SettingsSave",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/modes/normal.rs",
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test m168_settings --no-fail-fast s_opens_settings_lane_once",
+      "done_when": "open_settings navigates to lane; s saves on Settings lane",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Migrate tui_settings* and m168_settings* tests from modal to lane assertions; add missing AC tests",
+      "files": [
+        "crates/raul/tests/tui_settings.rs",
+        "crates/raul/tests/tui_settings_automation.rs",
+        "crates/raul/tests/tui_settings_lane_smoke.rs",
+        "crates/raul/tests/m168_settings.rs",
+        "crates/raul/tests/m168_settings_hotkeys.rs",
+        "crates/raul/tests/m168_settings_grouped.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test m168_settings_hotkeys --no-fail-fast esc_closes_settings_twice_is_not_required",
+      "done_when": "All settings tests assert lane semantics not modal",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Update AGENT-READINESS.md for keybind change; close-out make test clippy fmt doctor dep-audit-raul mp validate",
+      "files": [
+        "docs/concepts/01 - Agent Integration/AGENT-READINESS.md"
+      ],
+      "tests": "make test && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && cargo fmt --all -- --check && make doctor && make dep-audit-raul && mp validate",
+      "done_when": "Full suite green; docs updated",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-15",
+    "branch": "",
+    "evidence": "M169-rev: four findings from external review remediated in place. (1) HIGH: load_settings_lane early-returns when app.settings is populated; JumpLane(4) / mouse-click of Settings tab while already on Settings no longer wipes staged_edits. (2) MED: set_config_value removed; apply_settings_commit_edit no longer shadows mp's parse_bool/parse_icons coercion; apply_settings_enter prefers staged_edits over mp config get for re-edit buffer. (3) MED: apply_settings_save now tracks committed keys on commit-time failure and surfaces partial state via reload_settings_after_save_keeping - failed key stays in staged_edits, committed keys are dropped so retry only re-tries the failed one. (4) LOW: tab_move_up/down now wrap (AC-01 verbatim). (5) LOW: staged_edits is BTreeMap<String,String> for deterministic key-sorted iteration. 14 regression tests in crates/raul/tests/m169_rev.rs; 2342/2342 tests pass; clippy + fmt + doctor + dep-audit-raul + mp validate + mp milestone verify all green."
+  }
+}

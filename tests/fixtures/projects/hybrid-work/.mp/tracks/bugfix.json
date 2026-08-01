@@ -1,0 +1,39 @@
+{
+  "track": {
+    "kind": "bugfix",
+    "title": "Bugfixes",
+    "perpetual": true,
+    "scope": "Production fixes without milestone ceremony",
+    "created": "2026-06-17"
+  },
+  "items": [
+    {
+      "id": "BF-01",
+      "title": "Fix null pointer on empty search query",
+      "status": "done",
+      "effort": "S",
+      "problem": "API 500 when q= is empty",
+      "done_when": "Empty query returns 200 with empty results",
+      "verification": "cargo test search_empty_query",
+      "steps": ["Guard empty query in search handler"],
+      "evidence": "test passed 2026-06-15",
+      "created": "2026-06-15",
+      "completed": "2026-06-15",
+      "archived_at": ""
+    },
+    {
+      "id": "BF-02",
+      "title": "Retry timeout on webhook delivery",
+      "status": "pending",
+      "effort": "S",
+      "problem": "Transient failures drop events",
+      "done_when": "Webhook retried up to 3 times with backoff",
+      "verification": "cargo test webhook_retry",
+      "steps": ["Add retry policy to webhook client"],
+      "evidence": "",
+      "created": "2026-06-17",
+      "completed": "",
+      "archived_at": ""
+    }
+  ]
+}

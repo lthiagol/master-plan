@@ -1,0 +1,132 @@
+{
+  "ideas": [
+    {
+      "id": "ID-01",
+      "title": "mp serve: socket-mode for test fan-out (deferred)",
+      "body": "@/Users/thiago/Code/Pessoal/master-plan/.mp-scratch/m-batch-create-20260712-215643/id01.body",
+      "status": "open",
+      "tags": [
+        "performance",
+        "testing",
+        "architecture",
+        "deferred"
+      ],
+      "source": "conversation",
+      "created": "2026-07-12",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-02",
+      "title": "M147 external review and remediation close-out",
+      "body": "External review of commit 38095d2 found three additional correctness defects in the agent-enforced automation contract:\n\n- F-03 (high): reviewer severity vocabulary did not match SeverityRank, silently disabling auto-remediation.\n- F-04 (medium): per-milestone branching ran after claim and hard-coded `main`.\n- F-05 (medium): commit_after_execute committed before milestone completion, excluding plan evidence and permitting commits for rejected completion.\n\nRunner remediation landed in `238415a3da86f13e1928c317cab538e08011dabd` with seven semantic contract tests. Fresh stage-10 re-review passed: skill-contract nextest 15/15, fmt exit 0, clippy clean, `mp milestone verify 147` 6/6 runnable-pass, M147 L5 audit 0 violations, and all five findings fixed. Review verdict recorded by `pi-m147-rereviewer`.\n\nLesson captured as `docs/code-review-lessons.md` L63: agent-enforced policy needs one vocabulary across config, parser, and skill instructions.\n",
+      "status": "archived",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-14",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-03",
+      "title": "Surface deferred milestones on the path (lane or --include flag)",
+      "body": "# Context\n\nToday the `raul path` / `mp path` surfaces filter out `execution_status: deferred` milestones entirely — they are invisible to the actionable-work view, and the only way to find them is `mp list milestones --where 'execution_status==deferred'` (or the milestones tab in `raul`). With `deferred count = 1` (M158) this is fine; once deferrals accumulate across cycles, \"I forgot M158 existed\" becomes the failure mode.\n\nThe deferred/blocked distinction in the data model is ORTHOGONAL (both are filtered out of path today, both have different resolution workflows — `reopen` for deferred, `unblock` for blocked), but they share the same user-facing problem: neither is reachable from the path tab.\n\n# Problem\n\nOperating path tabs that filter out \"not-now\" milestones make reversibility expensive:\n- `mp milestone reopen <id>` is a deliberate command the agent has to remember.\n- The deferral reason is buried in the milestone JSON; nothing in the path surface reminds the operator what was parked and why.\n- Audit hygiene degrades: deferred milestones rot when out of sight.\n\n# Proposal (deferred-friendly shape)\n\nTwo-tier design, scale-gated:\n\n| Project state       | Surface                                                                                  |\n|---------------------|------------------------------------------------------------------------------------------|\n| 0-3 deferred        | Add `--include deferred` flag to `mp path` / `raul path` (one-key toggle, hidden by default). Blocked can ride the same flag. |\n| 4+ deferred         | Promote to a real `Deferred` lane in `raul`, last position. Header shows count (`Deferred (4)`), default-collapsed so the lane list stays short. Symmetric treatment for `Blocked`. |\n\n# Open questions\n\n1. In-lane action affordance — read-only list with \"use `mp milestone reopen <id>`\" help text, or one-key in-place `reopen`?  Start read-only.\n2. Naming: `Deferred` vs `Parked`. (Avoid `Backlog` — that surface already exists for non-milestone-scoped deferrals.)\n3. Same treatment for `Blocked`? Symmetric — yes per the orthogonal-but-similar UX argument.\n4. Ordering inside the lane/flag — by deferral date? by id? by priority?\n5. CLI parity: does `mp path` get a `deferred:` section in its output too, or is this TUI-only?\n\n# Stretch\n\n- Per-agent handoff: the runner can carry a \"deferred backlog\" page in the lane so the human can sweep reopens between sessions.\n- Visibility into why a milestone is blocked (vs deferred) at a glance in the lane header.\n\n# Tags\n\n`path`, `raul`, `deferred`, `ux`, `tui`. Promote to milestone when `deferred count >= 4` (currently 1 with M158).",
+      "status": "open",
+      "tags": [
+        "path",
+        "raul",
+        "deferred",
+        "ux",
+        "tui"
+      ],
+      "source": "conversation",
+      "created": "2026-07-14",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-04",
+      "title": "M177 complete + external review remediations",
+      "body": "Verification gate hardening shipped: prose detector in classify_with, write-time prose_warning, mp migrate manual-prefix-backfill (81 ACs), MP_VERIFY_DEFAULT_NO_SHELL docs, mp edit strip-deferred-reason. External CR remediations: quote-aware semicolon split, shell prefix allowlist, migrate CLI tests, dry-run files_modified=0, store::write_milestone. lifecycle=complete; reviews pass ok.",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-16",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-05",
+      "title": "M170 complete — backlog hygiene + review remediations",
+      "body": "M170 shipped B-78/B-83/TW-03/TW-10/TW-22. External clean-context review: F-02..F-06 remediated (CHANGELOG restore, Assigned docs, F-01 accepted). lifecycle=complete, reviews pass ok. Dogfood entry 36 for changelog wipe bug.",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-16",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-06",
+      "title": "M176 complete — perf AC re-spec + mp_measure!",
+      "body": "M176 shipped perf_measure, reality-check lint, PERF-ACS, re-specs for M159/M160/M161. External review remediations applied (honest deferred thresholds, no double-run, docs). lifecycle=complete, reviews pass ok.",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-16",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-07",
+      "title": "M175 complete — skill deploy + top-5 in-process conversion",
+      "body": "M175: recursive skill deploy regression tests; full top-5 suite conversion via lib_api::run (0 env.run); M162 wall-clock ACs replaced by conversion metric. External review remediations applied. lifecycle=complete.",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-16",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-08",
+      "title": "M187 runner hand-off ready",
+      "body": "# Runner hand-off (a) — M187 Persistence: PlanWriteTxn and multi-file transactions\n\n## Session boundary (L5)\n- **Coordinator session:** planning/spec/approve for code-review remediation Groups A–G.\n- **Runner session:** must be a **new** session. Do not continue this chat as the executor.\n- Executor must **not** run `mp reviews pass` on their own work.\n\n## Approved milestone\n| Field | Value |\n|-------|--------|\n| ID | **187** (M187) |\n| Title | Persistence: PlanWriteTxn and multi-file transactions |\n| lifecycle / spec_status | approved / ready |\n| Priority | high |\n| Source | `code-review-fixes.txt` GROUP A (Findings 1–2 + inventory) |\n\n## Acceptance criteria\n| AC | Verification |\n|----|----------------|\n| AC-01 | `cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast` |\n| AC-02 | `cargo nextest run -p mp --test mutation_transactions --no-fail-fast` |\n| AC-03 | `cargo clippy -p mp --tests --no-deps -- -D warnings` |\n\n`mp plan verify-ac 187` → ok, 0 unresolvable (see `m187-verify-ac.json` in this scratch).\n\n## Work packages / first claim\n- **WP1** PlanWriteTxn lock discipline — start at **S1** (`mp next` already points here).\n- **WP2** Multi-file transaction engine — S4–S6 after WP1 foundations.\n\nNote: `crates/mp/tests/mutation_transactions.rs` is a **failing stub** so AC-02 resolves. Replace with real failpoint coverage in S4; do not delete the binary.\n\n## Planning notes\n- Watch/runtime state must **not** use `PlanWriteTxn` for the Watch lifetime.\n- Activity append is post-commit best-effort on a **non-relocking** path.\n- Init/relocate need a **project-root** lock (plan-dir lock moves).\n- Inventory of unlocked writers is in `code-review-fixes.txt` under Group A.\n\n## Downstream drafts (do not execute yet)\n| Group | Milestone | Depends on | Status |\n|-------|-----------|------------|--------|\n| B Schema/input | M188 | 187 | draft |\n| C Lifecycle | M189 | 187 | draft |\n| D Watch | M190 | 188,189 | draft |\n| E Raul UI | M191 | 189 | draft |\n| F Security | M192 | 187,188 | draft |\n| G Cleanup/comments | M193 | 190,191,192 | draft |\n\nDogfood: Entries 38–44 in `mp-dogfood-log.md` point at M187–M193.\n\n## Out of scope for M187\nLifecycle/Watch/Raul UI, schema/input hardening, trust/install, comment cleanup.\n",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-07-19",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-09",
+      "title": "raul TUI settings: skill/component manager — list installable agents + skills, install/reinstall",
+      "body": "Today install/reinstall of agent + skill components is CLI-only (mp install, mp install --list-skills, mp install --check for drift). Add a settings screen in the raul TUI that acts as a skill/component file manager: enumerate every installable agent and skill component from the mp skill registry, show per-harness deployment state (installed / missing / stale), and let the human install, reinstall, or remove components. Reuses the existing mp install machinery (registry + per-harness deploy) behind a TUI surface, giving a visible, manageable view of what is deployed across OpenCode/Cursor/Pi and surfacing drift interactively. Scope hint: read side = mp install --list-skills --format json + mp install --check; write side wraps mp install / mp uninstall with a confirmation step.",
+      "status": "open",
+      "tags": [
+        "raul",
+        "tui",
+        "skills",
+        "install"
+      ],
+      "source": "session",
+      "created": "2026-07-24",
+      "promoted_to": ""
+    },
+    {
+      "id": "ID-10",
+      "title": "Harden install-helper tests and CI mp PATH",
+      "body": "Install tests prepend install bin to PATH (path_with_install_bin); CI puts target/release on PATH for raul find_mp. See docs-old/WIP-CI-HANDOFF.md and docs-old/WIP-CI-FOLLOWUP-HANDOFF.md.",
+      "status": "open",
+      "tags": [],
+      "source": "conversation",
+      "created": "2026-08-01",
+      "promoted_to": ""
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "p0-validate-ok",
+  "phase": "implemented",
+  "description": "Minimal valid plan passes validate",
+  "fixture": "projects/minimal-ready",
+  "command": ["validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": false
+  }
+}

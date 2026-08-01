@@ -1,0 +1,90 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "02"
+title = "Adoption and PM surface"
+slug = "adoption-pm"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["01"]
+effort = "L"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Profiles, brief, ideas, session, inbox, graph, charter."
+
+[problem]
+description = "WS1–WS4 adoption + PM commands (P3)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "profiles",
+    "brief",
+    "ideas",
+    "session",
+    "inbox",
+]
+out_of_scope = [
+    "delta specs",
+    "export views",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "WS integration tests"
+verification = "cargo test -p mp"
+status = "passed"
+evidence = "shipped; cargo test -p mp green"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "shipped; cargo test -p mp green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

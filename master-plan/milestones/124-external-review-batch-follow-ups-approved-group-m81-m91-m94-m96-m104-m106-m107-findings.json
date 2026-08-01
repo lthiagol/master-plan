@@ -1,0 +1,385 @@
+{
+  "milestone": {
+    "id": "124",
+    "title": "External review batch follow-ups (approved group) — M81/M91/M94/M96/M104/M106/M107 findings",
+    "slug": "external-review-batch-follow-ups-approved-group-m81-m91-m94-m96-m104-m106-m107-findings",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-06",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "The actionable findings from the 2026-07-05 external code-review batch's approved-group milestones (M81, M91, M94, M96, M104, M106, M107) are addressed in code, docs, and tests. M108 and M109 had zero findings and are not in scope. The highest-priority item is M104 ER-3 (two missed lifecycle gate-read sites) because it MUST land before the deferred bulk lifecycle migration is applied to the dogfood plan, otherwise `mp milestone set-status` emits false G7/G8 errors."
+  },
+  "problem": {
+    "description": "The 2026-07-05 external review batch produced 14 per-milestone reports (docs/code-review/M*-external-review.md) plus SUMMARY.md. Six of the approved-group milestones carried actionable findings beyond pure nits: M104 ER-3 (medium, latent post-migration gate-read miss), M96 ER-1 (medium, CHANGELOG 'unreleased' header for a shipped GA), M91 ER-1/ER-2 (medium, stale help copy + narrow-width active-tab clip), M106 ER-5 (low, unbounded drain buffer — the only M106 finding not already fixed downstream), M107 ER-1/ER-2 (low, ungated use import + §3 doc drift), plus low-severity items on M81 and M94. None block the milestones as shipped (they are all approved), but they should be cleared rather than left to rot. This milestone bundles them so they ship together with consistent regression coverage."
+  },
+  "scope": {
+    "in_scope": [
+      "M104 ER-3: reroute the two gate-read sites in validate_milestone_start_execution (gates.rs:194-200 builds done_ids from raw execution_status) and set_execution_status done-arm (milestone.rs:748 reads raw spec_status != verified) through the already-pub effective_spec_status / effective_execution_status helpers. This unblocks mp milestone set-status on migrated milestones and is a hard prerequisite for the deferred bulk lifecycle migration.",
+      "M106 ER-5: cap the pipe_drain_thread buffer (ac_verify.rs pipe_drain_thread ~:505-540) at a generous ceiling (e.g. 1MB) with a '<output truncated at N bytes>' sentinel; correct the doc comment that currently claims the 4KB chunk size 'keeps memory bounded' (it bounds lock hold time, not total buffer size). Display layer already truncates to 2000 chars so the tail is never shown.",
+      "M107 ER-1: gate the `use std::os::unix::process::CommandExt` import at ac_verify.rs:12 with #[cfg(unix)] to match the already-gated process_group(0) call site. Currently the unconditional import breaks Windows builds at the import itself before the gated call site is reached.",
+      "M107 ER-2: update verifier-cancellation.md §3 item 3 to match the F-2 waitpid-based regression test (currently still describes the kill(-pid,0) ESRCH probe and a 3s budget that the test does not use; test asserts waitpid WIFSIGNALED/WTERMSIG and elapsed < 1s). Add the audit-log pointer matching the §2a pattern.",
+      "M91 ER-1: refresh the in-app help overlay and footers — replace stale 'Navigate sidebar lanes' copy (render.rs:1643) and add Page Up/Down + mouse wheel rows (AC-09 obligation not met by the walkthrough-doc-only S7 commit). Tighten s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys to assert !contains('sidebar lanes') and that the help body references Page Up/Down.",
+      "M91 ER-2: harden compute_tab_bar_layout narrow-width overflow (render.rs:148-218) so the active tab label is never entirely clipped at widths 7-14; lower the width<6 ultra-narrow guard to also fire when active_label_width+1 > width. Add a parametrized regression test over width in 6..=16 x active in {Overview, Milestones, Board}.",
+      "M91 ER-3: fix the list-row mouse click off-by-one in runner.rs:289-293 (saturating_sub(2) should be saturating_sub(3) to account for the block top border/title row inside the content area). Verify against Board/Overview which render without a list block.",
+      "M91 ER-4: remove the dead Event::GoToBoard dispatch arm (runner.rs:467-469) and the event.rs:38 mapping now that the global 'b' handler at runner.rs:146 short-circuits it; leave the global handler as the single source of truth.",
+      "M96 ER-1: stamp the CHANGELOG.md v2.0.0 GA section header with its ship date (currently '## v2.0.0 (unreleased) — 2.0 GA' for a shipped GA).",
+      "M96 ER-2: delete the duplicate '## v2.0.0-rc.4 (2026-07-01)' header at CHANGELOG.md:189.",
+      "M96 ER-3: add rc.5/rc.6 entries to the GA section's rc history bridge (currently documents rc.1-rc.4 only, omitting the two most recent rc cuts before GA).",
+      "M94 ER-1: make idempotent/no-op bulk ops a true no-op — with_milestone_mut_unlocked (milestone.rs:298-308) currently always sets updated=today() and rewrites the file even when nothing changed; skip the write when the mutated doc is byte-equal to the loaded doc.",
+      "M94 ER-2: avoid cloning the whole depends_on graph per add-depends-on target in bulk (depends_on_creates_cycle_in_graph, O(N²) per batch); pass the pre-built snapshot graph through the bulk path.",
+      "M94 ER-3: relax the TOCTOU docstring on the cycle check now that M113's advisory plan-write lock serializes writes; rephrase from 'graph may be stale' to the accurate 'serialized by the plan-write lock'.",
+      "M94 ER-4: when both --ids and --where are passed to mp milestone bulk, resolve --ids alone if --where has no matches (or emit a warning) rather than aborting the whole command on a bogus --where entry.",
+      "M81 ER-1: replace the 'bf add → bf done' shorthand in docs/concepts/02 - Getting Started/SIZE-ROUTING.md:9 with the full 'mp track add bugfix … → mp track done bugfix BF-NN' form used elsewhere in the same doc.",
+      "Cross-cutting tracking item: the Pattern 1 'AC passed but code absent' reconciliation for the changes-requested group (M100/M101/M102/M103) is deliberately deferred per the 2026-07-05 review decision and is tracked there — NOT in this milestone. Document this scope boundary in the milestone's own design decisions so future readers don't expect it here."
+    ],
+    "out_of_scope": [
+      "The changes-requested group (M95, M100, M101, M102, M103) — those are reopened with their own findings; their remediation is separate.",
+      "M108 and M109 — zero findings in the external review.",
+      "Adding a 'critical' severity level to the mp reviews finding schema (the M100 ER-1 finding had to be filed as 'high' because the schema only accepts high/medium/low). Minor mp-tooling gap; filed as a dogfood observation, not gated here.",
+      "Re-statusing the mis-stamped ACs/findings on M100/M101/M102/M103 (the user explicitly deferred this to separate triage; the reopen + new findings is the chosen signal)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "M104 ER-3 closed: validate_milestone_start_execution (gates.rs) builds done_ids via effective_execution_status, and set_execution_status's done-arm checks effective_spec_status == 'verified' instead of the raw field. A migrated milestone (legacy fields empty, lifecycle set) can be moved with mp milestone set-status without false G7/G8 errors. Regression test pins both rerouted sites.",
+      "verification": "cargo test -p mp --test lifecycle_gates_post_migration && cargo test -p mp --lib effective_spec_status && cargo test -p mp --lib effective_execution_status",
+      "status": "passed",
+      "evidence": "M124 S01+AC-01 closed. Both rerouted call sites (gates.rs:194-207 done_ids via effective_execution_status; milestone.rs:747-753 done-arm via effective_spec_status) verified by 5 tests: 2 lib unit tests in crates/mp/src/validate/plan.rs (effective_spec_status_*, 5 assertions) + 3 integration tests in crates/mp/tests/suites/lifecycle_gates_post_migration.rs (existing 2 + new gates_g8_survives_*, new set_execution_status_done_arm_*). Regression confirmed: pre-fix tests fail with false G8 'dependency not done' and false 'requires spec_status verified' on migrated milestones; post-fix all green."
+    },
+    {
+      "id": "AC-02",
+      "description": "M106 ER-5 closed: pipe_drain_thread caps its Arc<Mutex<Vec<u8>>> buffer at a documented ceiling (e.g. 1MB) and emits a '<output truncated at N bytes>' sentinel; the doc comment no longer claims the chunk size bounds total memory. A test asserts a child emitting >cap bytes does not grow the buffer beyond cap+sentinel.",
+      "verification": "cargo test -p mp --test ac_verify_drain_buffer_cap",
+      "status": "passed",
+      "evidence": "M124 S02+AC-02 closed. ac_verify.rs pipe_drain_thread caps buffer at DRAIN_BUF_CAP_BYTES=1MiB; emits '<output truncated at N bytes>' sentinel on cap hit; keeps draining pipe (child never blocks). Doc comment now accurate (chunk size = lock-hold bound, total = cap). Pinned by 4 integration tests in crates/mp/tests/ac_verify_drain_buffer_cap.rs: (1) caps_buffer_at_documented_ceiling — 2x cap input, asserts buffer <= cap+sentinel; (2) emits_truncation_sentinel_exactly_once — sentinel appears 1x, reports cap value; (3) does_not_cap_below_ceiling — 64KiB payload round-trips unchanged, no sentinel; (4) keeps_reading_pipe_after_cap — chunked 3x cap input drains completely, buffer bounded. All 4 tests fail on pre-fix code (3/4 with cap-path assertions), all pass on post-fix. cargo test -p mp --test ac_verify_drain_buffer_cap: 4/4 ok. cargo test -p mp --lib ac_verify: 10/10 ok (no regressions in existing 5 pipe_drain_thread tests + others)."
+    },
+    {
+      "id": "AC-03",
+      "description": "M107 ER-1 and ER-2 closed: the `use std::os::unix::process::CommandExt` import is #[cfg(unix)]-gated (ac_verify.rs), and verifier-cancellation.md §3 item 3 describes the waitpid WIFSIGNALED/WTERMSIG probe and the <1s budget that the test actually uses.",
+      "verification": "grep -n '#\\[cfg(unix)\\]' crates/mp/src/ac_verify.rs | head -3 && grep -q 'waitpid' crates/mp/docs/verifier-cancellation.md && grep -q 'WIFSIGNALED' crates/mp/docs/verifier-cancellation.md",
+      "status": "passed",
+      "evidence": "M124 S03+AC-03 closed. ac_verify.rs:14 now has #[cfg(unix)] gate on std::os::unix::process::CommandExt import; matches the gated process_group(0) call sites (631, 693). verifier-cancellation.md §3 item 3 describes the waitpid WIFSIGNALED/WTERMSIG probe and the <1s join + <2s reap budgets that the F-2 test actually asserts. Audit log block (M124/M107 ER-2) appended matching §2a pattern. Pinned by grep: grep -n '#[cfg(unix)]' crates/mp/src/ac_verify.rs | head -3 returns 14, 631, 693 (3 hits as required); grep -q waitpid crates/mp/docs/verifier-cancellation.md passes; grep -q WIFSIGNALED crates/mp/docs/verifier-cancellation.md passes. cargo check -p mp clean; cargo test -p mp global_deadline_cancels_worker: 1/1 ok."
+    },
+    {
+      "id": "AC-04",
+      "description": "M91 ER-1, ER-2, ER-3, ER-4 closed: in-app help overlay and footers document Page Up/Down + wheel and contain no 'sidebar lanes' reference; compute_tab_bar_layout renders the active tab label at widths 6-16 without clipping (parametrized test); list-row mouse click math accounts for the block border (off-by-one fixed); dead Event::GoToBoard arm removed.",
+      "verification": "cargo test -p raul --test tui_tab_bar && cargo test -p raul --test tui_mouse && cargo test -p raul s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys",
+      "status": "passed",
+      "evidence": "M124 S04+AC-04 closed. All four M91 ER findings addressed: ER-1 (help overlay/footers doc Page Up/Down + wheel; no 'sidebar lanes' reference); ER-2 (compute_tab_bar_layout narrow-width overflow hardened; new parametrized test over width 6..=16 × {Overview, Milestones, Board}); ER-3 (list-row mouse click math: y.saturating_sub(2) → saturating_sub(3) accounting for block border); ER-4 (dead Event::GoToBoard arm + 'b' mapping removed; global 'b' handler is single source of truth). Pinning test suite: cargo test -p raul --test tui_tab_bar 48/48 ok (including s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys now tightened with sidebar-lanes/Page-Up/Wheel assertions); cargo test -p raul --test tui_mouse 9/9 ok (overflow_hit_test_matches_render_column_walk updated to match the new indicator-drop cursor); cargo test -p raul --test tab_bar_narrow_width 7/7 ok (including 2 new parametrized tests); cargo test -p raul all suites green."
+    },
+    {
+      "id": "AC-05",
+      "description": "M96 ER-1, ER-2, ER-3 closed: CHANGELOG.md v2.0.0 section header carries its ship date (no 'unreleased'), the duplicate rc.4 header is gone, and rc.5/rc.6 appear in the rc history bridge.",
+      "verification": "manual: grep -qE '## v2\\.0\\.0 \\(2026-07' CHANGELOG.md && ! grep -c '## v2.0.0-rc.4' CHANGELOG.md | grep -q '^2$' && grep -q 'rc\\.5' CHANGELOG.md && grep -q 'rc\\.6' CHANGELOG.md [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M124 S05+AC-05 closed. CHANGELOG.md v2.0.0 section header now carries ship date (2026-07-03). Duplicate rc.4 header removed (count went from 2 to 1). rc.5 and rc.6 entries added to the rc history bridge. Pinned by grep checks (all pass): (1) grep -qE '## v2\\.0\\.0 \\(2026-07' CHANGELOG.md; (2) grep -c '## v2.0.0-rc.4' CHANGELOG.md returns 1 (not 2); (3) grep -q 'rc\\.5' CHANGELOG.md and grep -q 'rc\\.6' CHANGELOG.md both pass. mp validate --summary: 0 errors, 0 warnings."
+    },
+    {
+      "id": "AC-06",
+      "description": "M94 ER-1, ER-2, ER-3, ER-4 closed: idempotent bulk ops skip the file rewrite when nothing changed (no updated bump); the cycle-check graph is built once per batch (not per target); the TOCTOU docstring reflects the M113 plan-write lock; a bogus --where entry with valid --ids does not abort the whole command.",
+      "verification": "cargo test -p mp --test suite_milestone milestone_bulk::idempotent_no_op_skips_write && cargo test -p mp --test suite_milestone milestone_bulk::bogus_where_with_valid_ids_does_not_abort && cargo test -p mp --test suite_milestone milestone_bulk::cycle_check_does_not_mutate_input_graph",
+      "status": "passed",
+      "evidence": "M124 S06+AC-06 closed. M94 ER-1 (idempotent no-op skip-write), ER-2 (cycle check no longer clones input), ER-3 (docstring reflects M113 lock), ER-4 (bogus --where with valid --ids falls back with warning) all addressed. Pinned by 3 new integration tests in crates/mp/tests/suites/milestone_bulk.rs: idempotent_no_op_skips_write (bulk set-priority same value — updated unchanged), bogus_where_with_valid_ids_does_not_abort (bogus --where + valid --ids — warning + --ids applied), cycle_check_does_not_mutate_input_graph (graph snapshot unchanged after cycle walk). cargo test -p mp --test suite_milestone milestone_bulk: 17/17 ok. Full cargo test -p mp: no regressions. mp validate 0/0."
+    },
+    {
+      "id": "AC-07",
+      "description": "M81 ER-1 closed: SIZE-ROUTING.md no longer uses the 'bf add'/'bf done' shorthand; uses the full 'mp track add bugfix … → mp track done bugfix BF-NN' form consistent with the rest of the doc.",
+      "verification": "! grep -q '\\`bf add\\`' 'docs/concepts/02 - Getting Started/SIZE-ROUTING.md' && grep -q 'mp track add bugfix' 'docs/concepts/02 - Getting Started/SIZE-ROUTING.md'",
+      "status": "passed",
+      "evidence": "M124 S07+AC-07 closed. SIZE-ROUTING.md line 11 bf add/bf done shorthand replaced with full `mp track add bugfix …` → `mp track done bugfix BF-NN` form. Pinned by grep: ! grep -q \"`bf add`\" passes; grep -q \"mp track add bugfix\" passes. mp validate 0/0."
+    },
+    {
+      "id": "AC-08",
+      "description": "Closure: cargo test -p mp -p raul exits 0 and mp validate --summary reports 0 errors (the 3 transient G7 errors from the 2026-07-05 reopen of M95/M101/M103 are resolved by AC-01's gate reroute unblocking set-status, or explicitly accepted).",
+      "verification": "cargo test -p mp -p raul && mp validate --summary",
+      "status": "passed",
+      "evidence": "M124 S08+AC-08 closed. Closure gate passes: cargo test -p mp -p raul exits 0 (1129 tests passed, 0 failed). mp validate --summary reports 0 errors and 0 warnings. The transient G7 residues from the 2026-07-05 M95/M101/M103 reopen are gone (verified by the validate summary, plus the AC-01 reroute unblocks set-status on migrated milestones). All 8 WPs / 8 ACs closed."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Single consolidated milestone vs splits",
+      "choice": "One hygiene milestone covering all approved-group findings, rather than per-area splits (TUI / infra / docs).",
+      "rationale": "The findings are individually small (the largest is M104 ER-3 at two one-line reroutes). Bundling keeps the review/complete overhead to one cycle and lets the regression tests share fixtures. The user explicitly chose the consolidated option from the 2026-07-05 scope question."
+    },
+    {
+      "area": "M104 ER-3 sequencing",
+      "choice": "Treat AC-01 (M104 ER-3) as the load-bearing item and land it first.",
+      "rationale": "The two missed gate-read sites in validate_milestone_start_execution / set_execution_status done-arm are latent only because the dogfood plan still has legacy fields populated. They activate the moment the deferred bulk lifecycle migration (M100 follow-up) clears spec_status/execution_status. AC-01 also unblocks mp milestone reopen/set-status on migrated milestones (see mp-dogfood-log 2026-07-05 entry) — the bug that prevented a clean reopen of M95/M101/M103 in this very session."
+    },
+    {
+      "area": "Pattern 1 (AC/finding audit) scope boundary",
+      "choice": "The mis-stamped ACs and wrongly-fixed internal findings on M100/M101/M102/M103 are NOT reconciled in this milestone.",
+      "rationale": "Per the 2026-07-05 review decision, the changes-requested group is reopened with new external-review findings as the signal; re-statusing the existing ACs/findings is deferred to separate triage. Recording this boundary here so future readers don't expect the reconciliation in this milestone."
+    },
+    {
+      "area": "M106 ER-5 cap size",
+      "choice": "1MB ceiling on the drain buffer, sentinel-truncated.",
+      "rationale": "Display layer already truncates to 2000 chars, so the tail is never shown; 1MB is well above realistic cargo test output (a few MB worst case for --workspace) while protecting constrained CI runners (2GB GitHub Actions) from OOM under broad-scope verifications. Sentinel preserves the 'something was emitted' signal."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP01",
+      "name": "M104 ER-3 gate reroute",
+      "goal": "Validate-milestone-start-execution builds done_ids via effective_execution_status, and set_execution_status's done-arm checks effective_spec_status=='verified' instead of the raw field. Pinned by an integration test.",
+      "rollback": ""
+    },
+    {
+      "id": "WP02",
+      "name": "M106 ER-5 drain buffer cap",
+      "goal": "pipe_drain_thread caps its buffer at a documented ceiling (1MB) and emits a '<output truncated at N bytes>' sentinel; the doc comment no longer claims the chunk size bounds total memory. Pinned by an integration test.",
+      "rollback": ""
+    },
+    {
+      "id": "WP03",
+      "name": "M107 ER-1 ER-2 verifier cancellation hardening",
+      "goal": "cfg(unix)-gate the std::os::unix::process::CommandExt import; waitpid WIFSIGNALED/WTERMSIG probe documented. Pinned by document inspection.",
+      "rollback": ""
+    },
+    {
+      "id": "WP04",
+      "name": "M91 ER-1..ER-4 TUI polish",
+      "goal": "In-app help overlay/footers document Page Up/Down + wheel; compute_tab_bar_layout parametrized 6..=16; list-row mouse click accounts for block border; dead Event::GoToBoard arm removed. Pinned by raul tui tests.",
+      "rollback": ""
+    },
+    {
+      "id": "WP05",
+      "name": "M96 ER-1..ER-3 CHANGELOG hygiene",
+      "goal": "CHANGELOG v2.0.0 section header carries ship date; duplicate rc.4 header removed; rc.5/rc.6 present. Pinned by grep.",
+      "rollback": ""
+    },
+    {
+      "id": "WP06",
+      "name": "M94 ER-1..ER-4 bulk-op correctness",
+      "goal": "Idempotent bulk ops skip file rewrite when nothing changes; cycle-check graph built once per batch; TOCTOU docstring reflects M113 lock; bogus --where with valid --ids does not abort. Pinned by tests.",
+      "rollback": ""
+    },
+    {
+      "id": "WP07",
+      "name": "M81 ER-1 SIZE-ROUTING shorthand",
+      "goal": "SIZE-ROUTING.md no longer uses 'bf add'/'bf done' shorthand; uses full 'mp track add bugfix ... / mp track done bugfix BF-NN' form. Pinned by grep.",
+      "rollback": ""
+    },
+    {
+      "id": "WP08",
+      "name": "Closure gate",
+      "goal": "cargo test -p mp -p raul exits 0; mp validate --summary reports 0 errors.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP01",
+      "order": 1,
+      "action": "M124 ER-reapplication: In validate_milestone_start_execution (gates.rs), build done_ids via effective_execution_status rather than the raw field. In set_execution_status done-arm, check effective_spec_status == verified instead of raw spec_status. Add regression test pinning both rerouted sites.",
+      "files": [
+        "crates/mp/src/validate/gates.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test lifecycle_gates_post_migration && cargo test -p mp --lib effective_spec_status && cargo test -p mp --lib effective_execution_status",
+      "done_when": "Both rerouted sites pass cargo test; the new integration test fails before the fix and passes after.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S01 done: gates.rs done_ids routes through effective_execution_status; set_execution_status done-arm checks effective_spec_status (M124/M104 ER-3). Added 2 unit tests in crates/mp/src/validate/plan.rs + 2 integration tests in crates/mp/tests/suites/lifecycle_gates_post_migration.rs (gates_g8_survives_lifecycle_migration_done_ids_route, set_execution_status_done_arm_routes_through_effective_spec_status). Both new integration tests verified to FAIL on pre-fix code with exact symptoms (false G8 'dependency not done', false 'requires spec_status verified') and PASS on rerouted code. Full test suite: cargo test -p mp --test suite_misc lifecycle_gates 4/4 ok; cargo test -p mp --lib effective_spec_status 2/2 ok; cargo test -p mp --lib effective_execution_status 3/3 ok."
+    },
+    {
+      "id": "S02",
+      "work_package": "WP02",
+      "order": 2,
+      "action": "M124 ER-reapplication: Cap pipe_drain_thread buffer at a documented 1MB ceiling. Emit a sentinel when cap is hit. Update the doc comment to no longer claim chunk size bounds total memory. Add a test asserting >1MB child output does not grow the buffer beyond cap+sentinel.",
+      "files": [
+        "crates/mp/src/ac_verify.rs"
+      ],
+      "tests": "cargo test -p mp --test ac_verify_drain_buffer_cap",
+      "done_when": "A child emitting bytes larger than the 1MB cap does not grow the buffer beyond cap+sentinel.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S02 done: pipe_drain_thread (crates/mp/src/ac_verify.rs) now caps captured buffer at DRAIN_BUF_CAP_BYTES (1 MiB); emits '<output truncated at N bytes>' sentinel when cap hit; keeps draining pipe after cap so child never blocks. Doc comment corrected (chunk size bounds lock-hold time, not total buffer). Made pipe_drain_thread + DRAIN_BUF_CAP_BYTES pub so the regression test can pin the contract. 4 integration tests in crates/mp/tests/ac_verify_drain_buffer_cap.rs (caps_buffer_at_documented_ceiling, emits_truncation_sentinel_exactly_once, does_not_cap_below_ceiling, keeps_reading_pipe_after_cap). Verified regression-catching: 3 of 4 tests fail on pre-fix code; all 4 pass on post-fix code. Existing pipe_drain_thread tests (5) continue to pass."
+    },
+    {
+      "id": "S03",
+      "work_package": "WP03",
+      "order": 3,
+      "action": "M124 ER-reapplication: cfg(unix)-gate the std::os::unix::process::CommandExt import in ac_verify.rs. Update verifier-cancellation.md section 3 item 3 to describe the waitpid WIFSIGNALED/WTERMSIG probe and the under-1s budget.",
+      "files": [
+        "crates/mp/src/ac_verify.rs",
+        "crates/mp/docs/verifier-cancellation.md"
+      ],
+      "tests": "grep -n 'cfg(unix)' crates/mp/src/ac_verify.rs | head -3 && grep -q waitpid crates/mp/docs/verifier-cancellation.md && grep -q WIFSIGNALED crates/mp/docs/verifier-cancellation.md",
+      "done_when": "cfg(unix) attribute present on the import path in ac_verify.rs; verifier-cancellation.md mentions waitpid and WIFSIGNALED alongside the under-1s budget.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S03 done: cfg(unix) gate on 'use std::os::unix::process::CommandExt' at crates/mp/src/ac_verify.rs:14 (matches the already-gated process_group(0) call sites at 631 and 693). verifier-cancellation.md §3 item 3 updated: probe is waitpid (not kill ESRCH which confuses zombies with liveness); cleanup budget <1s; reap budget <2s; assertions on WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL matching the F-2 test (commands/milestone.rs tests::global_deadline_cancels_worker). Added M124 (M107 ER-2) audit log block at §3 item 4 mirroring §2a pattern. cargo check -p mp clean. cargo test -p mp global_deadline_cancels_worker: 1/1 ok. Verification grep checks (cfg(unix), waitpid, WIFSIGNALED) all pass."
+    },
+    {
+      "id": "S04",
+      "work_package": "WP04",
+      "order": 4,
+      "action": "M124 ER-reapplication: Tighten the in-app help overlay/footers so they document Page Up/Down + wheel and contain no sidebar lanes reference. Parametrize compute_tab_bar_layout across widths 6..=16. Fix list-row mouse click math to account for block border. Remove dead Event::GoToBoard arm.",
+      "files": [
+        "crates/raul/src/tui/help.rs",
+        "crates/raul/src/tui/tab_bar.rs",
+        "crates/raul/src/tui/list_row.rs",
+        "crates/raul/src/tui/input.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_tab_bar && cargo test -p raul --test tui_mouse && cargo test -p raul s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys",
+      "done_when": "Help text contains only the documented keys; active tab renders cleanly at every width in 6..=16; mouse click indexes the correct row after accounting for the block border; the GoToBoard arm is gone.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S04 done (M91 ER-1..ER-4). ER-1: render.rs help overlay replaces 'Navigate sidebar lanes' copy with 'Scroll content'; added 'PgUp/PgDn Page up / page down (in list)' and 'Wheel Scroll list (cursor over list)' rows under Content focused section (placed there to fit the visible portion of the centered 60%-height overlay). s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys test tightened: now asserts !contains('sidebar lanes'), contains Page Up/PgDn, contains Wheel. ER-2: compute_tab_bar_layout extends the ultra-narrow guard to fire when active_label_w+1 > width (in addition to width<6); post-outward-fan post-processing drops indicators/ellipses when the total emitted width exceeds the area (catches widths 7..=14 with long active labels). New parametrized tests in tab_bar_narrow_width.rs: active_tab_text_does_not_fit_yields_empty_visible (widths 6..=13 + Milestones); active_lane_visible_and_no_overflow_at_fitting_widths (width 6..=16 × {Overview, Milestones, Board}). updated overflow_hit_test_matches_render_column_walk to mirror the indicator-drop cursor. ER-3: runner.rs list-row mouse click math changed y.saturating_sub(2) → saturating_sub(3) accounting for header + tab bar + block border + block title row. ER-4: removed dead Event::GoToBoard arm in runner.rs dispatch and the 'KeyCode::Char(\"b\") → Event::GoToBoard' mapping in event.rs (and the Event::GoToBoard variant itself); global 'b' handler at runner.rs:149 is the single source of truth. All test commands green: cargo test -p raul --test tui_tab_bar (48/48); cargo test -p raul --test tui_mouse (9/9); cargo test -p raul s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys (1/1); cargo test -p raul --test tab_bar_narrow_width (7/7); cargo test -p raul (all suites, no failures)."
+    },
+    {
+      "id": "S05",
+      "work_package": "WP05",
+      "order": 5,
+      "action": "M124 ER-reapplication: Edit CHANGELOG.md so the v2.0.0 section header carries its ship date (no unreleased token). Remove the duplicate v2.0.0-rc.4 header. Add rc.5 and rc.6 entries inside the rc history bridge.",
+      "files": [
+        "CHANGELOG.md"
+      ],
+      "tests": "grep -qE v2.0.0..2026-07 CHANGELOG.md",
+      "done_when": "CHANGELOG.md has exactly one v2.0.0 header carrying the ship date, no duplicate rc.4 header, and both rc.5 and rc.6 appear in the rc history bridge.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S05 done (M96 ER-1..ER-3). ER-1: CHANGELOG.md v2.0.0 GA section header now carries the actual ship date '## v2.0.0 (2026-07-03) — 2.0 GA' (was '## v2.0.0 (unreleased) — 2.0 GA' for a shipped GA). Date matches git tag v2.0.0 (annotated tag date 2026-07-03, commit 'chore(release): cut v2.0.0 GA tag and close M96'). ER-2: removed the duplicate '## v2.0.0-rc.4 (2026-07-01)' header at the previous line 191. ER-3: rc history bridge updated from 'documents 2.0.0-rc.1 through 2.0.0-rc.4' to 'documents 2.0.0-rc.1 through 2.0.0-rc.6', with rc.5 entry (pre-GA housekeeping — spec/exec rendering fixes, B-64 backlog, remediations) and rc.6 entry (final rc before GA tag; reflects the same commits as v2.0.0). Verification grep checks all pass: ER-1 grep -qE '## v2\\.0\\.0 \\(2026-07' passes; ER-2 grep -c '## v2.0.0-rc.4' returns 1 (was 2); ER-3 grep -q rc.5 and grep -q rc.6 both pass. mp validate --summary: 0 errors, 0 warnings."
+    },
+    {
+      "id": "S06",
+      "work_package": "WP06",
+      "order": 6,
+      "action": "M124 ER-reapplication: Make mp milestone bulk set-priority (and other multi-id bulk commands) idempotent: skip file rewrite when post-write state matches pre-write; build cycle-check graph once per batch; update TOCTOU docstring to reflect the M113 plan-write lock; ensure bogus --where paired with valid --ids does not abort the whole command.",
+      "files": [
+        "crates/mp/src/commands/milestone_bulk.rs",
+        "crates/mp/src/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test suite_milestone milestone_bulk::idempotent_no_op_skips_write && cargo test -p mp --test suite_milestone milestone_bulk::bogus_where_with_valid_ids_does_not_abort",
+      "done_when": "Idempotent no-op skips write; cycle-check graph built once per batch; TOCTOU docstring reflects M113 lock; a bogus --where with valid --ids does not abort the batch.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S06 done (M94 ER-1..ER-4). ER-1: with_milestone_mut_unlocked (crates/mp/src/milestone.rs:298) captures original raw bytes before closure, compares against post-mutation serialized form, and skips write_milestone_synced when byte-equal — idempotent no-op bulk ops no longer bump updated or rewrite the file. ER-2: depends_on_creates_cycle_in_graph no longer clones input graph (was by_id.clone per call = O(N squared) per batch); cycle walk now overlays prospective deps entry on-the-fly via a chained match, leaving by_id read-only. ER-3: docstring on depends_on_creates_cycle_in_graph updated to reflect M113 plan-write advisory lock serializing concurrent CLI bulk dispatches. ER-4: resolve_targets in milestone_bulk.rs no longer bails when --where parses empty IF --ids is non-empty — emits warning on stderr and falls back to --ids alone. 3 new integration tests in crates/mp/tests/suites/milestone_bulk.rs: idempotent_no_op_skips_write, bogus_where_with_valid_ids_does_not_abort, cycle_check_does_not_mutate_input_graph. All cargo test -p mp suites pass (no regressions); mp validate 0/0."
+    },
+    {
+      "id": "S07",
+      "work_package": "WP07",
+      "order": 7,
+      "action": "M124 ER-reapplication: Search docs/concepts/02 - Getting Started/SIZE-ROUTING.md for the bf add / bf done shorthand; replace each occurrence with the full mp track add bugfix / mp track done bugfix BF-NN form. Confirm no other doc references the shorthand in a load-bearing way.",
+      "files": [
+        "docs/concepts/02 - Getting Started/SIZE-ROUTING.md"
+      ],
+      "tests": "! grep -q \"bf add\" \"docs/concepts/02 - Getting Started/SIZE-ROUTING.md\" && grep -q \"mp track add bugfix\" \"docs/concepts/02 - Getting Started/SIZE-ROUTING.md\"",
+      "done_when": "SIZE-ROUTING.md has no bf add / bf done shorthand and uses the full mp track add bugfix / mp track done bugfix BF-NN form throughout.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S07 done (M81 ER-1). docs/concepts/02 - Getting Started/SIZE-ROUTING.md line 11 replaced shorthand \"`bf add` → `bf done`\" with full form \"`mp track add bugfix …` → `mp track done bugfix BF-NN`\", consistent with the rest of the doc and the canonical mp CLI surface. Verification grep checks pass: ! grep -q \"`bf add`\" (shorthand removed) and grep -q \"mp track add bugfix\" (full form present). No other doc references the shorthand in a load-bearing way (cross-checked via grep across docs/concepts). mp validate --summary: 0 errors, 0 warnings."
+    },
+    {
+      "id": "S08",
+      "work_package": "WP08",
+      "order": 8,
+      "action": "M124 ER-reapplication: Run the closure gate: cargo test -p mp -p raul must exit 0; mp validate --summary must report 0 errors.",
+      "files": [],
+      "tests": "cargo test -p mp -p raul && target/debug/mp validate --summary",
+      "done_when": "cargo test green; mp validate 0 errors; transient G7 residues (if any) are either gone or carry explicit acceptance evidence with date and reviewer.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M124 S08 done (closure gate). cargo test -p mp -p raul: 1129 tests passed across 92 test result lines, 0 failed, 0 errors. mp validate --summary: 0 errors, 0 warnings. No transient G7 residues from the 2026-07-05 M95/M101/M103 reopen (the rerouted sites in AC-01 S01 unblocked set-status on migrated milestones, eliminating the false G7/G8 errors). All M124 work packages closed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-06",
+    "branch": "",
+    "evidence": "M124 complete."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "Review-substance has no first-class home in mp. The execution agent's self-review for M124 was written to an ad-hoc 'REVIEW-HANDOFF-M124.md' sidecar at the repo root and pointed to from the reviews.json 'notes' string. That file is not defined by mp, not validated, not surfaced by 'mp reviews show'/'mp reviews status', and is invisible to all read commands. Root cause: mp reviews offers only a one-line 'notes' field (too thin for a findings matrix) plus severity-scoped 'mp reviews finding' entries (no free-form thread/comments/handoff narrative). Agents are forced to invent sidecar files to carry review substance. Filed as BF-06 in the bugfix track for the structural fix (comments + handoffs as first-class review primitives on milestones). This finding records the M124 incident as evidence.",
+      "status": "open",
+      "author": "zcode/GLM-5.2 (external review)",
+      "fixed_in": "",
+      "created": "2026-07-06",
+      "resolved": ""
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "with_milestone_mut_unlocked idempotency check (milestone.rs:329-335) serializes the in-memory MilestoneFile via serde_json::to_string_pretty WITHOUT calling prepare_for_disk(), then compares against original_raw read from disk (which WAS prepared on last write). The comparison is byte-equal today ONLY because WorkPackage.steps is #[serde(skip_serializing)] and all other normalization is symmetric — so the unprepared and prepared forms happen to serialize identically. I verified empirically against M124 (8 steps, 8 WPs): three consecutive no-op bulk set-priority ops left the file mtime unchanged and same=true in the comparison. So the code is correct, but the equivalence rests on an invariant that is not asserted anywhere: if any future field gains an asymmetric normalize-on-write (prepare_for_disk-style) without a matching skip_serializing, the idempotency check will silently start reporting changed=true on every no-op, defeating ER-1. Suggested hardening: either (a) call prepare_for_disk() on a clone before serializing for the comparison so the check compares prepared-vs-prepared, or (b) add a unit test that asserts to_string_pretty(prepared) == on_disk_raw for a fixture with steps.",
+      "status": "fixed",
+      "author": "zcode/GLM-5.2 (external review)",
+      "fixed_in": "M124 review F-02 remediation: with_milestone_mut_unlocked idempotency check now serializes the prepared form (clone + prepare_for_disk + to_string_pretty) mirroring store::write_milestone exactly, so the byte-equality check compares prepared-vs-on-disk(prepared) bytes instead of relying on the coincidental skip_serializing invariant on WorkPackage.steps. Pinning test idempotent_no_op_skips_write_with_steps_present added in crates/mp/tests/suites/milestone_bulk.rs covering the WP+step divergence surface. cargo test -p mp -p raul: 1131/0.",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    }
+  ]
+}

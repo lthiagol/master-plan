@@ -1,0 +1,267 @@
+{
+  "milestone": {
+    "id": "155",
+    "title": "M146 follow-up: retire the spec_status / execution_status legacy aliases",
+    "slug": "m146-follow-up-retire-the-spec-status-execution-status-legacy-aliases",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "146"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-11",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-11T00:38:41.823741+00:00"
+  },
+  "intent": {
+    "outcome": "raul milestones, raul show, and raul spec stop carrying the legacy Spec/Exec columns and instead show a single Lifecycle column. mp status drops the by_execution_status / by_spec_status aliases from its JSON output. The Board lane (kanban view) classifies cards from lifecycle + the blocked/deferred/cancelled overlays instead of the legacy spec/exec pair. After this lands, the M100 'kept for backcompat during the migration window' can finally close and the spec_status / execution_status fields drop from the on-disk MilestoneMeta entirely."
+  },
+  "problem": {
+    "description": "M146 collapsed the TUI Plan-overview block to the canonical lifecycle rollup and added the set-lifecycle mutator, but the deferred work in M146 commit 8a3d1e2 is still open: (1) the raul CLI list / show / spec tables still read the legacy spec_status / execution_status fields and render two badges, (2) the mp status JSON output still emits the by_execution_status and by_spec_status keys alongside by_lifecycle, (3) the Board lane classification in crates/raul/src/tui/runner_helpers.rs::classify_card still keys on the legacy fields. These are the last three surfaces where a user can still see the legacy vocabulary after the migration. Each one of them is small in isolation but they all share the M100 spec_status/execution_status → lifecycle migration; doing them together lets the alias fields drop from the model in a single follow-up."
+  },
+  "scope": {
+    "in_scope": [
+      "Update raul milestones (list) column headers to render one Lifecycle column instead of Spec / Exec. The colour pipeline (status_role in crates/raul/src/config.rs) already maps both legacy and lifecycle values correctly, so this is a label change.",
+      "Update raul show <id> to render one Lifecycle badge. The Spec / Exec meta rows become a single row that reads the lifecycle field (with legacy-aliases fallback only when the canonical field is empty, mirroring the TUI detail fallback in M146).",
+      "Update raul spec <id> to render one Lifecycle + Review badge (drop the legacy Spec and Exec).",
+      "Update crates/raul/src/tui/runner_helpers.rs::build_board_columns + classify_card to read lifecycle + the blocked / deferred / cancelled overlays instead of spec_status / execution_status. The Board card data class (crates/raul/src/tui/app.rs::BoardCard) drops spec_status / execution_status fields. Classify_card's signature is simplified.",
+      "Update crates/mp/src/commands/status.rs to drop the by_execution_status and by_spec_status keys from the milestones block in the mp status JSON output. Update tests/fixtures/json-shape/status.json golden accordingly. The lanes block (path_engine::build_lanes) is the canonical source for execution-stage counts; consumers that need them use that block.",
+      "Mark the spec_status / execution_status fields on MilestoneMeta + MilestoneFile as `#[serde(rename = \"_deprecated_spec_status\")]` or move them under a #[serde(default, skip_serializing)] marker so they no longer appear in the wire format. Keep reading them on the in-memory struct so the migration window continues to read correctly from pre-M146 files.",
+      "Add a `mp milestone migrate-legacy-fields` command (or a flag on the existing `mp migrate-lifecycle`) that scrubs the legacy fields from disk for milestones that have already been M100-migrated. Bulk-roll across the repo after the wire-format drop. The migration is idempotent."
+    ],
+    "out_of_scope": [
+      "Removing the migration-helper functions legacy_spec_status_to_lifecycle / legacy_execution_status_to_lifecycle — those stay around as long as there are on-disk files that still carry the legacy fields. The followup-after-this-one milestone retires them once the wire-format is gone.",
+      "Updating the doc surface (master-plan config files, fixtures) — the wire-format change is the contract change; documentation follows from that."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul milestones (list) renders one Lifecycle column instead of Spec / Exec. Verified by the tui_render / milestones list tests.",
+      "verification": "cargo test -p raul --test tui_render",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p raul --test tui_render passed and the rendered table shows one Lifecycle column instead of Spec/Exec."
+    },
+    {
+      "id": "AC-02",
+      "description": "raul show <id> renders one Lifecycle badge. The legacy Spec / Exec row collapses to a single Lifecycle row, with a fallback to the legacy pair only when the milestone has never been migrated.",
+      "verification": "cargo test -p raul --test tui_render",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p raul --test tui_render passed and the meta block in show output reads a single Lifecycle row."
+    },
+    {
+      "id": "AC-03",
+      "description": "raul spec <id> renders one Lifecycle + Review badge pair, dropping the legacy Spec / Exec columns.",
+      "verification": "cargo test -p raul --test spec_review",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p raul --test spec_review passed and spec output drops Spec/Exec, keeps Lifecycle + Review."
+    },
+    {
+      "id": "AC-04",
+      "description": "mp status JSON output drops the by_execution_status and by_spec_status keys under milestones. The by_lifecycle rollup remains the canonical source. Golden fixture regenerated.",
+      "verification": "cargo test -p mp --test suite_misc status_shape_stable",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p mp --test suite_misc status_shape_stable passed and the milestones block in status output has only by_lifecycle."
+    },
+    {
+      "id": "AC-05",
+      "description": "crates/raul/src/tui/runner_helpers.rs::classify_card classifies from the lifecycle field plus the blocked / deferred / cancelled overlays. The pre-M146 spec/exec branches are removed. crates/raul/src/tui/app.rs::BoardCard drops spec_status / execution_status fields.",
+      "verification": "cargo test -p raul --test board_view",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p raul --test board_view passed and the board classification reads from lifecycle + overlays, not spec_status / execution_status."
+    },
+    {
+      "id": "AC-06",
+      "description": "mp milestone migrate-legacy-fields scrubs the legacy alias fields from disk for already-migrated milestones, with --dry-run support and an idempotent implementation.",
+      "verification": "cargo test -p mp --test suite_milestone",
+      "status": "passed",
+      "evidence": "Verified end-to-end: cargo test -p mp --test suite_milestone passed and the new field runs end-to-end and migration is idempotent."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "wire-format-compat",
+      "choice": "Strip the legacy alias fields from the on-disk JSON shape with a one-release migration: keep the in-memory struct fields readable so pre-M146 files still load, but the JSON shape after M155 carries only the canonical  field plus the  /  /  overlays.",
+      "rationale": "Two-step approach (wire-format drop, then in-memory struct field drop) lets external scripts that read the legacy keys see a clean removal in one release rather than a feature-by-feature drain. The migration is idempotent and migrate-legacy-fields rolls across the repo in one pass."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "CLI table labels",
+      "goal": "Update raul milestones (list), raul show, raul spec to render one Lifecycle column instead of Spec/Exec",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Status JSON + Board classification",
+      "goal": "Update mp status JSON output (drop by_execution_status and by_spec_status; regenerate status.json golden) and update Board lane classification (classify_card reads lifecycle + overlays; BoardCard drops legacy fields)",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Wire-format drop + migration",
+      "goal": "Mark spec_status / execution_status fields as #[serde(skip_serializing)] on the MilestoneMeta. Add mp milestone migrate-legacy-fields command with --dry-run + idempotency. Run the migration across the repo.",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "WP-close",
+      "goal": "Verify the milestone end-to-end: all tests green, golden updated, no regressions",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Update raul milestones (list) column headers to render one Lifecycle column",
+      "files": [],
+      "tests": "cargo test -p raul --test tui_render",
+      "done_when": "the rendered table shows one Lifecycle column instead of Spec/Exec",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update raul show <id> to render one Lifecycle badge with legacy-pair fallback",
+      "files": [],
+      "tests": "cargo test -p raul --test tui_render",
+      "done_when": "the meta block in show output reads a single Lifecycle row",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Update raul spec <id> to render one Lifecycle + Review badge pair",
+      "files": [],
+      "tests": "cargo test -p raul --test spec_review",
+      "done_when": "spec output drops Spec/Exec, keeps Lifecycle + Review",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Update mp status JSON output to drop by_execution_status and by_spec_status",
+      "files": [],
+      "tests": "cargo test -p mp --test suite_misc status_shape_stable",
+      "done_when": "the milestones block in status output has only by_lifecycle",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Update classify_card to use lifecycle + overlays; drop BoardCard legacy fields",
+      "files": [],
+      "tests": "cargo test -p raul --test board_view",
+      "done_when": "board view tests pass without spec_status / execution_status",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Mark spec_status / execution_status as skip_serializing; add migrate-legacy-fields command",
+      "files": [],
+      "tests": "cargo test -p mp --test suite_milestone",
+      "done_when": "the new field runs end-to-end and migration is idempotent",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP-close",
+      "order": 7,
+      "action": "Run cargo test -p raul -p mp and verify all green",
+      "files": [],
+      "tests": "cargo test -p raul && cargo test -p mp",
+      "done_when": "all tests pass and no regressions",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

@@ -1,0 +1,436 @@
+{
+  "milestone": {
+    "id": "163",
+    "title": "raul TUI review menu: graceful M121 errors + pre-flight gate check",
+    "slug": "raul-tui-review-menu-graceful-m121-errors-pre-flight-gate-check",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-12",
+    "updated": "2026-07-15",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-15T13:49:01.434532+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, the raul TUI's review menu no longer fails silently when the milestone's `mp milestone approve` returns an M121 (AC verification) gate error. The user sees a truncated, actionable message; the menu pre-validates the milestone and grey-outs items that would fail; and an end-to-end test pins the behavior so the bug cannot regress."
+  },
+  "problem": {
+    "description": "Reproducible bug (2026-07-12, repo's own plan): in `raul`, navigate to the Milestones tab, drill into a milestone (e.g. M77, M100), press `m` to open the review menu, select Approve, press Enter. Result: a 200+ char raw M121 error wall renders at the bottom of the terminal via `flash_message`, the menu closes, and the milestone is NOT approved. Confirmed via direct CLI: `mp milestone approve 100` returns `{\"ok\": false, \"errors\": [{\"code\": \"M121\", \"message\": \"AC AC-09 verification is not gate-passing (unknown): unrecognized command form; cannot statically resolve: (1) grep -n ... crates/mp-model/src/milestone.rs ...\"}]}`. The TUI never truncates the message (`crates/raul/src/tui/render/mod.rs:132-134` renders `format!(\" ⚠ {msg} \")` verbatim), never detects M121-specific failures, and never pre-validates the milestone before opening the menu (`crates/raul/src/tui/app.rs:764-770` `open_review_menu` does no `mp plan verify-ac` pre-flight). Existing tests in `crates/raul/tests/tui_review_menu.rs` (4 tests) and `tui_review_actions.rs` (5 tests) cover only App state and static-text checks — none drives `apply_review_menu_enter` end-to-end against a mock MpRunner, so the failure mode is invisible to CI."
+  },
+  "scope": {
+    "in_scope": [
+      "Add `flash_message` truncation in `crates/raul/src/tui/render/mod.rs:132-134` to the first sentence (split on `. `), append ` (press ? for details)` when truncated; full message stays accessible via a new `?`-bound action or via a `last_action_error: Option<String>` field on App.",
+      "Detect M121 gate errors in `apply_review_menu_enter` (`crates/raul/src/tui/action.rs:556-584`) and format a focused flash_message: `Cannot approve M{id}: {N} AC(s) have unresolved verifications. Run: mp plan verify-ac {id}` instead of the raw `e.to_string()`.",
+      "Pre-flight when opening the review menu: call the supported read-only `mp plan verify-ac <id>`, parse the canonical gate-passing statuses (`resolved`, `manual`, `runtime`, `inline`), close and surface subprocess or parse failures, and store the result as `preflight_gate` on App so the renderer can grey out Approve milestone whenever the gate is not open.",
+      "Update `render_review_menu_overlay` (`crates/raul/src/tui/render/overlays.rs:352-392`) to grey-out the `Approve milestone` item when `preflight_gate` reports `verify-ac` failure; selecting a greyed item still triggers the action but the flash_message now points to the preflight, not a cryptic raw error.",
+      "Add `crates/raul/tests/tui_review_menu_gate.rs` (or extend `tui_review_actions.rs`) with at least 3 end-to-end tests: (1) `apply_review_menu_enter` returns the focused M121 message when mp returns ok=false; (2) `flash_message` is truncated to first sentence; (3) opening the review menu on a milestone whose `mp plan verify-ac` reports failure sets `preflight_gate` accordingly and the renderer marks Approve as greyed.",
+      "Run `make check`, `make test`, `make doctor`."
+    ],
+    "out_of_scope": [
+      "No change to `mp milestone approve` semantics or the M121 gate logic (the gate is doing its job — the TUI just needs to surface the failure cleanly).",
+      "No `--force` bypass added to the TUI approve action. Forcing a gate-failing approval through the TUI is unsafe (would approve specs with broken verifications); users who want that should run `mp milestone approve --force` from the CLI.",
+      "No change to the review menu's 4-item list shape (Approve / Block / Unblock / Request grooming). Block, Unblock, and Request grooming also go through `mp milestone block|unblock` and `mp annotation create` — they may surface their own M121-class errors, but the same truncation + M121-format fixes apply via the shared `apply_review_menu_enter` path.",
+      "No change to the help screen's keybind display.",
+      "No retroactive fix for older milestones with stale unresolvable ACs (e.g. M77, M100). Those need their AC verifications rewritten — separate dogfood-log entries / follow-up milestones."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "When `mp milestone approve <id>` returns ok=false with an M121 error, `apply_review_menu_enter` sets `flash_message` to a focused, single-line string starting with `Cannot approve M` and ending with the `mp plan verify-ac <id>` command — not the raw 200+ char JSON-derived error.",
+      "verification": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast apply_review_menu_enter_emits_focused_message_when_m121_is_on_stderr",
+      "status": "passed",
+      "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+    },
+    {
+      "id": "AC-02",
+      "description": "When `app.flash_message` is set to a string longer than ~80 chars (terminal-width dependent), the rendered footer in `crates/raul/src/tui/render/mod.rs:132-134` truncates at the first sentence boundary and appends ` (press ? for details)` so the user can see actionable context without the message wrapping or running off-screen.",
+      "verification": "bash scripts/verify-m-tui-flash-truncation.sh",
+      "status": "passed",
+      "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+    },
+    {
+      "id": "AC-03",
+      "description": "Opening the review menu sets preflight_gate from mp plan verify-ac <id>. Statuses resolved, manual, runtime, and inline keep the gate open; any other status or a failed/malformed preflight closes it and render_review_menu_overlay dims Approve milestone.",
+      "verification": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast",
+      "status": "passed",
+      "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+    },
+    {
+      "id": "AC-04",
+      "description": "End-to-end test in `crates/raul/tests/tui_review_menu_gate.rs` drives `apply_review_menu_enter` with a mock MpRunner returning an M121-failing JSON response, and asserts (a) `flash_message` matches `^Cannot approve M\\d+: \\d+ AC\\(s\\) have unresolved verifications\\. Run: mp plan verify-ac \\d+$`.",
+      "verification": "bash scripts/verify-m-tui-flash-test.sh",
+      "status": "passed",
+      "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+    },
+    {
+      "id": "AC-05",
+      "description": "`make test` and `make doctor` still pass; no regression in the 4 existing `tui_review_menu.rs` tests, the 22 `tui_modes.rs` tests, or the 5 `tui_review_actions.rs` static checks.",
+      "verification": "make test && make doctor",
+      "status": "passed",
+      "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should the `?` action that surfaces the full flash_message also surface other flash contexts (e.g. `mp track show bugfix` results from inbox_nav), or only `apply_review_menu_enter` failures?",
+      "status": "resolved",
+      "answer": "Yes, all flash_messages — truncation applies uniformly."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Main",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Flash message truncation + M121 detection",
+      "goal": "Add flash_message truncation and M121 gate error detection in the TUI review menu",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Detect M121 gate errors in apply_review_menu_enter and format a focused flash_message: 'Cannot approve M{id}: {N} AC(s) have unresolved verifications. Run: mp plan verify-ac {id}' instead of raw e.to_string().",
+      "files": [
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast",
+      "done_when": "M121 error returns focused flash_message",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "F-02 remediation: both streams and ExitStatus are preserved; pretty-printed M121 JSON is parsed per stream. Focused integration suite 15/15."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add flash_message truncation in render/mod.rs:132-134: split at first sentence boundary (. ), append ' (press ? for details)' when truncated; full message accessible via new ? bound action or last_action_error field.",
+      "files": [
+        "crates/raul/src/tui/render/mod.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast",
+      "done_when": "flash_message truncates at first sentence",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "F-04/F-05/F-06 remediation: display-width/grapheme-safe footer, tiny-width fallback, details-only help view at 80x24, and centralized flash/detail state. Unit slice 16/16; integration 15/15."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Pre-flight on review-menu open: call mp plan verify-ac <id>, parse the canonical gate-passing statuses (resolved, manual, runtime, inline), store preflight_gate, close and surface subprocess/parse failures, and dim Approve milestone whenever the gate is not open.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/render/overlays.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast",
+      "done_when": "preflight_gate greys out Approve when verify-ac fails",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "F-11/F-12 fail-closed preflight: top-level ok:false and missing acs close the gate, missing preflight_gate dim-renders Approve. 18/18."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add crates/raul/tests/tui_review_menu_gate.rs with end-to-end tests: (1) apply_review_menu_enter returns focused M121 message when mp returns ok=false; (2) flash_message is truncated to first sentence; (3) preflight_gate sets and Approve item is greyed.",
+      "files": [
+        "crates/raul/tests/tui_review_menu_gate.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_review_menu_gate --no-fail-fast",
+      "done_when": "End-to-end tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "F-11/F-12 added preflight_gate_closes_when_top_level_ok_false, preflight_gate_closes_when_acs_missing, and approve_item_renders_dim_when_preflight_gate_is_missing. 18/18 hermetic suite."
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Run make test and make doctor to verify no regressions in 4 existing tui_review_menu.rs tests, 22 tui_modes.rs tests, and 5 tui_review_actions.rs static checks.",
+      "files": [
+        "crates/raul/"
+      ],
+      "tests": "make test && make doctor",
+      "done_when": "Full suite green",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "make test 2327/2327 passed (3 skipped); make doctor ok; dev/release clippy and fmt clean; cargo check clean; make check only fails the unrelated committed M167 stub audit."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-15",
+    "branch": "",
+    "evidence": "Remediation F-11/F-12 complete: preflight now closes on inconsistent or missing verify-ac output, and Approve milestone dims whenever the gate is not open. 18/18 integration tests, make test 2330/2330 passed, doctor/clippy/fmt/check/dep-audit-raul clean."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "cross-platform",
+      "description": "M163 self-review #1 (informational): The integration test file tui_review_menu_gate.rs embeds shell scripts as Rust string literals. This works on macOS/Linux but would not run on Windows. The pattern matches the existing tui_settings.rs + tui_settings_automation.rs tests in this crate (which use the same Unix-shell-script + tempfile approach), so the platform lock is the codebase's house style — not a regression introduced by M163. If cross-platform CI is desired, the fake-mp scaffolding would need a Windows shim or pure-Rust harness.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "detect_m121 parses each newline as standalone JSON, but mp commands::common::emit pretty-prints gate failures. An actual milestone approve M121 payload spans multiple lines, so detection returns None and parse_mp_ok_response falls back to the raw JSON wall, violating AC-01 and AC-04. Parse each output stream as a complete JSON document first, preserve stream boundaries, and add a pretty-printed non-zero fixture matching emit_gate_failure.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/runner_helpers.rs",
+        "new_range": {
+          "start_line": 436,
+          "end_line": 452
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "is_passing_ac_status accepts only resolved and manual, while the authoritative milestone approve gate explicitly permits verify-ac statuses runtime and inline. The review menu therefore dims Approve for milestones that mp will approve, so the preflight is not predictive. Reuse a canonical gate-passing predicate or align the TUI vocabulary with resolved, manual, runtime, and inline, with contract tests against real VerifyAcReport shapes.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/runner_helpers.rs",
+        "new_range": {
+          "start_line": 606,
+          "end_line": 611
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Footer sizing counts Unicode scalar values rather than terminal columns and always emits the 26-column long chrome even when footer_width is 1 through 25. For example, twenty CJK characters pass the 30-column short-message check but render at roughly 44 columns with chrome; a one-column footer still receives the full prefix and details suffix. This violates AC-02 on wide Unicode and narrow terminals. Measure display width, truncate on grapheme/display-width boundaries, and define a chrome fallback that never exceeds the available columns.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/flash_message.rs",
+        "new_range": {
+          "start_line": 108,
+          "end_line": 120
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Last action details are appended after sixteen static help rows, but Help uses a 60%-height overlay with no scroll state. On a standard 80x24 terminal the overlay is about 14 rows including borders, so the details header and body are clipped and pressing ? cannot expose them; the test hides this by using 200x60. Put details in a dedicated or scrollable view, or prioritize them before static help, and test a normal 80x24 terminal.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/overlays.rs",
+        "new_range": {
+          "start_line": 247,
+          "end_line": 324
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The renderer appends the details hint to every long flash_message, but last_action_error is maintained only by review-action paths. Existing inbox and Path flashes assign flash_message directly, so ? either shows no details or a stale prior review error for the new footer text. Couple the visible and full messages behind App setter/clear methods and append the hint only when matching details exist; add a transition test from a review error to a non-review flash.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/mod.rs",
+        "new_range": {
+          "start_line": 160,
+          "end_line": 166
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The new capture APIs discard ExitStatus, and load_preflight_gate converts spawn or parse failures to None; the renderer treats None as gate open. A missing, incompatible, non-zero, or malformed verify-ac command therefore silently presents Approve as normal instead of reporting that preflight failed. Return status with both streams, propagate a typed preflight error/unknown state, surface it to the user, and test non-zero plus malformed payloads.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/mp_runner.rs",
+        "new_range": {
+          "start_line": 303,
+          "end_line": 325
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "The AC-03 rendering assertion reconstructs the row to find Approve but then accepts palette.dim on any cell across that row, including overlay chrome or underlying milestone content. It does not inspect the cells spanning the matched label as claimed, so a regression that leaves Approve normally styled can still pass. Return the substring x-range and assert every relevant label cell style/modifier, with an inverse open-gate assertion on the same range.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/tests/tui_review_menu_gate.rs",
+        "new_range": {
+          "start_line": 216,
+          "end_line": 237
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-09",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "Acceptance verification metadata remains unsafe and non-demonstrating: AC-01 manually runs potentially mutating mp milestone approve 100 against the real repository plan, while AC-02 only checks that the verifier script file exists. mp milestone verify consequently marks AC-01 passed without execution and AC-02 passed without running truncation tests. Replace both with isolated focused test/script commands and record criterion-specific evidence.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "master-plan/milestones/163-raul-tui-review-menu-graceful-m121-errors-pre-flight-gate-check.json",
+        "new_range": {
+          "start_line": 53,
+          "end_line": 80
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "The spec correction is incomplete: AC-03 and S3 now use supported mp plan verify-ac <id>, but scope.in_scope still mandates the nonexistent --dry-run flag, while completion evidence claims the wording was corrected. This leaves the source of truth internally contradictory and can mislead future remediation. Update the remaining scope fragment through mp and validate that no M163 text advertises verify-ac --dry-run.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external",
+      "anchor": {
+        "path": "master-plan/milestones/163-raul-tui-review-menu-graceful-m121-errors-pre-flight-gate-check.json",
+        "new_range": {
+          "start_line": 37,
+          "end_line": 52
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-11: load_preflight_gate in crates/raul/src/tui/runner_helpers.rs:612-644 never validates the report top-level ok field. A parseable verify-ac payload with ok:false, unresolvable:0, and only canonical passing per-AC statuses is accepted as open, even though the subprocess explicitly reported a failed preflight. That leaves Approve enabled for an inconsistent or incompatible report. Require ok:true in addition to the per-AC predicate (or fail closed when absent/false) and add a fixture asserting ok:false closes the gate and surfaces the failure.",
+      "status": "fixed",
+      "author": "opencode-m163-re-review",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external"
+    },
+    {
+      "id": "F-12",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-12: render_review_menu_overlay in crates/raul/src/tui/render/overlays.rs:598-610 treats preflight_gate == None as open because is_some_and(|g| !g.open) returns false for None. Action::OpenReviewMenu also opens the menu without setting a gate when selected_milestone_id is absent, and App::open_review_menu is a public path that does not perform preflight. The M163 fail-closed contract requires missing or unknown preflight state to dim Approve (or prevent opening), not present it normally. Default the renderer to closed unless an explicit gate.open is true and add a no-preflight regression test.",
+      "status": "fixed",
+      "author": "opencode-m163-re-review",
+      "fixed_in": "",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "external"
+    }
+  ]
+}

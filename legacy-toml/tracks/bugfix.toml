@@ -1,0 +1,20 @@
+[track]
+kind = "bugfix"
+title = "Bugfixes"
+perpetual = true
+scope = "Small correctness fixes; no new features."
+created = "2026-06-18"
+
+[[items]]
+id = "BF-01"
+title = "Reconstruct hybrid-work .mp/ fixture"
+status = "done"
+effort = "S"
+problem = "The tests/fixtures/projects/hybrid-work/.mp/ directory is gitignored and was never committed; no bootstrap script generates it. This breaks cargo test (hybrid_next_step_returns_session_when_tracks_done), scenarios_runner (p3.1-hybrid-work-*), make test-fixtures, and make adopt-check at baseline."
+done_when = "hybrid-work/.mp/ exists with config.toml (profile=hybrid, next.prefer=track), plan.toml, ideas.toml, tracks/bugfix.toml (BF-01, BF-02); all 4 verification commands pass"
+verification = "cargo test -p mp green; cargo test --test scenarios_runner green; make test-fixtures green; make adopt-check green"
+steps = []
+evidence = "hybrid-work .mp/ fixture reconstructed via mp init --profile hybrid + hand-authored tracks/bugfix.toml (BF-01 done, BF-02 pending) + sessions/feature-oauth (session.toml + milestone.toml). Verified: cargo test -p mp green, scenarios_runner green, make test-fixtures green, make adopt-check hybrid-work fixture green."
+created = "2026-06-21"
+completed = "2026-06-21"
+archived_at = ""

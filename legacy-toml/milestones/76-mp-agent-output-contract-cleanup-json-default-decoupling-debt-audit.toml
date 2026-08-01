@@ -1,0 +1,255 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "76"
+title = "mp agent output contract cleanup — JSON default, decoupling debt audit"
+slug = "mp-agent-output-contract-cleanup-json-default-decoupling-debt-audit"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.2"
+
+[intent]
+outcome = "mp stdout is unconditionally JSON for agents with no ceremony flags; vestigial human/dual-audience code paths from pre-M41 are removed or moved to raul; docs/skills teach `mp <cmd>` not `mp <cmd> --format json`."
+
+[problem]
+description = "M41 made mp agent-only and M40/M45 split human display to raul, but the codebase and docs still carry dual-audience habits: `--format json` is taught everywhere despite being the default; `OutputFormat::Human` remains as a clap alias; `mp search` still renders ASCII tables; `render_verify_human()` builds prose that is never emitted; `output.default_format` config is dead; STORAGE.md still documents human/raw/TTY defaults from v1; raul's mp_runner defensively passes `--format json` on every shell-out. This adds agent token noise, confuses the contract (JSON API vs TOML file debug), and leaves human-format logic in mp where raul should own it."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Audit matrix: enumerate every mp output-format touchpoint (cli.rs enum, emit(), search.rs, graph.rs, show/list toml passthrough, config output.*, tests, golden scenarios, docs, templates/skills, raul mp_runner) with keep/move/remove decision per item",
+    "Remove OutputFormat::Human from clap + all match arms; delete dead human render paths (search ASCII table, render_verify_human, emit human param if unused)",
+    "Clarify --format toml scope: debug/raw-file passthrough only (show milestone, archived entity); document that list/generic emit toml is deprecated or removed if redundant with JSON",
+    "Docs/skills pass: AGENTS.md, master-planner SKILL, MP-COMMANDS, AGENT-PLAYBOOK, AGENT-READINESS, STORAGE.md — teach `mp <cmd>` default JSON; fix stale human/raw/next-step/pr-body references",
+    "raul mp_runner: stop appending --format json (rely on default); keep explicit json only where tests require stability",
+    "Tests: assert default output (no --format flag) is valid JSON on core reads; update format_dispatch and golden scenarios; keep json_shape_baseline intact",
+    "Remove or wire output.default_format and output.color from config schema (prefer delete if unused)",
+    "CHANGELOG + ADR note documenting agent stdout contract post-decoupling",
+]
+out_of_scope = [
+    "Adding new raul commands or TUI features (only move/delete mp human paths, not expand raul scope)",
+    "Changing --format json output shapes (D-011 freeze holds — behavior change is default-only and flag removal, not schema drift)",
+    "Compact/minified JSON mode or streaming NDJSON (separate future milestone)",
+    "Fixing the 67-milestone review backlog (orthogonal process debt)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Core read commands emit valid JSON with no --format flag (mp status, mp next, mp list milestones, mp show milestone <id>, mp validate)"
+verification = "crates/mp/tests/format_dispatch.rs"
+status = "passed"
+evidence = "format_dispatch default JSON tests"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "OutputFormat::Human removed; clap rejects --format human with clear error"
+verification = "crates/mp/tests/format_dispatch.rs"
+status = "passed"
+evidence = "format_human_is_rejected test"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "No human table rendering remains in mp search or milestone verify"
+verification = "manual: accepted — rg Human/render_verify_human crates/mp/src returns 0"
+status = "passed"
+evidence = "rg clean"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Docs/skills no longer teach mandatory --format json for agent reads; STORAGE.md reflects v2 agent-only contract"
+verification = "manual: accepted — AGENTS.md SKILL AGENT-READINESS STORAGE MP-COMMANDS updated"
+status = "passed"
+evidence = "docs updated"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "raul mp_runner relies on mp JSON default (no --format json on every call)"
+verification = "cargo test -p raul"
+status = "passed"
+evidence = "cargo test -p raul green"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Dead output.default_format config removed or honored consistently (not orphaned)"
+verification = "cargo test -p mp config"
+status = "passed"
+evidence = "config schema cleaned; templates updated"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Audit & code cleanup"
+goal = "Audit matrix + remove Human format and dead render paths from mp"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Format contract & tests"
+goal = "Clarify toml debug scope, default-without-flag JSON tests, config cleanup"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Docs, skills & raul"
+goal = "Docs/skills contract pass; raul mp_runner relies on JSON default"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Audit matrix: enumerate every mp output-format and human-display touchpoint (cli, emit, search, graph, show/list, config, tests, docs, raul mp_runner). Record keep/move/remove per item via mp note add."
+files = []
+tests = "manual: accepted — audit artifact reviewed"
+done_when = "Audit complete with disposition for every finding"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S1.1"
+work_package = "WP1"
+order = 2
+action = "Remove OutputFormat::Human; delete search ASCII table branch, render_verify_human, emit human param; reject --format human."
+files = []
+tests = "crates/mp/tests/format_dispatch.rs"
+done_when = "No Human/render_verify_human in crates/mp/src; --format human fails"
+status = "done"
+covers_ac = [
+    "AC-02",
+    "AC-03",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 3
+action = "Clarify --format toml: document raw-file passthrough only; resolve or document graph DOT quirk. Remove orphaned output.default_format/color or wire default_format."
+files = []
+tests = "crates/mp/tests/format_dispatch.rs"
+done_when = "Toml scope documented; config keys not orphaned"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 4
+action = "Add tests: core reads emit valid JSON without --format flag. Keep json_shape_baseline unchanged."
+files = []
+tests = "crates/mp/tests/format_dispatch.rs"
+done_when = "format_dispatch tests pass without explicit --format json on status/next/list/show/validate"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 5
+action = "raul mp_runner: remove --format json from shell-outs; cargo test -p raul."
+files = []
+tests = "cargo test -p raul"
+done_when = "mp_runner does not append --format json"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 6
+action = "Docs/skills pass: AGENTS.md, master-planner SKILL, AGENT-READINESS, AGENT-PLAYBOOK, STORAGE.md, MP-COMMANDS — mp cmd default JSON; fix stale human/raw/next-step/pr-body."
+files = []
+tests = "manual: accepted — doc rg verification"
+done_when = "Doc rg checks in AC-04 pass"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 7
+action = "CHANGELOG entry for agent stdout contract post-decoupling."
+files = []
+tests = "manual: accepted — CHANGELOG review"
+done_when = "CHANGELOG updated under v2.0.0 unreleased"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

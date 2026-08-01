@@ -1,0 +1,78 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "core tests pass",
+      "evidence": "",
+      "id": "AC-01",
+      "status": "pending",
+      "verification": "cargo test core"
+    }
+  ],
+  "intent": {
+    "outcome": "Core module works."
+  },
+  "milestone": {
+    "created": "2026-06-17",
+    "depends_on": [
+      "01"
+    ],
+    "effort": "M",
+    "execution_status": "in-progress",
+    "id": "02",
+    "priority": "high",
+    "risk": "low",
+    "slug": "core",
+    "spec_status": "ready",
+    "title": "Core",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Need core before feature."
+  },
+  "scope": {
+    "in_scope": [
+      "core module"
+    ],
+    "out_of_scope": [
+      "feature",
+      "docs"
+    ]
+  },
+  "steps": [
+    {
+      "action": "Add core types",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "done_when": "tests pass",
+      "id": "S1",
+      "order": 1,
+      "status": "pending",
+      "tests": "cargo test core_types",
+      "work_package": "WP1"
+    },
+    {
+      "action": "Wire core API",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "done_when": "tests pass",
+      "id": "S2",
+      "order": 2,
+      "status": "pending",
+      "tests": "cargo test core_api",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Implement core",
+      "id": "WP1",
+      "name": "Core",
+      "rollback": "git revert core"
+    }
+  ]
+}

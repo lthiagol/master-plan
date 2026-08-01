@@ -1,0 +1,300 @@
+{
+  "milestone": {
+    "id": "183",
+    "title": "raul two-line footer — globals on line 1, per-tab keys on line 2",
+    "slug": "raul-two-line-footer-globals-on-line-1-per-tab-keys-on-line-2",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-18",
+    "updated": "2026-07-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-18T20:36:04.967514+00:00"
+  },
+  "intent": {
+    "outcome": "Users see global keybinds (quit, help, refresh, lane-switch, sort, hide-done) and per-tab keybinds simultaneously. No mode-switching, no guesswork."
+  },
+  "problem": {
+    "description": "Today's footer is one line that shows whichever keybinds match the current (lane, content_state). Globals are visible only when they also appear in the per-tab set, so basic navigation is easy to miss for new users. The new lifecycle filter (F) and fuzzy search (/) keybinds landing in M184–M186 need a visible surface; the footer is the natural place."
+  },
+  "scope": {
+    "in_scope": [
+      "chrome.rs renders the footer as two horizontal lines: globals on line 1, per-tab on line 2",
+      "Globals surfaced on line 1: quit (q), help (?), refresh (r), prev-lane (Tab/Shift-Tab), next-lane (Tab), sort-rebind (S), cycle-sort (o), hide-done (h), filter (F, placeholder binding for M185), search (/, placeholder binding for M186)",
+      "Per-tab keybinds stay on line 2, dispatched from existing Keybinds::footer_* methods",
+      "Footer area math in view_state.rs splits footer_area into globals_top + per_tab_bottom",
+      "Truncation rules (per existing format_flash_footer_with_details helpers) apply per line, not across both"
+    ],
+    "out_of_scope": [
+      "The lifecycle filter modal itself (lands in M185)",
+      "The fuzzy search modal itself (lands in M186)",
+      "Adding any new actions to the keybind dispatcher; this milestone only re-renders the footer surface",
+      "Compaction to a single line on short terminals (per design decision: always show two lines)",
+      "Touching the lane enum or any lane-related code outside the footer renderer"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "chrome.rs renders the footer as two horizontal lines. Line 1 always shows the global keybinds (quit, help, refresh, lane-switch, sort, hide-done, filter-placeholder, search-placeholder). Line 2 shows the per-tab keybinds matching the current (lane, content_state) — the same set today's Keybinds::footer_* methods return.",
+      "verification": "manual: after M183 lands, cargo nextest run -p raul --test tui_footer_two_lines --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+    },
+    {
+      "id": "AC-02",
+      "description": "On each of the 7 lanes (Overview, Milestones, Path, Backlog, Ideas, Watch, Settings), the per-tab line content matches what the corresponding footer_* method returns today. No behavior change to per-tab keys; only the layout split.",
+      "verification": "manual: after M183 lands, cargo nextest run -p raul --test tui_footer_per_lane_parity --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+    },
+    {
+      "id": "AC-03",
+      "description": "Footer renders correctly at terminal widths 60, 80, 120, and 160: at width < 80 the two-line layout still fits without truncation of globals; per-tab line uses existing footer_for truncation rules; at width 60 the layout falls back gracefully if the global list exceeds the available width.",
+      "verification": "manual: after M183 lands, cargo nextest run -p raul --test tui_footer_widths --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+    },
+    {
+      "id": "AC-04",
+      "description": "cargo fmt --all -- --check passes; cargo clippy -p raul --tests --no-deps -- -D warnings passes.",
+      "verification": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+    },
+    {
+      "id": "AC-05",
+      "description": "mp validate exits 0 with the new milestone file in master-plan/.",
+      "verification": "manual: after M183 lands, ls master-plan/milestones/183-*.json returns ≥1 hit; cargo nextest run -p raul --no-fail-fast exits 0; mp validate exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "footer-area",
+      "choice": "Split the existing footer_area Rect at render time into globals_top + per_tab_bottom; view_state math stays as one footer_area",
+      "rationale": "Keeps view_state.rs simple (no layout rewiring); the renderer is the single place that picks which keys go on which line. Splitting the area in chrome.rs makes the render order explicit."
+    },
+    {
+      "area": "globals-source",
+      "choice": "Hand-curated list of globals in chrome.rs (not auto-derived from Keybinds)",
+      "rationale": "Some Keybinds entries are lane-scoped (e.g., filter is only useful on Milestones) and shouldn't pollute the global line. A hand-curated list keeps the global line stable and predictable."
+    },
+    {
+      "area": "placeholder-keys",
+      "choice": "F and / appear as labelled-but-unbound placeholders on line 1 until M185/M186 ship",
+      "rationale": "Surfaces upcoming keybinds to the user so the footer reflects the target shape early. The placeholder style is dim; the keys take effect once their respective milestones land."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "footer renderer",
+      "goal": "chrome.rs renders two horizontal lines (globals on line 1, per-tab on line 2); footer area math splits footer_area into globals_top + per_tab_bottom",
+      "rollback": "Revert chrome.rs to a single-line footer; Keybinds::footer_* methods and existing per-tab dispatch unchanged."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Refactor chrome.rs to render two horizontal lines from the existing footer_area: split into globals_top (line 1) and per_tab_bottom (line 2). The split happens in chrome.rs, not view_state.rs (keep view_state footer_area math as-is). Add a hand-curated list of globals: q (quit), ? (help), r (refresh), Tab/Shift-Tab (lane switch), S (sort rebind), o (cycle sort — placeholder until M186), h (hide-done), F (filter placeholder), / (search placeholder). F, /, o are labelled but unbound until M185/M186 ship — the placeholder style is dim. Three edge cases pinned: (a) if footer_area.height < 2, fall back to a single line carrying globals only; (b) the existing flash-message path (format_flash_footer_with_details) still renders correctly — flash messages span both rows as a single Paragraph; (c) mouse hit-test on the footer remains a no-op (no keybind is mouse-clickable) — verify runner.rs mouse handler is unaffected by the area split.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_footer_two_lines --no-fail-fast",
+      "done_when": "Two Paragraph widgets render in footer_area, the first carrying globals and the second carrying per-tab; truncation rules apply per line.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Wire the per-tab line content to the existing Keybinds::footer_* dispatch (footer_overview, footer_milestones, footer_path, footer_backlog, footer_ideas, footer_watch, footer_settings). Additionally, add modal-mode branches for Mode::LifecycleFilter (placeholder text: '↑↓ navigate · Space toggle · ⏎ commit · Esc revert') and Mode::SearchInput (placeholder text: 'type to filter · ⏎ commit · Esc cancel'). Placeholders render dim until M185/M186 ship. Verify on all 7 lanes that the per-tab content matches what each lane's footer_* returns today.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_footer_per_lane_parity --no-fail-fast",
+      "done_when": "Switching to each of the 7 lanes renders the matching per-tab footer on line 2; a test exercises each lane.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Confirm an existing raul config that references a Tweaks-specific keybind (TWEAK_OPEN or similar) still loads without panic — the key is silently a no-op and the footer renders the remaining globals + per-tab line normally. A warning is acceptable in this rc.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_unknown_keybind_graceful --no-fail-fast",
+      "done_when": "Loading a config with an unknown keybind name does not panic; the test pins the no-panic behavior.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Run the canonical lint gate and validate the plan: cargo fmt --all -- --check, cargo clippy -p raul --tests --no-deps -- -D warnings, and mp validate all pass.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "done_when": "All three commands exit 0 in sequence.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-18",
+    "branch": "",
+    "evidence": "M183 two-line footer: chrome.rs render_footer (globals + per-tab); view_state footer height=2; tests tui_footer_two_lines/per_lane_parity/widths/unknown_keybind_graceful; cargo nextest -p raul 717 passed; fmt+clippy clean. F-01 resolved as accepted deferral to M185/M186."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "S2 modal-mode footer branches (Mode::LifecycleFilter / Mode::SearchInput) deferred: those Mode variants land in M185/M186. chrome.rs documents the hand-off; per-tab line keeps current footer_for dispatch until then.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "accepted-defer:M185/M186",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "self",
+      "summary": "LifecycleFilter/SearchInput footer placeholders deferred to M185/M186"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "compute_overview_list_rects places lower_inbox/lower_activity at top_chunks[3].y + PATH_HEIGHT (const 7) even in compact mode where path_h is 6. On a 24x80 Overview the lower panels land on footer y (y=22) outside content_area. Short flash text and non-full-width globals leave dashboard box-drawing visible on the footer row (e.g. flash Saved 3 setting(s) shows box-drawing + Recent activity). M183 2-line footer made the bleed obvious; root cause is PATH_HEIGHT vs path_h mismatch. Fix: anchor lower panels at path.y + path.height (or path_h) and clamp to content; clear footer area before paint.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/view_state.rs",
+        "new_range": {
+          "start_line": 956,
+          "end_line": 956
+        },
+        "side": "new"
+      },
+      "summary": "Overview compact lower panels overlap footer_area"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "render_footer paints Paragraph widgets that only write text cells. Unpainted cells in footer_area retain prior buffer content. Combined with layout bleed (or any future overlay into footer rows), short flash messages and short globals lines show leftover chrome. Fix: frame.render_widget(Clear, area) before painting footer content. Pins AC-01/S1 flash path spanning both rows cleanly.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/chrome.rs",
+        "new_range": {
+          "start_line": 182,
+          "end_line": 182
+        },
+        "side": "new"
+      },
+      "summary": "render_footer does not clear footer_area before paint"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "view_state compact layout triggers on content_area.height < 32; dashboard_view.rs uses frame.area().height < 32. After M183 content_area = frame_h - 4, so at frame heights 32..35 view_state allocates compact chunk heights while dashboard_view still emits rich multi-line content into those short rects (clipped/wrong density). Fix: share one compact predicate (content height or a flag on DashboardChunks) between compute_overview_list_rects and render_dashboard.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/dashboard_view.rs",
+        "new_range": {
+          "start_line": 379,
+          "end_line": 379
+        },
+        "side": "new"
+      },
+      "summary": "dashboard compact flag desynced from view_state after 2-line footer"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "primary_key returns empty string when a binding vec is cleared; footer_globals_line still emits :quit / :help. No panic (S3 ok) but the globals line is misleading. Skip zero-width glyphs or fall back to a placeholder. Low: edge case for fully-cleared bindings only.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/chrome.rs",
+        "new_range": {
+          "start_line": 127,
+          "end_line": 127
+        },
+        "side": "new"
+      },
+      "summary": "Empty keybind slots render leading-colon tokens on globals line"
+    }
+  ]
+}

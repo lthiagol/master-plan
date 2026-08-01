@@ -1,0 +1,175 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "34"
+title = "Config scope & plan-dir relocation"
+slug = "config-scope-plan-dir-relocation"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-27"
+updated = "2026-06-27"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "mp config set writes to the plan-local config by default inside a project, never writes outside the plan dir as a side effect, and relocating the plan dir is a single atomic command."
+
+[problem]
+description = "Field testing (lazybrew adoption, I-01/I-02/I-08/I-11) found: (1) `mp config set` without --plan-dir writes to an unresolvable/global scope instead of the plan-local config, so changes silently do not apply; (2) `mp config set --plan-dir .mp ...` created a side-effect master-plan/config.toml redirect outside the plan dir; (3) after renaming .mp/->master-plan/, mp doctor failed because config still recorded location='.mp', with no command to relocate; (4) there is no documented cutover/rename recipe, so the agent invented mv + config set and still hit dangling doc references."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "`mp config set` defaults to the plan-local config when run inside a project with a plan dir (--plan-dir still overrides)",
+    "config set never creates files outside the plan directory",
+    "New `mp plan relocate <old> <new>`: renames the dir and updates workflow.plan.location atomically",
+    "docs/CUTOVER.md recipe: parallel-bootstrap cutover + rename + post-cutover link-lint guidance",
+    "Integration tests: config set plan-local default; no out-of-plan writes; relocate keeps doctor green",
+]
+out_of_scope = [
+    "Automatic repo-wide link linting for arbitrary markdown refs (document the manual check instead)",
+    "Multi-plan-dir / monorepo support (P5, backlog B-25)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Inside a project, `mp config set workflow.gates.strictness full` (no --plan-dir) writes to the plan-local config"
+verification = "config set test asserting the plan-local file changed"
+status = "passed"
+evidence = "config_scope_default tests pass; config set writes to plan-local config"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "`mp config set --plan-dir X ...` writes only inside X; no master-plan/config.toml side effect"
+verification = "filesystem assertion test"
+status = "passed"
+evidence = "config_scope_no_sideeffect tests pass; --plan-dir writes only inside plan dir"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "`mp plan relocate .mp master-plan` renames the dir, updates location, and `mp doctor` stays green"
+verification = "relocate scenario test"
+status = "passed"
+evidence = "plan_relocate tests pass; mp plan relocate renames dir and updates location"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "docs/CUTOVER.md documents rename + location update + post-cutover reference check"
+verification = "manual: accepted - doc review"
+status = "passed"
+evidence = "docs/CUTOVER.md written with rename + location update + post-cutover check"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Config scope default"
+goal = "mp config set defaults to the plan-local config inside a project and never writes outside the plan dir"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Plan relocate"
+goal = "mp plan relocate atomically renames the plan dir and updates workflow.plan.location"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Documentation"
+goal = "Document the rename + location update + post-cutover reference check"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Make mp config set default to the plan-local config when run inside a project with a plan dir (--plan-dir still overrides)"
+files = []
+tests = "cargo test -p mp --test config_scope_default"
+done_when = "Inside a project, mp config set workflow.gates.strictness full writes to the plan-local config"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Ensure mp config set --plan-dir X writes only inside X with no side-effect master-plan/config.toml outside the plan dir"
+files = []
+tests = "cargo test -p mp --test config_scope_no_sideeffect"
+done_when = "config set --plan-dir X creates no files outside X"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Implement mp plan relocate <old> <new> to rename the dir and update workflow.plan.location atomically"
+files = []
+tests = "cargo test -p mp --test plan_relocate"
+done_when = "mp plan relocate .mp master-plan renames the dir, updates location, and mp doctor stays green"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Write docs/CUTOVER.md covering rename + location update + post-cutover reference check"
+files = []
+tests = "manual: accepted — doc review"
+done_when = "docs/CUTOVER.md documents the cutover recipe end to end"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-27"
+branch = ""
+evidence = "All 4 steps done, all ACs passed, validate clean"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

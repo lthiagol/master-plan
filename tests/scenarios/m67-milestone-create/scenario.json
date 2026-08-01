@@ -1,0 +1,22 @@
+{
+  "id": "m67-milestone-create",
+  "phase": "implemented",
+  "description": "milestone create writes a new milestone file on minimal-ready fixture",
+  "fixture": "projects/minimal-ready",
+  "command": [
+    "milestone",
+    "create",
+    "--json",
+    "{\"title\":\"Write scenario\",\"intent\":{\"outcome\":\"Golden write\"},\"problem\":{\"description\":\"Test\"},\"scope\":{\"in_scope\":[\"x\"],\"out_of_scope\":[\"a\",\"b\"]},\"acceptance_criteria\":[{\"description\":\"ok\",\"verification\":\"echo ok\"}]}",
+    "--format",
+    "json"
+  ],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_contains": "\"ok\": true",
+    "fs_unchanged": false
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "milestone": {
+    "id": "132",
+    "title": "parallel test stability",
+    "slug": "parallel-test-stability",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-09",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "opencode:executor"
+  },
+  "intent": {
+    "outcome": "cargo test runs deterministically under parallel execution — concurrent cargo test --test X invocations against the same workspace no longer intermittently fail on shared-binary spawn or shared ~/.agents state, so CI and local runs are flake-free by default."
+  },
+  "problem": {
+    "description": "Three backlog items (B-70, B-73, B-77) describe the same root cause: when two cargo test --test X invocations run concurrently against the same workspace (e.g. suite_install + suite_milestone), ~13/30 runs produce intermittent spawn-failure or mp-command-failure panics. The failures cluster in two layers. Layer 1 (recursive try_build_workspace under ac_verify) is already FIXED (no occurrences remain in src). Layer 2 persists: concurrent test processes spawn target/debug/mp (and raul) and race on the shared binary build + shared ~/.agents/master-plan/ install-dir state (env.sh, stowed binaries). run_with_retry (common/mod.rs:16) mitigates but does not eliminate the flake. Affected surfaces include suite_install::uninstall_removes_env_sh, milestone_bulk::bulk_dry_run_does_not_persist, install_deploy::uninstall_removes_raul_binary, and milestone_priority::set_priority_all_valid_values — all of which pass in isolation. Note: B-77 sub-item 3 (install_skills_v2 stale TOML stubs) was already fixed and is out of scope."
+  },
+  "scope": {
+    "in_scope": [
+      "B-70/B-73/B-77 (consolidated): eliminate the parallel-cargo-test spawn + shared-state race",
+      "Isolate per-test ~/.agents/master-plan/ state so concurrent test processes do not share install-dir state",
+      "Pin a deterministic test-binary story so concurrent spawns do not race on target/debug/mp build/copy"
+    ],
+    "out_of_scope": [
+      "The install_skills_v2 stale-TOML-stub sub-item (B-77 sub-3) — already fixed",
+      "Layer 1 (recursive try_build_workspace) — already fixed",
+      "Rewriting the test framework wholesale — only the concurrency/isolation surfaces"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "AC-01: cargo test -p mp -p raul under default threading passes N/N consecutive runs (N>=5) with zero intermittent spawn-failure or mp-command-failure panics, including the previously-flaky suite_install/milestone_bulk/install_deploy/milestone_priority tests.",
+      "verification": "manual: for i in 1 2 3 4 5; do cargo test -p mp -p raul || exit 1; done; echo ok",
+      "status": "passed",
+      "evidence": "(legacy)"
+    },
+    {
+      "id": "AC-02",
+      "description": "AC-02: concurrent test processes do not share ~/.agents/master-plan/ install-dir state — each test (or test process) gets isolated state (per-test tempdir MP_HOME or equivalent), so an uninstall/stow in one process cannot race another.",
+      "verification": "cargo test -p mp parallel_tests_use_isolated_agents_state",
+      "status": "passed",
+      "evidence": "Two regression tests: (1) parallel_tests_use_isolated_agents_state fires N=8 parallel mp install --harness opencode + N=8 parallel uninstall --purge with per-thread TempDirs, verifies each thread's toolkit artifacts (bin/mp, bin/raul, env.sh) exist after install and are gone after uninstall with no cross-process contamination. (2) parallel_tests_isolate_all_eight_harnesses fires N=8 parallel mp install --harness both and asserts each of the 8 MP_<HARNESS>_SKILL_DIR paths produced its own SKILL.md under its own tempdir. Pre-M132 both would have either leaked into ~/.agents/<h>/skills/master-planner on the dev machine or raced on the shared target/debug/mp spawn. 5x consecutive cargo test -p mp -p raul all green (1278/1278)."
+    },
+    {
+      "id": "AC-03",
+      "description": "AC-03: Closure — the full suite is green and the plan validates clean.",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "M132 closed. All 3 ACs passed (AC-01 5x consecutive runs green, AC-02 parallel_tests_use_isolated_agents_state regression test passes, AC-03 mp validate clean + all backlog items resolved). Strategy: (a) installed stable-mp-bin snapshot in tests/common/mod.rs:mp_bin() — copies CARGO_BIN_EXE_mp once into a per-process scratch dir so cargo's transient unlink of target/debug/mp can't race our spawns; (b) closed 8 install/uninstall harness-isolation gaps across install_env_snippet, install_deploy, install_registry, install_source, workflow_gates, p7_optional_batch, p6_install_bootstrap; (c) added regression test parallel_tests_use_isolated_agents_state.rs that fires N=8 parallel install+uninstall --purge with per-thread TempDirs. B-70, B-73, B-77 resolved into this milestone."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "isolation strategy",
+      "choice": "Defer the concrete approach (single pre-built test binary, full per-test tempdir isolation, or adopting nextest as canonical runner) to decompose.",
+      "rationale": "Three viable strategies with different blast radius; the spec pins the deterministic-outcome contract, decompose picks the lowest-risk implementation."
+    },
+    {
+      "area": "verification",
+      "choice": "AC-01 uses a 5x consecutive-run loop rather than --test-threads=1.",
+      "rationale": "--test-threads=1 is the current workaround, not the contract; the contract is that default parallel execution is deterministic."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Install-dir state isolation",
+      "goal": "Each test process gets isolated ~/.agents/master-plan/ state (per-test tempdir MP_HOME), so an uninstall/stow in one process cannot race another. On completion resolve the shared-state half of B-70/B-73/B-77.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Deterministic test-binary spawn",
+      "goal": "Eliminate the target/debug/mp spawn race at its root (concurrent cargo test processes racing on the workspace package cache / CARGO_BIN_EXE_mp) rather than retry-masking it via run_with_retry. On completion resolve the spawn-race half of B-70/B-73/B-77.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Audit every test that touches the shared ~/.agents/master-plan/ install dir (suite_install, install_deploy, install_env_snippet, install_registry, install_source, raul_spec_*). Ensure each uses an isolated MP_HOME tempdir so no two concurrent processes share install-dir state. The TestEnv helper (common/mod.rs:56) already sets MP_HOME=repo_root for some paths — confirm install tests route stows/uninstalls through a per-test tempdir, not the real home.",
+      "files": [
+        "crates/mp/tests/common/mod.rs",
+        "crates/mp/tests/suites/"
+      ],
+      "tests": "cargo test -p mp parallel_tests_use_isolated_agents_state",
+      "done_when": "no test reads/writes the real ~/.agents/master-plan/; concurrent processes cannot collide on install-dir state",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Address the root cause of the target/debug/mp spawn race (run_with_retry at common/mod.rs:16 documents it: concurrent cargo test processes race on the workspace package cache and momentarily clobber CARGO_BIN_EXE_mp). Pick the lowest-risk fix during execution: either (a) pre-build the test binary once into a stable path and point tests at it, (b) adopt nextest as the canonical parallel runner with process isolation, or (c) a per-test copy of the binary. The goal is determinism, not retry-masking.",
+      "files": [
+        "crates/mp/tests/common/mod.rs",
+        "Makefile"
+      ],
+      "tests": "manual: for i in 1 2 3 4 5; do cargo test -p mp -p raul || exit 1; done; echo ok",
+      "done_when": "5x consecutive cargo test -p mp -p raul under default threading all green, zero intermittent spawn failures",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Closure: confirm deterministic parallel execution holds, then resolve the consolidated race cluster in the backlog.",
+      "files": [
+        "crates/mp/"
+      ],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp green, mp validate 0/0, then mp backlog resolve B-70/B-73/B-77 --into-milestone 132",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-09",
+    "branch": "",
+    "evidence": "M132 closed. All 3 ACs passed (AC-01 5x consecutive runs green, AC-02 parallel_tests_use_isolated_agents_state regression test passes, AC-03 mp validate clean + all backlog items resolved). Strategy: (a) installed stable-mp-bin snapshot in tests/common/mod.rs:mp_bin() — copies CARGO_BIN_EXE_mp once into a per-process scratch dir so cargo's transient unlink of target/debug/mp can't race our spawns; (b) closed 8 install/uninstall harness-isolation gaps across install_env_snippet, install_deploy, install_registry, install_source, workflow_gates, p7_optional_batch, p6_install_bootstrap; (c) added regression test parallel_tests_use_isolated_agents_state.rs that fires N=8 parallel install+uninstall --purge with per-thread TempDirs. B-70, B-73, B-77 resolved into this milestone."
+  }
+}

@@ -1,0 +1,226 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "71"
+title = "raul human PM surface: home dashboard, watch mode, digest cadence"
+slug = "raul-human-pm-surface-home-dashboard-watch-mode-digest-cadence"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Humans open raul and immediately see inbox, pending reviews (M64 when shipped), path preview, annotations, and execution mode. They can watch plan state refresh without retyping commands. They can export a digest since last handoff as markdown for stakeholders."
+
+[problem]
+description = "M41 moved human-readable output to raul; M44/M46/M50/M54 built review TUI and tracks/backlog views. But humans still lack a single 'what needs my attention?' landing experience. Agents have mp status + mp inbox; raul requires knowing which subcommand to run. There is no passive monitor while an agent executes autonomously. mp digest exists but lacks --since filtering and export paths for stakeholder updates on a cadence (post-handoff, weekly)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "raul TUI home/dashboard screen: aggregates mp status, inbox count, pending-review count (when M64 lands), suggested path preview, open annotations summary",
+    "Navigation from dashboard to existing review/tracks/backlog TUI screens",
+    "raul watch: poll mp status + inbox on interval (CLI flags --interval, --once); plain-text or minimal TUI ticker",
+    "mp digest --since <iso|--handoff|--days N> filter; --format markdown export to stdout or --out file",
+    "raul digest: wraps mp digest with human formatting and optional --open (pager/print path)",
+    "Integration tests: dashboard state wiring (unit), digest --since filters, watch --once smoke",
+]
+out_of_scope = [
+    "Email/Slack scheduled delivery (export file only)",
+    "Full Gantt/timeline visualization",
+    "Write operations from dashboard (read-only aggregate)",
+    "Building M64 reviews commands inside this milestone (consume when available; graceful empty if not)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "raul TUI opens to dashboard showing status, inbox, path preview, annotation summary"
+verification = "crates/raul/tests/tui_dashboard.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "raul watch --once refreshes status output without error against dogfood or fixture plan"
+verification = "crates/raul/tests/watch.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp digest --since-handoff emits filtered markdown digest"
+verification = "crates/mp/tests/digest.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "raul digest renders human-readable output from mp digest JSON"
+verification = "crates/raul/tests/digest.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[open_questions]]
+id = "Q-01"
+question = "Should dashboard be default raul entry (raul with no args) or raul dashboard subcommand?"
+status = "resolved"
+answer = "Suggestion: raul with no args launches TUI dashboard; raul --help keeps explicit subcommands for scripting."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "TUI home dashboard"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Watch mode"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Digest cadence"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add raul TUI dashboard screen layout with panels for status, inbox, path preview, annotations; default entry when raul runs with no subcommand"
+files = []
+tests = "crates/raul/tests/tui_dashboard.rs"
+done_when = "raul launches to dashboard"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Wire dashboard to mp status, inbox, path, annotation list JSON; show pending-review count when mp reviews pending exists (graceful empty otherwise)"
+files = []
+tests = "crates/raul/tests/tui_dashboard.rs"
+done_when = "dashboard panels populate from mp subprocess"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Keyboard navigation from dashboard to existing review/tracks/backlog TUI flows"
+files = []
+tests = "crates/raul/tests/tui_dashboard.rs"
+done_when = "dashboard keys navigate to sub-screens"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Implement raul watch [--interval SECS] [--once]: poll mp status + inbox, render plain summary"
+files = []
+tests = "crates/raul/tests/watch.rs"
+done_when = "raul watch --once exits 0"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Extend mp digest with --since-handoff, --since <iso>, --days N, and --format markdown [--out file]"
+files = []
+tests = "crates/mp/tests/digest.rs"
+done_when = "mp digest --since-handoff outputs filtered markdown"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "Add raul digest command wrapping mp digest with human-readable tables/text"
+files = []
+tests = "crates/raul/tests/digest.rs"
+done_when = "raul digest renders stakeholder-friendly output"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

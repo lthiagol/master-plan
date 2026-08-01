@@ -1,0 +1,91 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "04"
+title = "Promote ladder and publish"
+slug = "promote-publish"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["03"]
+effort = "M"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Promote flows, export, git, sync, split, doc alignment."
+
+[problem]
+description = "P5–P12: polish and promotion closure."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "promote",
+    "export",
+    "git",
+    "sync",
+    "split",
+    "brief promote",
+]
+out_of_scope = [
+    "brief reopen",
+    "auto push",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "52 integration tests"
+verification = "cargo test -p mp"
+status = "passed"
+evidence = "shipped; cargo test -p mp green"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "shipped; cargo test -p mp green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

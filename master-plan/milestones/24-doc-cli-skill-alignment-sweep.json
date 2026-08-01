@@ -1,0 +1,220 @@
+{
+  "milestone": {
+    "id": "24",
+    "title": "Doc/CLI/skill alignment sweep",
+    "slug": "doc-cli-skill-alignment-sweep",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-24",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Docs, the AGENTS template, and the master-planner skill use the real CLI flags so agents following them succeed on the first try."
+  },
+  "problem": {
+    "description": "Pilot P2/P3/M4/M5/M6/M8: docs and skill use `--type` (CLI wants `--checklist-type`); `--format human` is documented but unimplemented; the AGENTS template carries a stale 'not implemented' banner; command names drift (`idea add` vs `create`); INSTALL.md version stale; `--json @file` undocumented."
+  },
+  "scope": {
+    "in_scope": [],
+    "out_of_scope": [
+      "implementing --format human for every command (top-level only)",
+      "renaming or removing the --checklist-type flag (keep both names)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "--type is accepted as a deprecated alias for --checklist-type (with deprecation notice)",
+      "verification": "mp interview checklist --type milestone --id 01 succeeds",
+      "status": "passed",
+      "evidence": "interview_alias.rs tests pass; --type works with deprecation warning on stderr"
+    },
+    {
+      "id": "AC-02",
+      "description": "AGENT-READINESS.md contains a format capability matrix listing which commands support --format human today",
+      "verification": "manual: doc grep finds the matrix; spot-check 3 commands [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "AGENT-READINESS.md now has Format support matrix table listing all command --format human status"
+    },
+    {
+      "id": "AC-03",
+      "description": "AGENTS template regenerated: stale 'not implemented / safe today' banner removed, consistent with AGENT-READINESS",
+      "verification": "templates AGENTS-TEMPLATE.md has no stale banner",
+      "status": "passed",
+      "evidence": "AGENTS-TEMPLATE.md removed stale 'not implemented / safe today' banners; all --type replaced with --checklist-type"
+    },
+    {
+      "id": "AC-04",
+      "description": "Command-name sweep: docs/skill use real names; INSTALL.md version current; --file / --json @file documented in MP-COMMANDS.md and skill",
+      "verification": "grep for --type and 'idea add' in docs+skill returns only intentional mentions",
+      "status": "passed",
+      "evidence": "SKILL.md: --type-> --checklist-type, --file and --json @- documented; INSTALL.md: v1 RC-> v1.1"
+    },
+    {
+      "id": "AC-05",
+      "description": "--format human is either implemented for top-level commands or honestly marked unsupported per the matrix",
+      "verification": "mp list milestones --format human returns non-JSON or is marked unsupported in the matrix",
+      "status": "passed",
+      "evidence": "format human implemented for list milestones, status, path; matrix honestly marks others as fallback"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "CLI flag alignment",
+      "goal": "Make documented flags work: --type alias and top-level --format human",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Doc & skill sweep",
+      "goal": "Align docs, AGENTS template, and master-planner skill to real CLI names and flags",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "interview checklist: accept the legacy --type flag as a deprecated alias for --checklist-type, emitting a deprecation notice",
+      "files": [
+        "crates/mp/src/interview.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/interview_alias.rs: mp interview checklist --type milestone --id 01 succeeds and warns",
+      "done_when": "Legacy --type flag works as an alias with a deprecation notice",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement --format human for chosen top-level commands (e.g., list milestones, status, path): render non-JSON human-readable output",
+      "files": [
+        "crates/mp/src/render.rs",
+        "crates/mp/src/commands/"
+      ],
+      "tests": "crates/mp/tests/format_human.rs: mp list milestones --format human and mp status --format human return non-JSON human text",
+      "done_when": "Selected top-level commands render --format human as non-JSON text",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add a format capability matrix to AGENT-READINESS.md listing which commands support --format human today",
+      "files": [
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "manual: grep finds the matrix; spot-check 3 commands against actual CLI behavior",
+      "done_when": "AGENT-READINESS.md has a format capability matrix matching real behavior",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Regenerate the AGENTS template: remove stale 'not implemented / safe today' banner; align with AGENT-READINESS",
+      "files": [
+        "templates/AGENTS-TEMPLATE.md"
+      ],
+      "tests": "manual: template has no stale banner; flags match AGENT-READINESS",
+      "done_when": "AGENTS-TEMPLATE.md carries no stale banner and matches AGENT-READINESS",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Command-name and flag sweep across docs and skill: use real names; refresh INSTALL.md version; document --file and --json @file in MP-COMMANDS.md and the skill",
+      "files": [
+        "docs/MP-COMMANDS.md",
+        "docs/INSTALL.md",
+        "templates/skills/master-planner/SKILL.md"
+      ],
+      "tests": "manual: grep for --type and 'idea add' in docs+skill returns only intentional mentions",
+      "done_when": "Docs and skill use real command names; INSTALL version current; --file and --json @file documented",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Honestly mark the commands where --format human is not implemented as unsupported in the AGENT-READINESS format matrix (coordinate with the matrix step in WP2)",
+      "files": [
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "manual: matrix marks unsupported commands consistently with actual CLI behavior",
+      "done_when": "Commands without --format human are marked unsupported in the matrix, matching real behavior",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-25",
+    "branch": "",
+    "evidence": "All 6 steps done, 5 ACs passed, 7 new tests, full test suite green"
+  }
+}

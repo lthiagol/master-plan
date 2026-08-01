@@ -1,0 +1,271 @@
+{
+  "milestone": {
+    "id": "151",
+    "title": "harness command registry + mp agent harness surface",
+    "slug": "harness-command-registry-mp-agent-harness-surface",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "149"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-10",
+    "updated": "2026-07-14",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-14T02:55:13.935967+00:00"
+  },
+  "intent": {
+    "outcome": "A single typed registry maps each supported harness (opencode, pi, cursor for v1; the other herdr integrations behind herdr integration install) to its herdr agent start argv and per-harness flag translation (model, thinking level). mp watch and any future tool share one source of truth instead of each hardcoding launch commands."
+  },
+  "problem": {
+    "description": "M149's B2 finding showed herdr agent start <name> -- <argv...> needs the full harness command, but the milestone left argv construction underspecified and scoped v1 to a hardcoded opencode/pi/cursor trio. As more harnesses are adopted (herdr ships 14 integrations), ad-hoc launch logic in mp watch will diverge. A registry + a small mp agent harness CLI surface (list, start-command <name>) externalises this so launch commands are discoverable and testable."
+  },
+  "scope": {
+    "in_scope": [
+      "HarnessRegistry type: harness name -> argv template + per-harness model/thinking flag mapping",
+      "mp agent harness list and mp agent harness start-command <name> subcommands",
+      "mp watch resolves [agent.runner].harness through the registry instead of a hardcoded match",
+      "Tests asserting each registry entry produces a valid herdr agent start argv"
+    ],
+    "out_of_scope": [
+      "Auto-installing herdr integrations (herdr integration install remains manual)",
+      "Prompt templating per harness"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A HarnessRegistry type maps each v1 harness (opencode, pi, cursor) to its herdr agent start argv template and per-harness model/thinking-level flag translation. Entries are data-driven (one struct per harness), not a hardcoded match inside mp watch.",
+      "verification": "cargo test -p mp --test harness_registry",
+      "status": "passed",
+      "evidence": "All 4 steps done, all 4 ACs passed. registry + CLI surface + watch wiring + unknown-harness error path. Tests: harness_registry (12), agent_harness_cli (14), watch_config (21), agent_harness_unknown (8) — 55 integration + 10 inline = 65 tests total."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp agent harness list and mp agent harness start-command <name> subcommands exist, emit JSON by default, and surface the registry as the single source of truth for launch commands.",
+      "verification": "cargo test -p mp --test agent_harness_cli",
+      "status": "passed",
+      "evidence": "All 4 steps done, all 4 ACs passed. registry + CLI surface + watch wiring + unknown-harness error path. Tests: harness_registry (12), agent_harness_cli (14), watch_config (21), agent_harness_unknown (8) — 55 integration + 10 inline = 65 tests total."
+    },
+    {
+      "id": "AC-03",
+      "description": "mp watch resolves [agent.runner].harness and [agent.coordinator].harness through the registry to build the herdr agent start argv; no hardcoded harness match remains in the watch code path.",
+      "verification": "cargo test -p mp --test watch_config",
+      "status": "passed",
+      "evidence": "All 4 steps done, all 4 ACs passed. registry + CLI surface + watch wiring + unknown-harness error path. Tests: harness_registry (12), agent_harness_cli (14), watch_config (21), agent_harness_unknown (8) — 55 integration + 10 inline = 65 tests total."
+    },
+    {
+      "id": "AC-04",
+      "description": "A harness name not in the registry produces a clear error listing supported harnesses and pointing to 'herdr integration install <name>'. Unknown harness never panics.",
+      "verification": "cargo test -p mp --test agent_harness_unknown",
+      "status": "passed",
+      "evidence": "All 4 steps done, all 4 ACs passed. registry + CLI surface + watch wiring + unknown-harness error path. Tests: harness_registry (12), agent_harness_cli (14), watch_config (21), agent_harness_unknown (8) — 55 integration + 10 inline = 65 tests total."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "v1-surface",
+      "choice": "v1 ships opencode/pi/cursor only; other herdr integrations are behind herdr integration install + a future registry entry",
+      "rationale": "Only those three have mp harness skills AND a locally-installed status bridge (herdr integration status). Expanding the registry is additive once an integration is installed and a skill exists."
+    },
+    {
+      "area": "registry-location",
+      "choice": "registry lives in the mp crate, surfaced via mp agent harness — single source for mp watch and future tools",
+      "rationale": "Avoids each consumer (watch, raul, future dashboards) hardcoding launch commands. mp agent harness is the query surface; the struct is the internal source."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-REGISTRY",
+      "name": "Registry type",
+      "goal": "HarnessRegistry struct + opencode/pi/cursor entries with argv templates and flag translation",
+      "rollback": ""
+    },
+    {
+      "id": "WP-CLI",
+      "name": "mp agent harness CLI",
+      "goal": "mp agent harness list + start-command <name> subcommands, JSON output",
+      "rollback": ""
+    },
+    {
+      "id": "WP-WIRE",
+      "name": "Wire watch to registry",
+      "goal": "mp watch resolves harness -> argv via the registry; remove any hardcoded harness match",
+      "rollback": ""
+    },
+    {
+      "id": "WP-ERROR",
+      "name": "Unknown-harness error path",
+      "goal": "Clear actionable error for unsupported harness names; never panic",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-REGISTRY",
+      "order": 1,
+      "action": "Implement HarnessRegistry: one entry per v1 harness (opencode, pi, cursor) carrying the herdr agent start argv template and a model/thinking-level -> flags translator. Data-driven; iterating entries drives a single test.",
+      "files": [
+        "crates/mp/src/harness/registry.rs"
+      ],
+      "tests": "crates/mp/tests/harness_registry.rs",
+      "done_when": "HarnessRegistry::get('opencode'|'pi'|'cursor') returns a valid argv; each entry round-trips a fixture model+thinking config",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-CLI",
+      "order": 2,
+      "action": "Add mp agent harness list and mp agent harness start-command <name> subcommands emitting JSON. list shows name+argv; start-command prints the resolved argv for a given config.",
+      "files": [
+        "crates/mp/src/commands/agent.rs",
+        "crates/mp/src/cli"
+      ],
+      "tests": "crates/mp/tests/agent_harness_cli.rs",
+      "done_when": "mp agent harness list lists the 3 v1 harnesses; start-command opencode prints a valid argv",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-WIRE",
+      "order": 3,
+      "action": "Replace mp watch's harness->argv construction (M149 S3) with HarnessRegistry resolution. Verify no hardcoded harness match remains in the watch code path via a grep guard test.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/harness/registry.rs"
+      ],
+      "tests": "crates/mp/tests/watch_config.rs",
+      "done_when": "mp watch builds the runner/coordinator argv via the registry; grep guard asserts no bare harness-name match in watch/",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-ERROR",
+      "order": 4,
+      "action": "Unknown-harness error path: HarnessRegistry::get on an unsupported name returns a structured error listing supported harnesses and the 'herdr integration install <name>' hint. Wire it into mp watch precondition check (M149 S0).",
+      "files": [
+        "crates/mp/src/harness/registry.rs"
+      ],
+      "tests": "crates/mp/tests/agent_harness_unknown.rs",
+      "done_when": "mp watch with [agent.runner].harness='claude' exits non-zero with a message listing opencode/pi/cursor and the install hint",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-14",
+    "branch": "",
+    "evidence": "All 4 steps done, all 4 ACs passed. registry + CLI surface + watch wiring + unknown-harness error path. Tests: harness_registry (12), agent_harness_cli (14), watch_config (21), agent_harness_unknown (8) — 55 integration + 10 inline = 65 tests total."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "docs",
+      "description": "probe: test if finding add works on reviewed-clean milestone",
+      "status": "fixed",
+      "author": "external-review(M151-probe)",
+      "fixed_in": "probe-finding-noop",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "code-quality",
+      "description": "F-02 — Dead test setup in harness_list_does_not_require_existing_plan (commands/agent.rs:189-199). The test allocates a TempDir + PlanContext but never uses them; the body only calls HarnessRegistry::v1() directly. Test name promises 'does not require existing plan' but does not exercise the CLI surface (which would actually verify the contract). Fix: drop the unused ctx setup, or actually invoke  against a fresh cwd without an existing plan_dir and assert exit 0 + 3-entry JSON.",
+      "status": "fixed",
+      "author": "external-review(M151)",
+      "fixed_in": "33b8ab6",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "drift-risk",
+      "description": "F-03 — SUPPORTED_NAMES / V1_ENTRIES indexing drift risk (harness/registry.rs:50-58, 64-104). Doc comment claims a \"compile-time check\" but it is one-directional: adding V1_ENTRIES[3] forces SUPPORTED_NAMES to grow (otherwise index out of bounds), but adding to SUPPORTED_NAMES without extending V1_ENTRIES compiles cleanly. Real drift path: SUPPORTED_NAMES gains a 4th name -> WATCH_HARNESSES (alias) grows -> mp config set accepts the new name -> mp watch precondition calls HarnessRegistry::v1().get(new_name) which returns HarnessError::Unsupported -> inconsistent user experience (set succeeds, watch fails). Fix: invert the dependency (V1_ENTRIES declares ids; SUPPORTED_NAMES derives) or add a const_assert-style compile-time length check.",
+      "status": "fixed",
+      "author": "external-review(M151)",
+      "fixed_in": "33b8ab6",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "coverage-gap",
+      "description": "F-04 — runner_model_field_round_trips_into_harness_argv doesn't go through mp watch (tests/watch_config.rs:295-310). Test name implies AC-03 end-to-end coverage (the runner model config flows into the watch argv via the registry), but the body invokes `mp agent harness start-command opencode --model claude-opus-4` which only proves the registry produces correct argv. AC-03 is \"mp watch resolves [agent.runner].harness and [agent.coordinator].harness through the registry to build the herdr agent start argv\" — the test should at minimum assert that `mp watch --dry-run` reflects the configured model in the herdr argv (it currently does not; the opencode base case is covered by watch_dry_run.rs::dry_run_includes_herdr_start_argv_preview without --model). Fix: either rename to reflect what is tested (e.g. registry_emits_model_flag_for_opencode), or extend with a `mp watch --dry-run` assertion that includes --model in the argv.",
+      "status": "fixed",
+      "author": "external-review(M151)",
+      "fixed_in": "33b8ab6",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "F-05 — Stale doc comment on HarnessRegistry::iter (harness/registry.rs:117-122). Doc says \"The cheap form (iter) is preferred over entries() for callers that just need name -> HarnessEntry mapping.\" but entries() does not exist on HarnessRegistry. Dead cross-reference. Fix: either drop the sentence or implement a public entries() that returns the static slice (or &[HarnessEntry]) with its own doc, then keep the comparison.",
+      "status": "fixed",
+      "author": "external-review(M151)",
+      "fixed_in": "33b8ab6",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "code-quality",
+      "description": "F-06 — resolve_harness_argv loses HarnessError source chain (watch/herdr.rs:78-80). The .map_err(|e| anyhow::anyhow!(\"{e}\")) formats the HarnessError into a String and reconstructs an anyhow error, dropping the std::error::Error source. Callers cannot downcast_ref::<HarnessError>() or follow the source() chain for diagnostics. Fix: replace with anyhow::Error::new(e) (HarnessError already impls std::error::Error) so the original error type is preserved on the anyhow context chain.",
+      "status": "fixed",
+      "author": "external-review(M151)",
+      "fixed_in": "33b8ab6",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    }
+  ]
+}

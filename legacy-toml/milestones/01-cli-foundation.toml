@@ -1,0 +1,90 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "01"
+title = "CLI foundation"
+slug = "cli-foundation"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "L"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Core mp commands: init, validate, milestones, tracks, archive."
+
+[problem]
+description = "Rust P0–P2: query layer and lifecycle basics."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "init",
+    "doctor",
+    "validate",
+    "tracks",
+    "archive",
+]
+out_of_scope = [
+    "brief",
+    "brownfield",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Foundation tests pass"
+verification = "make test"
+status = "passed"
+evidence = "shipped; cargo test -p mp green"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "shipped; cargo test -p mp green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

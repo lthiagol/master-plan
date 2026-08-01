@@ -1,0 +1,156 @@
+{
+  "milestone": {
+    "id": "14",
+    "title": "Homebrew distribution",
+    "slug": "homebrew-dist",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "11"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Optional Homebrew formula for mp install on macOS."
+  },
+  "problem": {
+    "description": "INSTALL.md lists Homebrew as post-v1 optional; no formula exists (B-12)."
+  },
+  "scope": {
+    "in_scope": [
+      "Formula in lthiagol/homebrew-tap",
+      "make install parity check",
+      "INSTALL.md Homebrew section"
+    ],
+    "out_of_scope": [
+      "Official homebrew-core PR",
+      "Linux apt/rpm",
+      "Auto-update tap webhook"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Formula builds mp from source on macOS",
+      "verification": "brew install --build-from-source ./Formula/mp.rb",
+      "status": "passed",
+      "evidence": "brew install --build-from-source succeeds; binary at /opt/homebrew/bin/mp"
+    },
+    {
+      "id": "AC-02",
+      "description": "INSTALL.md documents tap install path",
+      "verification": "docs review",
+      "status": "passed",
+      "evidence": "INSTALL.md §4.4 documents brew tap lthiagol/tap && brew install lthiagol/tap/mp"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Formula",
+      "goal": "Homebrew install path",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "RESOLVED: lthiagol/homebrew-tap; pin to v1.0.0 tag",
+      "files": [
+        "master-plan/milestones/14-homebrew-dist.toml"
+      ],
+      "tests": "manual: verify version and release notes correct",
+      "done_when": "NC-01/NC-02 resolved",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Draft Formula/mp.rb (build from tagged source)",
+      "files": [
+        "Formula/mp.rb"
+      ],
+      "tests": "manual: verify version and release notes correct",
+      "done_when": "brew install --build-from-source succeeds",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Document Homebrew install in INSTALL.md",
+      "files": [
+        "docs/INSTALL.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "INSTALL.md has tap install instructions",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "HUMAN: Publish tap repo and verify remote brew install",
+      "files": [
+        "Formula/mp.rb"
+      ],
+      "tests": "make adopt-check",
+      "done_when": "brew install from published tap works",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

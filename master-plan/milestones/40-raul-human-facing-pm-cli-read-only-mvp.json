@@ -1,0 +1,330 @@
+{
+  "milestone": {
+    "id": "40",
+    "title": "raul: human-facing PM CLI (read-only MVP)",
+    "slug": "raul-human-facing-pm-cli-read-only-mvp",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "42"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-07-05",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "A three-crate workspace (mp-model, mp, raul): a shared pure-types crate (mp-model) holds the 61 domain structs already isolated in mp/src/model.rs; mp keeps all logic/store/validate/CLI; raul depends on mp-model for types and shells out to mp --format json for every plan operation, rendering milestones/steps/progress with styled tables and delegating idea writes to mp. mp stays the sole plan writer; raul is the polished human surface; the JSON contract remains the operation seam."
+  },
+  "problem": {
+    "description": "mp serves two audiences in one binary: agents (--format json, the stable programmatic API) and humans (--format human/markdown/pr-body, mp digest, mp graph). The human surfaces are agent-grade: terse, non-interactive, no drill-down. Humans reviewing the plan want styled tables, filters, drill-down, and a done-but-not-released dashboard. Splitting the human surface into a dedicated raul CLI lets each tool be optimized for its audience, and forces raul to consume mp --format json — reinforcing the JSON contract as the stable agent API."
+  },
+  "scope": {
+    "in_scope": [
+      "Extract crates/mp-model: move the pure domain types from mp/src/model.rs (already I/O-free) into crates/mp-model with serde derives + the TomlResource trait (interface only); mp depends on it via path dep and re-exports so mp internals are unchanged; all existing mp tests still pass",
+      "New binary raul in crates/raul, co-released with mp from this repo; raul depends on mp-model (types only)",
+      "MpRunner helper: shells out to mp <cmd> --format json, deserializes into mp-model types, surfaces non-zero exits as raul errors",
+      "raul shares ONLY mp-model types; never depends on mp logic/store/validate/CLI; all plan reads/writes flow through mp JSON process boundary",
+      "Read views: status, list milestones, show milestone <id>, next, path",
+      "Write surface: ideas only, delegated to mp idea create via shell (raul has zero plan-file writes — it physically cannot, since mp-model has no write capability)",
+      "Human-polish views: raul digest + raul graph (replace human modes of mp digest/graph)",
+      "Styling via comfy-table + owo-colors (minimal deps, M21 dep-diet consistent)",
+      "make target + workspace wiring so cargo build/release produces mp-model, mp, and raul"
+    ],
+    "out_of_scope": [
+      "Linking mp logic/store/validate/CLI/handlers into raul (types-only sharing via mp-model is the red line)",
+      "Direct plan-file writes from raul (always delegate to mp)",
+      "Editing specs/milestones/steps from raul",
+      "A separate git repo (kept in this repo for tight coupling)",
+      "Interactive TUI (that is M44)",
+      "Review/annotation system (that is M43)",
+      "Full feature parity with every mp --format human mode (7 views only)",
+      "Shared rendering helpers (rendering is audience-specific; mp render.rs stays agent-grade, raul stays human-polished)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul MVP renders milestones/steps/progress from `mp --format json` with styled tables/drill-down",
+      "verification": "manual: accepted - walkthrough",
+      "status": "passed",
+      "evidence": "raul status, milestones, show, next, path, digest, graph all render from mp JSON with styled tables"
+    },
+    {
+      "id": "AC-02",
+      "description": "raul idea capture shells out to `mp idea create`; raul never writes plan files directly (no TOML writes in raul)",
+      "verification": "manual: accepted - code review + write-path test",
+      "status": "passed",
+      "evidence": "raul idea delegates to mp idea create; gate test proves zero plan-file writes in raul source"
+    },
+    {
+      "id": "AC-03",
+      "description": "raul is decoupled from mp internals (consumes JSON only) - survives an mp internal refactor",
+      "verification": "manual: accepted - architecture review",
+      "status": "passed",
+      "evidence": "decoupling test confirms raul imports only mp-model; mp_model_has_no_io_imports test confirms mp-model has zero I/O"
+    },
+    {
+      "id": "AC-04",
+      "description": "Build/release: raul builds and ships from this repo alongside mp",
+      "verification": "manual: accepted - make target + release check",
+      "status": "passed",
+      "evidence": "make build-release produces mp, mp-model, raul; cargo tree confirms comfy-table/owo-colors not in mp"
+    },
+    {
+      "id": "AC-05",
+      "description": "crates/mp-model extracted as a pure types-only crate (no I/O, no logic); mp depends on it via path and re-exports; all existing mp unit + integration tests still pass unchanged",
+      "verification": "manual: cargo test -p mp (full suite green post-extraction) + manual: accepted - no fs/store/validate imports in mp-model/src [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "mp-model holds 61 domain types; mp re-exports via pub use mp_model::*; cargo test -p mp green"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP0",
+      "name": "Shared model crate",
+      "goal": "crates/mp-model holds the pure domain types; mp depends on it; all mp tests still pass",
+      "rollback": ""
+    },
+    {
+      "id": "WP1",
+      "name": "Scaffold",
+      "goal": "crates/raul skeleton wired into workspace; builds",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Reads",
+      "goal": "raul read commands rendering mp JSON into styled human views",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Writes",
+      "goal": "raul idea capture delegating to mp idea create; proven zero plan-file writes",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Polish",
+      "goal": "digest + graph human views replacing mp human modes; styling pass",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S0",
+      "work_package": "WP0",
+      "order": 1,
+      "action": "Extract crates/mp-model: move the pure domain types from mp/src/model.rs (61 types, already I/O-free) into a new crates/mp-model crate with serde derives + the TomlResource trait (interface only, no impls). mp gains a path dep on mp-model and re-exports the types so internal modules are unchanged. Verify mp-model/src has no fs/store/validate imports.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "crates/mp-model exists as pure types-only crate; mp depends on it via path and re-exports; mp-model/src has zero I/O imports; basic serde round-trip tests live in crates/mp-model/ guarding the shared types; cargo test -p mp full suite green",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Create crates/raul skeleton: Cargo.toml (name=raul, deps on mp-model + clap + serde + serde_json + anyhow), src/main.rs + src/cli.rs minimal clap root. Add crates/raul to workspace members. Add make target so make build covers mp-model + mp + raul. raul --version prints a version.",
+      "files": [],
+      "tests": "cargo build --release -p raul && ./target/release/raul --version",
+      "done_when": "cargo build --release produces target/release/raul; raul --version works; make build builds all three crates",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S0"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement MpRunner helper in raul: shells out to mp <cmd> --format json from the raul plan/project dir, captures stdout, deserializes into the appropriate mp-model type (or serde_json::Value), surfaces non-zero exits and missing-mp errors as clean raul errors. Gate test asserts raul source imports no mp logic modules (only mp-model types).",
+      "files": [],
+      "tests": "crates/raul/tests/decoupling.rs",
+      "done_when": "MpRunner exists; raul runs a trivial read (e.g. wrap mp status) end-to-end; raul inherits cwd so mp resolves the plan identically and forwards --project-root/--plan-dir when raul receives them; MpRunner detects mp missing from PATH and emits a clear actionable error; gate test confirms raul imports no mp logic/store/validate/CLI (only mp-model)",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement raul status: wraps mp status --format json, renders progress (done/planned/verified counts), inbox count, blockers, and suggested next step as a styled human table.",
+      "files": [],
+      "tests": "crates/raul/tests/status.rs",
+      "done_when": "raul status prints a readable styled summary sourced from mp status JSON; no plan-file access in raul",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S2.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Implement raul list milestones and raul show milestone <id>: wrap mp list milestones / mp show milestone JSON, render a milestones table and a drill-down detail view (steps + ACs + WPs + status) with colors and structure.",
+      "files": [],
+      "tests": "crates/raul/tests/show.rs",
+      "done_when": "raul list milestones and raul show milestone <id> render structured drill-down views from mp JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Implement raul next and raul path: wrap mp next-step / mp path JSON, render a what's-next view (next action + preview chain) and a path view (ordered upcoming milestones/steps).",
+      "files": [],
+      "tests": "crates/raul/tests/path.rs",
+      "done_when": "raul next and raul path render the execution queue readably from mp JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Implement raul idea: prompt the user for an idea title (+ optional description), shell out to mp idea create with the captured input. Assert via test that raul itself has no code path that writes any plan TOML file (no save_toml, no atomic_write, no fs::write to master-plan/) — only the mp idea create delegation.",
+      "files": [],
+      "tests": "crates/raul/tests/idea.rs",
+      "done_when": "raul idea captures input and creates an idea via mp; gate test confirms raul source contains no plan-file write path",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Implement raul digest and raul graph: wrap mp digest / mp graph JSON and render the human-facing versions (stakeholder summary, dependency/coverage graph) — replacing the need for humans to call mp's human modes.",
+      "files": [],
+      "tests": "crates/raul/tests/digest.rs",
+      "done_when": "raul digest and raul graph render human-facing views from mp JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Styling pass across all raul views: consistent colors (owo-colors), tables (comfy-table), headers, spacing, and error/empty-state presentation. Verify final build + that raul deps (comfy-table/owo-colors) do not leak into the mp crate.",
+      "files": [],
+      "tests": "cargo tree -p mp | grep -E 'comfy-table|owo-colors' && exit 1 || make build",
+      "done_when": "All raul views share a consistent styled presentation; cargo tree -p mp shows no comfy-table/owo-colors; make build green",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP1",
+      "order": 10,
+      "action": "JSON-contract audit: for each raul view (status, list milestones, show milestone, next, path, idea, digest, graph), enumerate the exact mp command and the JSON fields the renderer needs. Verify mp --format json emits every required field. Flag any gaps; where mp JSON is incomplete for a view, record either a multi-call strategy or an mp-JSON-extension follow-up.",
+      "files": [],
+      "tests": "manual: accepted — JSON-contract audit mapping review",
+      "done_when": "A documented mapping (view -> mp command -> required fields) exists; every raul view's required fields are confirmed present in mp JSON, or an explicit gap/follow-up is recorded",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-28",
+    "branch": "",
+    "evidence": "[verification force-bypassed: 1 runnable AC(s) failed] [bypass-annotation: Historical milestone (M40 raul human-facing CLI MVP); pre-M30 era; force-bypass preserved as historical record]"
+  }
+}

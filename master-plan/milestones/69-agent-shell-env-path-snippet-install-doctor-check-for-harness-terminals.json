@@ -1,0 +1,151 @@
+{
+  "milestone": {
+    "id": "69",
+    "title": "Agent shell env: PATH snippet install + doctor check for harness terminals",
+    "slug": "agent-shell-env-path-snippet-install-doctor-check-for-harness-terminals",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-30",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After install, each supported harness has a documented or auto-deployed env hook so agent terminals can run mp without full paths. mp doctor reports harness-specific env status and remediation."
+  },
+  "problem": {
+    "description": "make install and mp install print a PATH/MP_HOME snippet for ~/.zshrc, but IDE agent shells (Cursor, OpenCode) often do not source login shell rc files. Observed in review: mp not found until ~/.agents/master-plan/bin/mp was invoked by full path; MP_HOME unset. mp doctor checks embedded assets and skill files but not whether the current process can resolve mp. M65 fixes binary deployment and adds doctor discoverability warnings; this milestone addresses the harness-side gap: giving agents a reliable, install-managed way to get mp on PATH without manual per-user shell debugging."
+  },
+  "scope": {
+    "in_scope": [
+      "mp install writes a small env snippet file under ~/.agents/master-plan/env.sh (MP_HOME + PATH export) — idempotent, safe to source",
+      "Document in INSTALL.md and master-planner skill: agent sessions should source env.sh or add MP_HOME/bin to PATH (Cursor: note in skill compatibility section)",
+      "mp doctor: check whether mp resolves in current PATH; if not, print env.sh path and one-line source instruction",
+      "Cursor harness: optionally write ~/.cursor/mp-env.sh symlink or copy snippet path into install cursor convention (if harness registry supports env artifact type — extend registry or document manual step)",
+      "Integration test: doctor returns discoverability ok:false when PATH stripped, ok:true when MP_HOME/bin prepended"
+    ],
+    "out_of_scope": [
+      "Auto-editing ~/.zshrc or ~/.cursor/cli-config.json without explicit user flag",
+      "Windows PATH setup",
+      "Bundling raul into agent PATH (agents need mp only; humans need raul — M65)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp install creates ~/.agents/master-plan/env.sh with MP_HOME and PATH exports",
+      "verification": "crates/mp/tests/install_env_snippet.rs",
+      "status": "passed",
+      "evidence": "env.sh on install, doctor env.sh remediation, skill+INSTALL docs"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp doctor reports mp-on-PATH status and points to env.sh when missing",
+      "verification": "crates/mp/tests/doctor_discoverability.rs",
+      "status": "passed",
+      "evidence": "env.sh on install, doctor env.sh remediation, skill+INSTALL docs"
+    },
+    {
+      "id": "AC-03",
+      "description": "INSTALL.md and master-planner skill document agent-shell sourcing of env.sh",
+      "verification": "manual: accepted — docs review",
+      "status": "passed",
+      "evidence": "env.sh on install, doctor env.sh remediation, skill+INSTALL docs"
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should mp install --cursor also copy a Cursor rule snippet referencing env.sh, or docs-only?",
+      "status": "resolved",
+      "answer": "Suggestion: docs-only in M69; optional --cursor rule deploy as M69 follow-up track item if dogfooding shows agents still miss env.sh after skill update."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "env.sh snippet",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Doctor + docs",
+      "goal": "",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "mp install writes ~/.agents/master-plan/env.sh (MP_HOME + PATH) idempotently; uninstall removes it",
+      "files": [],
+      "tests": "crates/mp/tests/install_env_snippet.rs",
+      "done_when": "env.sh created on install",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Extend doctor discoverability (from M65) to point at env.sh when mp not on PATH",
+      "files": [],
+      "tests": "crates/mp/tests/doctor_discoverability.rs",
+      "done_when": "doctor shows env.sh remediation",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Update INSTALL.md + master-planner skill: agent shells should source env.sh; Cursor session-start note",
+      "files": [],
+      "tests": "manual: accepted — docs review",
+      "done_when": "docs and skill updated",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-30",
+    "branch": "",
+    "evidence": "env.sh on install, doctor env.sh remediation, skill+INSTALL docs"
+  }
+}

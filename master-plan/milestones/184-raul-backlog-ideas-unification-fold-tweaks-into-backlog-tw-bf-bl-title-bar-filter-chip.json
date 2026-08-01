@@ -1,0 +1,308 @@
+{
+  "milestone": {
+    "id": "184",
+    "title": "raul Backlog + Ideas unification — fold Tweaks into Backlog (TW-* + BF-* + BL-*), title-bar filter chip",
+    "slug": "raul-backlog-ideas-unification-fold-tweaks-into-backlog-tw-bf-bl-title-bar-filter-chip",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-18",
+    "updated": "2026-07-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-18T20:55:55.221389+00:00"
+  },
+  "intent": {
+    "outcome": "The Backlog tab is the single surface for actionable-but-not-milestone work (tweaks, bugfixes, formally deferred scope). The Ideas tab is for exploratory/uncommitted ideas (ID-*). The Tweaks lane is gone — its data shape was identical to Backlog with a different id-prefix filter."
+  },
+  "problem": {
+    "description": "Today Lane::Backlog, Lane::Tweaks, and Lane::Ideas share the same render_backlog_list renderer with id-prefix filtering — they are literally one data shape with three views. The split adds tab count and conceptual noise (what counts as a tweak vs a backlog item?) without surfacing new information. LANE_BUGFIXES (BF-*) is declared in lanes.rs but never surfaced in Lane::ordered(), so bugfixes have no tab at all. Per the user's framing: Backlog = 'issues/fix on something we have', Ideas = 'explore new things'."
+  },
+  "scope": {
+    "in_scope": [
+      "Drop Lane::Tweaks from Lane::ordered() and from the dispatcher in app.rs render() match",
+      "Update Lane::Backlog visible_backlog() to filter to id prefixes TW-* + BF-* + BL-*",
+      "Keep Lane::Ideas visible_backlog() filter to ID-* only (no change to existing behavior)",
+      "Update Lane::ordered() to 7 lanes: Overview, Milestones, Path, Backlog, Ideas, Watch, Settings",
+      "Update tab bar compact_label/label for the new ordering (no label change for Backlog or Ideas; just remove Tweaks)",
+      "Update the per-tab footer dispatch in chrome.rs to remove Tweaks-specific keys",
+      "Add a unit test pinning the Backlog prefix set (TW-* + BF-* + BL-*) and the Ideas prefix (ID-*)"
+    ],
+    "out_of_scope": [
+      "Filter chips in title bar (deferred — lands as part of M185's filter modal which renders the chip for Milestones; a Backlog filter chip is a separate follow-up)",
+      "Refactoring the table visual itself (deferred — M185 will lift the table helper and apply it to Milestones)",
+      "Dropping LANE_BUGFIXES or LANE_TWEAKS constants (we still reference them in tests / docs)",
+      "Any mp CLI change (TUI-only)",
+      "A new 'Bugfixes' lane — BF-* items are folded into Backlog alongside TW-* and BL-*"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Lane::ordered() returns exactly 7 lanes: Overview, Milestones, Path, Backlog, Ideas, Watch, Settings. Lane::Tweaks no longer appears in the tab bar or in any render() match arm.",
+      "verification": "manual: after M184 lands, cargo nextest run -p raul --test tui_lane_ordering --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-02",
+      "description": "Lane::Backlog visible_backlog() returns rows whose id starts with B- (canonical mp backlog), TW-, BF-, or BL-; excludes ID-*. A unit test pins this prefix set against a synthetic backlog with mixed ids.",
+      "verification": "manual: after M184 lands, cargo nextest run -p raul --test tui_backlog_prefix_filter --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-03",
+      "description": "Lane::Ideas visible_backlog() returns rows whose id starts with ID- only. A unit test pins this against a synthetic backlog with mixed ids.",
+      "verification": "manual: after M184 lands, cargo nextest run -p raul --test tui_ideas_prefix_filter --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-04",
+      "description": "Tab bar compact labels still render correctly on a 7-lane ordered list at terminal widths 80, 120, 160. The M167 follow-up contract that the first lane label is not preceded by a divider still holds.",
+      "verification": "manual: after M184 lands, cargo nextest run -p raul --test tui_tab_bar_layout --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-05",
+      "description": "An existing raul config that references a Tweaks-specific keybind still loads without panic (the keys are no-op; a warning is acceptable in this rc).",
+      "verification": "manual: after M184 lands, cargo nextest run -p raul --test tui_unknown_keybind_graceful --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-06",
+      "description": "cargo fmt --all -- --check passes; cargo clippy -p raul --tests --no-deps -- -D warnings passes.",
+      "verification": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp validate exits 0 with the new milestone file in master-plan/.",
+      "verification": "manual: after M184 lands, ls master-plan/milestones/184-*.json returns ≥1 hit; cargo nextest run -p raul --no-fail-fast exits 0; mp validate exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "data-shape",
+      "choice": "No change to BacklogLine struct or to mp's mp list backlog JSON shape",
+      "rationale": "The TUI filter is presentation-only; mp's data shape stays stable. Filter happens client-side in visible_backlog() against the cached full list — same pattern M172 S1 established for Tweaks/Ideas."
+    },
+    {
+      "area": "backlog-prefix-set",
+      "choice": "TW-* + BF-* + BL-* as an explicit literal prefix set in visible_backlog",
+      "rationale": "Explicit list (not regex, not starts_with-on-a-long-string) keeps the filter readable and reviewable. The user explicitly chose this set per the design discussion; encoding it inline avoids a config surface for what is, today, a presentation choice."
+    },
+    {
+      "area": "backlog-vs-ideas-line",
+      "choice": "Backlog draws no divider-only status bar; Ideas is structurally parallel",
+      "rationale": "Both lanes use the same renderer with different id-prefix filters. The lane label in the title bar is the only signal — no additional chip needed pre-M185."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "lane enum + filter",
+      "goal": "Drop Lane::Tweaks from Lane::ordered() and the dispatcher; update Lane::Backlog visible_backlog() to filter to TW-* + BF-* + BL-*",
+      "rollback": "Restore Lane::Tweaks in the enum and Lane::ordered(); revert Lane::Backlog visible_backlog() to no prefix filter."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Remove Lane::Tweaks from the Lane enum, Lane::ordered(), and the compact_label() match. Update the 6 production files that reference Lane::Tweaks: (1) crates/raul/src/tui/app.rs — drop the enum variant, the Lane::Tweaks arm in Lane::ordered(), the compact_label match, the sort_keys_for match, and the visible_backlog id-prefix-filter match (replace with None since Backlog now uses an explicit prefix set); (2) crates/raul/src/tui/runner_helpers.rs — remove Lane::Tweaks from the valid_lanes tuple in load_persisted_sort_keys and from the match_lane_label match; (3) crates/raul/src/tui/render/lane_lists.rs — drop the Lane::Tweaks arm from render_lane_list; (4) crates/raul/src/tui/view_state.rs — drop Lane::Tweaks from the scrollbar-rect dispatch match (line 598) so the Backlog-only arm remains; (5) crates/raul/src/tui/action.rs — collapse the Lane::Tweaks | Lane::Ideas arm in the Enter-key handler to Lane::Ideas only; (6) crates/raul/src/lanes.rs — drop LANE_TWEAKS constant and the Tweaks references in the lane_name_constants_are_the_only_source_of_truth test module. Update Lane::Backlog visible_backlog() to filter to id prefixes TW-* + BF-* + BL-*; verify Lane::Ideas filter to ID-* (already correct).",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/lanes.rs",
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lane_ordering --test tui_backlog_prefix_filter --test tui_ideas_prefix_filter --no-fail-fast",
+      "done_when": "Lane::Tweaks is no longer referenced anywhere; Lane::ordered() returns 7 lanes; Lane::Backlog visible_backlog() returns only TW-/BF-/BL-prefixed ids; Lane::Ideas returns only ID- prefixed ids. Tests pin both prefix sets.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update the tab bar to render 7 lanes with correct compact labels at terminal widths 80, 120, 160. Verify the M167 follow-up contract: the first lane label is not preceded by a divider; the divider logic still holds at the lane boundary.",
+      "files": [
+        "crates/raul/src/tui/render/tab_bar.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_tab_bar_layout --no-fail-fast",
+      "done_when": "Tab bar renders 7 lanes correctly at 80, 120, 160 wide; compact labels kick in on narrow widths; a test exercises each width.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Run the canonical lint gate and validate the plan: cargo fmt --all -- --check, cargo clippy -p raul --tests --no-deps -- -D warnings, and mp validate all pass.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "done_when": "All three commands exit 0 in sequence; the new milestone file is visible to mp validate.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Verify that an existing raul config referencing Tweaks-specific keybinds (e.g. 'tweaks_open') still loads without panic: the binding is silently dropped, the footer renders the remaining globals + per-tab line normally, and a warning is emitted to stderr. A regression test pins the no-panic behavior.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_unknown_keybind_graceful --no-fail-fast",
+      "done_when": "Loading a config with an unknown/Tweaks-specific keybind name does not panic; the test pins the no-panic behavior; a warning is acceptable in this rc.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Cleanup sweep — verify no stragglers remain: (a) rg 'Lane::Tweaks' crates/raul/src/ returns 0 hits; (b) rg 'LANE_TWEAKS' crates/raul/src/ returns 0 hits except in tests/ that pin the removed constant (those are acceptable — they document the migration). Update crates/raul/src/config.rs::lane_icon to remove the LANE_TWEAKS arm in both IconMode::Ascii ('[T]') and IconMode::Unicode ('🔧') — the Lane enum no longer carries Tweaks so the icon mapping falls through to the default. Update crates/raul/src/tui/runner_helpers.rs::match_lane_label to drop the Lane::Tweaks arm. Confirm the test in crates/raul/src/lanes.rs::lane_name_constants_are_the_only_source_of_truth passes with the Tweaks references removed.",
+      "files": [
+        "crates/raul/src/config.rs",
+        "crates/raul/src/lanes.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_no_tweaks_references --no-fail-fast",
+      "done_when": "rg 'Lane::Tweaks' crates/raul/src/ returns 0 hits; rg 'LANE_TWEAKS' returns only the canonical constant definition (or 0 hits); cargo test -p raul passes; the config lane_icon match compiles without the Tweaks arm.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-18",
+    "branch": "",
+    "evidence": "M184: 7-lane ordered (no Tweaks/Grooming); Backlog TW-/BF-/BL-*; Ideas ID-*; tab bar + prefix tests green; 726 raul tests; fmt+clippy clean"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "visible_backlog for Lane::Backlog keeps TW-/BF-/BL-* only. mp::store::next_backlog_id assigns the B- prefix (80 B-* rows in this plan, 0 BL-*). Open formal backlog (B-85/B-87) never appears on the Backlog tab. Spec AC-02 wrote BL-* but that diverges from the data model. Fix: accept B-* (canonical) plus BL-* (alias), TW-*, BF-*; pin with a regression test using real B- ids.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/app.rs",
+        "new_range": {
+          "start_line": 1244,
+          "end_line": 1244
+        },
+        "side": "new"
+      },
+      "summary": "Backlog filter uses BL-* but mp assigns B-*"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "runner_helpers::load_backlog_detail walks data[\"items\"] after reads::list_backlog, but mp list backlog emits {\"backlog\":[...]}. parse_backlog_lines correctly uses data[\"backlog\"]. Enter on Backlog/Ideas (M184 consolidated path) sets ContentState::BacklogDetail but never populates app.backlog_detail — empty detail pane. Fix: read data[\"backlog\"] (and tolerate items as fallback).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/runner_helpers.rs",
+        "new_range": {
+          "start_line": 121,
+          "end_line": 121
+        },
+        "side": "new"
+      },
+      "summary": "load_backlog_detail reads data[items] but list returns backlog"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "lane_lists.rs still comments that the visible filter includes Grooming after M184 removed Lane::Grooming from ordered(). Cosmetic doc drift only.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/lane_lists.rs",
+        "new_range": {
+          "start_line": 414,
+          "end_line": 414
+        },
+        "side": "new"
+      },
+      "summary": "Stale Grooming comment in milestone_tree render path"
+    }
+  ]
+}

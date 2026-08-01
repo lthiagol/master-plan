@@ -1,0 +1,15 @@
+{
+  "id": "m43-annotation-g14-gate",
+  "phase": "implemented",
+  "description": "Validate catches G14 with open approval-request annotations",
+  "fixture": "projects/m43-annotation-fixture",
+  "command": ["validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 2,
+    "stdout_json_file": "expected/validate-g14.json",
+    "fs_unchanged": false
+  }
+}

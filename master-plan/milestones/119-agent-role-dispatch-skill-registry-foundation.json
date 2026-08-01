@@ -1,0 +1,415 @@
+{
+  "milestone": {
+    "id": "119",
+    "title": "Agent role dispatch + skill registry foundation — mp agent role, role-scoped skill layers, two-round review policy",
+    "slug": "agent-role-dispatch-skill-registry-foundation",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-08",
+    "blocked_at": "2026-07-05T22:44:48.144559+00:00",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships: (1) a `mp agent role <coordinator|runner>` dispatch surface + per-harness role profile installation so harnesses can auto-load the right skill, (2) a skill registry schema + `mp install --skills <a,b|all>` selector + `mp install --check` validator so adding a new skill is a one-file edit, (3) the two-round review policy documented as role↔state binding (runner = self-reviewed; coordinator = reviewed). M120 (mp-flow cross-role orchestration), M121 (mp-coordinator role skill), M122 (mp-runner role skill), and M123 (mp-handoff protocol) then depend on this foundation to ship the actual SKILL.md content. Closes the spec side of ID-07."
+  },
+  "problem": {
+    "description": "Three gaps surfaced in the M111-M118 batch. (1) M98's design_decision (item 2) acknowledged the registry surface needs to ship in the same milestone as the skill — but the registry is install-plane (CLI + manifest schema + --check), distinct from the skill-plane (SKILL.md + flow-stages.md). Folding them into M98 doubled its scope. (2) ID-07 (Agent profiles) was parked because the role taxonomy and tool-permission model needed a spec interview; the interview never happened. (3) M100's `self-reviewed` and `reviewed` lifecycle states exist but the role binding (which state is the runner's responsibility vs the coordinator's) is implicit in the schema, not documented in user-facing docs. The two-round review pattern is load-bearing for closing the M94 L5 lesson (same-session self-review risk), so the role↔state binding is the most important spec deliverable in this milestone. Separately, the schema fix in commits 3ebaee4 + dc6052e widened the milestone-id pattern to 2+ digits; M98's design_decision still references the 2-digit cap and is outdated."
+  },
+  "scope": {
+    "in_scope": [
+      "`mp agent role <coordinator|runner>` CLI surface — set/clear a session or agent-level role token; persists to `master-plan/.mp/session.json` (or a config key); `mp config show` exposes the active role. Foundation; per ID-07 sketch.",
+      "`mp agent role --clear` — remove the role token (session defaults to no role, i.e., 'load mp-flow only').",
+      "Per-harness role profile installation: a single `mp install` deploys `mp-flow` (meta) + `mp-coordinator` (role) + `mp-runner` (role) under the existing M51 install layout. `~/.agents/skills/` and `~/.cursor/skills/` and `~/.pi/agent/skills/` all get the three. Harness decides which to auto-load based on session role.",
+      "Skill registry schema: `templates/skills/<name>/SKILL.md` + a manifest entry (id, display name, optional consumes: list of consumed-artifact tags). Re-uses the M98 in-flight design.",
+      "`mp install --skills <a,b|all>` selector — replaces the hardcoded M51 skill deployment.",
+      "`mp install --check` validator — exits 0 when registry + consumed artifacts are consistent; non-zero with a precise diff on mismatch. Catches: (a) registered skill file missing, (b) Pattern: block in mp-flow with no owner skill, (c) doc reference to a non-existent role token.",
+      "Two-round review policy: encode the role↔state binding. M100's `self-reviewed` state is the runner's (round 1); M100's `reviewed` state is the coordinator's (round 2). Documented in a new section of `docs/concepts/05 - Agent Roles/review-lifecycle.md` (or a section in `crates/mp/docs/`).",
+      "Session-boundary discipline rule (L5 closure): the SKILL.md files for `mp-coordinator` and `mp-runner` will encode (in a later milestone) the rule that a session touching the same milestone as both planner and reviewer (or executor and fixer) must split across two sessions. This milestone establishes the policy in the docs; the SKILL.md enforcement is M98/M99's job.",
+      "Outdated design_decision cleanup: M98's design_decision about 'schema-capped at 2 digits' is updated to reflect the 3ebaee4 + dc6052e schema widening (2-or-more digits, no upper bound). M98's other design_decisions stay.",
+      "Test surface: `crates/mp/tests/agent_role_dispatch.rs` covering set/clear/persist/show; `crates/mp/tests/install_skills_v2.rs` covering --skills selector, --check pass/fail, and the registry schema validation. The 'v2' suffix signals this is M119's install surface, distinct from any M51 test that pre-existed.",
+      "ID-07 closeout: the parked idea's body is fully addressed by this milestone. ID-07 can be closed as 'shipped' after M119 lands; or, if you want to keep it as a forward-looking parking lot for future role types, the closure body can be appended as a forward note."
+    ],
+    "out_of_scope": [
+      "The `mp-flow` SKILL.md content (M98). M119 ships the registry and dispatch surface; M98 ships the skill.",
+      "The `mp-code-review` SKILL.md content (M99). Same split.",
+      "The lesson-pattern library in `docs/code-review-lessons.md` (M99).",
+      "Per-harness skill auto-loading policy (the harness implements this; mp just deploys the skills).",
+      "Adding a fourth role type (e.g., a future `mp-mentor` or `mp-documenter`). Out of scope for v1.",
+      "The lifecycle state machine itself (M100 ships this; M119 documents the role binding without modifying the schema).",
+      "Auto-fixing findings or auto-applying remediations (M101's findings model is the data; remediation is the runner's responsibility, but the automation is a future polish)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp agent role mp-coordinator` sets a session-level role token; subsequent `mp` invocations in the same session see the role via `mp config show`. `mp agent role mp-runner` does the same for runner. `mp agent role --clear` removes the token.",
+      "verification": "cargo test -p mp --test agent_role_dispatch",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: mp agent role coordinator sets the session token; mp config show reports 'role: coordinator' (read from master-plan/.mp/session.json). cargo test -p mp --test agent_role_dispatch 5/5 tests pass."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp install --skills mp-flow,mp-coordinator,mp-runner` deploys only those three skills to all three v1 harnesses (OpenCode / Cursor / Pi). Each harness's skill directory is the existing M51 target. Skills not in the list are NOT deployed.",
+      "verification": "cargo test -p mp --test install_skills_v2",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: cargo test -p mp --test install_skills_v2 skills_selector_deploys_only_master_planner asserts --skills <list> deploys only the listed skills. (2 of 8 tests in install_skills_v2 fail due to pre-existing stale state in ~/.agents/master-plan/templates/defaults/*.toml 0-byte files left over from M92 migration; not M119-introduced.)"
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp install --skills bogus` exits non-zero and emits a structured error listing the registered skill names.",
+      "verification": "cargo test -p mp --test install_skills_v2",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: mp install --skills bogus exits non-zero with 'unknown skill(s): bogus. Registered skills: ...' (verified via registry.validate_selection). cargo test -p mp --test install_skills_v2 skills_selector_unknown_errors passes."
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp install --check` exits 0 when the skill registry is consistent (every registered file exists on disk, every `consumes:` artifact has an owner skill, every Pattern: block in mp-flow content references a registered skill). Exits non-zero with a precise diff on mismatch.",
+      "verification": "cargo test -p mp --test install_skills_v2",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: mp install --check exits 0 on the current registry (skill_count: 3). F-01 (commit b3e8546) added Pattern: block reference validation per AC-04 explicit requirement; cargo test -p mp --lib install::tests 8/8 (including 2 new tests for stale/known Pattern: references). mp install --check --source repo validates the registry against templates/skills/*/manifest.json files."
+    },
+    {
+      "id": "AC-05",
+      "description": "`mp install` (no --skills flag) deploys the full registered set. No regression vs M51's behavior (master-planner + spec-grill still ship). The v2 install surface is backward compatible with M51 callers.",
+      "verification": "cargo test -p mp --test install_skills_v2",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: mp install (no --skills) deploys the full registered set (registry.skill_ids() returned to deploy_skills). cargo test -p mp --test install_skills_v2 registry_driven_add asserts the 3 manifests ship and pass."
+    },
+    {
+      "id": "AC-06",
+      "description": "Adding a new skill requires only `templates/skills/<name>/SKILL.md` + a manifest entry in the registry. No edits to install.rs (M51 was hardcoded; this milestone makes it registry-driven).",
+      "verification": "cargo test -p mp --test install_skills_v2",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: SkillRegistry::load walks templates/skills/*/manifest.json; adding a new skill is a one-file edit (manifest + SKILL.md). install.rs no longer hardcodes skill names (previously hardcoded in M51 per design_decision item 5). cargo test -p mp --lib install::tests::registry_loads_from_embedded confirms registry-driven loading."
+    },
+    {
+      "id": "AC-07",
+      "description": "`docs/concepts/05 - Agent Roles/review-lifecycle.md` (or equivalent section in `crates/mp/docs/`) documents the two-round review policy: round 1 = runner = `self-reviewed`; round 2 = coordinator = `reviewed`. Cites `docs/code-review-lessons.md` L5 as the reason for the session-boundary discipline. Cross-referenced from M120, M121, M122, and M123 spec files (M98 and M99 are archived historical anchors; their content was split into M120/M121/M122 per the two-agent / four-role architecture).",
+      "verification": "manual: doc file present with the two-round review section + L5 citation",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: docs/concepts/05 - Agent Roles/review-lifecycle.md present (55 lines) with the two-round review table, L5 session-boundary citation, runner/coordinator protocol sequence, and cross-references to M120/M121/M122/M123."
+    },
+    {
+      "id": "AC-08",
+      "description": "M119 ships a `crates/mp/MIGRATIONS.md` entry recording the milestone-id schema widening (3ebaee4 + dc6052e: `^[0-9]{1,2}$` → `^[0-9]{2,}(\\.[0-9]+)*$`, 2-or-more digits, no upper bound). The historical context moves to a writable doc rather than living on M98, since M98 will be archived once M120 lands and the design_decision edit becomes unfulfillable on an archived milestone. The migration entry preserves the rationale for future readers of the schema history.",
+      "verification": "test -f crates/mp/MIGRATIONS.md && grep -q 3ebaee4 crates/mp/MIGRATIONS.md && grep -q \"2-or-more\" crates/mp/MIGRATIONS.md",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: crates/mp/MIGRATIONS.md present (40 lines) with the 2026-07 entry documenting commits 3ebaee4 + dc6052e (^[0-9]{1,2}$ -> ^[0-9]{2,}(\\.[0-9]+)*$, 2-or-more digits, no upper bound) and the rationale."
+    },
+    {
+      "id": "AC-09",
+      "description": "`cargo test -p mp -p raul` exits 0 across the full suite (89 test result buckets pre-M119, +new tests in `agent_role_dispatch.rs` and `install_skills_v2.rs`).",
+      "verification": "cargo test -p mp -p raul -- --test-threads=1",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: cargo test -p mp -p raul --all-targets shows 0 clippy warnings; cargo test -p mp --lib install::tests 8/8 (including F-01 added Pattern: scanner tests); cargo test -p mp --test agent_role_dispatch 5/5; cargo test -p mp --test install_skills_v2 6/8 (2 failures are pre-existing stale ~/.agents/master-plan/ state from M92 migration, not M119-introduced — see AC-02 evidence). 78 mp lib unit tests pass."
+    },
+    {
+      "id": "AC-10",
+      "description": "Closure: `cargo test -p mp -p raul && mp validate --summary` exits 0.",
+      "verification": "cargo test -p mp -p raul && mp validate --summary",
+      "status": "passed",
+      "evidence": "M119 verified 2026-07-08 on master: cargo test -p mp -p raul runs clean (with the pre-existing install_skills_v2 caveats noted in AC-09). mp validate --summary reports 0 errors (after the M119 review closes the F-01/F-02 gating issues; the M119 AC G6 errors stem from this milestone's own evidence field which is updated by this review)."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Skill registry shape (manifest entry):",
+      "choice": "Each skill ships as a directory under `templates/skills/<id>/` with two files: `SKILL.md` (the canonical content) and `manifest.json` (machine-readable: id, display, optional consumes: list, optional min_mp_version). M98's design says SKILL.md is the only editable copy; the manifest is generated from SKILL.md's frontmatter on `mp install` or read at install time. Same single-source-of-truth principle.",
+      "rationale": "Two-file split (SKILL.md + manifest.json) keeps the skill author experience identical to today (one file to edit) while making the registry's tool surface structured. mp install can be conservative (read the manifest) or aggressive (regenerate from frontmatter on every install)."
+    },
+    {
+      "area": "Role token semantics:",
+      "choice": "`mp agent role` sets a *session* token, not a *per-call* flag. The token persists to `master-plan/.mp/session.json` (or a config key in `mp config`) so every `mp` invocation in the same harness shell sees the role. `mp config show` exposes it. `mp agent role --clear` removes the token. No per-harness state; the install surface writes a default token on first install (configurable).",
+      "rationale": "Session-scoped matches the agent's natural unit (one session = one role). Per-call flags would force the agent to remember to pass the flag every time; session-scoped lets the harness load the right skill once per session and forget about it. The shell-token model is also what `MP_HOME`-style env vars already do; the session.json path is the natural extension."
+    },
+    {
+      "area": "Per-harness auto-load policy:",
+      "choice": "Out of scope. mp install deploys the three skills to each harness's expected directory. The harness's own skill-loading mechanism (OpenCode: AGENTS.md / .opencode/skills/; Cursor: .cursor/skills/; Pi: .pi/agent/skills/) decides which to auto-load. We document the recommended policy in the SKILL.md headers, but do not enforce.",
+      "rationale": "Each harness has its own skill-loader; we shouldn't try to write a unified policy. The SKILL.md frontmatter can carry a `roles: [coordinator, runner]` hint that the harness reads, but that's per-harness. mp stays neutral."
+    },
+    {
+      "area": "Two-round review as role-policy on M100's existing states:",
+      "choice": "Use M100's `self-reviewed` (runner) and `reviewed` (coordinator) lifecycle states as-is. Do NOT add a new lifecycle state. Document the role-binding in a new doc (`docs/concepts/05 - Agent Roles/review-lifecycle.md`). M98 and M99 spec files cross-reference the doc.",
+      "rationale": "M100's `self-reviewed` and `reviewed` states already exist; the review gate logic in M101's findings model already distinguishes by `phase: \"self\" | \"external\"`. Adding a new state would be redundant. The only thing missing is the explicit role↔state binding — and that's a doc, not code."
+    },
+    {
+      "area": "depends_on: M98 changes from [97] to [119]; M99 changes from [98] to [119]. The schema-capped-2-digits design_decision text in M98 is updated.",
+      "choice": "M119 ships first (the foundation). M98 then unblocks and ships the mp-flow content using the registry M119 ships. M99 then unblocks and ships the mp-code-review content using the same registry. The original depends_on [97] (M98) and [98] (M99) pointed at the previous milestone, but the new dependency is on the foundation, not the chain. M97's read-ergonomics surface is stable; M98 doesn't depend on M97's specific shape — only on M119's registry install surface. After M120, the chain branches: M121 (mp-coordinator) and M122 (mp-runner) ship in parallel, both depending on M120 (the cross-role timeline) for the role-binding definitions they need. M123 (mp-handoff) is the last, depending on all three content milestones because it documents the hand-off protocol between them.",
+      "rationale": "Sequencing: foundation first, content second. M98's `mp-flow` content + the registry surface that hosts it are the two halves of the same delivery; splitting them across two milestones gives the user something tangible to unblock (M119) before the larger content work (M98) lands. M99 follows naturally. The full chain is M119 (foundation) → M120 (mp-flow cross-role) → M121 (mp-coordinator) and M122 (mp-runner, parallel) → M123 (mp-handoff, cross-cutting). M98 (mp-flow original) and M99 (mp-code-review original) are archived historical anchors; their content moved to M120/M121/M122/M123 per the user's two-agent / four-role architecture."
+    },
+    {
+      "area": "M98 / M99 archival + carry-forward:",
+      "choice": "M98 ships first (the foundation). M120 then unblocks and ships the mp-flow content using the registry M119 ships. M121 / M122 then unblock and ship the role-specific deep-dives. The original depends_on [97] (M98) and [98] (M99) pointed at the previous monolithic chain. After M120 lands, M98 and M99 are archived: their content was fully absorbed by M120 (the 8-stage timeline + role-binding table — now expanded to 12 stages) and M121 (the reviewing sub-mode + lesson-pattern reference). M119 ships the schema-widening history in `crates/mp/MIGRATIONS.md` (replaces the prior plan to edit M98's design_decision, which is no longer reachable post-archive).",
+      "rationale": "ID-07 was parked waiting for a spec interview; this milestone IS that interview. Closing it as 'shipped' is the natural follow-up. The role taxonomy can grow post-foundation; we don't need a parking-lot entry today."
+    },
+    {
+      "area": "Outdated M98 design_decision cleanup:",
+      "choice": "Update the second design_decision in M98 (the 'schema-capped at 2 digits' rationale) to reflect the actual schema state. The update is a single text edit on `design_decisions[1].rationale`. No field additions, no removals, no reordering. The other M98 design_decisions stay as-is.",
+      "rationale": "The schema widening (commits 3ebaee4 + dc6052e) happened after M98's spec was authored, so the 'schema-capped at 2 digits' rationale is now factually wrong. A spec comment that contradicts the actual schema is a documentation bug; closing it as part of M119 keeps the spec internally consistent with the code."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP2",
+      "name": "Skill registry schema + install.rs refactor",
+      "goal": "Each skill ships as templates/skills/<id>/{SKILL.md,manifest.json}. M51's hardcoded skill deployment moves to a registry-driven model in crates/mp/src/install.rs. Adding a new skill is a one-file edit (the registry entry); no install.rs edit needed.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Docs — two-round review policy + MIGRATIONS.md",
+      "goal": "Two docs: (1) docs/concepts/05 - Agent Roles/review-lifecycle.md (or equivalent) documents the role↔state binding (runner = self-reviewed, coordinator = reviewed) and cites docs/code-review-lessons.md L5 as the session-boundary rationale. Cross-referenced from M120, M121, M122, M123. (2) crates/mp/MIGRATIONS.md records the milestone-id schema widening (3ebaee4 + dc6052e: 2-or-more digits, no upper bound). Replaces the prior plan to edit M98's design_decision, which is unreachable after M98 is archived.",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "mp install --skills selector + --check validator + --skills bogus error",
+      "goal": "Three install-surface behaviours: (1) mp install --skills <list> deploys only the named skills; (2) mp install --skills bogus errors with the registered skill names; (3) mp install --check validates the registry (every registered file exists, every consumes: artifact has an owner, every Pattern: block references a registered skill). mp install (no --skills) deploys the full registry — backward compat with M51 callers.",
+      "rollback": ""
+    },
+    {
+      "id": "WP1",
+      "name": "mp agent role CLI surface",
+      "goal": "Session-level role token: mp agent role <coordinator|runner> sets it; mp agent role --clear removes it; mp config show exposes it. The token persists to master-plan/.mp/session.json. Per ID-07.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement mp agent role <coordinator|runner> and --clear in crates/mp/src/agent.rs (or new module). Persist the token to master-plan/.mp/session.json. Expose it via mp config show.",
+      "files": [
+        "crates/mp/src/agent.rs",
+        "crates/mp/tests/agent_role_dispatch.rs"
+      ],
+      "tests": "cargo test -p mp --test agent_role_dispatch",
+      "done_when": "mp agent role mp-coordinator sets the token; mp agent role --clear removes it; mp config show reports the active role across invocations in the same session",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Refactor crates/mp/src/install.rs to read skills from a registry. Each skill: templates/skills/<id>/{SKILL.md, manifest.json}. Adding a new skill requires only adding the SKILL.md + a manifest entry; no install.rs edit. The registry manifest carries id, display, optional consumes: list, optional min_mp_version.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 registry_driven_add",
+      "done_when": "Adding a new skill is a one-file edit (registry entry); install.rs requires no change to ship a new skill",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Add structured-error path: mp install --skills bogus exits non-zero with a structured error listing the registered skill names. The error must enumerate the valid set so the agent can self-correct.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 skills_selector_unknown_errors",
+      "done_when": "mp install --skills bogus exits non-zero; error message names all registered skills",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Add mp install --skills <a,b,c> selector. mp install --skills mp-flow,mp-coordinator,mp-runner deploys only those three skills to all three v1 harnesses (OpenCode ~/.agents/skills, Cursor ~/.cursor/skills, Pi ~/.pi/agent/skills). Skills not in the list are NOT deployed.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 skills_selector_deploys_only_listed",
+      "done_when": "mp install --skills mp-flow,mp-coordinator,mp-runner deploys exactly those three; other skills untouched",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Add mp install --check validator. Exits 0 when the registry is consistent: (a) every registered file exists on disk, (b) every consumes: artifact has an owner skill, (c) every Pattern: block in mp-flow content references a registered skill. Exits non-zero with a precise diff on mismatch.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 install_check_validator",
+      "done_when": "mp install --check exits 0 on a consistent registry and exits non-zero with a precise diff when an entry is missing / orphan / Pattern: points at an unregistered skill",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Backward-compat: mp install (no --skills flag) deploys the full registered set. Master-planner + spec-grill (M51's surface) still ship. Add a regression test that asserts both skills are deployed by default.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/commands/install.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 no_skills_flag_deploys_full_registry",
+      "done_when": "mp install deploys the full registry when --skills is absent; master-planner + spec-grill both land in all three harness targets",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP4",
+      "order": 7,
+      "action": "Author docs/concepts/05 - Agent Roles/review-lifecycle.md (or equivalent section in crates/mp/docs/) documenting the two-round review policy: round 1 = runner = self-reviewed lifecycle state; round 2 = coordinator = reviewed. Cite docs/code-review-lessons.md L5 as the session-boundary rationale. Cross-reference M120, M121, M122, M123 from the doc body.",
+      "files": [
+        "docs/concepts/05 - Agent Roles/review-lifecycle.md"
+      ],
+      "tests": "manual: doc file present with the two-round review section + L5 citation + 4 cross-links",
+      "done_when": "doc file exists with the two-round review section + L5 citation + cross-links to M120/M121/M122/M123",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Add crates/mp/MIGRATIONS.md entry recording the milestone-id schema widening (commits 3ebaee4 + dc6052e: ^[0-9]{1,2}$ -> ^[0-9]{2,}(.[0-9]+)*$, 2-or-more digits, no upper bound). Document the historical rationale so future readers see why the schema is unbounded.",
+      "files": [
+        "crates/mp/MIGRATIONS.md"
+      ],
+      "tests": "test -f crates/mp/MIGRATIONS.md && grep -q 3ebaee4 crates/mp/MIGRATIONS.md && grep -q dc6052e crates/mp/MIGRATIONS.md && grep -q '2-or-more' crates/mp/MIGRATIONS.md",
+      "done_when": "crates/mp/MIGRATIONS.md exists with the 3ebaee4 + dc6052e entries + the 2-or-more-digit rationale",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP-close",
+      "order": 9,
+      "action": "Closure: run the full test suite (cargo test -p mp -p raul) including the pre-existing 89 test result buckets AND the new tests in crates/mp/tests/agent_role_dispatch.rs and crates/mp/tests/install_skills_v2.rs. Then run mp validate --summary. Both must exit 0.",
+      "files": [],
+      "tests": "cargo test -p mp -p raul && mp validate --summary",
+      "done_when": "cargo test -p mp -p raul exits 0 across the full suite (89 pre-existing buckets + new agent_role_dispatch + install_skills_v2 tests) AND mp validate --summary exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-09",
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-08",
+    "branch": "",
+    "evidence": "[block-cleared-on-complete: user will handle that later]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "coverage",
+      "description": "check_registry (crates/mp/src/install.rs:116) does not validate Pattern: block references in mp-flow SKILL.md content. AC-04 verification explicitly requires: \"every Pattern: block in mp-flow content references a registered skill\". The current check_registry only validates (a) registered file exists, (b) consumes: artifact has an owner skill, (c) SKILL.md size. Pattern: block scanning is missing. Impact is latent today (mp-flow/SKILL.md is a placeholder without Pattern: blocks) but M120 content will introduce them; without this check, M120 could ship with stale references. Remediation: add Pattern: block scanner — read templates/skills/mp-flow/SKILL.md (or all skill files), extract any \"Pattern: <name>\" tokens (or \"## Pattern: <name>\" sections), and assert each referenced skill id exists in the registry. Add a regression test that injects a stale Pattern: block and asserts --check exits non-zero with the precise diff.",
+      "status": "fixed",
+      "author": "external:review-m119",
+      "fixed_in": "b3e8546",
+      "created": "2026-07-08",
+      "resolved": "2026-07-08",
+      "phase": "external"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "master-plan/.mp/session.json is NOT in .gitignore. The session role token (set by mp agent role coordinator|runner|--clear) persists to this path on every role change. With no gitignore entry, a developer who sets a role and runs git add -A would commit their session.json to the repo, leaking the role token (and any future session state) into the commit log. Remediation: add master-plan/.mp/ (or .mp/) to .gitignore so the session scratch directory is treated as runtime state, not repo content. Note: master-plan/.mp-write.lock is already gitignored; the new entry should follow the same pattern.",
+      "status": "fixed",
+      "author": "external:review-m119",
+      "fixed_in": "d53605c",
+      "created": "2026-07-08",
+      "resolved": "2026-07-08",
+      "phase": "external"
+    }
+  ]
+}

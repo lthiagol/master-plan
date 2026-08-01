@@ -1,0 +1,123 @@
+{
+  "milestone": {
+    "id": "105",
+    "title": "Test infrastructure refactor — ac_verify pipe deadlock, AC+step unification, scope discipline",
+    "slug": "test-infra-refactor-ac-verify-deadlock-step-ac-unification-scope-discipline",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "greenfield",
+    "priority": "normal",
+    "created": "2026-07-04",
+    "updated": "2026-07-04",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "mp's test runner is reliable (no deadlocks on chatty processes), consistent (AC and step verifications share a single runner), and scoped to the milestone's affected crates — so future milestones don't rediscover the 'verification timed out after 300s' failure mode that blocked M104."
+  },
+  "problem": {
+    "description": "Three coupled defects. (1) crates/mp/src/ac_verify.rs::execute reads child stdout/stderr only at child exit; cargo compile output fills the macOS pipe buffer, blocks on write, the verifier's try_wait loop never sees child exit until the 300s gate fires. Symptom: mp milestone complete cannot pass any milestone with a cargo test AC verification on cold cache; M104 stalled here twice in one session. (2) verify_milestone_in and verify_step_tests_in are parallel codepaths sharing a Kind enum and shell-out pattern but owning separate report-envelope types — duplicated and drift-prone. (3) The 'AC verification strings should be scoped to affected crates' rule lives in a dogfood-log entry, not in the tooling or the milestone-planning checklist — the next milestone author will hit the same trap M104 did."
+  },
+  "scope": {
+    "in_scope": [
+      "Replace ac_verify::execute's drain-at-exit loop with a per-pipe reader thread (std::thread, not tokio).",
+      "Unify verify_milestone_in and verify_step_tests_in behind a shared runner; keep two thin envelope builders for callers (AcResult, StepTestsResult shapes unchanged).",
+      "AGENTS.md / milestone planning checklist note: AC verification strings must be scoped to the milestone's affected crates (cargo test -p <crate> -p <crate>); broad scopes (--workspace, --all, make test) belong in CI, not in mp milestone complete's gate.",
+      "Soft lint: warn (not block) when verification strings match --workspace, --all, or `make test` patterns. Surface via a make verify-lint (or equivalent) target or pre-commit hook.",
+      "Test audit doc: enumerate current test files / fixtures / scenarios; classify each (keep / drop / investigate); list coverage gaps. Output as docs/TEST-AUDIT.md or crates/mp/TEST_AUDIT.md (Q-02). No bulk deletes in this milestone — decisions documented for the next dogfood pass.",
+      "Coverage gap analysis: confirm M104's additions (sort regression, lifecycle parity) are still green and replicable; flag any other under-tested surface from the audit."
+    ],
+    "out_of_scope": [
+      "Switching mp to async / tokio runtime.",
+      "Adopting cargo-nextest.",
+      "M104 itself (functionally done; will complete after this milestone ships via the now-working verifier).",
+      "Harness / TUI / installer tests.",
+      "Bumping DEFAULT_VERIFY_TIMEOUT_SECS (scope discipline replaces this — the 300s ceiling remains as a forcing function).",
+      "Bulk deletion or mass restructuring of existing tests (audit decisions land in the next dogfood pass, not this commit)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Replacing ac_verify::execute with a per-pipe reader-thread drain makes a M104-style verification string (cargo test -p mp -p raul && mp validate --summary) finish in <60s on warm target/. On cold target/, the verifier completes without hitting the 300s gate (the deadlock fix is observable). Manual reproduction: clean target/, re-run mp milestone complete 104 (which had its ACs narrowed during M104 work), observe no 300s gate fire even without redirect hacks.",
+      "verification": "cargo test -p mp -p raul && mp validate --summary && mp milestone complete 104 --force",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "verify_milestone_in and verify_step_tests_in share one classifier and one runner. External behavior (AcResult, StepTestsResult shapes, the mp milestone complete payload, mp reviews step-tests output) is unchanged. Existing milestone integration tests and make test pass without modification.",
+      "verification": "cargo test -p mp -p raul",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "A soft lint surfaces a warning (does NOT block the gate) when any verification string in any milestone matches --workspace, --all, or `make test` patterns. M104, whose historical AC-04 once read `make test && mp validate`, is unblocked after the lint addition even if the historical string is still on disk; the warning is recorded in the lint report and explicitly NOT a gate failure.",
+      "verification": "make verify-lint && cargo test -p mp -p raul",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Test audit doc (docs/TEST-AUDIT.md or crates/mp/TEST_AUDIT.md, per Q-02) enumerates current test files / fixtures / scenarios and classifies each as keep / drop / investigate. Coverage gaps from the audit are listed. The doc is the basis for any subsequent test-cleanup decisions (NOT in this milestone's commit set).",
+      "verification": "test -f docs/TEST-AUDIT.md || test -f crates/mp/TEST_AUDIT.md",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "cargo test -p mp -p raul exits 0 and mp validate --summary exits 0/0. No flake introduced — existing tests behave identically before and after the refactor (covered by AC-02's full test pass + manual spot-check on previously-passing tests).",
+      "verification": "cargo test -p mp -p raul && mp validate --summary",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "process stdout drain mechanism",
+      "choice": "std::thread per pipe, not tokio",
+      "rationale": "The deadlock is a small localized fix; tokio would pull a runtime + async migration of every verifier call site (verify_milestone, run_step_test, all integration tests), and blow the make dep-audit transitive budget. std::thread adds zero deps, matches mp's pure-sync style, and the fix is local to ac_verify::execute."
+    },
+    {
+      "area": "enforcement of scope discipline",
+      "choice": "Soft lint (warning), not hard block",
+      "rationale": "The 300s timeout stays as a forcing function. The lint makes scope violations visible without breaking pending milestones whose historical AC strings predate the lint (e.g., M104's earlier `make test && mp validate`). Hard blocking would entangle this milestone with completion of those stragglers."
+    },
+    {
+      "area": "verify_milestone_in / verify_step_tests_in unification",
+      "choice": "Shared runner, two thin envelope builders",
+      "rationale": "Keep AcResult / StepTestsResult as caller-facing shapes (avoid changing CLI output or downstream JSON consumers). Move the duplicated shell-out-and-classify into one runner. ~50 lines of dedup, zero external behavior change."
+    },
+    {
+      "area": "test audit outputs",
+      "choice": "Classify first; delete in a later milestone",
+      "rationale": "Bulk deletion in this milestone would risk regressing tests whose coverage is implicit. Audit decisions land in the doc; the next dogfood pass (or a follow-up milestone) acts on them. Keeps blast radius tight."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should the soft lint live as a make verify-lint target, a pre-commit hook, or both? Cheap to add either.",
+      "status": "resolved",
+      "answer": "make verify-lint target only. A pre-commit hook adds per-developer setup cost for marginal value; a Master Plan — common targets\n\n  \u001b[36madopt-check           \u001b[0m Validate v1 adoption paths (full + hybrid)\n  \u001b[36mbuild-release         \u001b[0m Build all workspace binaries (mp + raul)\n  \u001b[36mbuild                 \u001b[0m Alias for build-release\n  \u001b[36mcheck-plan-json       \u001b[0m M92 gate: no .toml under plan dirs\n  \u001b[36mcheck                 \u001b[0m cargo check all workspace members (mp + raul + mp-model)\n  \u001b[36mclean                 \u001b[0m cargo clean\n  \u001b[36mdep-audit-raul        \u001b[0m raul dependency audit (single crossterm, no comfy-table, <=100 transitive)\n  \u001b[36mdep-audit             \u001b[0m Dependency surface audit (transitive count gate + explicit features)\n  \u001b[36mdesign-check          \u001b[0m Verify ARCHITECTURE.md module map matches src/ structure\n  \u001b[36mdev-env               \u001b[0m Print shell exports for local development\n  \u001b[36mdoctor                \u001b[0m mp doctor (dev: MP_HOME = repo root)\n  \u001b[36mhelp                  \u001b[0m Show this help\n  \u001b[36minstall-cursor        \u001b[0m Install toolkit + Cursor harness\n  \u001b[36minstall-global        \u001b[0m Install toolkit only (~/.agents/master-plan, no harness skills)\n  \u001b[36minstall-opencode      \u001b[0m Install toolkit + OpenCode harness (master-planner + spec-grill)\n  \u001b[36minstall-pi            \u001b[0m Install toolkit + Pi harness (pi.dev)\n  \u001b[36minstall               \u001b[0m Full install: toolkit + OpenCode + Cursor + Pi (v1 harness trio)\n  \u001b[36mtest-fixtures         \u001b[0m Run mp validate on hand-crafted fixtures\n  \u001b[36mtest-scenarios        \u001b[0m Run golden CLI scenarios (tests/scenarios)\n  \u001b[36mtest                  \u001b[0m Run Rust unit/integration tests\n  \u001b[36muninstall             \u001b[0m Remove global install (toolkit + all harness artifacts) target is enough for CI integration and ad-hoc runs."
+    },
+    {
+      "id": "Q-02",
+      "question": "Audit doc location: docs/ (project-level, observable from repo root) vs crates/mp/TEST_AUDIT.md (crate-local, lives next to the code it audits) vs master-plan/ (alongside other audit notes)?",
+      "status": "resolved",
+      "answer": "docs/TEST-AUDIT.md (project-level, repo root). The audit spans both crates/mp and crates/raul and is referenced from AGENTS.md / project docs, so a single doc at repo root is the right home."
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

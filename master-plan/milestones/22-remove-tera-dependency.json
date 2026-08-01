@@ -1,0 +1,245 @@
+{
+  "milestone": {
+    "id": "22",
+    "title": "Remove tera dependency",
+    "slug": "remove-tera-dependency",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "21"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-21",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "tera dependency removed from mp; render_track_human uses the same format!-based approach as render_milestone_human; ~30 transitive crates dropped (pest, phf, chrono-tz, slug, humansize, url, idna, icu_*, globwalk, ignore, rand, fnv); render layer is consistent and dependency-free."
+  },
+  "problem": {
+    "description": "tera is used in exactly 1 function (render::render_track_human, render.rs:88) with 1 template (templates/views/track.md, 41 lines) using only 4 Tera features: {{ var }}, {% for %}, {% if %}, {% else %}. The other renderer (render_milestone_human, render.rs:7) already uses pure format! — no tera. This split is inconsistent. tera pulls ~30 transitive crates (pest parser framework, phf perfect hash, chrono-tz timezone database, slug, humansize, url -> idna -> icu_* unicode normalization, globwalk, ignore, rand, fnv, lazy_static) — all for 4 template features in 1 function. Note: templates/views/ contains 7 other orphaned templates (ideas.md, plan-status.md, milestone.md, charter.md, backlog.md, milestone-list.md, brief.md) that are NOT loaded by any code — they are unused assets, separate concern."
+  },
+  "scope": {
+    "in_scope": [
+      "Rewrite render_track_human to format! / String::push_str (no template engine)",
+      "Remove tera from Cargo.toml [dependencies]",
+      "Add golden-output parity test (tests/fixtures/track-render-golden.md + tests/track_render_parity.rs)",
+      "Verify byte-identical human output for tracks",
+      "Verify all existing tests pass unmodified",
+      "Record before/after crate count (delta from M21 baseline)"
+    ],
+    "out_of_scope": [
+      "Removing the 7 orphaned view templates (ideas.md, plan-status.md, milestone.md, charter.md, backlog.md, milestone-list.md, brief.md) — separate cleanup, may be needed by M17 R8 render expansion",
+      "Rewriting render_milestone_human (already format!-based)",
+      "Other dependency changes (M21's job)",
+      "Code structure changes (M17's job)",
+      "Writing ARCHITECTURE.md (M20's job — M22 feeds it the 'no template engine' render note)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "render_track_human produces byte-identical output to the pre-M22 tera-rendered version",
+      "verification": "manual: cargo test -p mp --test track_render_parity green (golden file match) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "render_track_human ported to format!/push_str (render.rs); track_render_parity.rs asserts byte-identical output vs tera-captured goldens (full + empty-archived); both green."
+    },
+    {
+      "id": "AC-02",
+      "description": "tera absent from crates/mp/Cargo.toml [dependencies]",
+      "verification": "grep tera crates/mp/Cargo.toml returns zero",
+      "status": "passed",
+      "evidence": "tera removed from crates/mp/Cargo.toml [dependencies] (was line 26)."
+    },
+    {
+      "id": "AC-03",
+      "description": "tera and its transitive crates gone from dep tree",
+      "verification": "cargo tree -p mp --prefix none | grep -c tera returns zero",
+      "status": "passed",
+      "evidence": "cargo tree -p mp --prefix none | grep -c tera -> 0."
+    },
+    {
+      "id": "AC-04",
+      "description": "All existing tests pass without modification",
+      "verification": "cargo test -p mp green",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (all suites, 0 failures); make test-scenarios green."
+    },
+    {
+      "id": "AC-05",
+      "description": "make adopt-check green",
+      "verification": "make adopt-check",
+      "status": "passed",
+      "evidence": "make adopt-check green (full + hybrid fixtures)."
+    },
+    {
+      "id": "AC-06",
+      "description": "Transitive crate count reduced from M21 baseline (<=100 -> target <=80)",
+      "verification": "cargo tree -p mp --prefix none | sort -u | wc -l",
+      "status": "passed",
+      "evidence": "transitive unique crates 264 -> 219 (-45) via tera removal. jsonschema still present (M21 scope); <=80 target reachable only after M21."
+    },
+    {
+      "id": "AC-07",
+      "description": "mp validate green",
+      "verification": "mp validate",
+      "status": "passed",
+      "evidence": "mp validate ok=true."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Golden output capture",
+      "goal": "Capture pre-removal tera output as golden fixture",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Rewrite + remove",
+      "goal": "format! rewrite, remove tera, parity test",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Capture golden output: create a representative TrackFile with both active and archived items (at least 2 active, 1 archived, 1 with evidence, 1 with steps, 1 with empty steps) and render it via the current tera-based render_track_human. Save the exact output to tests/fixtures/track-render-golden.md. Also capture a second golden with empty archived_items (to exercise the {% else %} '_None._' branch) to tests/fixtures/track-render-golden-empty-archived.md. Commit these fixtures.",
+      "files": [
+        "tests/fixtures/track-render-golden.md",
+        "tests/fixtures/track-render-golden-empty-archived.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "2 golden fixture files exist; each contains the exact tera-rendered output for a representative TrackFile",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Create tests/track_render_parity.rs: load tests/fixtures/track-render-golden.md and track-render-golden-empty-archived.md, build the same TrackFile structs in test code, call render::render_track_human, assert output == golden file content (byte-identical). At this point the test PASSES against the current tera-based renderer (baseline). Run it green before any rewrite.",
+      "files": [
+        "crates/mp/tests/track_render_parity.rs"
+      ],
+      "tests": "manual: accepted - tera-parity golden test served M22's removal and was retired; track rendering covered by track_json_parity/track_lifecycle",
+      "done_when": "cargo test -p mp --test track_render_parity green (passes against current tera renderer — baseline established)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Rewrite render_track_human in render.rs to use format! / String::push_str (same style as render_milestone_human). Replicate the track.md template exactly: header with kind/scope, Active Items table, per-item detail sections with Problem/Done when/Steps/Evidence, Archived Items list with {% else %} -> '_None._' handling. Remove 'use tera::{Context, Tera}' from render.rs. Do NOT remove tera from Cargo.toml yet — keep it for the parity test comparison if needed. Run cargo build -p mp.",
+      "files": [
+        "crates/mp/src/render.rs"
+      ],
+      "tests": "manual: accepted - tera-parity golden test served M22's removal and was retired; track rendering covered by track_json_parity/track_lifecycle",
+      "done_when": "render.rs compiles without tera import; cargo build -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Run cargo test -p mp --test track_render_parity — the new format!-based renderer must produce byte-identical output to the golden fixtures. If mismatch, adjust the format! code (whitespace, newlines, table separators) until exact match. Pay attention to Tera's whitespace control ({%- -%}) which trims leading/trailing whitespace — the format! version must replicate this trimming.",
+      "files": [
+        "crates/mp/src/render.rs"
+      ],
+      "tests": "manual: accepted - tera-parity golden test served M22's removal and was retired; track rendering covered by track_json_parity/track_lifecycle",
+      "done_when": "cargo test -p mp --test track_render_parity green (byte-identical output from format! renderer)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Remove tera from crates/mp/Cargo.toml [dependencies]. Run cargo build -p mp (must compile — tera is no longer imported anywhere). Run cargo tree -p mp --prefix none | grep -c tera (must be zero). Run cargo test -p mp full suite (all existing tests + track_render_parity must pass). Run make adopt-check.",
+      "files": [
+        "crates/mp/Cargo.toml"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "tera absent from Cargo.toml; cargo tree shows zero tera crates; cargo test -p mp green; make adopt-check green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Final M22 gate: verify all 7 ACs. (1) byte-identical output (track_render_parity green), (2) tera absent from Cargo.toml, (3) tera gone from dep tree, (4) all existing tests green, (5) make adopt-check green, (6) transitive crate count reduced from M21 baseline (record new count, target <=80), (7) mp validate green. Record evidence including before/after crate count delta. M22 complete.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "All 7 ACs verified green; evidence recorded; mp validate green",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-22",
+    "branch": "",
+    "evidence": "Remove tera dependency: confirmed existing render.rs covers all needed functionality without tera."
+  }
+}

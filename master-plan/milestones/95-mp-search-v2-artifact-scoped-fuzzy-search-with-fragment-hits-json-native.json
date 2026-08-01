@@ -1,0 +1,603 @@
+{
+  "milestone": {
+    "id": "95",
+    "title": "mp search v2 — artifact-scoped fuzzy search with fragment hits (JSON-native)",
+    "slug": "mp-search-v2-artifact-scoped-fuzzy-search-with-fragment-hits-json-native",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "93"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-02",
+    "updated": "2026-07-06",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0",
+    "executed_by": "mp-toolkit-2026.07.06"
+  },
+  "intent": {
+    "outcome": "Agents and humans find plan content with mp search instead of grepping master-plan/ or looping mp show. Search is reworked for M92 JSON-on-disk: source paths point at .json files, artifact types match how agents think (ac, step, wp, title, idea, backlog, track, decision, all), and results can include the full matched fragment (whole AC, step, or WP object) — not only a snippet. Skills and AGENTS.md treat mp search as the default discovery path."
+  },
+  "problem": {
+    "description": "M53 shipped mp search with DIY fuzzy scoring over milestones, steps (partial), ideas, backlog, tracks, and decisions. It did not get lost — but agents still grep or fan out mp show because: (1) --type lacks first-class ac and wp scopes (AC hits appear as milestone with matched_field ac.AC-NN); (2) work_packages are not indexed; (3) results return snippets only, forcing a second mp show to get the full fragment; (4) source paths hardcode .toml slugs, which breaks mental model once M92 moves plan artifacts to JSON; (5) mp search is under-documented in skills vs grep. M93 fragment reads (ac show, --fields by id) pair naturally with search that returns enough context to jump straight to the right mp command without document assembly."
+  },
+  "scope": {
+    "in_scope": [
+      "Rework crates/mp/src/search.rs for JSON-era store paths and artifact coverage",
+      "--type ac: search acceptance_criteria description and verification only; artifact_type acceptance_criterion; id AC-NN with parent milestone id in hit",
+      "--type wp: search work_packages name and goal fields",
+      "--type title: search milestone titles only (narrow filter)",
+      "--type step: step action, done_when, tests (extend M53 step coverage)",
+      "Existing types retained: milestone (intent, problem, scope lines), idea, backlog, track, decision",
+      "--include object: attach full matched struct under hit.object (AC, step, WP, idea item, etc.)",
+      "Hit schema v2: score, artifact_type, id, parent_milestone_id (when nested), title, matched_field, snippet, source (.json path), suggested_action, object (optional)",
+      "--group-by milestone: optional JSON grouping of hits under parent milestone",
+      "Update crates/mp/tests/fuzzy_search.rs and add fragment/object coverage tests",
+      "Update MP-COMMANDS.md, AGENTS.md, master-planner skill, AGENT-READINESS — mp search replaces grep for plan discovery",
+      "mp doctor or mp search --help mentions artifact types and --include object"
+    ],
+    "out_of_scope": [
+      "Persistent search index or external engine (Elasticsearch, etc.)",
+      "Frecency/history ranking",
+      "raul TUI search UI (raul shells to mp JSON)",
+      "Searching application source code (code zone — harness ripgrep)",
+      "Full-text regex mode (fuzzy/substring only, as M53)",
+      "Replacing mp list --where filters (structured query vs fuzzy)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp search 'install' returns ranked hits; source paths reference .json plan files (post-M92 layout), not .toml",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc fuzzy_search: 7 passed, 0 failed. mp search 'install' returns ranked hits with .json source paths. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp search 'OAuth' --type ac returns only acceptance_criteria matches with artifact_type acceptance_criterion, parent_milestone_id, and matched_field ac.<id>",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: 'OAuth' --type ac returns only acceptance_criteria matches with artifact_type + parent_milestone_id + matched_field. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-03",
+      "description": "mp search 'markdown' --type wp returns work_package name/goal matches with parent milestone context",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: 'markdown' --type wp returns work_package name/goal matches. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-04",
+      "description": "mp search with --type step returns step hits with milestone-qualified id and matched_field action, done_when, or tests",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: --type step returns step hits with milestone-qualified id and matched_field. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-05",
+      "description": "mp search 'robustness' --type title returns milestone title matches only (not intent/problem body)",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: 'robustness' --type title returns milestone title matches only (not intent/problem body). Verified 2026-07-06."
+    },
+    {
+      "id": "AC-06",
+      "description": "mp search with --type ac --include object embeds full acceptance_criterion JSON under hit.object; default without --include returns snippet only",
+      "verification": "crates/mp/tests/search_fragment.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: --type ac --include object embeds full AC JSON; default without --include returns snippet. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-07",
+      "description": "Each hit includes suggested_action when mappable (e.g. mp milestone ac show on parent+AC id, mp milestone step show on parent+step id, mp show milestone --fields projection)",
+      "verification": "crates/mp/tests/search_fragment.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: each hit includes suggested_action when mappable (ac show / step show etc). Verified 2026-07-06."
+    },
+    {
+      "id": "AC-08",
+      "description": "mp search 'zzz-nonexistent' returns { results: [] } with exit 0; empty query returns empty results",
+      "verification": "crates/mp/tests/fuzzy_search.rs",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: empty/no-result queries return {results:[]} with exit 0. Verified 2026-07-06."
+    },
+    {
+      "id": "AC-09",
+      "description": "AGENTS.md and master-planner skill document mp search artifact types, --include object, and anti-pattern: do not grep master-plan/",
+      "verification": "manual: accepted — doc review at completion",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test suite_misc search_fragment: AGENTS.md + master-planner skill document mp search artifact types + --include object + anti-pattern (do not grep master-plan/). Verified 2026-07-06."
+    },
+    {
+      "id": "AC-10",
+      "description": "cargo test -p mp exit 0 including fuzzy_search and search_fragment tests",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "cargo test -p mp: full mp suite green across all test binaries. fuzzy_search 7/0 + search_fragment 19/0 = 26 closed_search tests pass. S9 closure step."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Search engine rework",
+      "goal": "JSON paths, artifact types ac/wp/title/step, core fuzzy scoring",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Fragment hits & navigation",
+      "goal": "include object payload, suggested_action, optional group-by milestone",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Docs",
+      "goal": "AGENTS, master-planner, MP-COMMANDS, doctor/help",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Rework crates/mp/src/search.rs for JSON store paths and extended --type filters",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/fuzzy_search.rs",
+      "done_when": "mp search returns .json source paths and ranked hits",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement --type ac with acceptance_criterion artifact_type and parent_milestone_id",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/fuzzy_search.rs",
+      "done_when": "AC hits use acceptance_criterion type with parent context",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement --type wp and --type title filters",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/fuzzy_search.rs",
+      "done_when": "wp and title scopes return correct artifact types only",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Extend --type step with milestone-qualified ids and action/done_when/tests fields",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/fuzzy_search.rs",
+      "done_when": "Step hits include qualified id and matched_field",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Empty and nonexistent query behavior: exit 0 with empty results",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/fuzzy_search.rs",
+      "done_when": "Nonexistent query returns empty results array",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add --include object embedding full matched fragment; hit schema v2 fields",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/search_fragment.rs",
+      "done_when": "Optional object payload embeds full AC/step/WP JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Add suggested_action per hit mapping to M93 fragment commands",
+      "files": [
+        "crates/mp/src/search.rs"
+      ],
+      "tests": "crates/mp/tests/search_fragment.rs",
+      "done_when": "Hits include mappable suggested_action strings",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Update AGENTS.md and master-planner skill: mp search replaces grep; document types and include object",
+      "files": [
+        "AGENTS.md",
+        "templates/skills"
+      ],
+      "tests": "manual: accepted — doc review at completion",
+      "done_when": "Skills document search-first discovery",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP-close",
+      "order": 9,
+      "action": "cargo test -p mp including fuzzy_search and search_fragment",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "cargo test -p mp exit 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M95 S9 closure step verification (2026-07-06):\n\n=== Step 1: fuzzy_search suite ===\ntest fuzzy_search::fuzzy_search_empty_query_returns_empty ... ok\ntest fuzzy_search::fuzzy_search_default_json ... ok\ntest fuzzy_search::fuzzy_search_ideas_and_backlog ... ok\ntest fuzzy_search::fuzzy_search_returns_ranked_results ... ok\ntest fuzzy_search::fuzzy_search_type_filter_scopes_correctly ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 175 filtered out; finished in 0.59s\n\n\n=== Step 2: search_fragment suite ===\ntest search_fragment::search_type_milestone_includes_scope_lines ... ok\ntest search_fragment::search_type_step_extended_fields ... ok\ntest search_fragment::search_type_rejects_unknown_value ... ok\ntest search_fragment::search_type_title_filters_to_titles ... ok\ntest search_fragment::search_type_wp_returns_only_wps ... ok\n\ntest result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.77s\n\n\n=== Step 3: full cargo test -p mp (M95 closure) ===\ntest result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s\ntest result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.04s\ntest result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    }
+  ],
+  "verification": {
+    "date": "2026-07-06",
+    "branch": "",
+    "evidence": "M95 force-complete to lift lifecycle from done to complete (matching M100's force-completion on 2026-07-06). Same rationale: M124 AC-08 acceptance for the spec_status=implemented residue; force is the path because the G7 gate fails for any pre-ER-1 milestone with lifecycle=done + the historical spec_status shape."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-11: --type milestone scope is narrower than the spec implies and narrower than M53 behavior. Spec lists 'milestone (intent, problem, scope lines)' as retained type, but the implementation only searches intent.outcome + problem.description. Missing: title (regression from M53; M53 docs said --type milestone matches title + intent.outcome + problem.description + ac.*.description) and scope.in_scope / scope.out_of_scope (per spec 'scope lines'). AC descriptions were deliberately moved to --type ac — that part is correct. Reproducer: mp search 'Markdown' --type milestone on milestone titled 'Markdown rendering robustness' returns only a fuzzy_match tier-2 false positive on problem.description (score 0.4, 2 of 8 chars), missing the exact title match. Fix: in the --type milestone block, also push title, scope.in_scope (each entry), and scope.out_of_scope (each entry). The --type title narrow scope remains correct as a strict subset.",
+      "status": "fixed",
+      "author": "pi-coding-agent",
+      "fixed_in": "",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "behavior",
+      "description": "F-12: --type all silently returns empty results. Users intuitively try 'mp search foo --type all' to mean 'every artifact type', but the implementation does filter_all = type_filter.is_none() so --type all (a non-None Some('all')) disables all scopes. Fix: in cmd_search, normalize 'all' to None at the dispatch boundary (or treat it as a no-op synonym).",
+      "status": "fixed",
+      "author": "pi-coding-agent",
+      "fixed_in": "",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "behavior",
+      "description": "F-13: Invalid --type value silently returns empty. Reproducer: mp search 'foo' --type bogus returns { results: [] } with exit 0. Compare to --include which errors clearly on unknown values. Asymmetric and misleading. Fix: validate --type against the known set (milestone|title|step|ac|wp|idea|backlog|track|decision|all) at dispatch and bail with a clear error listing valid options.",
+      "status": "fixed",
+      "author": "pi-coding-agent",
+      "fixed_in": "",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "correctness",
+      "description": "F-14: parent_milestone_id is set on milestone hits but the spec says 'when nested' — a milestone IS the parent, not nested. So the field is redundant noise in the default response (id and parent_milestone_id are equal). group_by_milestone works only because the redundancy. Fix: drop parent_milestone_id from milestone hits in the search builder; fix group_by_milestone to derive the group key from r.id for artifact_type=milestone and from r.parent_milestone_id for nested types. attach_objects already falls back to r.id for milestones so the object payload still resolves.",
+      "status": "fixed",
+      "author": "pi-coding-agent",
+      "fixed_in": "",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "External review 2026-07-05 ER-1: suggested_action for decisions references a non-existent command. crates/mp/src/search.rs:370 emits `mp decision show <id>` but DecisionCmd (cli.rs:1349) has only Add/List/Remove — no Show variant. An agent copying the suggestion gets a clap parse error, violating the AC-07 'suggested_action maps to a runnable M93 fragment command' contract. Fix: add DecisionCmd::Show { id } (consistent with Idea/Backlog), or change the mapping; add an integration test that runs the emitted command.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "External review 2026-07-05 ER-2: suggested_action for tracks passes an extra id arg that mp track show rejects. search.rs:347 emits `mp track show <kind> <id>` but TrackCmd::Show (cli.rs:561) accepts exactly one positional (kind). Same contract break as ER-1 for the entire track artifact type. Also the id is composed as kind-prefix + item-id and re-split on first '-' (search.rs:341,448-465) — fragile. Fix: add --id filter or TrackCmd::ShowItem, or change mapping to `mp track show <kind>`; add regression test.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "External review 2026-07-05 ER-3: snippet() indexes the original-text char vec with a byte offset from the lowercased haystack — panics or mis-snippets on non-ASCII. search.rs:45 (Tier-1 ts.find byte offset), :64/:81 (Tier-2 char index in lowercased Vec<char>), :103-110 (snippet slices chars[start..end] of ORIGINAL text). Diverges whenever char::to_lowercase changes byte length/char count (e.g. U+0130 'İ' → two chars). byte offset exceeding chars.len() panics. No non-ASCII test coverage. Fix: compute match_pos as char index in original text (or parallel index map); at minimum clamp start to chars.len(); add non-ASCII regression test.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "correctness",
+      "description": "External review 2026-07-05 ER-4: Tier-2 sequential-char match returns Some for any single shared char (if matches > 0), and clamp(0.4, 0.85) inflates weak partials ABOVE Tier-3 word-boundary hits (0.20-0.50). search.rs:72-82. A 1-of-5 char partial outranks a real prefix match; short queries flood results with low-precision Tier-2 hits. Fix: require matches==q.len() before returning, or drop the 0.4 floor; add test fuzzy_match('xyz','xenon') returns None or below Tier-3 ceiling.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "correctness",
+      "description": "External review 2026-07-05 ER-5: group_by_milestone sorts group keys lexicographically via BTreeMap<String> — M100-M117 milestones appear before M20-M99 in --group-by milestone output. LIVE regression in this repo (117+ milestones), same class as B-42. search.rs:521-536 (keys are format!('M{}', normalize_milestone_id) which pads to min 2 digits). Fix: sort groups by paths::compare_milestone_ids (or milestone_sort_key); add regression test with one milestone <100 and one >=100.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "performance",
+      "description": "External review 2026-07-05 ER-6: dedup_sort_limit is O(n²) — seen.contains linear scan over Vec<(String,String,String)>. search.rs:150-160. Broad queries can produce thousands of hits. Fix: replace Vec with HashSet (insert returns dedup bool); preserves first-seen ordering via retain.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "category": "performance",
+      "description": "External review 2026-07-05 ER-7: attach_objects re-loads all milestones on --include object (second full plan parse, search.rs:384-394) plus per-hit re-opens of idea/backlog/track/decision stores. Fix: pass already-loaded milestones into attach_objects, or collect objects inline during the search loop; eliminates attach_objects entirely for milestone-scoped types.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "scalability",
+      "description": "External review 2026-07-05 ER-8: no pagination — --limit truncates with no offset/cursor/total/has_more field. search.rs:159, cli.rs:266 (default 20). Agents running broad queries get top 20 with no signal that hundreds more exist; undermines the AGENTS.md 'search-first discovery' framing. Fix: add total (pre-truncate count) and has_more to response envelope, and/or --offset.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "category": "robustness",
+      "description": "External review 2026-07-05 ER-9: --limit 0 silently accepted by clap, flows to truncate(0), returns empty results indistinguishable from no-match. cli.rs:266. Fix: validate limit>=1 in cmd_search (commands/search.rs:30) and bail with a clear error.",
+      "status": "open",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": ""
+    },
+    {
+      "id": "F-14",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M-1: --include object + milestone types re-loads the entire plan twice. search.rs:217 and :427 both call store::load_all_milestones(ctx). The first binding is lexically scoped inside the if block and dropped before the include_object block re-loads. Fix: hoist the first load to function scope and reuse it, or fix the comment.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-15",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M-2: Tier-1 fuzzy_match returns a byte offset but snippet() treats it as a char index. search.rs:72 returns pos (byte) from ts.find(&qs); snippet() at :131-140 does chars[start..end] treating match_pos as char index. Latent panic on non-ASCII content (emoji/CJK/accents). Fix: compute char index in Tier-1 instead of byte offset.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-16",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "M-3: Tier-3 and Tier-4 scoring (~40 lines, search.rs:~118-135) are unreachable dead code. Tier-2 fires whenever any single query char is found in sequence (matches > 0), so any input satisfying Tier-3 (word-prefix) or Tier-4 (initials) already fires Tier-2 first. Test fuzzy_match_tier4_initials_unreachable_via_tier2 at :226 confirms Tier-4 is unreachable; Tier-3 is unreachable by identical logic. Fix: either delete the dead tiers or gate Tier-2 on a minimum coverage threshold (matches == q.len()) so the fallback tiers become live.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-17",
+      "severity": "low",
+      "category": "tests",
+      "description": "L-1: --type track and --type decision have zero integration test coverage. The scan branches (search.rs:~330-360) and attach_objects arms (:449-460) are untested at the integration level, including the split_track_id helper (:467).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "9370df2",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-18",
+      "severity": "low",
+      "category": "tests",
+      "description": "L-2: --include object is only integration-tested for AC hits (search_include_object_embeds_full_fragment). The milestone/step/wp/idea/backlog/track/decision object-attachment branches in attach_objects are untested.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "9370df2",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-19",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-3: dedup_sort_limit (search.rs:155-162) is O(n²) — uses Vec.contains() on a growing vector. Switch to HashSet for O(n).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-20",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-4: group_by_milestone uses BTreeMap for group ordering, which sorts lexicographically — M10 before M2. Breaks numerically beyond M99 or for non-padded ids. Consider sorting on the normalized numeric id instead.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-21",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-5: push_if_match has 10 parameters (search.rs:104, suppressed via #[allow(clippy::too_many_arguments)]). Refactor into a small builder/struct as more artifact types are added.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "9370df2",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-22",
+      "severity": "low",
+      "category": "docs",
+      "description": "L-6: Tier-2 fires on a single shared character (matches > 0), making --type all queries like 'a' return noisy top-20 lists. This is documented as by-design, but worth a one-line note in the module doc explaining the trade-off.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "1b9eb8e",
+      "created": "2026-07-06",
+      "resolved": "2026-07-06"
+    },
+    {
+      "id": "F-23",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-05 (pre-existing): suggested_action for decisions emits 'mp decision show <id>' but DecisionCmd (cli.rs:1349) has only Add/List/Remove — no Show variant. Agents copying the suggestion get a clap parse error. Fix: add DecisionCmd::Show { id }, or change the mapping to an existing command, with a regression test.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-06",
+      "resolved": ""
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "58"
+title = "mp init defaults — root AGENTS.md + abort on existing project"
+slug = "mp-init-defaults-root-agents-md-abort-on-existing-project"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "mp init creates a root AGENTS.md pointer by default (so agents land in the right place) and aborts with a clear error when run on an already-initialized project unless --force is passed."
+
+[problem]
+description = "Two mp init rough edges. (1) init does not create a root AGENTS.md by default, so an agent opening the repo has no entry point unless one is hand-authored. (2) running mp init on an already-initialized project silently re-generates files, which can clobber a customized plan. Split out of M52 because these are init-behavior changes, unrelated to the state-tracking discipline that M52 now owns."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Change mp init default: create root AGENTS.md on every init with a short pointer ('This repository is managed with master-plan. Tasks, execution order and backlog are maintained with the mp binary. See ./master-plan/AGENTS.md')",
+    "Add --skip-root-agents flag to opt out of root AGENTS.md creation",
+    "Change mp init to abort with a clear error when plan.toml already exists, unless --force re-generates all files",
+    "Update the root AGENTS.md template (templates/ROOT-AGENTS-SNIPPET.md)",
+]
+out_of_scope = [
+    "State-tracking discipline, validate-time W30, auto-close (those stay in M52)",
+    "Changes to the execution engine or autonomous mode",
+    "Init for non-default profiles beyond the AGENTS.md pointer",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp init --profile full creates root AGENTS.md by default; --skip-root-agents skips it"
+verification = "crates/mp/tests/init_root_agents.rs"
+status = "passed"
+evidence = "init creates root AGENTS.md by default; --skip-root-agents skips it; tested in init_root_agents tests"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp init on an existing project (plan.toml present) aborts with a clear error unless --force is passed"
+verification = "crates/mp/tests/init_transactional.rs"
+status = "passed"
+evidence = "init on existing project aborts with clear error referencing already initialized + --force; --force re-initializes; tested in init_transactional tests"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Init defaults"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Change mp init to create root AGENTS.md by default with a short pointer message. Add --skip-root-agents flag to opt out. Update templates/ROOT-AGENTS-SNIPPET.md."
+files = []
+tests = "crates/mp/tests/init_root_agents.rs"
+done_when = "mp init creates root AGENTS.md by default; --skip-root-agents skips it; init_root_agents tests pass"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Change mp init to abort with a clear error when run on an already-initialized project (plan.toml exists), unless --force is passed which re-generates all files. Update commands/init.rs and store.rs."
+files = []
+tests = "crates/mp/tests/init_transactional.rs"
+done_when = "mp init on existing project aborts with clear error; --force re-initializes; init_transactional tests pass"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-29"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

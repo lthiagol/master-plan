@@ -1,0 +1,618 @@
+{
+  "milestone": {
+    "id": "180",
+    "title": "mp project overview — bounded activity journal and consolidated status snapshot",
+    "slug": "mp-project-overview-bounded-activity-journal-and-consolidated-status-snapshot",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "178"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-16",
+    "updated": "2026-07-17",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-17T19:43:31.173618+00:00"
+  },
+  "intent": {
+    "outcome": "Human-facing clients can read one structured, current project-overview snapshot containing health, milestone and step statistics, work-queue counts, canonical lifecycle totals, watch state, suggested path, Inbox preview, and recent project activity backed by a shared bounded event journal."
+  },
+  "problem": {
+    "description": "Raul's Overview currently combines `mp status` and `mp inbox`, while additional state is spread across milestones, path lanes, backlog, ideas, annotations, reviews, validation, execution, and watch operational state. There is no project-wide activity feed: milestone creation and lifecycle transitions can only be approximated from latest timestamps or per-file git history, and watch/execution operations have no shared chronological journal. Building the redesigned Overview directly in Raul would duplicate classification and aggregation logic across the CLI and TUI. mp needs to own a compact read model and the future event history that feeds it."
+  },
+  "scope": {
+    "in_scope": [
+      "A project-shared, plan-zone activity journal that begins recording when this feature ships; no historical backfill",
+      "A bounded rolling journal retaining the newest 500 events and permanently discarding older events when the cap is exceeded",
+      "A compact event shape containing timestamp, event type, project or milestone subject, and a short human-readable summary",
+      "Milestone activity events for milestone creation and every canonical lifecycle transition",
+      "Operational activity events for block and unblock, mp watch start/stop/terminal result, execution handoff, and validation-state changes",
+      "Validation activity is emitted only when the recorded validation state changes, not on every identical validation invocation",
+      "Event persistence is best-effort relative to the primary mp mutation: if the plan operation succeeds but the journal write fails, the operation remains successful and mp emits a visible warning",
+      "A consolidated current Overview snapshot owned by mp rather than Raul, with project health: validation state/error count, blocker count, execution mode, and planning state",
+      "Current milestone statistics and current step counts split by pending, in-progress, done, failed, and skipped",
+      "Current work-queue counts for Inbox, pending external reviews, backlog, parked ideas, open annotations, blocked milestones, and remediation milestones",
+      "Counts for every canonical lifecycle bucket: draft, groomed, approved, in-progress, done, self-reviewed, reviewed, complete, and remediation",
+      "A state-only mp watch summary: idle, running, stopped, failed, or complete, without active milestone/stage details",
+      "A bounded suggested-path preview containing three to five upcoming items, based on available path data",
+      "The latest five actionable Inbox items and latest five journal events in the Overview snapshot",
+      "Structured read commands for the consolidated Overview snapshot and bounded activity retrieval so Raul does not read plan files or reconstruct events"
+    ],
+    "out_of_scope": [
+      "The Raul Overview layout, rendering, responsive behavior, or navigation; those belong to the dependent Raul milestone",
+      "Backfilling events from git history, existing timestamps, milestone logs, or prior watch logs",
+      "Step start/completion/claim events, review findings/resolutions/claims, approval events, or arbitrary milestone metadata edits",
+      "Actor identity, originating command, reason/provenance expansion, or full audit-trail semantics beyond the selected core event details",
+      "Time-window trends, seven-day or thirty-day throughput, charts, velocity, or historical comparisons",
+      "Archiving events beyond the newest 500, configuring the retention cap, or keeping multiple journal files",
+      "Failing or rolling back an otherwise successful plan operation solely because its activity event could not be written",
+      "Changing lifecycle definitions, path ordering, Inbox classification, review semantics, or mp watch behavior",
+      "Webhooks, notifications, remote event delivery, or a general-purpose event bus"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "The project-shared activity journal stores core event rows with timestamp, type, subject, and summary, begins empty on projects that predate the feature, and retains exactly the newest 500 events when additional rows are recorded.",
+      "verification": "cargo nextest run -p mp --test milestone_log --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-02",
+      "description": "Creating a milestone records one milestone-created event, and each canonical lifecycle transition records one lifecycle-transition event containing the milestone subject and old/new lifecycle in its summary. Repeated reads and no-op writes do not create duplicate activity.",
+      "verification": "cargo nextest run -p mp --test transition_reliability --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-03",
+      "description": "Block, unblock, execution handoff, and M178 watch start/stop/terminal outcomes record operational events. Validation records an event only when its persisted ok/error state changes and does not append duplicates for an unchanged result.",
+      "verification": "cargo nextest run -p mp --test transition_reliability --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-04",
+      "description": "If journal persistence fails after a state-changing command succeeds logically, the primary plan change remains committed, the command surfaces a visible structured warning, and the project remains schema-valid rather than reporting a false rollback.",
+      "verification": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-05",
+      "description": "The structured Overview snapshot reports validation state/error count, blocker count, execution mode, planning state, and state-only watch status using mp-owned classifications.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-06",
+      "description": "The Overview snapshot reports total milestones; every canonical lifecycle bucket; and aggregate step counts for pending, in-progress, done, failed, and skipped across the current project state.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-07",
+      "description": "The Overview snapshot reports separate current counts for actionable Inbox items, pending external reviews, backlog items, parked ideas, open annotations, blocked milestones, and remediation milestones without requiring Raul to call each underlying command.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-08",
+      "description": "The Overview snapshot includes a short ordered suggested-path preview of three to five available items, at most five actionable Inbox entries, and the newest five activity events in descending chronological order.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    },
+    {
+      "id": "AC-09",
+      "description": "Existing status, inbox, path, lifecycle, validation, execution, and watch commands preserve their current wire behavior while the new Overview read model is added.",
+      "verification": "cargo nextest run -p mp --no-fail-fast",
+      "status": "passed",
+      "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "module-seam",
+      "choice": "mp owns one consolidated project-overview read model",
+      "rationale": "Lifecycle classification, queue counts, path preview, watch state, and activity ordering are domain logic. Hiding them behind a small structured interface gives Raul leverage and keeps aggregation local to mp."
+    },
+    {
+      "area": "history-start",
+      "choice": "Record future events only",
+      "rationale": "The user does not want inferred historical data from git or timestamps presented as authoritative events."
+    },
+    {
+      "area": "storage",
+      "choice": "Use a project-shared plan-zone journal",
+      "rationale": "Activity should travel with the project and be visible to teammates and clones rather than being local to one Raul installation."
+    },
+    {
+      "area": "retention",
+      "choice": "Keep the newest 500 events and discard older rows",
+      "rationale": "The Overview needs recent operational context, not an unbounded audit database or archive system."
+    },
+    {
+      "area": "event-scope",
+      "choice": "Milestone lifecycle plus selected operations only",
+      "rationale": "The user selected milestone creation/transitions and operations, while excluding step and review-detail noise from the feed."
+    },
+    {
+      "area": "event-details",
+      "choice": "Timestamp, type, subject, and short summary",
+      "rationale": "Rows remain readable in a compact five-item panel; actor and command provenance are explicitly unnecessary."
+    },
+    {
+      "area": "failure-policy",
+      "choice": "Warn and continue when journal persistence fails",
+      "rationale": "Activity visibility must not block otherwise valid project-management transitions."
+    },
+    {
+      "area": "statistics-period",
+      "choice": "Current snapshot only",
+      "rationale": "The redesigned Overview describes actual project state rather than trends or historical throughput."
+    },
+    {
+      "area": "watch-summary",
+      "choice": "Expose watch state only",
+      "rationale": "Detailed milestone, stage, queue, log, and agent progress belongs in the dedicated Watch tab."
+    },
+    {
+      "area": "watch-summary-derivation",
+      "choice": "Map the 5-state Overview watch summary from M178's classification + terminal outcomes: idle = no recorded run and no terminal result (stale/interrupted with no terminal result also surfaces as idle); running = M178 classifies the run live; complete = terminal outcome completed; failed = terminal outcome failed, skipped, or exhausted (any non-success terminal); stopped = terminal outcome gracefully stopped. mp owns this derivation; Raul consumes the single coarse state.",
+      "rationale": "M178 exposes a live/stale/terminal classification plus five terminal outcomes (completed/failed/skipped/exhausted/stopped), but the Overview health strip needs one coarse watch state. Pinning the mapping in mp (not Raul) keeps mp authoritative and removes the ambiguity of where skipped/exhausted land in the idle/running/stopped/failed/complete set."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Activity journal storage",
+      "goal": "Provide a project-shared, bounded, structured future-event journal with stable read interfaces.",
+      "rollback": "Disable journal dispatch and hooks; absent or retained activity.json remains non-authoritative and existing plans stay readable."
+    },
+    {
+      "id": "WP2",
+      "name": "Event instrumentation",
+      "goal": "Record the approved milestone lifecycle and operational event categories exactly once without blocking primary mutations.",
+      "rollback": "Remove event hooks while preserving every existing milestone, execution, validation, and watch transition."
+    },
+    {
+      "id": "WP3",
+      "name": "Overview read model",
+      "goal": "Aggregate current health, lifecycle, steps, queues, watch state, path, Inbox, and activity behind one mp-owned snapshot.",
+      "rollback": "Remove the new aggregator and leave status, inbox, path, review, validation, execution, and watch commands unchanged."
+    },
+    {
+      "id": "WP4",
+      "name": "Compatibility and hardening",
+      "goal": "Handle missing/corrupt activity safely and prove no existing wire contract or project state is invalidated.",
+      "rollback": "Treat activity as unavailable and return structured empty/diagnostic data while keeping primary reads operational."
+    },
+    {
+      "id": "WP5",
+      "name": "Acceptance verification",
+      "goal": "Exercise the journal, event hooks, snapshot, and compatibility matrix through existing resolvable mp test targets.",
+      "rollback": "Revert the smallest failing work package; no runtime data migration is required for an absent best-effort journal."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add the core activity event model and lazy project-shared activity.json storage with atomic locked writes, absent-file-as-empty reads, newest-first bounded reads, and retention of exactly the newest 500 core-detail events.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/paths.rs",
+        "crates/mp/src/lib.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test milestone_log --no-fail-fast",
+      "done_when": "Timestamp/type/subject/summary rows round-trip, concurrent writes serialize under the plan lock, event 501 evicts only the oldest row, and pre-M180 projects require no migration or backfill.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Expose machine-readable bounded activity retrieval and the consolidated Overview command surface with JSON-default output and fields projection, while keeping the Overview implementation behind an mp module interface.",
+      "files": [
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/commands/mod.rs",
+        "crates/mp/src/commands/activity.rs",
+        "crates/mp/src/commands/overview.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "done_when": "Clients can read latest activity and one Overview payload without reading plan files; projection works and no existing command is renamed or removed.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Record one milestone-created event and one event for every actual canonical lifecycle transition across create, direct lifecycle setters, completion, reopen, remediation, review auto-promotion, and session paths; suppress no-op duplicates.",
+      "files": [
+        "crates/mp/src/milestone/spec.rs",
+        "crates/mp/src/milestone/io.rs",
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/session.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test transition_reliability --no-fail-fast",
+      "done_when": "Creation and old-to-new lifecycle summaries are emitted exactly once from every lifecycle write seam, while reads and same-state mutations emit none.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Record block, unblock, and successful execution-handoff operational events after their primary mutations commit, with no events for rejected or no-op paths.",
+      "files": [
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/execution.rs",
+        "crates/mp/src/commands/execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test transition_reliability --no-fail-fast",
+      "done_when": "Each successful operation appends one core-detail event and journal behavior does not alter block overlays, lifecycle, handoff gates, or command results.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Integrate M178 watch start, graceful stop, and complete/failed/skipped/exhausted terminal outcomes with operational activity events while consuming M178's classifier instead of re-inferring liveness.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/state.rs",
+        "crates/mp/src/watch/sequencer.rs",
+        "crates/mp/src/watch/shutdown.rs",
+        "crates/mp/src/activity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "done_when": "Every approved watch operation emits one event after control state is durable, and foreground/resume/detach/pane/sequencing behavior remains owned by M178.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Route all journal appends through an explicit best-effort recorder that preserves successful primary writes, emits a visible structured warning on activity failure, and serializes concurrent appends.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/commands/common.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/commands/execution.rs",
+        "crates/mp/src/commands/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "Injected journal failures leave the intended plan mutation committed and schema-valid, return success plus warning, never claim rollback, and cannot corrupt activity.json.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S4",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Record validation activity only when the persisted ok/error-count state changes, using the latest validation event as the deduplication baseline without changing validation output or exit semantics.",
+      "files": [
+        "crates/mp/src/commands/validate.rs",
+        "crates/mp/src/validate/plan.rs",
+        "crates/mp/src/validate/report.rs",
+        "crates/mp/src/activity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Repeated identical validations append nothing, changed ok/error state appends one event, and a prior best-effort failure may safely retry on the next invocation.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Build the mp-owned Overview snapshot health/statistics core by reusing existing classifiers for validation, blockers, execution/planning mode, M178 state-only watch status, total milestones, nine lifecycle buckets, and pending/in-progress/done/failed/skipped step counts.",
+      "files": [
+        "crates/mp/src/overview.rs",
+        "crates/mp/src/commands/overview.rs",
+        "crates/mp/src/commands/status.rs",
+        "crates/mp/src/validate/plan.rs",
+        "crates/mp/src/execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "done_when": "One snapshot reports every AC-05/AC-06 field for empty and populated projects without introducing a second lifecycle, step, validation, or watch classification.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Add current work-queue counts for actionable Inbox, pending external reviews, backlog, parked ideas, open annotations, blocked milestones, and remediation milestones by reusing existing loaders and filters.",
+      "files": [
+        "crates/mp/src/overview.rs",
+        "crates/mp/src/inbox.rs",
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/store.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "done_when": "Every queue count matches its authoritative existing command/loader on the same snapshot and Raul needs no per-queue subprocesses.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Add the bounded ordered projections: three-to-five suggested path items, newest five actionable Inbox items, and newest five activity rows sorted descending, with explicit empty arrays when unavailable.",
+      "files": [
+        "crates/mp/src/overview.rs",
+        "crates/mp/src/commands/overview.rs",
+        "crates/mp/src/path_engine.rs",
+        "crates/mp/src/inbox.rs",
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/projection.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast",
+      "done_when": "The snapshot never exceeds five items per preview, preserves mp path order, uses actionable Inbox semantics, and does not expose trends or detailed Watch state.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S8",
+        "S9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP4",
+      "order": 11,
+      "action": "Harden missing, malformed, and unwritable journal paths and verify the new modules reuse domain helpers without changing status, Inbox, path, lifecycle, validation, execution, review, or watch wire behavior.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/overview.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/commands/status.rs",
+        "crates/mp/src/commands/overview.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Absent history is an empty future-only feed, malformed history is a structured diagnostic, primary plan reads remain valid, and existing command fixtures remain byte/field compatible.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S6",
+        "S7",
+        "S8",
+        "S9",
+        "S10"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP5",
+      "order": 12,
+      "action": "Extend the established history, transition, concurrency, misc, validation, and watch targets with all M180 scenarios and run the complete mp regression suite.",
+      "files": [
+        "crates/mp/tests/milestone_log.rs",
+        "crates/mp/tests/transition_reliability.rs",
+        "crates/mp/tests/plan_io_concurrent_writes.rs",
+        "crates/mp/tests/suite_misc.rs",
+        "crates/mp/tests/suite_validate.rs",
+        "crates/mp/tests/watch_state_file.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast",
+      "done_when": "All nine ACs have behavioral coverage in resolvable targets, no journal test depends on historical backfill, and the full mp suite passes without wire regressions.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8",
+        "S9",
+        "S10",
+        "S11"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-17",
+    "branch": "",
+    "evidence": "M180 external review (round-1) remediated: F-02 (HIGH, AC-04 violation — milestone-side journal writes propagated as command failures, fixed via append_event_best_effort_unlocked + 5 regression tests), F-03 (MEDIUM, dead code in overview/path.rs), F-01/F-04 (LOW, docstring residuals). cargo nextest -p mp: 2085/2085 green (was 2080; +5 from F-02 regression coverage). clippy + fmt clean. mp milestone verify 180: 9/9 ACs pass. Verdict ok per L19."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "parse_legacy_validation_summary uses ad-hoc contains()/substring splits; an unrecognized wording returns None and silently degrades change-detection to 'always emit'. Only fires for journals written during the M180 dev window (canonical data field always populates for new events). Worth a one-line note in the docstring that the fallback is best-effort.",
+      "status": "fixed",
+      "author": "external-agent (opencode)",
+      "fixed_in": "M180 external-review F-01 docstring",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-04 violation: milestone-side journal writes (record_lifecycle_transition + direct append_event calls in block_milestone/unblock_milestone/create_milestone/complete_milestone/set_lifecycle/apply_spec_status/add_finding_with_phase/resolve_finding) propagate journal errors via '?'. By the time these run, the primary mutation has already committed — the propagated Err reports a false rollback, exactly what AC-04 forbids. The append_event_best_effort path (validate/execution/session/watch) correctly swallows + warns; the in-lock milestone path does not. No test injects a journal failure into a milestone command, so the green suite hid the violation.",
+      "status": "fixed",
+      "author": "external-agent (opencode)",
+      "fixed_in": "M180 external-review F-02 fix",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "overview/path.rs build_path_items has dead code: 'if items.len() < MIN_PREVIEW { items.truncate(MIN_PREVIEW.min(items.len())); }' is a no-op (truncate(N.min(len)) == truncate(len) when len < N). The comment says 'honor an empty list rather than padding' — if that intent is right the branch should be deleted; if the intent was something else the implementation is wrong.",
+      "status": "fixed",
+      "author": "external-agent (opencode)",
+      "fixed_in": "M180 external-review F-03 fix",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "correctness",
+      "description": "record_validation_state_change reads prior state outside the plan-write lock and writes inside it (via append_event_best_effort). Two concurrent mp validate calls could both observe the same prior, both decide 'changed', both append — producing a duplicate validation-state event. Low impact (best-effort, bounded, structural dedup), but the docstring's 'next call treats the journal as having no prior state' is weaker than the prose implies under concurrency.",
+      "status": "fixed",
+      "author": "external-agent (opencode)",
+      "fixed_in": "M180 external-review F-04 docstring",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17"
+    }
+  ]
+}

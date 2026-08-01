@@ -1,0 +1,271 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "87"
+title = "Raul TUI robustness — drill-in edge cases, panic visibility, truncation correctness"
+slug = "raul-tui-robustness-drill-in-edge-cases-panic-visibility-truncation-correctness"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "Raul TUI drill-in paths work under hide_done filtering, latent panics are diagnosable instead of silently exiting 0, text truncation uses char counts not byte counts, co-approval tolerates approve failure, and track lanes omit redundant kind prefixes. Status/Overview focus-key routing (formerly AC-04/S4) is deferred to M91 top-tab layout."
+
+[problem]
+description = "A focused audit of raul TUI surfaced robustness bugs M85 defers. (1) Board/Path/Inbox drill-in vs hide_done silently fails for done milestones. (2) TUI panics swallowed in catch_unwind. (3) Byte-vs-char truncation in render.rs, watch.rs, annotation.rs. (4) runner.rs co-approval ? propagates before let _ binding. (5) render_tracks_list redundant [kind] prefix in filtered lanes. Status/Overview Tab and focus-key routing deferred to M91 per CH-87-01."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Fix Board/Path/Inbox drill-in to handle hide_done: enter detail by id or search visible_milestones()",
+    "Print panic payload to stderr before returning from catch_unwind",
+    "Fix byte-vs-char truncation in render.rs annotation preview, watch.rs, annotation.rs list",
+    "Fix runner.rs co-approval let _ = ...? idiom — drop ? to tolerate approve failure",
+    "Drop redundant [kind] prefix in render_tracks_list rows when lane already filters by kind",
+]
+out_of_scope = [
+    "Sidebar data loading, footer accuracy, theme activation, --color flag (covered by M85)",
+    "Markdown rendering, icons, progress bars (covered by M86)",
+    "Status/Overview Tab and focus-key routing (deferred to M91 — CH-87-01 F-01)",
+    "New features beyond these robustness fixes",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Drilling into a done milestone from the Board (or Path/Inbox) succeeds even when hide_done is enabled. Today enter_milestone_detail indexes visible_milestones() but the position comes from the full vec, so the lookup silently fails for done milestones. Test: set hide_done=true, select a done Board card, press Enter, assert content transitions to MilestoneDetail with the correct milestone id."
+verification = "crates/raul/tests/tui_drill_in.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "A panic inside the TUI event loop prints the panic payload to stderr and exits non-zero, instead of mapping Err(_) => Ok(()) (silent exit 0). Test: inject a panic via a test helper and assert stderr contains the payload and the return is non-zero / an error propagates."
+verification = "crates/raul/tests/tui_panic.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "Text truncation uses char count, not byte length. In render.rs annotation preview, watch.rs, and annotation.rs list: a multi-byte body of 50 chars (but >60 bytes) does NOT get ... appended; a body of 70 chars DOES. Test feeds a CJK/em-dash string and asserts the boundary."
+verification = "crates/raul/tests/truncation.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "Co-approval path tolerates mp milestone approve failure: runner.rs:444 no longer propagates via ? before the let _ binding — approve failure does not abort annotation loading. Test: approve returns error, assert annotations still load and the command returns Ok."
+verification = "crates/raul/tests/approval_flow.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "render_tracks_list rows omit the redundant [kind] prefix in lanes that already filter by kind (Bugfixes shows only bugfix items, Tweaks only tweaks). Test: bugfix lane rows do not contain a [bugfix] token."
+verification = "crates/raul/tests/tracks.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "All existing raul tests pass (cargo test -p raul); no regressions"
+verification = "cargo test -p raul"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Drill-in + hide_done"
+goal = "Fix Board/Path/Inbox milestone drill-in when hide_done filters done milestones"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Diagnosability"
+goal = "Make TUI panics visible on stderr; fix byte-vs-char truncation"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Full raul test suite green; no regressions"
+rollback = ""
+
+[[work_packages]]
+id = "wp-navigation"
+name = "Co-approval tolerance"
+goal = "Co-approval path tolerates mp milestone approve failure"
+rollback = ""
+
+[[work_packages]]
+id = "wp-tracks"
+name = "Tracks list polish"
+goal = "Remove redundant [kind] prefix in kind-filtered lanes"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Fix Board/Path/Inbox drill-in index mismatch with hide_done: resolve position via visible_milestones() or enter detail by milestone id instead of full-list index (runner.rs Board/Path, inbox_nav.rs)"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/inbox_nav.rs",
+    "crates/raul/src/tui/app.rs",
+]
+tests = "crates/raul/tests/tui_drill_in.rs"
+done_when = "Drilling into a done milestone from Board, Path, or Inbox succeeds with hide_done=true and opens MilestoneDetail with the correct id"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Print panic payload to stderr in runner.rs catch_unwind before returning; propagate non-zero exit instead of mapping Err(_) => Ok(())"
+files = ["crates/raul/src/tui/runner.rs"]
+tests = "crates/raul/tests/tui_panic.rs"
+done_when = "Injected TUI panic prints payload to stderr and the runner returns a non-zero error"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Fix byte-vs-char truncation: compare chars().count() not len() in render.rs annotation preview, watch.rs, and annotation.rs list rows"
+files = [
+    "crates/raul/src/tui/render.rs",
+    "crates/raul/src/commands/watch.rs",
+    "crates/raul/src/commands/annotation.rs",
+]
+tests = "crates/raul/tests/truncation.rs"
+done_when = "Multi-byte bodies truncate at 60 chars not 60 bytes; 50-char CJK body has no premature ellipsis, 70-char body does"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "wp-navigation"
+order = 4
+action = "DEFERRED to M91 (CH-87-01): Status/Overview focus-key routing removed from M87 scope"
+files = ["crates/raul/src/tui/runner.rs"]
+tests = "manual: accepted — step skipped, work moved to M91"
+done_when = "N/A — superseded by M91 tab-bar focus model"
+status = "skipped"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "wp-navigation"
+order = 5
+action = "Fix runner.rs co-approval path: drop ? on let _ = runner.run_raw(approve) so approve failure does not abort annotation loading (match pattern at lines 281,766-772)"
+files = ["crates/raul/src/tui/runner.rs"]
+tests = "crates/raul/tests/approval_flow.rs"
+done_when = "When mp milestone approve returns error during co-approval, annotations still load and command returns Ok"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "wp-tracks"
+order = 6
+action = "Drop redundant [kind] prefix in render_tracks_list rows when lane already filters by kind (Bugfixes/Tweaks)"
+files = ["crates/raul/src/tui/render.rs"]
+tests = "crates/raul/tests/tracks.rs"
+done_when = "Bugfix lane rows omit [bugfix] token; tweak lane rows omit [tweak] token"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP-close"
+order = 7
+action = "Run full raul test suite and fix any regressions from robustness changes"
+files = []
+tests = "cargo test -p raul"
+done_when = "cargo test -p raul exit 0 with all new and existing tests passing"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

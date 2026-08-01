@@ -1,0 +1,52 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "edge-below done",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "manual: fixture"
+    }
+  ],
+  "intent": {
+    "outcome": "Milestone 99 — last numeric id before 100."
+  },
+  "milestone": {
+    "created": "2026-07-04",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "99",
+    "risk": "low",
+    "slug": "edge-below",
+    "spec_status": "verified",
+    "title": "Edge 99",
+    "updated": "2026-07-04"
+  },
+  "problem": {
+    "description": "Idiomatically the boundary case below 100."
+  },
+  "scope": {
+    "in_scope": ["99"],
+    "out_of_scope": []
+  },
+  "steps": [
+    {
+      "action": "Do 99",
+      "covers_ac": ["AC-01"],
+      "done_when": "done",
+      "id": "S1",
+      "status": "done",
+      "tests": "manual: fixture",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Bootstrap 99",
+      "id": "WP1",
+      "name": "WP1",
+      "rollback": "n/a"
+    }
+  ]
+}

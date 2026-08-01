@@ -1,0 +1,198 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "72"
+title = "M21 Phase 1 closure: pin remaining default features + dep-audit tighten"
+slug = "m21-phase-1-closure-pin-remaining-default-features-dep-audit-tighten"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Every direct runtime dep in crates/mp/Cargo.toml has an explicit features= (or documented exception). Transitive count recorded before/after; optional gate tighten if pinning saves headroom. jsonschema stays dev-only oracle unless a follow-up removes it."
+
+[problem]
+description = "M21 dependency diet shipped mini_schema (Phase 2) and set make dep-audit gate at <=150 transitive crates (today 137). Phase 1 explicitly called for pinning features on all direct deps; evidence notes 6 deps still use defaults: regex, serde_json, walkdir, include_dir, tempfile, mp-model. make dep-audit lists them on every run. M21 stretch goal was <=100 runtime transitive — not met; gate was relaxed to 150. Closing Phase 1 reduces surprise transitive pulls on upgrades and documents intentional feature sets."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Pin regex: default-features=false, features=[std, unicode-perl] (verify mini_schema pattern + mp search)",
+    "Pin serde_json: default-features=false, features=[std]",
+    "Pin walkdir, tempfile, include_dir where meaningful feature flags exist; document if none",
+    "Re-run cargo test -p mp, make test-fixtures, make dep-audit after each pin",
+    "Record before/after transitive count in milestone evidence",
+    "Update M21 evidence / ARCHITECTURE.md dep-policy paragraph if gate or policy changes",
+    "Optional: tighten make dep-audit gate from 150 to 130 if count allows with margin",
+]
+out_of_scope = [
+    "Removing walkdir/tempfile/include_dir (marginal DIY — not worth risk)",
+    "Removing jsonschema dev-dependency (separate optional track)",
+    "raul dependency changes (M73)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "make dep-audit reports zero deps using defaults (or documented exceptions only)"
+verification = "make dep-audit"
+status = "passed"
+evidence = "Pinned regex/serde_json/tempfile; dep-audit clean; 137 transitive; ARCHITECTURE.md"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "cargo test -p mp and make test-fixtures green after pinning"
+verification = "cargo test -p mp && make test-fixtures"
+status = "passed"
+evidence = "Pinned regex/serde_json/tempfile; dep-audit clean; 137 transitive; ARCHITECTURE.md"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "Transitive unique crate count <=150 (or new tightened gate if adopted)"
+verification = "make dep-audit"
+status = "passed"
+evidence = "Pinned regex/serde_json/tempfile; dep-audit clean; 137 transitive; ARCHITECTURE.md"
+
+[[open_questions]]
+id = "Q-01"
+question = "Tighten dep-audit gate from 150 to 130 after pinning?"
+status = "resolved"
+answer = "Suggestion: only tighten if post-pin count is <=125, leaving 5-crate buffer; otherwise keep 150 until raul/mp further diet."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Feature pinning"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Audit gate"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Pin regex: default-features=false, features=[std, unicode-perl]; run mini_schema + search tests"
+files = []
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "regex pinned; gate_matrix + fuzzy_search pass"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Pin serde_json: default-features=false, features=[std]; run full mp test suite"
+files = []
+tests = "cargo test -p mp"
+done_when = "serde_json pinned; cargo test -p mp green"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Pin walkdir, tempfile, include_dir where flags exist; document mp-model exception (serde-only path crate)"
+files = []
+tests = "make dep-audit"
+done_when = "dep-audit shows no undocumented defaults"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Record before/after transitive counts; tighten make dep-audit gate to 130 only if post-pin count <=125"
+files = []
+tests = "make dep-audit"
+done_when = "evidence recorded; gate updated or justified"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Update ARCHITECTURE.md dep-policy note with final pinned feature sets"
+files = []
+tests = "manual: accepted — docs review"
+done_when = "ARCHITECTURE.md dep policy current"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "Pinned regex/serde_json/tempfile; dep-audit clean; 137 transitive; ARCHITECTURE.md"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

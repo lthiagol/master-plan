@@ -1,0 +1,247 @@
+{
+  "milestone": {
+    "id": "60",
+    "title": "Grooming-depth rubric: 'is this groomed enough?' + readiness validate warnings",
+    "slug": "grooming-depth-rubric-is-this-groomed-enough-readiness-validate-warnings",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "'Is this groomed enough?' has a canonical answer: a documented rubric (GROOMING.md) for the human-judgment parts and four new mp validate warnings (W40-W43) for the machine-checkable parts, so spec_status: ready reliably implies execution-readiness quality, not just mechanical gate compliance."
+  },
+  "problem": {
+    "description": "spec_status: ready only proves the mechanical gates (G1-G10) pass — it says nothing about readiness quality. A challenge pass over the 10 spec-ready milestones found repeated quality gaps that gates do not catch: empty done_when on every step (M54/M55); bundled unrelated concerns in one milestone (M51); ACs with no covering step (G10 only fires under strictness=full); unverifiable AC examples referencing non-existent artifacts (M53 'oauth'); missing integration design for high-risk work (M56 Make-to-Rust bridge); stale references to done/deleted milestones (M48 'coordinate with M47'). Because none of this is encoded, contributors re-ask 'is this groomed enough?' every milestone with no shared definition. The machine-checkable subset should become validate warnings; the rest should become a rubric doc."
+  },
+  "scope": {
+    "in_scope": [
+      "Author a GROOMING.md rubric: the full definition of 'groomed enough' — capability-sized steps (not micro, not bundled), non-empty done_when on every step, AC<->step coverage, no bundled unrelated concerns, real (non-hypothetical) AC examples, design note required for high-ambiguity/integration milestones, no stale references.",
+      "Formalize the design-note convention: when required (risk=medium/high or integration-heavy), where it lives (the design_decisions field vs a linked doc), and what it contains (interactions, alternatives considered, risky seams).",
+      "Add mp validate warning W40: a step has an empty done_when field.",
+      "Add mp validate warning W41: a step tests or AC verification value is 'manual: accepted' with no justification reason — enforces the AGENTS.md convention that manual tests state a reason. (G10 already covers uncovered-AC strictly under strictness=full, so W41 targets a different smell.)",
+      "Add mp validate warning W42: a milestone with risk=medium or risk=high has empty design_decisions (the design-note nudge for ambiguous work).",
+      "Add `mp milestone design-decision add <id> --decision <text> --rationale <text>` so design_decisions is writable via CLI — currently NO writer exists, so W42 would warn about something users cannot fix through the toolkit.",
+      "Add mp validate warning W43: a step action or AC references a milestone/step id (e.g. M55, S3) that does not exist in the plan (stale-reference catch).",
+      "Add an 'Is this groomed enough?' section to AGENTS.md pointing at GROOMING.md, and cross-link from the groom/interview flow.",
+      "Dogfood: run the new checks on this repo's own plan and resolve every W40-W43 they surface (backfill done_when, cover uncovered ACs, add design notes where flagged)."
+    ],
+    "out_of_scope": [
+      "Changing the semantics of the existing G1-G10 gates.",
+      "Auto-decomposition or auto-generation of steps/design notes.",
+      "A standalone mp milestone readiness scoring command (the warnings cover the machine-checkable subset).",
+      "Forcing design notes on low-risk, low-ambiguity milestones."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp validate emits W40 when any step has an empty done_when field",
+      "verification": "crates/mp/tests/validate_readiness.rs",
+      "status": "passed",
+      "evidence": "W40 implemented: warns when step has empty done_when; tested in validate_readiness tests"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp validate emits W41 when a step tests or AC verification value is 'manual: accepted' with no justification reason",
+      "verification": "crates/mp/tests/validate_readiness.rs",
+      "status": "passed",
+      "evidence": "W41 implemented: warns when manual: accepted has no justification reason; tested in validate_readiness tests"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp milestone design-decision add writes an entry, and mp validate emits W42 when a risk=medium/high milestone has empty design_decisions",
+      "verification": "crates/mp/tests/validate_readiness.rs",
+      "status": "passed",
+      "evidence": "mp milestone design-decision add implemented; W42 warns on risk=medium/high with empty design_decisions; tested in validate_readiness tests"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp validate emits W43 when a step action or AC references a milestone/step id that does not exist",
+      "verification": "crates/mp/tests/validate_readiness.rs",
+      "status": "passed",
+      "evidence": "W43 implemented: catches stale milestone/step refs in actions and ACs; tested in validate_readiness tests"
+    },
+    {
+      "id": "AC-05",
+      "description": "GROOMING.md documents the full rubric; AGENTS.md has an 'Is this groomed enough?' section pointing to it",
+      "verification": "manual: accepted - doc review",
+      "status": "passed",
+      "evidence": "GROOMING.md updated with §0 grooming-depth rubric (7 criteria + design-note convention); AGENTS.md has cross-link to rubric"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Rubric + design-note convention",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Readiness validate warnings (W40-W43)",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "AGENTS.md wiring + dogfood",
+      "goal": "",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Author GROOMING.md with the full definition of groomed-enough (human-judgment parts) and the design-note convention: required for risk=medium/high or integration-heavy milestones; lives in the design_decisions field or a linked doc; contains interactions, alternatives considered, risky seams.",
+      "files": [],
+      "tests": "manual: accepted - GROOMING.md review",
+      "done_when": "GROOMING.md documents the full groomed-enough rubric (capability-sized steps, non-empty done_when, AC-step coverage, no bundled concerns, real AC examples, design-note triggers, no stale refs) plus the design-note convention (when required, where, what it contains)",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP3",
+      "order": 2,
+      "action": "Add an Is this groomed enough? section to AGENTS.md pointing at GROOMING.md. Cross-link from the groom and interview flows so the rubric is encountered at planning time.",
+      "files": [],
+      "tests": "manual: accepted - AGENTS.md review",
+      "done_when": "AGENTS.md has an Is this groomed enough? section pointing to GROOMING.md; groom/interview flow cross-links it",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add W40 to crates/mp/src/validate.rs: warn when a step has an empty done_when field. Add coverage in crates/mp/tests/validate_readiness.rs.",
+      "files": [],
+      "tests": "crates/mp/tests/validate_readiness.rs",
+      "done_when": "W40 emitted for steps with empty done_when; validate_readiness tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add W41 to crates/mp/src/validate.rs: warn when a step tests or AC verification value is \"manual: accepted\" with no justification reason (no em-dash/hyphen + text after it). Enforces the AGENTS.md convention. Do NOT duplicate G10 (uncovered-AC) — G10 already covers that under strictness=full.",
+      "files": [],
+      "tests": "crates/mp/tests/validate_readiness.rs",
+      "done_when": "W41 emitted for bare manual: accepted values with no justification reason; validate_readiness tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add W42 to validate.rs (warn when risk=medium/high milestone has empty design_decisions) AND implement `mp milestone design-decision add <id> --decision <text> --rationale <text>` so the warning is actionable — currently no CLI writer exists for design_decisions, so without this command W42 would flag something users cannot fix.",
+      "files": [],
+      "tests": "crates/mp/tests/validate_readiness.rs",
+      "done_when": "mp milestone design-decision add writes an entry; W42 emitted for risk=medium/high milestones with empty design_decisions; validate_readiness tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add W43 to validate.rs: warn when a step action or AC text references a milestone/step id (patterns like M42, S3) that does not exist in the plan (stale-reference catch).",
+      "files": [],
+      "tests": "crates/mp/tests/validate_readiness.rs",
+      "done_when": "W43 emitted for stale milestone/step id references in step actions and ACs; validate_readiness tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Dogfood: run the new W40-W43 checks on this repo own plan and resolve every warning. Backfill any empty done_when, add justification to bare manual: accepted values, fix stale id refs. EXPECTED CASCADE: W42 will flag M51, M56, M59, and M60 itself (medium-risk, empty design_decisions) — add design_decisions to each via the new design-decision add command. The plan must validate clean against its own readiness bar.",
+      "files": [],
+      "tests": "mp validate --format json returns 0 warnings of code W40|W41|W42|W43",
+      "done_when": "This repo plan is clean against W40-W43 (including design_decisions backfilled on M51/M56/M59/M60)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-29",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

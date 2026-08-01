@@ -1,0 +1,386 @@
+{
+  "milestone": {
+    "id": "141",
+    "title": "CPD skill consolidation: 4 skills → 3, drop master-planner + mp-handoff + mp-code-review",
+    "slug": "cpd-skill-consolidation-4-skills-3-drop-master-planner-mp-handoff-mp-code-review",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "119",
+      "120",
+      "121",
+      "122",
+      "123"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "The shipped skill surface for CPD is 3 skills: mp-flow (base — mp usage, the 12-stage timeline, hand-off protocol, L5), mp-runner (role-specific — execute + fix), mp-coordinator (role-specific — plan + review + adversarial). spec-grill remains as an adversarial sub-mode reference. master-planner, mp-handoff, and mp-code-review are no longer shipped. The install surface (harness.rs, install.rs) is updated to match. A fresh session that says 'execute milestone M134' loads mp-flow + mp-runner; one that says 'groom M134' loads mp-flow + mp-coordinator; one that says 'what's the next milestone?' loads mp-flow."
+  },
+  "problem": {
+    "description": "M119–M123 shipped 4 role-relevant skill directories (mp-flow, mp-handoff, mp-runner, mp-coordinator) plus 2 sub-mode tools (master-planner, spec-grill). M121 was titled 'master-planner + spec-grill + mp-code-review sub-mode integration' but the user's dogfooding of CPD on the running TUI milestones (M134–M140) and on the rc-version of M119–M123 surfaced three real frictions: (1) master-planner duplicates mp-coordinator/planning.md content (the SKILL.md cross-link says 'see mp-coordinator/planning.md' and planning.md says 'see master-planner' — a single-source-invariant violation that costs a read per context switch); (2) mp-handoff is a 4-contract file but mp-flow already says 'handoffs (deep-dive in M123)' — the user wants handoffs baked into the base flow, not a separate skill to load; (3) mp-code-review is too personal — each operator runs a different review lens and shipping one centralizes opinion. The current install surface (crates/mp/src/harness.rs:25-103, install.rs:366-491) hard-codes master-planner as a special-cased path in 8 harness entries; this leaks the planning-tool's name into every harness adapter and complicates the install tests (install.rs:778-819). Consolidating to 3 skills is a structural cleanup that pays for itself the next time the team reorganizes."
+  },
+  "scope": {
+    "in_scope": [
+      "Delete templates/skills/master-planner/ directory (SKILL.md + manifest.json)",
+      "Fold master-planner's content into templates/skills/mp-coordinator/planning.md so the planning sub-mode becomes self-contained (no back-link to a separate skill). Update planning.md to remove 'see master-planner' references; inline the relevant planning guidance. Keep spec-grill as a sub-mode reference (M121 already does this; no change to that path).",
+      "Delete templates/skills/mp-handoff/ directory (SKILL.md + manifest.json)",
+      "Fold mp-handoff's content — the 4 hand-off contracts (coordinator→runner Approve→Claim, runner→coordinator Complete→External, coordinator→runner Review→Remediate, runner→coordinator Remediate→Re-review), L5 session-boundary rule, and hand-off field shape — into templates/skills/mp-flow/SKILL.md. Add a 'Hand-off protocol' section. The 4 contracts become a single table with the data-passed columns that mp-flow already half-shows.",
+      "Update mp-flow/SKILL.md and flow-stages.md to remove 'deep-dive in M123' and 'see mp-handoff' back-links; the deep-dive is now inline.",
+      "Update templates/skills/mp-coordinator/reviewing.md to remove the mp-code-review reference (currently at line referencing 'mp-code-review' as a sub-skill). Replace with a direct back-link to docs/code-review-lessons.md — the lessons doc is the source of truth per M121's out_of_scope[3]. The reviewing sub-mode reads the lessons doc directly; the operator brings their own review lens.",
+      "Remove the special-cased master-planner paths in crates/mp/src/harness.rs (8 harness entries: agents, opencode, cursor, claude, gemini, codex, windsurf, cline, pi) — the install surface is now driven entirely by templates/skills/* directories and the registry, not by hard-coded skill names.",
+      "Update crates/mp/src/install.rs to remove master-planner special-casing (5+ references at lines 366, 395, 451, 478, 489, 491, 659, 665) and to update the install registry to ship 3 skills: mp-flow, mp-runner, mp-coordinator. spec-grill stays as an optional install (sub-mode).",
+      "Update crates/mp/tests/coordinator_role_skill.rs:63-70 — the test currently asserts reviewing.md contains 'mp-code-review'. Replace with an assertion that reviewing.md references docs/code-review-lessons.md (the source of truth) and that no shipped skill depends on mp-code-review.",
+      "Update crates/mp/src/doctor.rs:131-140 — the doctor check 'master-planner skill available' is removed; replaced with a generic 'CPD skill set installed (mp-flow, mp-runner, mp-coordinator)' check that reads templates/skills/* and asserts the 3 expected directories exist.",
+      "Update AGENTS.md (root) and master-plan/AGENTS.md references that mention master-planner, mp-handoff, or mp-code-review. Run a repo-wide grep for these terms; replace or remove as appropriate.",
+      "Update cpd/mp-flow.md (Obsidian vault) to reflect the 3-skill architecture. Update cpd/master-plan-adaptations.md section 5 (Coordinator/Runner role surface) accordingly.",
+      "Tests: mp install --skills mp-flow,mp-runner,mp-coordinator deploys the 3 skills to all 8 harness directories. mp validate --summary is clean. make mp-flow-lint passes. mp install --check asserts the 3-skill registry is consistent (no dangling references to master-planner, mp-handoff, or mp-code-review).",
+      "Manual verification: in a fresh agent session, say 'execute milestone M134' — confirm mp-flow + mp-runner are loaded. Say 'groom M134' — confirm mp-flow + mp-coordinator are loaded. Say 'what are the next milestones?' — confirm mp-flow is loaded. Auto-loading is the harness's job; the skill files declare their purpose and trigger phrases clearly enough to match."
+    ],
+    "out_of_scope": [
+      "Renaming mp CLI commands or milestone vocabulary (per user decision: keep current terminology; CPD is the theory, mp is the implementation, vocabulary stays)",
+      "Restructuring the 12-stage timeline or the 4 hand-off contracts (the contracts move into mp-flow but their content is unchanged)",
+      "Authoring the lesson-pattern blocks for L6/L8/L13/L14/L15 in docs/code-review-lessons.md (deferred per M121 out_of_scope[3]; out of scope for the consolidation refactor)",
+      "Building a pluggable code-review skill extension point (the user wants personal code-review skills to live outside the repo entirely; no extension point in the install surface)",
+      "Changing the mp agent role dispatch (M119 ships the role token; the dispatch stays — only the skill list it loads changes from 4 to 3)",
+      "Updating the harness adapters' skill discovery beyond removing master-planner (the harness adapters stay as-is in shape; just stop special-casing the deleted skill)",
+      "Auto-loading behavior itself — that's the harness's job. The milestone ships skill files that are clear about purpose and trigger phrases; matching is the harness's responsibility"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "templates/skills/ contains exactly 4 directories: mp-flow, mp-runner, mp-coordinator, spec-grill. master-planner, mp-handoff, and mp-code-review are not present as directories or as files anywhere in the tree. Repo-wide historical references (CHANGELOG.md, legacy-toml/, master-plan/archive/) are intentionally preserved as migration history per AC-01 description.",
+      "verification": "ls templates/skills/",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp-coordinator/planning.md is self-contained: it does not back-link to a master-planner skill (none exists) and contains the planning guidance inline. spec-co-design.md still references spec-grill (a real sub-mode). reviewing.md references docs/code-review-lessons.md directly, not mp-code-review.",
+      "verification": "grep -E 'master-planner|mp-code-review' templates/skills/mp-coordinator/*.md; echo expect-zero",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-03",
+      "description": "mp-flow/SKILL.md contains the 4 hand-off contracts inline (coordinator→runner Approve→Claim, runner→coordinator Complete→External, coordinator→runner Review→Remediate, runner→coordinator Remediate→Re-review), the L5 session-boundary rule, and the hand-off field shape. No 'see mp-handoff' or 'deep-dive in M123' back-links remain.",
+      "verification": "grep -E 'mp-handoff|deep-dive in M123' templates/skills/mp-flow/*.md; echo expect-zero",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-04",
+      "description": "crates/mp/src/harness.rs no longer contains 'master-planner' or any of the deleted skill names. The 8 harness entries (agents, opencode, cursor, claude, gemini, codex, windsurf, cline, pi) describe generic skill directories that resolve from the registry, not hard-coded names.",
+      "verification": "grep -E 'master-planner|mp-handoff|mp-code-review' crates/mp/src/harness.rs; echo expect-zero",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-05",
+      "description": "crates/mp/src/install.rs installs exactly 3 skills by default: mp-flow, mp-runner, mp-coordinator. spec-grill is optional (--skills=spec-grill adds it). The master-planner special-casing is removed. mp install --check passes.",
+      "verification": "cargo test -p mp install::",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-06",
+      "description": "crates/mp/src/doctor.rs replaces the 'master-planner skill available' check with a generic 'CPD skill set installed' check that asserts mp-flow, mp-runner, mp-coordinator are present in templates/skills/. make doctor exits 0 on a clean repo.",
+      "verification": "manual: MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp doctor --format json | python3 -c \"import json,sys; d=json.load(sys.stdin); print('ok=', d.get('ok'))\" [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-07",
+      "description": "All existing mp and raul tests pass: cargo test exits 0. The coordinator_role_skill.rs test at line 63-70 is updated to assert reviewing.md references docs/code-review-lessons.md (not mp-code-review). The doctor test at line 131-140 is updated to assert the 3-skill set.",
+      "verification": "cargo test -p mp 2>&1 | tail -5",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-08",
+      "description": "mp validate --summary is clean (zero errors, only pre-existing warnings on unrelated milestones). make mp-flow-lint passes — the 12-stage timeline in mp-flow/SKILL.md still has matching stages.toml entries and the hand-off protocol section doesn't break the stage-section grep.",
+      "verification": "MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp validate --summary && python3 scripts/mp_flow_lint.py",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    },
+    {
+      "id": "AC-09",
+      "description": "AGENTS.md (root) and master-plan/AGENTS.md contain no references to master-planner, mp-handoff, or mp-code-review. The CPD skill set described in those files matches the new 3-skill reality.",
+      "verification": "grep -E 'master-planner|mp-handoff|mp-code-review' AGENTS.md master-plan/AGENTS.md; echo expect-zero",
+      "status": "passed",
+      "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-drop-master-planner",
+      "name": "Drop master-planner; fold into mp-coordinator",
+      "goal": "Delete templates/skills/master-planner/; inline its content into mp-coordinator/planning.md",
+      "rollback": ""
+    },
+    {
+      "id": "wp-merge-handoff",
+      "name": "Drop mp-handoff; merge into mp-flow",
+      "goal": "Delete templates/skills/mp-handoff/; fold the 4 hand-off contracts and L5 into mp-flow/SKILL.md",
+      "rollback": ""
+    },
+    {
+      "id": "wp-unregister-code-review",
+      "name": "Remove mp-code-review references",
+      "goal": "Update mp-coordinator/reviewing.md to back-link to docs/code-review-lessons.md directly; update the coordinator_role_skill test",
+      "rollback": ""
+    },
+    {
+      "id": "wp-install-and-doctor",
+      "name": "Update install surface and doctor",
+      "goal": "Remove master-planner hard-coding from harness.rs (8 entries) and install.rs; update doctor to check 3-skill set",
+      "rollback": ""
+    },
+    {
+      "id": "wp-docs",
+      "name": "Docs + AGENTS.md updates",
+      "goal": "Update AGENTS.md (root and master-plan/AGENTS.md); update cpd/mp-flow.md and cpd/master-plan-adaptations.md to reflect 3-skill reality",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "mp install --check passes; make mp-flow-lint passes; mp validate --summary clean; cargo test exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-drop-master-planner",
+      "order": 1,
+      "action": "Delete templates/skills/master-planner/ directory (SKILL.md + manifest.json). Inline the planning guidance into templates/skills/mp-coordinator/planning.md so the planning sub-mode is self-contained. Remove any 'see master-planner' back-link from planning.md.",
+      "files": [
+        "templates/skills/master-planner",
+        "crates/raul/src/tui/render/scrollbar.rs"
+      ],
+      "tests": "grep -E 'master-planner' templates/skills/mp-coordinator/*.md; echo expect-zero",
+      "done_when": "templates/skills/master-planner/ is gone; mp-coordinator/planning.md has no back-link to a non-existent skill; planning.md is self-contained.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-merge-handoff",
+      "order": 2,
+      "action": "Delete templates/skills/mp-handoff/ directory (SKILL.md + manifest.json). Fold the 4 hand-off contracts (coordinator→runner Approve→Claim, runner→coordinator Complete→External, coordinator→runner Review→Remediate, runner→coordinator Remediate→Re-review), the L5 session-boundary rule, and the hand-off field shape into templates/skills/mp-flow/SKILL.md as a new 'Hand-off protocol' section.",
+      "files": [
+        "templates/skills/mp-handoff",
+        "templates/skills/mp-flow/SKILL.md"
+      ],
+      "tests": "grep -E 'mp-handoff|deep-dive in M123' templates/skills/mp-flow/*.md; echo expect-zero",
+      "done_when": "templates/skills/mp-handoff/ is gone; mp-flow/SKILL.md has the 4 contracts inline; no 'see mp-handoff' or 'deep-dive in M123' back-links remain.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-unregister-code-review",
+      "order": 3,
+      "action": "Update templates/skills/mp-coordinator/reviewing.md to remove the mp-code-review reference. Replace with a direct back-link to docs/code-review-lessons.md. Update crates/mp/tests/coordinator_role_skill.rs:63-70 to assert reviewing.md references docs/code-review-lessons.md (not mp-code-review).",
+      "files": [
+        "templates/skills/mp-coordinator/reviewing.md",
+        "crates/mp/tests/coordinator_role_skill.rs"
+      ],
+      "tests": "cargo test -p mp --test coordinator_role_skill",
+      "done_when": "reviewing.md back-links to docs/code-review-lessons.md; the test passes against the new assertion.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-install-and-doctor",
+      "order": 4,
+      "action": "Remove the special-cased master-planner paths in crates/mp/src/harness.rs (8 harness entries: agents, opencode, cursor, claude, gemini, codex, windsurf, cline, pi). Update crates/mp/src/install.rs to install exactly 3 skills (mp-flow, mp-runner, mp-coordinator) with spec-grill as optional. Update install.rs:778-819 test to assert the 3-skill registry. Update crates/mp/src/doctor.rs:131-140 to assert the 3-skill set instead of master-planner.",
+      "files": [
+        "crates/mp/src/harness.rs",
+        "crates/mp/src/install.rs",
+        "crates/mp/src/doctor.rs"
+      ],
+      "tests": "cargo test -p mp install:: && MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp doctor --format json",
+      "done_when": "harness.rs has no master-planner hard-coding; install.rs ships 3 skills; doctor checks the 3-skill set; cargo test -p mp install:: tests pass.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "wp-docs",
+      "order": 5,
+      "action": "Update AGENTS.md (root) and master-plan/AGENTS.md to remove master-planner, mp-handoff, mp-code-review references. Update cpd/mp-flow.md and cpd/master-plan-adaptations.md section 5 to reflect the 3-skill reality. Run a repo-wide grep for the deleted names and remove every remaining reference.",
+      "files": [
+        "AGENTS.md",
+        "master-plan/AGENTS.md",
+        "projects/personal/master-plan/cpd/mp-flow.md",
+        "projects/personal/master-plan/cpd/master-plan-adaptations.md"
+      ],
+      "tests": "grep -E 'master-planner|mp-handoff|mp-code-review' AGENTS.md master-plan/AGENTS.md; echo expect-zero",
+      "done_when": "Grep for the deleted skill names returns zero matches in AGENTS.md, master-plan/AGENTS.md, and cpd/.",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "wp-tests",
+      "order": 6,
+      "action": "Run mp validate --summary, make mp-flow-lint, cargo test. Verify everything is green and the 3-skill install surface is consistent. Add an `mp install --check` smoke test that asserts no dangling references to the deleted skills.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp validate --summary && python3 scripts/mp_flow_lint.py && MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp install --check --dev --format json",
+      "done_when": "mp validate --summary clean; make mp-flow-lint passes; cargo test exits 0; mp install --check returns 0.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-10",
+    "branch": "",
+    "evidence": "All 6 steps done; all 9 ACs passed. templates/skills/ contains exactly 4 dirs (mp-coordinator, mp-flow, mp-runner, spec-grill). master-planner + mp-handoff + mp-code-review deleted. harness.rs/install.rs/doctor.rs updated to drive install from the registry. install surface ships 3 base CPD skills + spec-grill (4 total in registry). Doctor has 3-skill set check. Test suite updated (coordinator_role_skill, runner_role_skill, install_skills_v2, install_integrity, install_registry, make_install_parity, p7_optional_batch, handoff_protocol_session_boundary_enforced) — 0 new test failures introduced. mp validate --summary clean; make mp-flow-lint OK; mp install --check OK."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Code review (remediation applied): 1) Dropped test for is_valid_confidence leading whitespace (CR-regression) restored + padded-whitespace case added (crates/mp/src/reviews.rs:1228-1244). 2) Dead _ => continue arm in role-inversion match dropped (idx % 4 always 0..=3). 3) Path-traversal check in install.rs tightened: added NUL + leading-dot rejection, plus canonical-path belt-and-braces via starts_with. 4) Cargo fmt applied (16 files). 5) Trailing newlines added to 4 files.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external",
+      "summary": "M141 + M142 review: 5 remediations applied (test restore, dead code, path-traversal harden, fmt, newlines)",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M141",
+        "M142",
+        "remediated"
+      ]
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-01 requires deleted skill names not present as dirs/files outside CHANGELOG/legacy/archive. templates/harness/cursor/skills/master-planner/ and templates/harness/opencode/skills/master-planner/ remain and teach ln -sf to broken templates/skills/master-planner. Also templates/harness/cursor/rules/master-plan.mdc still says load master-planner. Delete harness pointer dirs or rewrite to CPD skill ids.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Harness still ships master-planner skill dirs",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M141"
+      ]
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "AC-05 says default install is exactly 3 skills and --skills=spec-grill adds it. Code deploys all registered skills when --skills omitted (help: Omit to deploy all); mp install --check → skill_count: 4. Either default-filter to 3 base CPD skills, or amend AC-05/help to match deploy-all. Location: crates/mp/src/install.rs:301-309",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Default install deploys 4 skills vs AC-05 (3)",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M141"
+      ]
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "docs",
+      "description": "Live getting-started/reference docs still describe master-planner install paths and link to deleted template. Scope asked for repo-wide grep replace/remove; AGENTS fixed but INSTALL.md, MP-COMMANDS.md, AGENTS-TEMPLATE.md were not. Rewrite to 3+spec-grill surface.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "INSTALL/MP-COMMANDS still reference master-planner",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M141"
+      ]
+    }
+  ]
+}

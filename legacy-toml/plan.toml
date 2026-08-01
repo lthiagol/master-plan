@@ -1,0 +1,3707 @@
+[project]
+name = "master-plan toolkit"
+description = "Spec-driven planning CLI and agent skill (crates/mp)"
+stack = [
+    "Rust",
+    "TOML",
+]
+platforms = []
+created = "2026-06-18"
+target_version = "2.0"
+planning_status = "in-execution"
+planning_phase = "charter"
+
+[charter]
+goals = [
+    "Ship agent-ready mp CLI for the full planning pipeline",
+    "Dogfood master-plan in this repo to track toolkit work",
+    "Maintain agent-only mp CLI + human-facing raul surface",
+    "CLI grouping redesign (Docker-style) is implemented and documented",
+    "Grooming discipline: every step has a test, every AC is covered by a step",
+]
+non_goals = ["Maintain bash legacy workflow"]
+deferred = []
+principles = []
+
+[metrics]
+lines_of_code = 0
+unit_tests = 4
+integration_tests = 55
+coverage_percent = 0.0
+checked_at = "2026-06-18"
+
+[execution]
+strategy = "resume_then_ready"
+interleave = "milestone"
+mode = "autonomous"
+handoff_at = "2026-06-30T17:10:03.419790+00:00"
+handoff_by = "cursor-agent"
+focus_milestone = ""
+focus_through_step = ""
+handoff_changed_milestones = []
+
+[[execution.adoption_order]]
+milestone = "12"
+before = "11"
+rank = 0
+reason = ""
+
+[[execution.adoption_order]]
+milestone = "13"
+before = "14"
+rank = 0
+reason = ""
+
+[[execution.adoption_order]]
+milestone = "16"
+before = "17"
+rank = 0
+reason = "M16 unblocks the v1.1 wave; M17/M18/M19 depend on plan hygiene"
+
+[[execution.adoption_order]]
+milestone = "30"
+before = "18"
+rank = 0
+reason = "M30 verify gate first — hardens completion of the debt; ships as v1.3.1"
+
+[[execution.adoption_order]]
+milestone = "21"
+before = "19"
+rank = 0
+reason = "debt order per pilot-pending: M18 -> M21 -> M20 dep chain (M19 independent)"
+
+[[execution.adoption_order]]
+milestone = "41"
+before = "43"
+rank = 0
+reason = "M41 strips mp human output first so M43 authors annotation commands json-only (mirrors idea.rs); avoids writing human rendering that M41 would then delete"
+
+[[execution.adoption_order]]
+milestone = "43"
+before = "44"
+rank = 0
+reason = "M44 TUI consumes the annotation system (M44 depends_on M43; pin records the why)"
+
+[[execution.adoption_order]]
+milestone = "44"
+before = "38"
+rank = 0
+reason = "design the grouping over the final post-M41/M43 surface, with the raul read layer settled"
+
+[[execution.adoption_order]]
+milestone = "38"
+before = "45"
+rank = 0
+reason = "M45 impl consumes M38 design output; the rename is one clean pass over the final surface"
+
+[[execution.adoption_order]]
+milestone = "56"
+before = "51"
+rank = 0
+reason = "M56 harness registry is the foundation M51 consumes; M51 install engine reads the registry and the --print-paths bridge"
+
+[[execution.adoption_order]]
+milestone = "39"
+before = "51"
+rank = 0
+reason = "M51 deploys the spec-grill skill authored in M39"
+
+[execution.handoff_baseline]
+planning_status = "in-execution"
+execution_mode = "autonomous"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "01"
+title = "CLI foundation"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "02"
+title = "Adoption and PM surface"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "03"
+title = "Brownfield and execution"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "04"
+title = "Promote ladder and publish"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "05"
+title = "Meta master-plan"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "06"
+title = "Remaining polish"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "07"
+title = "Quality and CI"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "08"
+title = "Session model depth"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "09"
+title = "Scale and PM maturity"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "10"
+title = "Documentation alignment"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "11"
+title = "v1.0 release and adoption checkpoint"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "12"
+title = "Post-v0.2 doc truth sync"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "13"
+title = "Session UX depth"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "14"
+title = "Homebrew distribution"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "15"
+title = "MP-COMMANDS completeness pass"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "16"
+title = "Plan hygiene & v1.0 closure"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "17"
+title = "Code health & refactoring"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "18"
+title = "Doc-code drift closure"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "19"
+title = "AGENTS.md simplification"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "20"
+title = "Architecture map (ARCHITECTURE.md)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "21"
+title = "Dependency diet"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "22"
+title = "Remove tera dependency"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "23"
+title = "Install & first-run integrity"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "24"
+title = "Doc/CLI/skill alignment sweep"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "25"
+title = "Validation & status consistency"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "26"
+title = "CLI gap closures & error UX"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "27"
+title = "Agent enablement docs + master-planner skill v2"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "28"
+title = "Green CI: step-test backfill & testing hardening"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "29"
+title = "Self-contained binary via embedded assets"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "30"
+title = "Verify milestone completion (run AC verifications)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "31"
+title = "Backlog execution"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "32"
+title = "Plan-index integrity & drift detection"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "33"
+title = "Clean init & collection lifecycle"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "34"
+title = "Config scope & plan-dir relocation"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "35"
+title = "Import & authoring smarts"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "36"
+title = "Release map & version targeting"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "37"
+title = "Changelog management (mp changelog)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "38"
+title = "CLI grouping redesign (Docker-style) - design & migration plan"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "39"
+title = "spec-grill: interactive spec co-design skill"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "40"
+title = "raul: human-facing PM CLI (read-only MVP)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "41"
+title = "Simplify mp to agent-only (move human surface to raul)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "42"
+title = "Repo reorganization for multi-binary maintenance"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "43"
+title = "Plan annotation system (review requests + approval gate)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "44"
+title = "raul TUI mode (interactive annotation review & approval)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "45"
+title = "CLI grouping redesign - implementation (2.0 rename + raul repoint)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "46"
+title = "raul: review, approval & understanding layer"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "47"
+title = "CI green + test-suite design pass (coverage, naming, guardrails)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "48"
+title = "Documentation refresh + visual model (mermaid resource & command graphs)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "49"
+title = "Native dependency & impact queries (reverse deps + blast radius)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "50"
+title = "raul: complete the review surface (tracks + backlog views M46 missed)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "51"
+title = "Install & distribution architecture v2 (harness registry engine)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "52"
+title = "State tracking discipline & autonomous agent guardrails"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "53"
+title = "Fuzzy search across plan artifacts (mp search)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "54"
+title = "raul TUI v2 — visual overhaul + review workflow actions"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "56"
+title = "Unified harness registry for all install paths (make + mp + source)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "57"
+title = "Configurable code review gate (workflow.steps.code_review)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "58"
+title = "mp init defaults — root AGENTS.md + abort on existing project"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "59"
+title = "Milestone & step archival (soft-delete for grooming)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "60"
+title = "Grooming-depth rubric: 'is this groomed enough?' + readiness validate warnings"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "61"
+title = "Charter editing: remove + set for goals/nongoals/principles (+ dogfood refresh)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "62"
+title = "Execution remediation: finish incomplete M48/M52/M54/M57 + close dogfood gaps + completion guardrail"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "63"
+title = "M62 follow-up: make the completion guardrail catch bare-path tests + commit remediation + fix flaky raul test"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "64"
+title = "Mandatory independent review phase: execute→review→remediate cycle + review queue"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "65"
+title = "Install v3: ship raul globally + runtime PATH discoverability"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "66"
+title = "Plan persistence reliability: silent failures, gate drift, write-path consistency"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "67"
+title = "Test suite gap closure: kill stubs, harden CI, add missing workflow coverage"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "68"
+title = "Code health: validation layer refactor + model split + output consistency"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "69"
+title = "Agent shell env: PATH snippet install + doctor check for harness terminals"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "70"
+title = "Agent session continuity: plan diff, AC traceability, step claim/lease"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "71"
+title = "raul human PM surface: home dashboard, watch mode, digest cadence"
+spec_status = "ready"
+execution_status = "planned"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "72"
+title = "M21 Phase 1 closure: pin remaining default features + dep-audit tighten"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "73"
+title = "raul dependency consolidation: unify crossterm, drop comfy-table"
+spec_status = "ready"
+execution_status = "planned"
+
+[[execution.handoff_baseline.milestone_index]]
+id = "74"
+title = "Make install: delegate to mp install + v1 harness trio (OpenCode, Cursor, Pi)"
+spec_status = "verified"
+execution_status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "01"
+title = "CLI foundation"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "02"
+title = "Adoption and PM surface"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "03"
+title = "Brownfield and execution"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "04"
+title = "Promote ladder and publish"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "05"
+title = "Meta master-plan"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "06"
+title = "Remaining polish"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-18"
+steps = []
+
+[[execution.handoff_baseline.milestones]]
+id = "07"
+title = "Quality and CI"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "08"
+title = "Session model depth"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "09"
+title = "Scale and PM maturity"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "10"
+title = "Documentation alignment"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "11"
+title = "v1.0 release and adoption checkpoint"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "12"
+title = "Post-v0.2 doc truth sync"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "13"
+title = "Session UX depth"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "14"
+title = "Homebrew distribution"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "15"
+title = "MP-COMMANDS completeness pass"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "16"
+title = "Plan hygiene & v1.0 closure"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "17"
+title = "Code health & refactoring"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S12"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S13"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S14"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S15"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S16"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S17"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S18"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S19"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S20"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S21"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S22"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S23"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S24"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S25"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S26"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S27"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S28"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S29"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "18"
+title = "Doc-code drift closure"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S12"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S13"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S14"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S15"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S16"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S17"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "19"
+title = "AGENTS.md simplification"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "20"
+title = "Architecture map (ARCHITECTURE.md)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "21"
+title = "Dependency diet"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S12"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S13"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S14"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S15"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S16"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S17"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S18"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S19"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S20"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S21"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S22"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S23"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S24"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S25"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S26"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S27"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S28"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S29"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S30"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S31"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S32"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "22"
+title = "Remove tera dependency"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "23"
+title = "Install & first-run integrity"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "24"
+title = "Doc/CLI/skill alignment sweep"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "25"
+title = "Validation & status consistency"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "26"
+title = "CLI gap closures & error UX"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "27"
+title = "Agent enablement docs + master-planner skill v2"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "28"
+title = "Green CI: step-test backfill & testing hardening"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-25"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "in-progress"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "29"
+title = "Self-contained binary via embedded assets"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "30"
+title = "Verify milestone completion (run AC verifications)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "31"
+title = "Backlog execution"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "32"
+title = "Plan-index integrity & drift detection"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "33"
+title = "Clean init & collection lifecycle"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "34"
+title = "Config scope & plan-dir relocation"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "35"
+title = "Import & authoring smarts"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "36"
+title = "Release map & version targeting"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "37"
+title = "Changelog management (mp changelog)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-27"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "38"
+title = "CLI grouping redesign (Docker-style) - design & migration plan"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "39"
+title = "spec-grill: interactive spec co-design skill"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "40"
+title = "raul: human-facing PM CLI (read-only MVP)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-28"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S0"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2.1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "41"
+title = "Simplify mp to agent-only (move human surface to raul)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "42"
+title = "Repo reorganization for multi-binary maintenance"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-28"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1.1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "43"
+title = "Plan annotation system (review requests + approval gate)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "44"
+title = "raul TUI mode (interactive annotation review & approval)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "45"
+title = "CLI grouping redesign - implementation (2.0 rename + raul repoint)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "46"
+title = "raul: review, approval & understanding layer"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-28"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "47"
+title = "CI green + test-suite design pass (coverage, naming, guardrails)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S12"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S13"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S14"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S15"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "48"
+title = "Documentation refresh + visual model (mermaid resource & command graphs)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "49"
+title = "Native dependency & impact queries (reverse deps + blast radius)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "50"
+title = "raul: complete the review surface (tracks + backlog views M46 missed)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "51"
+title = "Install & distribution architecture v2 (harness registry engine)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S12"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S13"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S14"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "52"
+title = "State tracking discipline & autonomous agent guardrails"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "53"
+title = "Fuzzy search across plan artifacts (mp search)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "54"
+title = "raul TUI v2 — visual overhaul + review workflow actions"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S11"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "56"
+title = "Unified harness registry for all install paths (make + mp + source)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "57"
+title = "Configurable code review gate (workflow.steps.code_review)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "58"
+title = "mp init defaults — root AGENTS.md + abort on existing project"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "59"
+title = "Milestone & step archival (soft-delete for grooming)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "60"
+title = "Grooming-depth rubric: 'is this groomed enough?' + readiness validate warnings"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "61"
+title = "Charter editing: remove + set for goals/nongoals/principles (+ dogfood refresh)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-29"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "62"
+title = "Execution remediation: finish incomplete M48/M52/M54/M57 + close dogfood gaps + completion guardrail"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "63"
+title = "M62 follow-up: make the completion guardrail catch bare-path tests + commit remediation + fix flaky raul test"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "64"
+title = "Mandatory independent review phase: execute→review→remediate cycle + review queue"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "65"
+title = "Install v3: ship raul globally + runtime PATH discoverability"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "66"
+title = "Plan persistence reliability: silent failures, gate drift, write-path consistency"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "67"
+title = "Test suite gap closure: kill stubs, harden CI, add missing workflow coverage"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "68"
+title = "Code health: validation layer refactor + model split + output consistency"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "69"
+title = "Agent shell env: PATH snippet install + doctor check for harness terminals"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "70"
+title = "Agent session continuity: plan diff, AC traceability, step claim/lease"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "71"
+title = "raul human PM surface: home dashboard, watch mode, digest cadence"
+spec_status = "ready"
+execution_status = "planned"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "72"
+title = "M21 Phase 1 closure: pin remaining default features + dep-audit tighten"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones]]
+id = "73"
+title = "raul dependency consolidation: unify crossterm, drop comfy-table"
+spec_status = "ready"
+execution_status = "planned"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S2"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S3"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "pending"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "pending"
+
+[[execution.handoff_baseline.milestones]]
+id = "74"
+title = "Make install: delegate to mp install + v1 harness trio (OpenCode, Cursor, Pi)"
+spec_status = "verified"
+execution_status = "done"
+updated = "2026-06-30"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1.1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S1.1.1"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S4"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S5"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S6"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S7"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S8"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S9"
+status = "done"
+
+[[execution.handoff_baseline.milestones.steps]]
+id = "S10"
+status = "done"
+
+[[milestones]]
+id = "01"
+title = "CLI foundation"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "02"
+title = "Adoption and PM surface"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "03"
+title = "Brownfield and execution"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "04"
+title = "Promote ladder and publish"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "05"
+title = "Meta master-plan"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "06"
+title = "Remaining polish"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "07"
+title = "Quality and CI"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "08"
+title = "Session model depth"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "09"
+title = "Scale and PM maturity"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "10"
+title = "Documentation alignment"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "11"
+title = "v1.0 release and adoption checkpoint"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "12"
+title = "Post-v0.2 doc truth sync"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "13"
+title = "Session UX depth"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "14"
+title = "Homebrew distribution"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "15"
+title = "MP-COMMANDS completeness pass"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "16"
+title = "Plan hygiene & v1.0 closure"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "17"
+title = "Code health & refactoring"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "18"
+title = "Doc-code drift closure"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "19"
+title = "AGENTS.md simplification"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "20"
+title = "Architecture map (ARCHITECTURE.md)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "21"
+title = "Dependency diet"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "22"
+title = "Remove tera dependency"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "23"
+title = "Install & first-run integrity"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "24"
+title = "Doc/CLI/skill alignment sweep"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "25"
+title = "Validation & status consistency"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "26"
+title = "CLI gap closures & error UX"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "27"
+title = "Agent enablement docs + master-planner skill v2"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "28"
+title = "Green CI: step-test backfill & testing hardening"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "29"
+title = "Self-contained binary via embedded assets"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "30"
+title = "Verify milestone completion (run AC verifications)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "31"
+title = "Backlog execution"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "32"
+title = "Plan-index integrity & drift detection"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "33"
+title = "Clean init & collection lifecycle"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "34"
+title = "Config scope & plan-dir relocation"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "35"
+title = "Import & authoring smarts"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "36"
+title = "Release map & version targeting"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "37"
+title = "Changelog management (mp changelog)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "38"
+title = "CLI grouping redesign (Docker-style) - design & migration plan"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "39"
+title = "spec-grill: interactive spec co-design skill"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "40"
+title = "raul: human-facing PM CLI (read-only MVP)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "41"
+title = "Simplify mp to agent-only (move human surface to raul)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "42"
+title = "Repo reorganization for multi-binary maintenance"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "43"
+title = "Plan annotation system (review requests + approval gate)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "44"
+title = "raul TUI mode (interactive annotation review & approval)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "45"
+title = "CLI grouping redesign - implementation (2.0 rename + raul repoint)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "46"
+title = "raul: review, approval & understanding layer"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "47"
+title = "CI green + test-suite design pass (coverage, naming, guardrails)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "48"
+title = "Documentation refresh + visual model (mermaid resource & command graphs)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "49"
+title = "Native dependency & impact queries (reverse deps + blast radius)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "50"
+title = "raul: complete the review surface (tracks + backlog views M46 missed)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "51"
+title = "Install & distribution architecture v2 (harness registry engine)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "52"
+title = "State tracking discipline & autonomous agent guardrails"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "53"
+title = "Fuzzy search across plan artifacts (mp search)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "54"
+title = "raul TUI v2 — visual overhaul + review workflow actions"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "56"
+title = "Unified harness registry for all install paths (make + mp + source)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "57"
+title = "Configurable code review gate (workflow.steps.code_review)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "58"
+title = "mp init defaults — root AGENTS.md + abort on existing project"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "59"
+title = "Milestone & step archival (soft-delete for grooming)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "60"
+title = "Grooming-depth rubric: 'is this groomed enough?' + readiness validate warnings"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "61"
+title = "Charter editing: remove + set for goals/nongoals/principles (+ dogfood refresh)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "62"
+title = "Execution remediation: finish incomplete M48/M52/M54/M57 + close dogfood gaps + completion guardrail"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "63"
+title = "M62 follow-up: make the completion guardrail catch bare-path tests + commit remediation + fix flaky raul test"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "64"
+title = "Mandatory independent review phase: execute→review→remediate cycle + review queue"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "65"
+title = "Install v3: ship raul globally + runtime PATH discoverability"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "66"
+title = "Plan persistence reliability: silent failures, gate drift, write-path consistency"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "67"
+title = "Test suite gap closure: kill stubs, harden CI, add missing workflow coverage"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "68"
+title = "Code health: validation layer refactor + model split + output consistency"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "69"
+title = "Agent shell env: PATH snippet install + doctor check for harness terminals"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "70"
+title = "Agent session continuity: plan diff, AC traceability, step claim/lease"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "71"
+title = "raul human PM surface: home dashboard, watch mode, digest cadence"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "72"
+title = "M21 Phase 1 closure: pin remaining default features + dep-audit tighten"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "73"
+title = "raul dependency consolidation: unify crossterm, drop comfy-table"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "74"
+title = "Make install: delegate to mp install + v1 harness trio (OpenCode, Cursor, Pi)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "75"
+title = "Documentation flow diagrams — process visuals across concepts docs"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "76"
+title = "mp agent output contract cleanup — JSON default, decoupling debt audit"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "77"
+title = "raul TUI sidebar shell — tabbed lanes, responsive layout, mouse navigation"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "78"
+title = "Plan hygiene sweep — W20 multi-value cleanup + validate-green guardrail reconciliation"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "79"
+title = "Agent ergonomics — JSON projection, structured filters, summary rollups, bulk review ops"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "80"
+title = "Spec-review surface — condensed, diffable, AC-traceable spec views for humans and agents"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "81"
+title = "Position size-aware routing as the core principle — docs, onboarding, and discovery"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "82"
+title = "Lean spec model — drop 18 unused ceremony fields (2.0 clean break, no back-compat)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "83"
+title = "Review lifecycle & findings — executor attribution, structured findings, review_state"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "84"
+title = "raul TUI review board — Kanban of milestones by review_state, with finding drill-in"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "85"
+title = "Raul TUI polish & code-review cleanup — 27 audit findings"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "86"
+title = "Raul TUI visual overhaul — syntax highlight, icons, rich detail rendering"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "87"
+title = "Raul TUI robustness — drill-in edge cases, panic visibility, truncation correctness"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "88"
+title = "Agent health rollups — milestone summary, finding batch ops, jq-loop prevention"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "89"
+title = "Raul TUI welcome — plan overview lane (session snapshot of pending work)"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "90"
+title = "Dogfooding ergonomics — agent doc split, review discovery, CLI gap closure"
+spec_status = "verified"
+execution_status = "done"
+blocked_by = ""
+
+[[milestones]]
+id = "91"
+title = "Raul TUI top-tab navigation — replace sidebar with horizontal lane tabs"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "92"
+title = "Unified JSON plan persistence — drop TOML on-disk and dual-format CLI"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "93"
+title = "Plan fragment operations — agents edit by id, never document shape"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "94"
+title = "Bulk milestone operations — multi-target metadata writes without agent loops"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "95"
+title = "mp search v2 — artifact-scoped fuzzy search with fragment hits (JSON-native)"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[milestones]]
+id = "96"
+title = "2.0 GA release — JSON-native agent-first toolkit ship"
+spec_status = "ready"
+execution_status = "planned"
+blocked_by = ""
+
+[[releases]]
+version = "2.0.0-rc.1"
+status = "shipped"
+date = "2026-06-30"
+milestones = [
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "56",
+    "57",
+    "58",
+    "59",
+    "60",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+]
+
+[[releases]]
+version = "2.0.0"
+status = "planned"
+date = ""
+milestones = [
+    "76",
+    "83",
+    "84",
+    "82",
+    "90",
+    "92",
+    "93",
+    "94",
+    "95",
+    "81",
+    "96",
+]
+
+[[releases]]
+version = "2.0.0-rc.2"
+status = "shipped"
+date = "2026-06-30"
+milestones = ["76"]

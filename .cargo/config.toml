@@ -1,0 +1,14 @@
+# Faster dev iteration: split-debuginfo on macOS; optional mold on Linux (see scripts/rust-linker.sh).
+# mold does not support Mach-O — do not force it on darwin.
+
+[profile.dev]
+split-debuginfo = "unpacked"
+
+[profile.dev.build-override]
+opt-level = 0
+
+[target.x86_64-unknown-linux-gnu]
+linker = "scripts/rust-linker.sh"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "scripts/rust-linker.sh"

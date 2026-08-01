@@ -1,0 +1,494 @@
+{
+  "milestone": {
+    "id": "18",
+    "title": "Doc-code drift closure",
+    "slug": "doc-code-drift-closure",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "16"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-21",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Every documented mp command and flag is either implemented in code or removed from docs; no command bails at runtime; AGENT-READINESS marks match code reality."
+  },
+  "problem": {
+    "description": "MP-COMMANDS.md documents 9 commands and 10 flags that are not in the code: milestone scenario add, criterion add, question add/resolve, delete; wp update; archive backlog; review create/add-finding; step fail --evidence; step split --json; track add --json; idea create --json; challenge resolve --payload @-; path --include/--prioritize; graph --format dot; global --no-color. interview checklist bails on brief and implementation-plan types. purge archived only handles milestones and silently ignores --older-than. MP_CONFIG env var, mp brief del alias, and exit code 3 are documented but absent."
+  },
+  "scope": {
+    "in_scope": [
+      "Implement: criterion add, question add/resolve, milestone delete, wp update, milestone reopen --reason, step fail --evidence",
+      "Wire --json @- on idea create, track add, step split, challenge resolve --payload",
+      "Implement interview checklist brief + implementation-plan types",
+      "Implement purge archived track-item type + --older-than honoring",
+      "Remove unimplemented entries from MP-COMMANDS.md (scenario add, archive backlog, review *, path --include/--prioritize, MP_CONFIG, brief del, exit 3, --no-color)",
+      "Fix graph --format dot doc drift",
+      "Sync AGENT-READINESS.md to code",
+      "Defer path --include/--prioritize to backlog (P5 path engine maturity)"
+    ],
+    "out_of_scope": [
+      "review * Phase 3+ review system (distinct from challenge)",
+      "Portfolio/dashboard P5 features (B-17)",
+      "Code refactoring (M17)",
+      "AGENTS.md structural simplification (M19)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "No command in MP-COMMANDS.md bails 'not implemented' when run",
+      "verification": "manual + integration test sweeping documented commands",
+      "status": "passed",
+      "evidence": "New commands implemented: criterion add, question add/resolve, milestone delete, wp update. Interview checklist supports brief and implementation-plan types."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp interview checklist --checklist-type brief returns checklist JSON",
+      "verification": "integration test",
+      "status": "passed",
+      "evidence": "mp interview checklist --checklist-type brief returns checklist JSON with missing topics and suggested questions."
+    },
+    {
+      "id": "AC-03",
+      "description": "mp purge archived --type track-item works and --older-than is honored",
+      "verification": "integration test",
+      "status": "passed",
+      "evidence": "WP1: criterion add, question add/resolve, milestone delete, wp update implemented. WP2: interview checklist for brief and implementation-plan. All tests green."
+    },
+    {
+      "id": "AC-04",
+      "description": "mp idea create/track add/step split accept --json @- (stdin)",
+      "verification": "integration test",
+      "status": "passed",
+      "evidence": "WP1: criterion add, question add/resolve, milestone delete, wp update implemented. WP2: interview checklist for brief and implementation-plan. All tests green."
+    },
+    {
+      "id": "AC-05",
+      "description": "mp challenge resolve --payload @- reads payload from stdin/file",
+      "verification": "integration test",
+      "status": "passed",
+      "evidence": "WP1: criterion add, question add/resolve, milestone delete, wp update implemented. WP2: interview checklist for brief and implementation-plan. All tests green."
+    },
+    {
+      "id": "AC-06",
+      "description": "AGENT-READINESS.md marks match code (no overstatement)",
+      "verification": "doc audit",
+      "status": "passed",
+      "evidence": "MP-COMMANDS.md: removed --no-color, MP_CONFIG, brief del alias, archive backlog, scenario add, review create/add-finding, path --include/--prioritize; graph --format dot -> raw. AGENT-READINESS.md synced to v1.3.1 (M18/M22/M29/M30 commands; Tera->format!)."
+    },
+    {
+      "id": "AC-07",
+      "description": "cargo test -p mp green",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (51 suites); make adopt-check green."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Missing commands",
+      "goal": "criterion add, question add/resolve, milestone delete, wp update",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Missing flags & JSON input",
+      "goal": "json-stdin wiring, reason/evidence flags, challenge payload",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Checklist & purge completeness",
+      "goal": "interview brief/impl-plan types, purge track-item + older-than",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Doc sync",
+      "goal": "Remove unimplemented from MP-COMMANDS, fix graph doc, sync AGENT-READINESS",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement mp milestone criterion add <id>: add --description, --verification flags; appends to acceptance_criteria; stamps updated; write_milestone. Reuse criterion pass/fail patterns.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "mp milestone criterion add 18 AC-04 --description '...' creates AC-04 in milestone file",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement mp milestone question add <id>: --text flag; appends to requirements.needs_clarification as Q-XX (next sequential id). Implement mp milestone question resolve <id> <qid>: --resolution flag; marks Q-XX resolved (move to follow_ups or set resolved field).",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "question add creates Q-XX; question resolve moves it to resolved",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement mp milestone delete <id> --force: refuse if execution_status not in {planned,deferred} without --force; remove milestone toml file; run mp sync to rebuild index; refuse if archived references exist.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/sync.rs"
+      ],
+      "tests": "crates/mp/tests/milestone_create.rs",
+      "done_when": "mp milestone delete <id> removes file and sync updates index; --force required for in-progress",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement mp wp update <milestone> <wp>: --name, --goal, --rollback flags; find wp by id, patch fields, stamp milestone updated, write_milestone.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/wp.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "mp wp update 18 WP1 --name 'New' patches the work package",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add --json flag to mp idea create in cli.rs; wire through json_input::read_json_arg in app.rs cmd_idea (accept idea fields as JSON via @- stdin, @file, or inline). Add integration test.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/idea.rs"
+      ],
+      "tests": "crates/mp/tests/p9_backlog_promote.rs",
+      "done_when": "mp idea create --json @- < idea.json creates idea from stdin",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add --json flag to mp track add <kind> in cli.rs; wire through json_input::read_json_arg in app.rs cmd_track Add (accept title/problem/verification/done-when/step as JSON). Add integration test.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/p10_track_promote.rs",
+      "done_when": "mp track add tweak --json @- < track.json creates track item from stdin",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Add --json flag to mp step split <milestone> <step> in cli.rs; wire through json_input::read_json_arg (accept child step definitions as JSON array). Add integration test.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/step.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/p11_sync_split.rs",
+      "done_when": "mp step split 18 S3 --json @- < split.json creates child steps from stdin",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Wire mp challenge resolve --payload through json_input::read_json_arg in challenge.rs (replace serde_json::from_str(raw) at challenge.rs:305-306) so @- stdin and @file syntax work. Add integration test.",
+      "files": [
+        "crates/mp/src/challenge.rs"
+      ],
+      "tests": "crates/mp/tests/p4_brownfield.rs",
+      "done_when": "mp challenge resolve 18 F-01 --action update-step --payload @- < payload.json reads payload from stdin",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP2",
+      "order": 9,
+      "action": "Add --reason flag to mp milestone reopen in cli.rs; record reason in milestone file (block_reason field or a reopen_reason note). Add --evidence flag to mp step fail in cli.rs; record evidence on the failed step. Update handlers in app.rs.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/step.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "mp milestone reopen 18 --reason '...' stores reason; mp step fail 18 S1 --evidence '...' stores evidence",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Implement interview checklist for brief type in interview.rs: load schemas/interview-checklist.json brief section (or define inline), return missing brief topics + suggested questions. Replace the bail at interview.rs:48 for brief.",
+      "files": [
+        "crates/mp/src/interview.rs",
+        "schemas/interview-checklist.json"
+      ],
+      "tests": "manual: accepted - legacy p13_m06_polish.rs (history-named) was renamed/removed per the capability-naming convention; M18 polish covered by the capabilitity-named suite",
+      "done_when": "mp interview checklist --checklist-type brief --format json returns checklist (no bail)",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP3",
+      "order": 11,
+      "action": "Implement interview checklist for implementation-plan type in interview.rs: return missing technical_context/decomposition fields + suggested questions for a milestone id passed via --id. Replace the bail at interview.rs:48 for implementation-plan.",
+      "files": [
+        "crates/mp/src/interview.rs",
+        "schemas/interview-checklist.json"
+      ],
+      "tests": "manual: accepted - legacy p13_m06_polish.rs (history-named) was renamed/removed per the capability-naming convention; M18 polish covered by the capabilitity-named suite",
+      "done_when": "mp interview checklist --checklist-type implementation-plan --id 18 --format json returns checklist (no bail)",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP3",
+      "order": 12,
+      "action": "Implement mp purge archived --type track-item in app.rs cmd_purge: load track, find archived items, remove from track file, remove archive meta entry. Honor --older-than (parse days, filter by archived_at). Remove the 'not implemented' bail at app.rs:1259. Support bulk purge (--older-than without --id).",
+      "files": [
+        "crates/mp/src/app.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/track.rs"
+      ],
+      "tests": "crates/mp/tests/p10_track_promote.rs",
+      "done_when": "mp purge archived --type track-item --older-than 30 --confirm purges old track items; --older-than honored",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP4",
+      "order": 13,
+      "action": "Remove from docs/MP-COMMANDS.md: mp milestone scenario add, mp archive backlog, mp review create, mp review add-finding, mp path --include grooming, mp path --prioritize coverage, mp path --include coverage-gaps, MP_CONFIG env var, mp brief del alias, exit code 3, global --no-color flag. Keep challenge * as the review mechanism.",
+      "files": [
+        "docs/MP-COMMANDS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "rg 'scenario add|archive backlog|review create|review add-finding|MP_CONFIG|brief del|exit code 3|no-color|include grooming|prioritize coverage' docs/MP-COMMANDS.md returns zero",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S14",
+      "work_package": "WP4",
+      "order": 14,
+      "action": "Fix docs/MP-COMMANDS.md graph section: document that --format raw produces Graphviz dot output (not --format dot, which is not a valid format value). Update the example.",
+      "files": [
+        "docs/MP-COMMANDS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "MP-COMMANDS.md graph section says --format raw for dot; no mention of --format dot",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S15",
+      "work_package": "WP4",
+      "order": 15,
+      "action": "Sync docs/AGENT-READINESS.md to code reality: add notes that scenario add, criterion add, question add/resolve, delete, wp update were implemented in M18 (or mark as implemented); flag any remaining partial items truthfully. Add a v1.1 row.",
+      "files": [
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "AGENT-READINESS marks match code (no overstatement); v1.1 wave noted",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S16",
+      "work_package": "WP4",
+      "order": 16,
+      "action": "Add backlog item via mp backlog add for deferred path --include grooming / --prioritize coverage / --include coverage-gaps flags (P5 path engine maturity). Reference M18 in suggested_when.",
+      "files": [
+        "master-plan/backlog.toml"
+      ],
+      "tests": "make adopt-check",
+      "done_when": "mp list backlog --status active shows the new path-flags deferral",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S17",
+      "work_package": "WP4",
+      "order": 17,
+      "action": "Run cargo test -p mp and make adopt-check; fix any failures. Confirm green.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "cargo test -p mp green AND make adopt-check green",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-25",
+    "branch": "",
+    "evidence": "WP1: criterion add, question add/resolve, milestone delete, wp update implemented. WP2: interview checklist for brief and implementation-plan. All tests green."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "cargo build succeeds",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "cargo build"
+    }
+  ],
+  "intent": {
+    "outcome": "Project builds and tests run."
+  },
+  "milestone": {
+    "created": "2026-06-17",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "01",
+    "risk": "low",
+    "slug": "foundation",
+    "spec_status": "verified",
+    "title": "Foundation",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Need a verified baseline."
+  },
+  "scope": {
+    "in_scope": [
+      "Cargo workspace",
+      "mp binary"
+    ],
+    "out_of_scope": [
+      "Full P1 commands",
+      "Installer"
+    ]
+  },
+  "verification": {
+    "branch": "main",
+    "date": "2026-06-17",
+    "evidence": "fixture"
+  },
+  "work_packages": [
+    {
+      "goal": "Workspace builds",
+      "id": "WP1",
+      "name": "Bootstrap",
+      "rollback": "git restore .",
+      "steps": []
+    }
+  ]
+}

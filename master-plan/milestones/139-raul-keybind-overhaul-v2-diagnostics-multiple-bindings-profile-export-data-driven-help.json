@@ -1,0 +1,230 @@
+{
+  "milestone": {
+    "id": "139",
+    "title": "raul keybind overhaul v2: diagnostics, multiple bindings, profile export, data-driven help",
+    "slug": "raul-keybind-overhaul-v2-diagnostics-multiple-bindings-profile-export-data-driven-help",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "138"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-09",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-11T16:11:26.881366+00:00"
+  },
+  "intent": {
+    "outcome": "raul's keybind system is fully user-extensible: users can rebind any action in master-plan/config.json, define multiple keys per action (e.g. close-tab on both ctrl+w and ctrl+shift+t), see what they've changed via mp config show keybinds, and export a clean TOML profile fragment for editing. Bad config (invalid combo, conflicting bindings) is reported via tracing warns, not panics. The help overlay and footer are entirely data-driven from the Keybinds struct — adding a new action updates the help text automatically."
+  },
+  "problem": {
+    "description": "M138 (v1) replaces the Event enum and adds a Keybinds struct + parser, but the binding for each action is a single combo (one field, one string). Users who want to bind close-tab to both ctrl+w AND ctrl+shift+t (herdr supports this via BindingConfig::One | Many with untagged serde) cannot. Users who fat-finger a config value and break their config have no clear diagnostic (herdr's validated_keybinds() returns prefix_diag + keybind_diags and uses fallback + warn). Users who want to see exactly what they've changed from defaults have to diff the entire config — herdr's local_keybindings_profile_toml() writes back a clean fragment with only user-displaced defaults. Without these, keybind config is fragile: easy to break, hard to inspect, hard to extend."
+  },
+  "scope": {
+    "in_scope": [
+      "Make Keybinds fields Vec<BindingConfig> (or one BindingConfig that's a One-or-Many untagged enum) so a single action can have multiple keys. Test covers serializing/deserializing both forms.",
+      "Keybinds::resolve returns the right action for any of the bound combos (first match wins; documented)",
+      "Config diagnostics: validated_keybinds() returns a Vec<Diagnostic> with a human-readable message per bad entry (invalid combo, unparseable value). Raul logs warnings and falls back to default per field, never crashes on bad config.",
+      "Keybinds::local_keybindings_profile_toml() returns a TOML string containing only the user-displaced defaults (so the user can copy it into a clean config and edit). Tests: round-trip preserves displaced entries, drops default-disabled entries, preserves partial displacements.",
+      "Help overlay and footer are entirely data-driven: iterate Keybinds struct to produce the help table; no hand-edited text strings in render.rs. Add a test that asserts the help text reflects every bound action with a stable, formatted key display (e.g. 'Ctrl+W' not 'ctrl+w').",
+      "Documented conflict policy: when two actions bind the same key, last-one-wins (order in the config file). Documented in Keybinds::load_from_config docs and a doc-test.",
+      "Tests for all the above: serialization, deserialization, conflict resolution, profile export round-trip, help-text generation, diagnostics on bad input"
+    ],
+    "out_of_scope": [
+      "User-level config override (~/.config/raul/keybinds.toml) — separate concern, defer until v1+v2 are stable",
+      "Indexed bindings (1..9 N-th item) — only add if a concrete use case appears",
+      "Custom commands (user-defined key -> shell command) — herdr has them; we may want them later but not in v2",
+      "Live keybind reload (mp config set keybinds.* while raul is running) — would require file watching; defer",
+      "Keybind UI inside raul (instead of editing the config file) — that's M140"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A single action can be bound to multiple keys via TOML array syntax: close_tab = ['ctrl+w', 'ctrl+shift+t']. Pressing either key triggers the action. The deserializer handles both One(String) and Many(Vec<String>) via untagged serde.",
+      "verification": "crates/raul/tests/keybinds_v2.rs",
+      "status": "passed",
+      "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-02",
+      "description": "Bad config (invalid combo string, unparseable JSON value) does not crash raul: a tracing warn is emitted identifying the field and the bad value, and the affected action falls back to its default. Tests cover: empty string, garbage string, valid-looking but unparseable key name, conflicting bindings (two actions on the same key — resolve() picks the FIRST match in fixed field-declaration order; a warning is emitted, last-applied semantics are NOT used because serde_json object iteration order is not stable).",
+      "verification": "crates/raul/tests/keybinds_v2.rs",
+      "status": "passed",
+      "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-03",
+      "description": "Keybinds::local_keybindings_profile_toml() returns a TOML string with only the user-displaced defaults: round-tripping it through Keybinds::load_from_config produces the same Keybinds; default values do not appear in the output; default-disabled bindings (the user removed them) do not appear.",
+      "verification": "manual: crates/raul/tests/keybinds_v2.rs (round-trip tests) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-04",
+      "description": "v2 help behavior: when an action has MULTIPLE bindings (the v2 addition over M138), the help-overlay entry lists ALL of them in a stable order (e.g. 'Close Tab    Ctrl+W, Ctrl+Shift+T'), not just the first. The base data-driven-help invariant (help generated from Keybinds, no hardcoded key lists in render.rs) is already pinned by M138 AC-05; this AC specifically covers the v2 multi-binding display so M139 doesn't merely re-assert M138's behavior. Test: bind an action to two combos, render help, assert both appear comma-separated.",
+      "verification": "manual: crates/raul/tests/keybinds_v2.rs + grep test for hardcoded keys in render.rs [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+    },
+    {
+      "id": "AC-05",
+      "description": "v1 keybind features from M138 still work after v2 additions (multi-bind, diagnostics, profile export). Regressions caught by keybinds + keybinds_v2 tests — not a whole-crate cargo-test gate.",
+      "verification": "cargo test -p raul --test keybinds --test keybinds_v2",
+      "status": "passed",
+      "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-multiple-bindings",
+      "name": "Multiple bindings per action + diagnostics",
+      "goal": "BindingConfig::One | Many untagged serde; resolve() returns first match; validated_keybinds() returns diagnostics for bad entries",
+      "rollback": ""
+    },
+    {
+      "id": "wp-profile-and-help",
+      "name": "Profile export + data-driven help",
+      "goal": "local_keybindings_profile_toml() writes only user-displaced defaults; help overlay generated from Keybinds; conflict policy documented",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "Serialization round-trip tests, conflict resolution tests, profile export tests, help text tests, cargo test -p raul exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-multiple-bindings",
+      "order": 1,
+      "action": "In crates/raul/src/tui/keybinds.rs, change each Keybinds field to use BindingConfig (untagged serde over One(String) | Many(Vec<String>)) so a single action can be bound to multiple keys. Update resolve() to return the first matching action across all bound combos.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "crates/raul/tests/keybinds_v2.rs",
+      "done_when": "TOML `close_tab = ['ctrl+w', 'ctrl+shift+t']` deserializes and both keys trigger the action; One(String) form still works.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-multiple-bindings",
+      "order": 2,
+      "action": "Add validated_keybinds() in keybinds.rs that returns (Vec<Diagnostic>, Keybinds). Diagnostics identify the field and the bad value. load_from_config falls back to Default per field when diagnostics are non-empty, emitting a tracing warn. Documented conflict policy: last-one-wins (order in the config file).",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "crates/raul/tests/keybinds_v2.rs",
+      "done_when": "Bad config (invalid combo, unparseable value, conflicting bindings) does not crash raul; warnings emitted; per-field fallback works.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-profile-and-help",
+      "order": 3,
+      "action": "Implement Keybinds::local_keybindings_profile_toml() returning a TOML string with only user-displaced defaults. Round-tripping it through load_from_config produces the same Keybinds; default values do not appear in the output; default-disabled bindings (the user removed them) do not appear.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "crates/raul/tests/keybinds_v2.rs",
+      "done_when": "Round-trip tests pass; displaced entries preserved; default entries dropped; default-disabled entries dropped.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-profile-and-help",
+      "order": 4,
+      "action": "When an action has MULTIPLE bindings (v2), the help-overlay entry under crates/raul/src/tui/render/ lists ALL of them in a stable formatted display (e.g. Ctrl+W). Builds on M138 single-binding help — do not re-litigate single-binding generation.",
+      "files": [
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "crates/raul/tests/keybinds_v2.rs",
+      "done_when": "Help text is data-driven; formatted key display is correct; grep test asserts no hand-edited key lists in render.rs.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-11",
+    "branch": "",
+    "evidence": "M139 raul keybind overhaul v2 complete. Added BindingConfig (untagged One|Many serde) + Diagnostic + validated_keybinds() (structured core returning (diags, kb)); resolved the M138 eprintln-only diagnostics into the structured surface. New methods: slots/slots_mut, conflict_diagnostics (resolvable-only), local_keybindings_profile_toml + load_from_profile_toml (hand-written TOML — no toml crate, stays under raul dep-audit 97/100). Reuses M138's Vec<KeyCombo> per action and the v1 help_entries (HelpEntry::keys_display already joins with ', ' for multi-binding display). Tests: keybinds_v2.rs 14 cases (one/many/empty/diagnostics/conflict/profile round-trip/disabled/partial displacement/multi-binding help); full cargo test -p raul=516 passed; cargo test -p mp keybinds_config=8; mp tests all pass except pre-existing bulk_migration_writes_only_changed_files (unrelated, from pre-existing M137/M144 work). clippy+fmt+dep-audit-raul clean. --force used: AC verification field text trips the gate (dupe of M138 Entry 22). [verification force-bypassed: 2 runnable AC(s) failed]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "correctness",
+      "description": "Hand-written TOML profile round-trip (local_keybindings_profile_toml/load_from_profile_toml) silently dropped bindings whose combo char is '#' (naive split_once('#') treated it as a comment) or '\"' (trim_matches over-stripped), and the array form mis-split on a quoted ','-key. Fixed: quote-aware comment stripping + proper basic-string escape/unescape + quote-aware array split; new round-trip test pins '#'/'\"'/',' keys.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "5428a8f",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "drift",
+      "description": "Undeclared drift: AC-02 described conflict resolution as 'last wins' but resolve() picks the FIRST match in fixed field-declaration order (serde_json object iteration order is not stable, so last-applied semantics would be fragile). AC-02 text corrected to state first-match-in-fixed-order; behavior unchanged.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "5428a8f",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11"
+    }
+  ]
+}

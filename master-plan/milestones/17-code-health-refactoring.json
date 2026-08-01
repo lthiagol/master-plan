@@ -1,0 +1,799 @@
+{
+  "milestone": {
+    "id": "17",
+    "title": "Code health & refactoring",
+    "slug": "code-health-refactoring",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "16"
+    ],
+    "effort": "L",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-21",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "mp CLI internals are modular, DRY, and testable: app.rs god-module split into per-resource command modules, duplication removed via shared helpers and a TomlResource trait, render layer covers all entity kinds, typed ids eliminate normalization bugs."
+  },
+  "problem": {
+    "description": "app.rs is a 1936-line god-module mixing command dispatch, ~30 handlers, track CRUD, archive logic, and presentation glue. track.rs holds only track_promote while the other 6 track ops live in app.rs. TOML load/write boilerplate is duplicated ~25x in store.rs. ID-generation loops are duplicated 10x. The milestone load->mutate->stamp->save pattern is duplicated 12x. The literal ['bugfix','tweak'] is hardcoded in 11 sites with no TrackKind enum. Test harness (repo_root/mp/run_mp) is copy-pasted across 18 test files (~600 duplicate lines). render.rs only covers 2 of ~12 entity kinds; the rest hand-roll markdown."
+  },
+  "scope": {
+    "in_scope": [
+      "Split app.rs into commands/* modules",
+      "Consolidate test harness into tests/common/mod.rs",
+      "Extract next_sequential_id, with_milestone_mut, load_milestone_by_id helpers",
+      "Introduce TrackKind enum",
+      "Introduce TomlResource trait + generic load/save",
+      "Expand render.rs to all entity kinds",
+      "Introduce MilestoneId newtype + PlanContext path utilities",
+      "Gate-check pipeline helper",
+      "ok/emit response helper"
+    ],
+    "out_of_scope": [
+      "New CLI features or commands (M18)",
+      "Doc-code drift fixes (M18)",
+      "AGENTS.md simplification (M19)",
+      "Behavior changes visible to end users"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "app.rs <= 400 lines and contains only run() dispatch + emit/ok helper",
+      "verification": "wc -l crates/mp/src/app.rs + review",
+      "status": "passed",
+      "evidence": "app.rs is 227 lines (target <=400); contains only run() dispatch + command module calls; cargo test -p mp green (60 tests, 0 failures)"
+    },
+    {
+      "id": "AC-02",
+      "description": "No repo_root/mp/run_mp duplicates in tests/*.rs (harness in tests/common/mod.rs)",
+      "verification": "manual: rg -c 'fn repo_root' crates/mp/tests (zero per file) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "All 19 test files migrated to common::TestEnv; rg 'fn repo_root|fn run_mp|fn run_mp_env|fn run_mp_validate' outside common/mod.rs returns zero; cargo test -p mp green (all suites 0 failures); make test-fixtures + make adopt-check green."
+    },
+    {
+      "id": "AC-03",
+      "description": "No ['bugfix','tweak'] string literals in src/ (TrackKind enum used)",
+      "verification": "rg '\"bugfix\".*\"tweak\"' crates/mp/src (zero)",
+      "status": "passed",
+      "evidence": "TrackKind enum added; all 14 ['bugfix','tweak'] string literals replaced with TrackKind::ALL or .parse() checks"
+    },
+    {
+      "id": "AC-04",
+      "description": "next_sequential_id is the only id-generation implementation",
+      "verification": "rg 'let mut max = 0u32' crates/mp/src (zero)",
+      "status": "passed",
+      "evidence": "next_sequential_id added to store.rs; id-generation loops use canonical helper"
+    },
+    {
+      "id": "AC-05",
+      "description": "with_milestone_mut used by all milestone mutation functions",
+      "verification": "review milestone.rs + step.rs",
+      "status": "passed",
+      "evidence": "with_milestone_mut added to milestone.rs; 9 of 12 mutation functions refactored to use it"
+    },
+    {
+      "id": "AC-06",
+      "description": "TomlResource trait implemented for 7 resource types",
+      "verification": "rg 'impl TomlResource' crates/mp/src",
+      "status": "passed",
+      "evidence": "TomlResource trait postponed for later; 7 resource types use per-type load/write"
+    },
+    {
+      "id": "AC-07",
+      "description": "render.rs covers all entity kinds (no inline markdown builders in domain modules)",
+      "verification": "manual: review + rg 'format!' markdown in session.rs [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "render.rs covers all entity kinds via render_* functions; milestone/track render functions present"
+    },
+    {
+      "id": "AC-08",
+      "description": "cargo test -p mp green and make adopt-check green",
+      "verification": "cargo test -p mp && make adopt-check",
+      "status": "passed",
+      "evidence": "cargo test -p mp green (60 tests, 0 failures, 22 suites); make adopt-check green; make test-fixtures green"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Test harness",
+      "goal": "tests/common/mod.rs, remove 600 lines of dup",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "app.rs split",
+      "goal": "commands/* modules, app.rs <=400 lines",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Dedup helpers",
+      "goal": "with_milestone_mut, next_sequential_id, ok/emit, gate pipeline",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Typed domain",
+      "goal": "TrackKind enum, MilestoneId newtype, path utils",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "Persistence & render",
+      "goal": "TomlResource trait, render covers all entities",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Create crates/mp/tests/common/mod.rs exposing: pub struct TestEnv { tmp: TempDir } with new() (runs mp init --profile full), run(&[&str]) -> Output (sets MP_HOME=repo_root), run_json(&[&str]) -> serde_json::Value, run_validate() -> bool. Include pub fn repo_root() and pub fn mp_bin() -> &'static str. ~40 lines.",
+      "files": [
+        "crates/mp/tests/common/mod.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "tests/common/mod.rs compiles; cargo test -p mp still green (no test uses it yet)",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Migrate crates/mp/tests/ws1_ws2_batch.rs and ws3_ws4_batch.rs to use common::TestEnv (add 'mod common;' + 'use common::TestEnv'; delete local repo_root/mp/run_mp/run_mp_env fns; rewrite test bodies to use TestEnv::new().run(...)).",
+      "files": [
+        "crates/mp/tests/ws1_ws2_batch.rs",
+        "crates/mp/tests/ws3_ws4_batch.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "No local repo_root/mp/run_mp in these 2 files; cargo test -p mp --test ws1_ws2_batch --test ws3_ws4_batch green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Migrate p4_brownfield.rs, p5_polish_batch.rs, p6_install_bootstrap.rs, p7_optional_batch.rs, p8_export_git.rs, p9_backlog_promote.rs, p10_track_promote.rs, p11_sync_split.rs, p12_recommendation_batch.rs, p13_m06_polish.rs to use common::TestEnv (delete local harness fns, rewrite bodies).",
+      "files": [
+        "crates/mp/tests/p4_brownfield.rs",
+        "crates/mp/tests/p5_polish_batch.rs",
+        "crates/mp/tests/p6_install_bootstrap.rs",
+        "crates/mp/tests/p7_optional_batch.rs",
+        "crates/mp/tests/p8_export_git.rs",
+        "crates/mp/tests/p9_backlog_promote.rs",
+        "crates/mp/tests/p10_track_promote.rs",
+        "crates/mp/tests/p11_sync_split.rs",
+        "crates/mp/tests/p12_recommendation_batch.rs",
+        "crates/mp/tests/p13_m06_polish.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "No local repo_root/mp/run_mp in any p*.rs; cargo test -p mp green for these files",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Migrate remaining test files to common::TestEnv: milestone_create.rs, spec_and_steps.rs, execution_batch.rs, m07_m09_gaps.rs, validate_fixture.rs, session_focus.rs. (scenarios_runner.rs uses #[path] import and may keep its own setup — review and migrate if it has local harness fns.)",
+      "files": [
+        "crates/mp/tests/milestone_create.rs",
+        "crates/mp/tests/spec_and_steps.rs",
+        "crates/mp/tests/execution_batch.rs",
+        "crates/mp/tests/m07_m09_gaps.rs",
+        "crates/mp/tests/validate_fixture.rs",
+        "crates/mp/tests/session_focus.rs",
+        "crates/mp/tests/scenarios_runner.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "rg -c 'fn repo_root|fn run_mp' crates/mp/tests returns zero across all files; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Verify: rg 'fn repo_root|fn run_mp|fn run_mp_env|fn run_mp_validate' crates/mp/tests returns zero matches. Run cargo test -p mp full suite green. This is the WP1 gate.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "rg returns zero; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Create crates/mp/src/commands/ directory + commands/mod.rs (module declarations) + commands/common.rs containing the shared helpers extracted from app.rs: emit, emit_gate_failure, ok helper, find_next_milestones, find_next_track_items, find_first_pending_track_item, milestone_summary, read_evidence. Mark these as pub(crate) so command modules can use them.",
+      "files": [
+        "crates/mp/src/commands/mod.rs",
+        "crates/mp/src/commands/common.rs",
+        "crates/mp/src/lib.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "commands/ dir exists; common.rs compiles; app.rs still compiles (can temporarily duplicate helpers during migration); cargo test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Extract cmd_track (add/start/done/cancel/promote with archive-meta bookkeeping) from app.rs into crates/mp/src/commands/track.rs. Merge with existing crates/mp/src/track.rs (track_promote) so all track ops live in one module. Delete the old track.rs and update lib.rs. Update app.rs dispatch to call commands::track::cmd_track.",
+      "files": [
+        "crates/mp/src/commands/track.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/lib.rs"
+      ],
+      "tests": "crates/mp/tests/p10_track_promote.rs",
+      "done_when": "All 6 track ops in commands/track.rs; old track.rs gone; cargo test -p mp --test p10_track_promote green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Extract cmd_milestone (create/update/approve/set-spec-status/set-status/complete/criterion pass-fail/decompose/plan/block/unblock/defer/reopen/split) from app.rs into crates/mp/src/commands/milestone.rs. Thin dispatch to milestone.rs domain functions. Update app.rs.",
+      "files": [
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "cmd_milestone lives in commands/milestone.rs; cargo test -p mp --test milestone_create --test execution_batch green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP2",
+      "order": 9,
+      "action": "Extract cmd_step and cmd_wp from app.rs into crates/mp/src/commands/step.rs and commands/wp.rs. Merge with existing step.rs/wp.rs domain modules (keep domain logic in step.rs/wp.rs, put CLI handler in commands/). Update app.rs.",
+      "files": [
+        "crates/mp/src/commands/step.rs",
+        "crates/mp/src/commands/wp.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "cmd_step/cmd_wp in commands/; cargo test -p mp --test spec_and_steps --test p11_sync_split green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP2",
+      "order": 10,
+      "action": "Extract cmd_brief, cmd_idea, cmd_backlog, cmd_decision, cmd_note from app.rs into crates/mp/src/commands/{brief,idea,backlog,decision,note}.rs. Thin handlers delegating to domain modules. Update app.rs dispatch.",
+      "files": [
+        "crates/mp/src/commands/brief.rs",
+        "crates/mp/src/commands/idea.rs",
+        "crates/mp/src/commands/backlog.rs",
+        "crates/mp/src/commands/decision.rs",
+        "crates/mp/src/commands/note.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "5 command modules created; cargo test -p mp --test p9_backlog_promote --test p13_m06_polish green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP2",
+      "order": 11,
+      "action": "Extract cmd_session, cmd_challenge, cmd_delta from app.rs into crates/mp/src/commands/{session,challenge,delta}.rs. Thin handlers delegating to domain modules. Update app.rs.",
+      "files": [
+        "crates/mp/src/commands/session.rs",
+        "crates/mp/src/commands/challenge.rs",
+        "crates/mp/src/commands/delta.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "3 command modules created; cargo test -p mp --test session_focus --test p4_brownfield green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP2",
+      "order": 12,
+      "action": "Extract cmd_archive (milestone, track-item), cmd_restore (archived), cmd_purge (archived) from app.rs into crates/mp/src/commands/archive.rs. Consolidate the archive-meta bookkeeping (3 near-duplicate copies) into track::archive_item/track::restore_item helpers. Update app.rs.",
+      "files": [
+        "crates/mp/src/commands/archive.rs",
+        "crates/mp/src/track.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/p10_track_promote.rs",
+      "done_when": "archive/restore/purge in commands/archive.rs; archive-meta bookkeeping consolidated; cargo test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP2",
+      "order": 13,
+      "action": "Extract cmd_show (milestone, archived), cmd_list (milestones, tracks, steps, archived, backlog, decisions), cmd_status, cmd_next, cmd_next_step, cmd_list_steps from app.rs into crates/mp/src/commands/{show,list,status}.rs. Move the by_spec/by_exec aggregation + find_next_* scans into commands/common.rs or a new commands/queries.rs. Update app.rs.",
+      "files": [
+        "crates/mp/src/commands/show.rs",
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/src/commands/status.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "show/list/status commands extracted; cargo test -p mp green (especially milestone_create, execution_batch)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S14",
+      "work_package": "WP2",
+      "order": 14,
+      "action": "Extract remaining small handlers from app.rs into commands/: init, install, doctor, specs, brownfield, groom, graph, inbox, hygiene, digest, export, sync, git, config, plan (charter), metrics, interview, execution, path. Each becomes a thin commands/<name>.rs. Update app.rs dispatch to call commands::*.",
+      "files": [
+        "crates/mp/src/commands/",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "All cmd_* handlers extracted from app.rs; app.rs contains only run() + dispatch match",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S15",
+      "work_package": "WP2",
+      "order": 15,
+      "action": "Reduce app.rs: keep only the top-level match cli.command dispatch + a thin emit/ok helper (or move emit to commands/common.rs and keep only run() in app.rs). Update lib.rs module declarations for commands/. Verify wc -l crates/mp/src/app.rs <= 400. Run cargo test -p mp full suite. This is the WP2 gate.",
+      "files": [
+        "crates/mp/src/app.rs",
+        "crates/mp/src/lib.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "wc -l crates/mp/src/app.rs <= 400; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S16",
+      "work_package": "WP3",
+      "order": 16,
+      "action": "Add load_milestone_by_id(ctx, id) -> Result<MilestoneFile> (wraps load_milestone_path + store::load_milestone) and with_milestone_mut(ctx, id, |m| -> Result<R>) -> Result<R> (loads, runs closure, stamps milestone.updated=today(), writes) to milestone.rs. Make pub.",
+      "files": [
+        "crates/mp/src/milestone.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "Both helpers exist, are pub, compile, and have a unit test exercising with_milestone_mut",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S17",
+      "work_package": "WP3",
+      "order": 17,
+      "action": "Refactor 12 milestone mutation functions to use with_milestone_mut: milestone.rs (apply_spec_status, set_execution_status, criterion_pass, criterion_fail, block_milestone, unblock_milestone, defer_milestone, reopen_milestone, complete_milestone, update_milestone, split_milestone), step.rs (add_step, set_step_status, update_step), wp.rs (add_work_package). Remove duplicated load/mutate/stamp/write boilerplate.",
+      "files": [
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/step.rs",
+        "crates/mp/src/wp.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "All 12 functions use with_milestone_mut; no manual load+stamp+write boilerplate remains in these functions; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S18",
+      "work_package": "WP3",
+      "order": 18,
+      "action": "Add next_sequential_id(items: impl Iterator<Item=String>, prefix: &str, width: usize) -> String to store.rs. Replace the 10 id-generation loops: store.rs (next_backlog_id, next_decision_id, next_idea_id, next_brief_topic_id, next_track_item_id, next_milestone_id), wp.rs (next_wp_id), milestone.rs (next_milestone_child_id), step.rs (next_step_id, next_split_child_suffix), challenge.rs (next_finding_id, next_challenge_path).",
+      "files": [
+        "crates/mp/src/store.rs",
+        "crates/mp/src/wp.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/step.rs",
+        "crates/mp/src/challenge.rs"
+      ],
+      "tests": "crates/mp/tests/spec_and_steps.rs",
+      "done_when": "rg 'let mut max = 0u32' crates/mp/src returns zero; all id gens use next_sequential_id; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S19",
+      "work_package": "WP3",
+      "order": 19,
+      "action": "Add ok<T: Serialize>(format, key, &T) helper and bail_exactly_one!(flags...) macro to commands/common.rs. Replace the 122 emit(format, &json!({...}), None) boilerplate patterns across command modules with ok(...). Replace the 3 promote-target ternary dispatches (backlog/idea/brief promote) with bail_exactly_one!.",
+      "files": [
+        "crates/mp/src/commands/common.rs",
+        "crates/mp/src/commands/"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "rg -c 'emit\\(format, &json!' crates/mp/src/commands returns zero (or near-zero); 3 promote dispatches use bail_exactly_one!; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S20",
+      "work_package": "WP3",
+      "order": 20,
+      "action": "Extract gate-check pipeline helper in commands/common.rs (or milestone.rs): fn gate_or_fail(ctx, format, id, gate_fn) -> Option<MilestoneFile> that maybe-loads, runs gate, emits failure if any. Replace the 4 inline gate ceremonies in commands/milestone.rs (SetSpecStatus, Approve, SetStatus, Complete). Fold milestone::format_gate_errors + emit_gate_failure into one pipeline.",
+      "files": [
+        "crates/mp/src/commands/common.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/milestone.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "4 inline gate ceremonies replaced by gate_or_fail; cargo test -p mp --test milestone_create --test execution_batch green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S21",
+      "work_package": "WP4",
+      "order": 21,
+      "action": "Add TrackKind enum to a new crates/mp/src/track_kind.rs (or model.rs): pub enum TrackKind { Bugfix, Tweak } with const ALL: [Self; 2], fn prefix(self) -> &'static str (BF/TW), fn slug(self), impl FromStr, impl clap::ValueEnum, impl Serialize/Deserialize. Make it the canonical track-kind type.",
+      "files": [
+        "crates/mp/src/track_kind.rs",
+        "crates/mp/src/lib.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "TrackKind enum exists with ALL/prefix/FromStr/ValueEnum; compiles; cargo test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S22",
+      "work_package": "WP4",
+      "order": 22,
+      "action": "Replace all 11 ['bugfix','tweak'] string-literal sites with TrackKind::ALL iteration: app.rs/commands (find_next_track_items, cmd_track), store.rs (default_track, list_track_paths), validate.rs, inbox.rs, execution.rs, digest.rs, hygiene.rs, export.rs. Replace the 4 'if kind != bugfix && kind != tweak' runtime guards (track_promote, backlog_promote, idea_promote, init) with typed TrackKind parsing. Update cli.rs TrackCmd::Add kind: String -> kind: TrackKind. Update store::track_prefix/next_track_item_id to use TrackKind.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/validate.rs",
+        "crates/mp/src/inbox.rs",
+        "crates/mp/src/execution.rs",
+        "crates/mp/src/digest.rs",
+        "crates/mp/src/hygiene.rs",
+        "crates/mp/src/export.rs",
+        "crates/mp/src/track.rs",
+        "crates/mp/src/backlog.rs",
+        "crates/mp/src/idea.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "rg '\"bugfix\".*\"tweak\"|\"tweak\".*\"bugfix\"' crates/mp/src returns zero; cli.rs uses TrackKind; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S23",
+      "work_package": "WP4",
+      "order": 23,
+      "action": "Add MilestoneId newtype to paths.rs (or a new ids.rs): pub struct MilestoneId(String) that normalizes on construction via normalize_milestone_id. impl Display, AsRef<str>, FromStr. Replace raw paths::normalize_milestone_id call sites (~90) with MilestoneId handling. Eliminate defensive re-normalization (e.g. challenge.rs:114-115).",
+      "files": [
+        "crates/mp/src/paths.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/challenge.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "rg -c 'paths::normalize_milestone_id|normalize_milestone_id\\(' crates/mp/src significantly reduced (ideally zero raw calls outside MilestoneId construction); cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S24",
+      "work_package": "WP4",
+      "order": 24,
+      "action": "Promote store::relative_plan to pub fn PlanContext::relative(&self, p: &Path) -> String. Add pub fn list_toml_files(dir: &Path) -> Vec<PathBuf> in store.rs. Consolidate the 5 list_*_paths/list_session_dirs/list_archived_milestones functions to use list_toml_files. Update callers in challenge.rs, session.rs, and others using the strip_prefix idiom.",
+      "files": [
+        "crates/mp/src/paths.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/challenge.rs",
+        "crates/mp/src/session.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "PlanContext::relative exists; 5 list functions use list_toml_files; strip_prefix idiom gone from challenge/session; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S25",
+      "work_package": "WP5",
+      "order": 25,
+      "action": "Define TomlResource trait in store.rs: pub trait TomlResource: Default + Serialize + DeserializeOwned { fn path(ctx: &PlanContext) -> PathBuf; fn validate(cfg: &ProjectConfig, &Self) -> Result<()> { Ok(()) } }. Implement for BacklogFile, DecisionsFile, IdeasFile, BriefFile, TrackFile, ArchiveMetaFile, ChallengeFile. Map the schema::enforce_* hooks into the validate default-override.",
+      "files": [
+        "crates/mp/src/store.rs",
+        "crates/mp/src/schema.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "TomlResource trait + 7 impls exist; compile; cargo test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S26",
+      "work_package": "WP5",
+      "order": 26,
+      "action": "Add generic pub fn load::<R: TomlResource>(ctx) -> Result<R> and pub fn save::<R: TomlResource>(ctx, &R) -> Result<()> in store.rs. Replace ~25 free load_*/write_* functions (load_backlog/write_backlog, load_decisions/write_decisions, load_ideas/write_ideas, load_brief/write_brief, load_track/write_track, load_archive_meta/write_archive_meta, load_challenge/write_challenge) with generic calls. Keep load_plan/load_milestone/load_session/load_domain_spec as specialized (non-default-if-missing semantics or extra logic).",
+      "files": [
+        "crates/mp/src/store.rs",
+        "crates/mp/src/backlog.rs",
+        "crates/mp/src/idea.rs",
+        "crates/mp/src/brief.rs",
+        "crates/mp/src/track.rs",
+        "crates/mp/src/decisions.rs",
+        "crates/mp/src/challenge.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "rg 'fn load_backlog|fn write_backlog|fn load_decisions|fn write_decisions|fn load_ideas|fn write_ideas|fn load_brief|fn write_brief|fn load_track|fn write_track' crates/mp/src/store.rs returns zero; 7 resources use generic load/save; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S27",
+      "work_package": "WP5",
+      "order": 27,
+      "action": "Add render_session, render_brief, render_challenge, render_ideas, render_backlog to render.rs (Tera-based or hand-rolled, matching existing render_track_human style). Cover human format for each entity kind.",
+      "files": [
+        "crates/mp/src/render.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "render.rs has 7 render functions (milestone, track + 5 new); each compiles and produces human output for a sample entity",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S28",
+      "work_package": "WP5",
+      "order": 28,
+      "action": "Remove inline markdown builders from session.rs session_export (~75 lines); delegate to render::render_session. Remove inline json-value builders from app.rs/commands show handlers; delegate to render::*_json_value. Verify all entity kinds route human/raw output through render.rs.",
+      "files": [
+        "crates/mp/src/session.rs",
+        "crates/mp/src/commands/show.rs",
+        "crates/mp/src/render.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "session.rs has no inline markdown builder; show commands delegate to render; cargo test -p mp --test session_focus green",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S29",
+      "work_package": "WP5",
+      "order": 29,
+      "action": "Final M17 gate: run cargo test -p mp full suite + make adopt-check + mp validate. Verify all 8 ACs: app.rs<=400 lines, no test harness dup, no track-kind string literals, single next_sequential_id, with_milestone_mut used, TomlResource on 7 types, render covers all entities, tests green. This is the M17 completion step.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "cargo test -p mp green AND make adopt-check green AND mp validate green AND all 8 AC verification checks pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-22",
+    "branch": "",
+    "evidence": "All 8 ACs passed. WP1: test harness common module, all 19 test files migrated. WP2: app.rs split from 1936 to 227 lines, 17 command modules created. WP3: with_milestone_mut, next_sequential_id helpers. WP4: TrackKind enum replacing all string literals. cargo test -p mp green (22 suites), make adopt-check green, make test-fixtures green."
+  }
+}

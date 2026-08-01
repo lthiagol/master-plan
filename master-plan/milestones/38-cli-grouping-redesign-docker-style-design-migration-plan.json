@@ -1,0 +1,180 @@
+{
+  "milestone": {
+    "id": "38",
+    "title": "CLI grouping redesign (Docker-style) - design & migration plan",
+    "slug": "cli-grouping-redesign-docker-style-design-migration-plan",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "41"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "A documented, human-friendly hierarchical command grouping for mp (noun-first object groups like docker container/network/image) plus a hard-rename plan that repoints raul shell-outs in-lockstep (clean 2.0 break, no aliases), so the CLI is regrouped as part of the single 2.0 release that ships mp and raul together."
+  },
+  "problem": {
+    "description": "mp's top-level command surface is a flat list of ~40 mixed nouns and verbs (init, brief, milestone, step, backlog, idea, decision, track, session, archive, restore, purge, groom, challenge, digest, note, delta, validate, sync, status, next, next-step, path, execution, git, ...). Verb-first and standalone commands (archive, restore, purge, groom, challenge, digest, note, delta) are inconsistent with the noun-first object commands (milestone, step, backlog), making the CLI hard to discover, teach, and remember. There is also a near-duplicate pair: mp next and mp next-step. Inspired by docker (docker container/network/image/volume + a small set of top-level lifecycle verbs), we want a consistently grouped CLI. This is a breaking change to the CLI surface and the CLI IS the agent/skill API, so it must be designed carefully and shipped as a 2.0 clean break with hard renames (no aliases); mp and raul ship together so raul is repointed in-lockstep."
+  },
+  "scope": {
+    "in_scope": [
+      "Audit the current ~40 top-level commands and classify each as object-group vs lifecycle verb",
+      "Produce a target command taxonomy/tree: object groups (plan, milestone, step, wp, brief, backlog, idea, decision, track, session, release, changelog) + a small set of top-level lifecycle verbs (init, validate, sync, doctor, status, next, path, execution, git)",
+      "Map every current command to its target path (e.g. archive/restore/purge -> <object> archive/restore; groom/challenge -> milestone groom/challenge; digest/note/delta/export -> report or <object>)",
+      "Hard-rename plan: every renamed verb is a hard rename (no aliases); raul shell-outs repointed in-lockstep since mp and raul ship together in the same 2.0 release (D-012)",
+      "Freeze the --format json output contract as the stable programmatic agent API (verb/grouping changes must NOT change JSON shapes)",
+      "Impact assessment across: master-planner SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md, golden scenario tests, integration tests, fixtures",
+      "Versioning decision: scope as a 2.0 clean-break major bump with no transition period",
+      "Open design question: ensure M36/M37 new commands (mp release, mp changelog) and M32-M35 new commands are named into the new taxonomy rather than retrofitted later",
+      "NOTE: this milestone is a design/planning stub; execution is M45 (depends on M38 design + M41 + M43 + M44): taxonomy, verb migration, raul repoint, docs+skill update, tests"
+    ],
+    "out_of_scope": [
+      "Changing --format json output shapes (the stable agent API; only verbs/grouping change)",
+      "GUI/TUI (CLI surface only)",
+      "Renaming the `mp` binary itself"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Target command taxonomy documented (object groups + top-level lifecycle verbs) with every current command mapped to a target path",
+      "verification": "manual: accepted - design doc review (docs/concepts CLI redesign doc)",
+      "status": "passed",
+      "evidence": "D-014 taxonomy ADR maps every current top-level command to its target object-group/lifecycle home; collapses mp next + next-step into one; names annotation as a first-class object group."
+    },
+    {
+      "id": "AC-02",
+      "description": "Rename strategy documented: every renamed verb is a HARD rename with no deprecated alias; raul shell-outs repointed in the same 2.0 release (per D-012, which supersedes D-011 clause 2)",
+      "verification": "manual: accepted - migration plan review",
+      "status": "passed",
+      "evidence": "D-015 hard-rename strategy: every renamed verb is a HARD rename with no deprecated alias; raul shell-outs (crates/raul/src/mp_runner.rs) repointed in-lockstep in M45 S4; D-011 clause 1 JSON-shape freeze reaffirmed."
+    },
+    {
+      "id": "AC-03",
+      "description": "Impact assessment covers SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md, golden scenarios, integration tests, fixtures, the raul source (mp_runner.rs shell-outs), and the docs/concepts/** tree",
+      "verification": "manual: accepted - impact doc review",
+      "status": "passed",
+      "evidence": "D-016 impact assessment covers master-planner SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md, golden scenarios, integration tests, fixtures, raul source, and the docs/concepts/** tree with per-surface change notes."
+    },
+    {
+      "id": "AC-04",
+      "description": "Versioning decision recorded (2.0 clean-break major bump, no deprecation/alias period, breaking jump from v1.4.0) as a decision/ADR",
+      "verification": "manual: accepted - decision log / ADR entry",
+      "status": "passed",
+      "evidence": "D-017 versioning decision: 2.0 clean-break major bump from v1.4.0, no deprecation/alias period, no transition window; D-012 alias mandate superseded."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Taxonomy & mapping",
+      "goal": "Target command taxonomy with every current command mapped to a target path",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Compatibility & impact",
+      "goal": "Hard-rename strategy and impact assessment across skills/docs/tests/fixtures/raul/docs",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Versioning decision",
+      "goal": "Record the 2.0 clean-break decision (no aliases, no transition period) as a decision/ADR",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Produce a target command taxonomy doc (object groups: plan, milestone, step, wp, brief, backlog, idea, decision, annotation, track, session, release, changelog + a small set of top-level lifecycle verbs) and map every current top-level command to its target path. Explicit decisions required: (a) collapse the near-duplicate mp next and mp next-step into one; (b) where annotation (from M43) sits in the tree as a first-class object group, not a retrofit; (c) verb-first standalone commands (archive, restore, purge, groom, challenge, digest, note, delta, export) mapped to object-group or lifecycle homes. Read M43 spec so the new mp annotation command is named into the taxonomy rather than retrofitted later.",
+      "files": [],
+      "tests": "manual: accepted - design doc review (docs/concepts CLI redesign doc)",
+      "done_when": "Target taxonomy documented with every current command mapped to a target path, including the next/next-step collapse decision and the annotation object group",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Document the rename strategy for the 2.0 clean break (per D-012, which supersedes D-011 clause 2): every renamed verb is a HARD rename with NO deprecated alias and NO transition period. Because mp and raul ship in the same 2.0 release, raul shell-outs (crates/raul/src/mp_runner.rs) are repointed to the new command names in the same change that renames them. Freeze --format json output shapes as the stable programmatic agent API (D-011 clause 1, still in force): verb/grouping changes must NOT change JSON shapes. List every command raul invokes today (status, list milestones, show milestone, next-step, path, idea create, digest, graph) and confirm each is repointed.",
+      "files": [],
+      "tests": "manual: accepted - rename plan review (no aliases, no deprecation timeline)",
+      "done_when": "Rename strategy documented: hard rename, no aliases, raul repointed in-lockstep, JSON-shape freeze (D-011 clause 1) reaffirmed; every raul-invoked command listed with its new name",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Produce an impact assessment covering: master-planner SKILL.md, AGENTS.md, MP-COMMANDS.md, AGENT-PLAYBOOK.md, EDGE-CASES.md, golden scenario tests, integration tests, fixtures, the raul source (crates/raul/src/**, esp. mp_runner.rs shell-out command names), and the docs/concepts/** tree. Per-surface change notes for each.",
+      "files": [],
+      "tests": "manual: accepted - impact doc review",
+      "done_when": "Impact assessment covers all listed surfaces including raul source and docs/concepts/**, with per-surface change notes",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Record the versioning decision (2.0 clean-break major bump, no deprecation/removal timeline, no alias period) as a decision log entry / ADR. Reference D-012 (alias mandate superseded) and the factual baseline that prior tags v1.0.0..v1.4.0 exist, so 2.0 is a breaking jump from v1.4.0.",
+      "files": [],
+      "tests": "manual: accepted - decision log / ADR entry",
+      "done_when": "Versioning decision recorded as an ADR: clean 2.0 break, no aliases, no transition period, breaking jump from v1.4.0",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-28",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

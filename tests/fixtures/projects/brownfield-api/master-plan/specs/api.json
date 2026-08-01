@@ -1,0 +1,37 @@
+{
+  "domain": {
+    "id": "api",
+    "summary": "Public and internal HTTP endpoints.",
+    "title": "HTTP API",
+    "updated": "2026-06-17",
+    "version": 1
+  },
+  "interface": {
+    "endpoints": [
+      {
+        "description": "Public liveness check",
+        "method": "GET",
+        "path": "/api/health"
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "id": "REQ-01",
+      "scenarios": [
+        "SC-01"
+      ],
+      "statement": "All /api/* routes require authentication unless documented public."
+    }
+  ],
+  "scenarios": [
+    {
+      "given": "No session token",
+      "id": "SC-01",
+      "priority": "P1",
+      "then": "401 Unauthorized",
+      "title": "Protected route rejects anonymous",
+      "when": "GET /api/user"
+    }
+  ]
+}

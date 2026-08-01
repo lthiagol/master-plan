@@ -1,0 +1,364 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "93"
+title = "Plan fragment operations — agents edit by id, never document shape"
+slug = "plan-fragment-operations-agents-edit-by-id-never-document-shape"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = ["92"]
+effort = "M"
+risk = "med"
+change_kind = ""
+priority = "high"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Coding agents plan by issuing small mp verbs (show/add/update/remove on acceptance criteria, steps, and work packages) and reading small JSON slices — never assembling milestone documents, never replacing whole arrays via milestone update, never thinking about file layout. Every mutator returns only the changed fragment; every read can target one AC or one step by stable id. Goal 2 of Master Plan is explicit: remove formatting responsibility from agents; mp owns persistence after M92 JSON-canonical storage."
+
+[problem]
+description = "Master Plan already enforces the pattern (goal 1) but agents still act as document editors for goal 2. Observed agent workflows during grooming and challenge sessions: (1) mp show milestone emits the full milestone (~hundreds of lines) when the agent only needed steps or one AC; (2) removing a deferred AC (e.g. after M91 supersedes M87 AC-04) has no command — agents must mp milestone update --json with a hand-built acceptance_criteria array; (3) criterion add and step add exist, but criterion update/remove and step remove do not; (4) mutators are inconsistent — criterion add returns one AC, but milestone update returns the whole milestone; (5) agents guess JSON shape when patching arrays, causing clobbered fields and validate failures. M79 added --fields for reads; M92 unifies on-disk JSON — but neither gives id-targeted fragment writes or safe deletes. Without fragment ops, agents worry about formatting; with them, agents state intent ('remove AC-04', 'update S3 action') and mp enforces coverage and schema."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Agent use case — spec read: mp milestone ac list/show <milestone> [AC-id] and mp milestone step show <milestone> <step-id> return one fragment without full milestone load in agent context (implementation may load internally)",
+    "Agent use case — spec groom: mp milestone ac update/remove; challenge finding resolves by removing deferred AC without rebuilding array",
+    "Agent use case — decompose: mp milestone step remove for discarded steps; mp milestone wp remove for empty/superseded WPs",
+    "Agent use case — execution: mp list steps --milestone <id> --fields projection documented; step show returns tests/done_when/covers_ac for one step",
+    "Extend --fields: acceptance_criteria[AC-03] and steps[S4] id selectors (in addition to index [])",
+    "mp milestone ac add (alias/wrapper of criterion add), ac update (description, verification), ac remove",
+    "mp milestone step remove <milestone> <step-id> with depends_on_steps and coverage guards",
+    "mp milestone wp remove <milestone> <wp-id> when no steps reference the WP",
+    "Normalize mutator stdout contract across ac/step/wp add/update/remove (fragment only)",
+    "mp milestone update guard: reject acceptance_criteria and steps in --json unless --replace-arrays",
+    "Update AGENTS.md, master-planner skill, MP-COMMANDS.md, AGENT-READINESS with fragment-first recipes and anti-patterns (no array rebuild)",
+    "Integration tests per use case; make test-scenarios if CLI help text changes",
+]
+out_of_scope = [
+    "JSON Patch / RFC 6902 generic patch endpoint",
+    "Fragment ops on ideas/backlog/tracks (separate artifact commands)",
+    "design_decision / open_question update/remove (follow-up track)",
+    "raul new subcommands (raul continues to shell to mp)",
+    "Changing milestone or step id assignment scheme",
+    "Bulk fragment ops across milestones (mp reviews finding resolve --all pattern is separate)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp milestone ac show 87 AC-03 returns JSON with only that acceptance criterion object (id, description, verification, status, evidence) — not the full milestone"
+verification = "crates/mp/tests/fragment_ac_read.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone step show on a milestone with steps returns JSON with only the requested step object (id, action, done_when, tests, covers_ac, work_package, status) — not the full milestone"
+verification = "crates/mp/tests/fragment_step_read.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp show milestone --fields with id selectors acceptance_criteria[AC-03] and steps by outline id project one element by stable id, not only numeric index"
+verification = "crates/mp/tests/fragment_projection.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = 'mp milestone ac update 87 AC-03 --description "…" updates one AC; stdout is { ok, acceptance_criterion } with changed fields only in the returned object'
+verification = "crates/mp/tests/fragment_ac_write.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = 'mp milestone ac remove fails with structured error listing covering steps when any step covers_ac includes the target AC; succeeds when uncovered and returns { ok, removed: "<ac-id>" }'
+verification = "crates/mp/tests/fragment_ac_write.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = 'mp milestone step remove fails when another step depends_on_steps includes the target; succeeds when safe; stdout returns { ok, step } or { ok, removed: "<step-id>" }'
+verification = "crates/mp/tests/fragment_step_write.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "mp milestone wp remove fails when steps still reference the work package; succeeds when empty"
+verification = "crates/mp/tests/fragment_wp_write.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "mp milestone update with acceptance_criteria or steps arrays in --json errors unless --replace-arrays; fragment commands remain the documented agent path"
+verification = "crates/mp/tests/fragment_update_guard.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "End-to-end grooming scenario: ac add → step add covering AC → ac remove blocked → step remove → ac remove succeeds — no milestone update array rebuild; mp validate green throughout"
+verification = "crates/mp/tests/fragment_groom_scenario.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-10"
+description = "AGENTS.md and master-planner skill document fragment-first agent recipes; cargo test -p mp exit 0"
+verification = "cargo test -p mp"
+status = "pending"
+evidence = ""
+
+[[design_decisions]]
+area = ""
+choice = "Strict guard: mp milestone update --json rejects acceptance_criteria and steps keys by default"
+rationale = "Goal 2 — agents must not rebuild document arrays. Everyday planning uses fragment commands (ac/step/wp add|update|remove). Hard error prevents accidental clobber; no soft deprecation."
+
+[[design_decisions]]
+area = ""
+choice = "Escape hatch: --replace-arrays on milestone update allows whole-array replacement for migration scripts and maintainer tools only"
+rationale = "M82/M92 rebaseline and one-off repairs need bulk array writes. Flag is explicit and auditable; agents and skills must not use it in normal grooming/execute flows."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Fragment reads"
+goal = "ac show, step show, --fields id selectors"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Fragment writes"
+goal = "ac/step/wp update/remove with guards and fragment stdout contract"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Update guard & groom scenario"
+goal = "Reject array rebuild on milestone update; end-to-end grooming flow"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Docs"
+goal = "AGENTS, master-planner, MP-COMMANDS, AGENT-READINESS"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement mp milestone ac show and ac list returning single-fragment JSON"
+files = [
+    "crates/mp/src/commands/milestone.rs",
+    "crates/mp/src/milestone.rs",
+]
+tests = "crates/mp/tests/fragment_ac_read.rs"
+done_when = "ac show returns only the requested acceptance_criterion object"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Implement mp milestone step show returning single step fragment JSON"
+files = ["crates/mp/src/step.rs"]
+tests = "crates/mp/tests/fragment_step_read.rs"
+done_when = "step show returns only the requested step object"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Extend --fields with acceptance_criteria[AC-id] and steps[S-id] id selectors"
+files = ["crates/mp/src/fields.rs"]
+tests = "crates/mp/tests/fragment_projection.rs"
+done_when = "Fields projection works by stable id not only numeric index"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Implement mp milestone ac update and ac remove with coverage guards; fragment-only stdout"
+files = ["crates/mp/src/milestone.rs"]
+tests = "crates/mp/tests/fragment_ac_write.rs"
+done_when = "ac update/remove return changed fragment or structured guard errors"
+status = "pending"
+covers_ac = [
+    "AC-04",
+    "AC-05",
+]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Implement mp milestone step remove with depends_on_steps guards"
+files = ["crates/mp/src/step.rs"]
+tests = "crates/mp/tests/fragment_step_write.rs"
+done_when = "step remove fails when referenced by deps; succeeds when safe"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Implement mp milestone wp remove when no steps reference the WP"
+files = ["crates/mp/src/wp.rs"]
+tests = "crates/mp/tests/fragment_wp_write.rs"
+done_when = "wp remove fails when steps still reference WP"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP3"
+order = 7
+action = "Guard mp milestone update: reject acceptance_criteria/steps arrays unless --replace-arrays"
+files = ["crates/mp/src/milestone.rs"]
+tests = "crates/mp/tests/fragment_update_guard.rs"
+done_when = "Array rebuild via milestone update errors without escape hatch"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP3"
+order = 8
+action = "End-to-end grooming scenario: ac add, step add, guarded removes, validate green throughout"
+files = ["crates/mp/tests/fragment_groom_scenario.rs"]
+tests = "crates/mp/tests/fragment_groom_scenario.rs"
+done_when = "Grooming flow completes without milestone update array rebuild"
+status = "pending"
+covers_ac = ["AC-09"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP4"
+order = 9
+action = "Document fragment-first recipes in AGENTS.md, master-planner, MP-COMMANDS, AGENT-READINESS"
+files = [
+    "AGENTS.md",
+    "templates/skills",
+    "docs",
+]
+tests = "manual: accepted — doc review"
+done_when = "Docs forbid array rebuild anti-pattern"
+status = "pending"
+covers_ac = ["AC-10"]
+depends_on_steps = ["S8"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S10"
+work_package = "WP-close"
+order = 10
+action = "cargo test -p mp; make test-scenarios if CLI help changed"
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp exit 0"
+status = "pending"
+covers_ac = ["AC-10"]
+depends_on_steps = ["S9"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

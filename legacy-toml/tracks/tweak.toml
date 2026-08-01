@@ -1,0 +1,272 @@
+[track]
+kind = "tweak"
+title = "Tweaks"
+perpetual = true
+scope = "Small improvements and polish; no new features."
+created = "2026-06-18"
+
+[[items]]
+id = "TW-01"
+title = "--version flag on mp CLI"
+status = "done"
+effort = "S"
+problem = "No way to check installed mp version"
+done_when = ""
+verification = "mp --version prints version from Cargo.toml"
+steps = []
+evidence = "mp --version prints 'mp 1.0.0'"
+created = "2026-06-18"
+completed = "2026-06-18"
+archived_at = ""
+
+[[items]]
+id = "TW-02"
+title = "Post-v1.4 cleanup: dead templates, perpetual bug, stale pilot docs"
+status = "done"
+effort = "S"
+problem = "Eight templates/views/*.md files are dead code (unused since M22); render_track_human hardcodes 'Perpetual: yes' regardless of the actual field; pilot docs have reached end-of-lifecycle (all findings resolved, all milestones done)."
+done_when = ""
+verification = "ls templates/views/*.md returns 0; render_track_human prints the actual perpetual field value; master-plan-pilot.md and master-plan-pilot-pending.md removed."
+steps = []
+evidence = "Removed 8 dead templates/views/*.md files; fixed render_track_human perpetual flag (now reads TrackMeta.perpetual); removed stale pilot docs (lifecycle complete). track_render_parity still green (test data has perpetual=true -> 'yes')."
+created = "2026-06-25"
+completed = "2026-06-25"
+archived_at = ""
+
+[[items]]
+id = "TW-03"
+title = "Show assigned backlog ID prominently in mp backlog add output"
+status = "pending"
+effort = "S"
+problem = "Field testing (lazybrew adoption, I-07) found mp backlog add output did not clearly surface the assigned B-xx ID, which led to an accidental duplicate B-01."
+done_when = "mp backlog add prints the assigned id on the first line of its confirmation output"
+verification = "crates/mp/tests test asserting mp backlog add confirmation output contains the assigned B-xx id"
+steps = []
+evidence = ""
+created = "2026-06-27"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-04"
+title = "Drop unused glob dependency from crates/mp/Cargo.toml"
+status = "done"
+effort = "S"
+problem = "glob = 0.3 is listed in crates/mp/Cargo.toml but is 100% unused: paths.rs hand-rolls glob_simple(), brownfield.rs passes --glob as a string to external tools, and there are zero use glob / glob:: anywhere in src/ or tests/. Dead weight left over from the M21 dep diet."
+done_when = "glob removed from crates/mp/Cargo.toml; cargo build --release -p mp green; cargo test -p mp green"
+verification = "cargo build --release -p mp && cargo test -p mp"
+steps = []
+evidence = "Completed in M47 S4: dropped unused glob dep"
+created = "2026-06-28"
+completed = "2026-06-29"
+archived_at = ""
+
+[[items]]
+id = "TW-05"
+title = "Drop unused glob crate dependency from mp"
+status = "archived"
+effort = "S"
+problem = "crates/mp/Cargo.toml declares glob = 0.3 but it is unused: no  or  import exists anywhere in crates/mp/src (glob_simple in paths.rs uses regex; the --glob strings in brownfield.rs are passed to an external tool, not the crate). Was briefly bundled into M41 S5 but it is a dependency-diet concern, not a human-output-removal concern, so it is tracked separately here."
+done_when = "glob dependency removed from crates/mp/Cargo.toml; cargo build --release -p mp green; no new imports needed"
+verification = "cargo build --release -p mp && grep -c '^glob' crates/mp/Cargo.toml returns 0"
+steps = []
+evidence = ""
+created = "2026-06-28"
+completed = ""
+archived_at = "2026-06-28T19:19:08.842187008+00:00"
+
+[[items]]
+id = "TW-06"
+title = "Drop unused glob crate dependency from mp"
+status = "done"
+effort = "S"
+problem = "crates/mp/Cargo.toml declares glob 0.3 but the crate is unused: there is no glob import anywhere in crates/mp/src. glob_simple in paths.rs is a custom helper built on the regex crate, and the --glob strings in brownfield.rs are arguments passed to an external tool, not uses of the glob crate. This was briefly bundled into M41 S5 but it is a dependency-diet concern, not a human-output-removal concern, so it is tracked separately here."
+done_when = "glob dependency removed from crates/mp/Cargo.toml; cargo build --release -p mp green; no new imports needed"
+verification = "cargo build --release -p mp and a Cargo.toml grep confirming glob is gone"
+steps = []
+evidence = "Duplicate of TW-04, already completed"
+created = "2026-06-28"
+completed = "2026-06-29"
+archived_at = ""
+
+[[items]]
+id = "TW-07"
+title = "Validate AC verification/tests fields are runnable or manual-literal"
+status = "done"
+effort = "S"
+problem = "M41/M44/M45 shipped 5 acceptance criteria whose 'verification' (and step 'tests') values glue human prose onto shell commands (e.g. 'cargo tree -p mp shows no ratatui/crossterm', 'cargo test -p mp + mp --help review ...', '... && manual raul smoke test'). mp milestone verify then fails to execute them. The AGENTS.md step-testing convention requires a single path/command or a 'manual: accepted — <reason>' literal, but nothing enforces it, so the mistake recurs."
+done_when = "mp validate emits a warning (or error, per interview) when a verification/tests value is neither a single clean command/path nor a 'manual:' literal; existing repo ACs audited and the 5 malformed M41/M44/M45 strings either corrected or marked manual."
+verification = "cargo test -p mp for the new validator + mp validate green on the repo"
+steps = []
+evidence = "Completed in M47 S11: verification field validator"
+created = "2026-06-29"
+completed = "2026-06-29"
+archived_at = ""
+
+[[items]]
+id = "TW-08"
+title = "mp milestone set-priority command"
+status = "done"
+effort = "S"
+problem = "There is no command to set a milestone's priority; mp milestone update --json ignores the priority field, so priorities cannot be changed via mp (only by hand-editing TOML, which violates the plan-write-via-mp rule). Add a set-priority command so milestones can be prioritized for execution sequencing."
+done_when = "mp milestone set-priority <id> <high|normal|low> sets the priority; it round-trips through mp show; unknown levels error."
+verification = "crates/mp/tests/milestone_priority.rs"
+steps = []
+evidence = "Added mp milestone set-priority <id> <urgent|high|normal|low>. Domain function in milestone.rs validates against VALID_PRIORITIES. 5 integration tests in milestone_priority.rs."
+created = "2026-07-01"
+completed = "2026-07-01"
+archived_at = ""
+
+[[items]]
+id = "TW-09"
+title = "mp track list surfaces individual items (id, title, status), not just group counts"
+status = "done"
+effort = "S"
+problem = "mp track list and mp list tracks return only group summaries (kind + total/pending/active counts) and omit individual track ids/titles/status. A user or agent cannot find a specific track's id from the list output — they must call mp track show <kind> and grep items[]. This is the same agent-read-ergonomics gap M79 addressed, on the track surface."
+done_when = "mp track list (and mp list tracks) include individual tracks with id, title, and status in their default output (or via an --items flag); a flat listing lets a caller find any track's id in one command."
+verification = "crates/mp/tests/track_listing.rs"
+steps = []
+evidence = "Added --items to mp track list and mp list tracks. When set, each track group includes individual items (id, title, status). Threaded --fields support through cmd_track. 4 tests in track_listing.rs."
+created = "2026-07-01"
+completed = "2026-07-01"
+archived_at = ""
+
+[[items]]
+id = "TW-10"
+title = "M88: add resolve --all to root AGENTS.md review table"
+status = "pending"
+effort = "S"
+problem = "Root AGENTS.md review findings table omits mp reviews finding resolve --all; playbook and AGENT-READINESS document it."
+done_when = "AGENTS.md review table lists batch resolve command"
+verification = "grep 'resolve.*--all' AGENTS.md && mp validate"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-11"
+title = "M88: test finding list summary with --open filter"
+status = "pending"
+effort = "S"
+problem = "agent_summary.rs does not assert summary block totals when mp reviews finding list --open is used."
+done_when = "test asserts summary.open/total on filtered finding list"
+verification = "cargo test -p mp --test agent_summary"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-12"
+title = "M54 deferred: behavioral review CLI/TUI tests (M86)"
+status = "pending"
+effort = "S"
+problem = "M54 AC-05/06/07 verified by static grep tests only; no fixture-based tests that approve/block/grooming delegate to mp and surface errors."
+done_when = "integration tests exercise review CLI and TUI review menu against fixture milestone"
+verification = "cargo test -p raul --test review_commands --test tui_review_actions"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-13"
+title = "M54 deferred: TUI set-dependency in review menu (M86)"
+status = "pending"
+effort = "S"
+problem = "M54 S11 promised set-dependency in TUI review menu; only CLI mp milestone set-dependency exists."
+done_when = "review menu includes set-dependency action wired to mp milestone update"
+verification = "cargo test -p raul --test tui_review_actions"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-14"
+title = "M54 deferred: refresh stale M54 AC evidence strings"
+status = "pending"
+effort = "S"
+problem = "M54 AC-01..04 evidence still references phantom tests from earlier passes; audit trail contradicts current test files."
+done_when = "all M54 AC evidence strings match runnable test commands or manual acceptance reasons"
+verification = "mp show milestone 54 --fields 'acceptance_criteria[].evidence' && mp validate"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-15"
+title = "M90: single-pass milestone load in build_inbox"
+status = "pending"
+effort = "S"
+problem = "build_inbox calls pending_reviews (full milestone scan) then load_all_milestones again in the main loop — redundant I/O on every inbox/status read."
+done_when = "build_inbox loads milestones once and derives execution-review items without a second full scan"
+verification = "cargo test -p mp --test review_discovery && cargo test -p mp --test inbox_phantoms"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-16"
+title = "M90: clarify inbox_count semantics after execution-review items added"
+status = "pending"
+effort = "S"
+problem = "mp status inbox_count now includes execution-review queue items; agents comparing before/after M90 may misread triage priority vs pending_review_count."
+done_when = "Documented whether inbox_count should include execution-review items or status exposes separate review_inbox_count"
+verification = "manual: accepted — AGENT-READINESS or status docs explain relationship between inbox_count and pending_review_count"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-17"
+title = "M90: document reviews status and inbox --filter in MP-COMMANDS.md"
+status = "pending"
+effort = "S"
+problem = "AGENT-READINESS updated but MP-COMMANDS.md still lacks mp reviews status and inbox filter presets (spec-review, execution-review, review)."
+done_when = "MP-COMMANDS.md documents mp reviews status, reviews pending --summary, and inbox --filter values"
+verification = "manual: accepted — MP-COMMANDS.md sections for reviews status and inbox --filter"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-18"
+title = "M90: dedupe review-queue test fixture helpers"
+status = "pending"
+effort = "S"
+problem = "write_done_milestone / write_spec_review_milestone duplicated between review_discovery.rs and reviews_queue.rs — drift risk when milestone schema changes."
+done_when = "Shared test helper module used by review_discovery and reviews_queue integration tests"
+verification = "cargo test -p mp --test review_discovery && cargo test -p mp --test reviews_queue"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""
+
+[[items]]
+id = "TW-19"
+title = "M90: execute checklist — set-spec-status verified before complete (G7)"
+status = "pending"
+effort = "S"
+problem = "M90 complete initially failed G7 (done requires spec_status verified); executor had to run set-spec-status verified manually after complete."
+done_when = "master-plan/AGENTS.md §3.3 execute recipe includes mp milestone set-spec-status <id> verified before complete when applicable"
+verification = "manual: accepted — master-plan/AGENTS.md execute flow mentions set-spec-status verified before complete"
+steps = []
+evidence = ""
+created = "2026-07-02"
+completed = ""
+archived_at = ""

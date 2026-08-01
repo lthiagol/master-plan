@@ -1,0 +1,167 @@
+{
+  "milestone": {
+    "id": "35",
+    "title": "Import & authoring smarts",
+    "slug": "import-authoring-smarts",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-06-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "mp can import plan content from existing markdown via --from-repo, and authoring milestones via JSON is reliable and well-documented."
+  },
+  "problem": {
+    "description": "Field testing (lazybrew adoption, I-04/I-05/I-06) found: (1) `mp init --from-repo` produced no charter draft or backlog candidates despite rich source material (status.md, backlog.md with B-xx items) - it appears to scan only source code; (2) `mp milestone create --json @-` via stdin heredoc did not populate structured fields, forcing a fallback to --file; (3) the JSON input schema is undocumented and the expected shape (separate top-level problem.description vs intent.problem) was discovered by trial and error. Inbox idea ID-01 (`mp milestone create --example`) is the same authoring-friction surface."
+  },
+  "scope": {
+    "in_scope": [
+      "--from-repo scans markdown docs (README, DESIGN, status, backlog) for goals, non-goals, and backlog candidates",
+      "Fix `mp milestone create --json @-` stdin pipe to populate structured fields (or document --file as preferred and remove the stdin footgun)",
+      "Document the milestone JSON input schema (intent.outcome + problem.description, scope, acceptance_criteria) in --help and docs",
+      "Optional: `mp milestone create --example` prints a schema-valid template (resolves idea ID-01)",
+      "Integration tests: from-repo markdown extraction; --json @- stdin round-trip; example output validates"
+    ],
+    "out_of_scope": [
+      "AI-summarization of source code into spec prose",
+      "Generic multi-format ingestion (PDF, issue trackers) - markdown only"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "On a repo with status.md/backlog.md, `mp init --from-repo` surfaces charter goal and backlog candidates",
+      "verification": "fixture repo from-repo test asserting non-empty suggestions",
+      "status": "passed",
+      "evidence": "init_from_repo_markdown tests pass; from-repo scans markdown for charter/backlog candidates"
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp milestone create --json @-` via stdin pipe populates intent/problem/scope/ACs correctly",
+      "verification": "stdin round-trip integration test",
+      "status": "passed",
+      "evidence": "milestone_create_stdin tests pass; stdin pipe populates structured fields"
+    },
+    {
+      "id": "AC-03",
+      "description": "The milestone JSON input schema is documented (docs + --help) and matches the accepted shape",
+      "verification": "manual: accepted - doc review against accepted JSON",
+      "status": "passed",
+      "evidence": "JSON input schema documented in --help and MP-COMMANDS.md"
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp milestone create --example` emits a schema-valid template",
+      "verification": "example output passes schema validation test",
+      "status": "passed",
+      "evidence": "milestone_create_example tests pass; --example emits schema-valid template"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Repo import",
+      "goal": "mp init --from-repo extracts charter goals and backlog candidates from markdown docs",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "JSON authoring",
+      "goal": "mp milestone create JSON authoring is reliable and documented, with a template helper",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extend mp init --from-repo to scan markdown docs (README, DESIGN, status.md, backlog.md) for charter goals, non-goals, and backlog candidates",
+      "files": [],
+      "tests": "cargo test -p mp --test init_from_repo_markdown",
+      "done_when": "On a repo with status.md/backlog.md, mp init --from-repo surfaces charter goal and backlog candidates",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Fix mp milestone create --json @- stdin pipe to populate intent/problem/scope/AC structured fields",
+      "files": [],
+      "tests": "cargo test -p mp --test milestone_create_stdin",
+      "done_when": "mp milestone create --json @- via stdin pipe populates structured fields correctly",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Document the milestone JSON input schema (intent.outcome, problem.description, scope, acceptance_criteria) in --help and docs",
+      "files": [],
+      "tests": "make test-scenarios",
+      "done_when": "Milestone JSON input schema documented and matches the accepted shape",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement mp milestone create --example printing a schema-valid template (resolves idea ID-01)",
+      "files": [],
+      "tests": "cargo test -p mp --test milestone_create_example",
+      "done_when": "mp milestone create --example emits a schema-valid template",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-27",
+    "branch": "",
+    "evidence": "All 4 steps done, all ACs passed, validate clean"
+  }
+}

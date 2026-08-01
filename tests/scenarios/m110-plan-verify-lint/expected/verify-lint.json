@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "warning_count": 1,
+  "warnings": [
+    {
+      "code": "W-VERIFY-LINT",
+      "milestone_file": "99-broad-scope-fixture.json",
+      "line": 27,
+      "field": "verification",
+      "pattern": "cargo[[:space:]]+test[[:space:]]+--workspace",
+      "value": "cargo test --workspace && mp validate"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "challenge": {
+    "id": "CH-149-01",
+    "milestone_id": "149",
+    "scope": "plan",
+    "status": "closed",
+    "created": "2026-07-10",
+    "closed": "2026-07-10",
+    "summary": ""
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "blocker",
+      "category": "gap",
+      "title": "B2: harness->argv construction undefined",
+      "description": "herdr agent start <name> -- <argv...> requires the FULL harness command. [agent.runner] harness='opencode' names a harness but S3 does not define where the command comes from. Different harnesses launch differently; no harness->command registry exists, so S3 is unimplementable beyond one hardcoded harness. Also the herdr integration must be installed (herdr integration install opencode) or nothing reports status — listed nowhere as a precondition. FIX: add harness-command registry (proposed M151) + integration-installed precondition check (proposed S0/doctor).",
+      "target": "S3",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-02",
+      "severity": "blocker",
+      "category": "risk",
+      "title": "B1: completion signal wrong for interactive agents",
+      "description": "S5 says wait_for_done(pane) blocks until herdr reports agent-status=done. The opencode bridge (~/.config/opencode/plugins/herdr-agent-state.js) only maps session status to idle/working — it NEVER reports done. herdr wait agent-status --status done blocks forever for opencode. Even idle is ambiguous (fires every turn mid-milestone). plan.json lifecycle (mp show --fields lifecycle: approved->in-progress->self-reviewed->reviewed) is the only unambiguous completion signal. FIX: flip S5/S7 so lifecycle polling is the primary gate; demote herdr agent-status to liveness/health only. Contradicts the polling-strategy design decision which already had the right answer.",
+      "target": "S5",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-03",
+      "severity": "blocker",
+      "category": "gap",
+      "title": "B3: config file path and schema wrong",
+      "description": "S1 says add [agent.runner] to ProjectConfig in crates/mp-model/src/config.rs. That file has NO ProjectConfig (only domain types Decisions/Brief/Ideas). The real ProjectConfig is in crates/mp/src/config.rs with sections workflow/output/display/ui/archive/next/git/planning. Also [agent.runner] needs a command/argv field (per B2), not just harness/model/thinking_level. thinking_level is harness-specific (opencode --model vs pi flags) with no consumer defined. FIX: correct S1 path to crates/mp/src/config.rs; add command field; defer per-harness model/thinking mapping to follow-up.",
+      "target": "S1",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-04",
+      "severity": "major",
+      "category": "risk",
+      "title": "S4: prompt-send readiness race",
+      "description": "Sending a prompt before the harness has booted silently drops it. Need to gate agent send on readiness: wait agent-status --status idle (or output-match on the harness prompt) BEFORE agent send. Spec does not gate send on readiness. FIX: add S4a readiness-gate step.",
+      "target": "S4",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-05",
+      "severity": "major",
+      "category": "risk",
+      "title": "S8: pane reuse vs L5 session-boundary",
+      "description": "Pane reuse across milestones conflicts with the mp-flow L5 session-boundary discipline: the runner execution session (stages 5-7) must close before the coordinator review session (stage 8) opens in a FRESH session, and stage-8 != stage-10 (re-review) sessions. FIX: state an explicit rule that pane reuse is per-role and the review loop (8->9->10) still enforces session boundaries; do not reuse one coordinator pane across stage 8 and stage 10.",
+      "target": "S8",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-06",
+      "severity": "major",
+      "category": "coverage",
+      "title": "S6: prompt tests are manual-only",
+      "description": "S6 tests='manual review (prompt template correctness)' violates the repo rule 'evidence is test output not prose' (AGENTS.md). FIX: add property/snapshot tests asserting each template interpolates a fixture milestone without panicking and contains required handoff-data fields.",
+      "target": "S6",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-07",
+      "severity": "major",
+      "category": "scope",
+      "title": "S7: reinvents mp execution check/status/report",
+      "description": "mp execution check/status/handoff/report already exist and own readiness + liveness derivation. S7 re-reads raw milestone JSON and re-derives readiness. FIX: S7 state machine should CALL mp execution check/status rather than duplicating the readiness/liveness logic.",
+      "target": "S7",
+      "status": "resolved",
+      "resolution": "Spec remediated directly via step/AC/design-decision fragments (S0,S1,S4,S5,S6,S7,S8 + AC-01/02/03 + 3 design decisions)",
+      "action": "no-change",
+      "action_ref": ""
+    }
+  ]
+}

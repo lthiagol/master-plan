@@ -1,0 +1,169 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "26"
+title = "CLI gap closures & error UX"
+slug = "cli-gap-closures-error-ux"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-24"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Common planning actions the schema already supports are reachable via CLI, and schema/validation errors are actionable."
+
+[problem]
+description = "Pilot M11/M12/M2/H5: `step update` lacks --depends-on-steps (schema has the field); no `plan principles add`; milestone create/update errors are cryptic (no field/path); interview checklist requires --id even for new-milestone interviews."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = []
+out_of_scope = [
+    "automatic depends_on_steps inference on decompose (backlogged)",
+    "an interactive milestone-create wizard UI",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp step update <m> <s> --depends-on-steps S1,S2 sets and persists the field with validation"
+verification = "set deps; mp show milestone shows depends_on_steps"
+status = "passed"
+evidence = "step_deps.rs test passes"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp plan principles add <text> appends to charter principles without hand-editing plan.toml"
+verification = "add a principle; mp plan show lists it"
+status = "passed"
+evidence = "plan_principles.rs test passes"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "milestone create/update validation errors include the JSON path/TOML field and hint at --example or the schema"
+verification = "submit out_of_scope at top level → error names scope.out_of_scope"
+status = "passed"
+evidence = "spec_errors.rs test passes; schema errors show field path and hint"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp interview checklist --checklist-type milestone --draft returns generic new-milestone questions without --id"
+verification = "manual: run without --id; get suggested questions, no 'milestone id required' block"
+status = "passed"
+evidence = "interview_draft.rs tests pass"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "CLI gaps & error UX"
+goal = "Expose already-supported schema fields via CLI and make validation errors actionable"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "step update: add a --depends-on-steps flag that sets, persists, and validates the depends_on_steps field"
+files = [
+    "crates/mp/src/step.rs",
+    "crates/mp/src/cli.rs",
+]
+tests = "crates/mp/tests/step_deps.rs: set deps via step update; mp show milestone shows depends_on_steps"
+done_when = "step update --depends-on-steps persists and validates step dependencies"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Add 'mp plan principles add <text>' to append to charter principles without hand-editing plan.toml"
+files = [
+    "crates/mp/src/charter.rs",
+    "crates/mp/src/cli.rs",
+]
+tests = "crates/mp/tests/plan_principles.rs: add a principle; mp plan show lists it"
+done_when = "plan principles add appends a principle visible in mp plan show"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Improve milestone create/update validation errors: include the JSON path / TOML field and hint at --example or the schema"
+files = [
+    "crates/mp/src/specs.rs",
+    "crates/mp/src/schema.rs",
+]
+tests = "crates/mp/tests/spec_errors.rs: submit out_of_scope at top level -> error names scope.out_of_scope"
+done_when = "Validation errors name the offending field/path and hint at --example or the schema"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 4
+action = "interview checklist: support a --draft mode that returns generic new-milestone questions without requiring --id"
+files = [
+    "crates/mp/src/interview.rs",
+    "crates/mp/src/cli.rs",
+]
+tests = "cargo test -p mp"
+done_when = "interview checklist --draft returns generic questions without --id"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-25"
+branch = ""
+evidence = "All 4 steps done, 4 ACs passed, full suite green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

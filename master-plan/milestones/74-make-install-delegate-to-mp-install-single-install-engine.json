@@ -1,0 +1,405 @@
+{
+  "milestone": {
+    "id": "74",
+    "title": "Make install: delegate to mp install + v1 harness trio (OpenCode, Cursor, Pi)",
+    "slug": "make-install-delegate-to-mp-install-single-install-engine",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "51",
+      "56",
+      "65",
+      "69"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-30",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Contributors run make install and get the exact same artifact tree, doctor checks, and remediation hints as mp install --dev --source <repo> --harness opencode,cursor,pi. v1 default install targets three harnesses: OpenCode, Cursor, and Pi (pi.dev). The Makefile is a thin build-and-invoke wrapper — no duplicated copy logic, harness paths, or shell rc guessing."
+  },
+  "problem": {
+    "description": "M51/M56 shipped mp install as the canonical install engine (binaries, env.sh, spec-grill, convention files, harness registry). make install still reimplements a parallel path with parity drift (no env.sh, stale PATH notes). Separately, pi is in the harness registry but with incorrect paths (~/.pi/skills/ vs official ~/.pi/agent/skills/) and wrong convention file (.pirules vs AGENTS.md at ~/.pi/agent/). Pi natively discovers ~/.agents/skills/ (shared with OpenCode) but also ~/.pi/agent/skills/ and loads global AGENTS.md from ~/.pi/agent/AGENTS.md. v1 install docs and make install only target OpenCode + Cursor. User request: from M74 onward, default install supports opencode, cursor, and pi."
+  },
+  "scope": {
+    "in_scope": [
+      "Makefile refactor: install targets call target/release/mp install/uninstall with --harness opencode,cursor,pi for default make install",
+      "Fix pi harness registry paths per pi.dev docs: global skills at ~/.pi/agent/skills/, project at .pi/skills/, global AGENTS.md at ~/.pi/agent/AGENTS.md (replace incorrect ~/.pi/skills/ and .pirules)",
+      "Extend HarnessDescriptor if needed: separate convention_path from skill_dir (pi convention lives in agent root, not under skill dir)",
+      "Deploy master-planner + spec-grill to pi native paths on mp install --harness pi; note ~/.agents/skills/ overlap with OpenCode (document, do not duplicate canonical skill source)",
+      "make install-pi target (or install-opencode,cursor,pi split targets) mirroring mp install --harness pi",
+      "scripts/install-summary.sh: human-friendly output from install JSON (path_snippet, doctor checks, harness list including pi)",
+      "mp install --toolkit-only flag if install-global must remain skills-free",
+      "Parity integration test: make install vs mp install --harness opencode,cursor,pi",
+      "make uninstall delegates to mp uninstall --purge",
+      "Update INSTALL.md, ADOPTION-CHECKLIST.md, README.md, AGENTS.md, master-planner skill compatibility section for Pi (skills + AGENTS.md + env.sh; link pi.dev docs)",
+      "Remove stale install-cursor note and double build-release",
+      "Doctor checks for pi harness: skill at ~/.pi/agent/skills/master-planner/SKILL.md, AGENTS.md at ~/.pi/agent/AGENTS.md when pi in installed harness set"
+    ],
+    "out_of_scope": [
+      "Pi extensions (~/.pi/agent/extensions/) — skills-only integration for v1; extensions are user-authored TypeScript modules",
+      "Pi npm/git package install (pi install command) — we deploy flat SKILL.md trees, not pi packages",
+      "Auto-editing ~/.zshrc, ~/.bashrc, or harness settings.json",
+      "Windows PATH setup",
+      "Homebrew formula changes",
+      "Human install output in raul",
+      "Other registry harnesses (claude-code, gemini, codex, windsurf, cline) — remain in registry but not v1 default install",
+      "Changing mp install CLI default from opencode (make install passes explicit opencode,cursor,pi)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "make install deploys env.sh, bin/raul, spec-grill, and master-planner for opencode+cursor+pi — parity with mp install --dev --source <repo> --harness opencode,cursor,pi",
+      "verification": "crates/mp/tests/make_install_parity.rs",
+      "status": "passed",
+      "evidence": "make_install_parity + install_registry"
+    },
+    {
+      "id": "AC-02",
+      "description": "Pi harness registry paths match pi.dev: ~/.pi/agent/skills/master-planner/SKILL.md, ~/.pi/agent/AGENTS.md convention, .pi/skills/ project path; doctor verifies when pi harness installed",
+      "verification": "crates/mp/tests/harness_registry.rs",
+      "status": "passed",
+      "evidence": "harness_registry + install_pi_harness_doctor_reports_artifacts"
+    },
+    {
+      "id": "AC-03",
+      "description": "make uninstall removes the same artifacts mp uninstall --purge would remove from a make install",
+      "verification": "crates/mp/tests/make_install_parity.rs",
+      "status": "passed",
+      "evidence": "make_install_parity uninstall roundtrip"
+    },
+    {
+      "id": "AC-04",
+      "description": "make install output reflects doctor PATH status (no unconditional not-on-PATH when mp resolves on PATH)",
+      "verification": "crates/mp/tests/make_install_parity.rs",
+      "status": "passed",
+      "evidence": "install-summary PATH remediation test"
+    },
+    {
+      "id": "AC-05",
+      "description": "Makefile contains no manual cp of mp/raul/templates to INSTALL_DIR; install targets invoke TARGET only",
+      "verification": "manual: accepted — Makefile review",
+      "status": "passed",
+      "evidence": "Makefile delegates to mp install only"
+    },
+    {
+      "id": "AC-06",
+      "description": "INSTALL.md documents OpenCode, Cursor, and Pi harness setup; README and skill template link to valid doc paths",
+      "verification": "manual: accepted — docs link check",
+      "status": "passed",
+      "evidence": "INSTALL.md README ADOPTION-CHECKLIST skill Pi trio"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Bootstrap: make build-release then $(TARGET) install — not circular",
+      "rationale": "Makefile is orchestration only; mp install is single source of truth"
+    },
+    {
+      "area": "",
+      "choice": "Always pass --dev --source $(ROOT) from repo Makefile",
+      "rationale": "Ensures fresh target/release binaries and repo asset tree, not stale global mp"
+    },
+    {
+      "area": "",
+      "choice": "Human install UX via scripts/install-summary.sh parsing JSON",
+      "rationale": "M41 keeps mp JSON-only; thin shell wrapper avoids expanding mp output surface for dev-repo path"
+    },
+    {
+      "area": "",
+      "choice": "v1 default install harness set: opencode, cursor, pi (not all 8 registry entries)",
+      "rationale": "User-facing v1 targets three harnesses; others remain in registry for mp install --harness but are not make install defaults"
+    },
+    {
+      "area": "",
+      "choice": "Pi skills at ~/.pi/agent/skills/; conventions at ~/.pi/agent/AGENTS.md per pi.dev",
+      "rationale": "Current registry uses wrong paths (~/.pi/skills/, .pirules); pi loads AGENTS.md from agent root and skills from agent/skills or ~/.agents/skills/"
+    },
+    {
+      "area": "",
+      "choice": "Pi extensions out of scope — skills-only v1 integration",
+      "rationale": "Extensions are TypeScript modules in ~/.pi/agent/extensions/; master-planner is an Agent Skill (SKILL.md), not an extension"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Pi harness registry & convention paths",
+      "goal": "Fix pi.dev paths and deploy AGENTS.md to ~/.pi/agent/",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "mp install --toolkit-only",
+      "goal": "Preserve install-global semantics without harness skill deploy",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Makefile delegation & parity tests",
+      "goal": "make install/uninstall invoke mp; human summary script; integration tests",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Docs: v1 harness trio",
+      "goal": "INSTALL.md + README + skill for OpenCode, Cursor, Pi",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extend HarnessDescriptor: add global_convention_path (Option); fix pi entry per pi.dev — global_skill_dir ~/.pi/agent/skills/master-planner, project_skill_dir .pi/skills/master-planner, convention ~/.pi/agent/AGENTS.md; update print_paths JSON and harness_registry tests",
+      "files": [
+        "crates/mp/src/harness.rs",
+        "crates/mp/tests/harness_registry.rs"
+      ],
+      "tests": "crates/mp/tests/harness_registry.rs",
+      "done_when": "mp install --print-paths --harness pi emits ~/.pi/agent/ paths",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update deploy_convention in install.rs to use harness global_convention_path when set (pi AGENTS.md at agent root, not under skill dir)",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/harness.rs"
+      ],
+      "tests": "crates/mp/tests/install_registry.rs",
+      "done_when": "mp install --harness pi deploys ~/.pi/agent/AGENTS.md and ~/.pi/agent/skills/master-planner/SKILL.md",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Doctor: verify pi harness artifacts (skill + AGENTS.md) when pi in installed harness set; extend doctor_registry tests",
+      "files": [
+        "crates/mp/src/doctor.rs",
+        "crates/mp/tests/doctor_registry.rs"
+      ],
+      "tests": "crates/mp/tests/doctor_registry.rs",
+      "done_when": "doctor reports pi skill and convention checks",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add mp install --toolkit-only flag: deploy bin/env.sh/templates only, skip harness skill and convention deploy",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/install.rs",
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "crates/mp/tests/install_registry.rs",
+      "done_when": "mp install --toolkit-only creates bin/env.sh without skill dirs",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1.1.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Add scripts/install-summary.sh: parse mp install JSON; print harnesses, doctor PATH status, env.sh hint",
+      "files": [
+        "scripts/install-summary.sh"
+      ],
+      "tests": "manual: accepted — install summary script review",
+      "done_when": "script prints doctor-backed PATH status",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Rewrite Makefile: delegate install/uninstall to mp; harness opencode,cursor,pi; pipe JSON to install-summary.sh",
+      "files": [
+        "Makefile"
+      ],
+      "tests": "manual: accepted — Makefile review",
+      "done_when": "Makefile has no manual cp to INSTALL_DIR",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Add make_install_parity.rs: make install vs mp install tree; uninstall roundtrip; PATH summary",
+      "files": [
+        "crates/mp/tests/make_install_parity.rs"
+      ],
+      "tests": "crates/mp/tests/make_install_parity.rs",
+      "done_when": "parity tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Update INSTALL.md: v1 harness trio, pi paths, env.sh, make install table; fix doc path references",
+      "files": [
+        "docs/concepts/02 - Getting Started/INSTALL.md"
+      ],
+      "tests": "manual: accepted — docs review",
+      "done_when": "INSTALL.md documents all three harnesses",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Update README, ADOPTION-CHECKLIST, AGENTS.md, master-planner SKILL.md: v1 trio and valid doc links",
+      "files": [
+        "README.md",
+        "docs/concepts/02 - Getting Started/ADOPTION-CHECKLIST.md",
+        "AGENTS.md",
+        "templates/skills/master-planner/SKILL.md"
+      ],
+      "tests": "manual: accepted — docs link check",
+      "done_when": "doc links resolve and Pi in skill compatibility",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP-close",
+      "order": 10,
+      "action": "Closure: cargo test install/parity/harness suites; mp validate; dogfood make install in temp INSTALL_DIR",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "all M74 step tests pass and mp validate clean",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

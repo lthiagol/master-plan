@@ -1,0 +1,313 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "79"
+title = "Agent ergonomics — JSON projection, structured filters, summary rollups, bulk review ops"
+slug = "agent-ergonomics-json-projection-structured-filters-summary-rollups-bulk-review-ops"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-01"
+updated = "2026-07-01"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "Agents using mp run tight read/loop workflows without shelling out to python3/jq to slice JSON, fanning out N subprocess calls to classify artifacts, recomputing rollups, or looping bulk writes. The common agent patterns observed during the 2026-07-01 review-backlog sweep (project fields, filter artifacts, aggregate, bulk-resolve reviews, triage a queue) are first-class mp commands."
+
+[problem]
+description = "During the 2026-07-01 review-backlog sweep the agent wrapped nearly every mp JSON emit in ad-hoc shell glue: (1) python3 to project one or two fields because mp emits whole objects (~15 occurrences; idea ID-08); (2) a 66-call python loop over `mp show milestone` to classify reviews by evidence text, because there is no structured filter and no bulk detail in one call; (3) python Counter to roll up validate warnings by code and reviews by month, because mp has no summary mode; (4) a 66-call python loop of `mp reviews pass` because there is no bulk resolve. mp is agent-only JSON, so these recurring agent reads/writes should be first-class. Each ad-hoc glue is a drift risk (guessing JSON keys) and a clarity/perf cost."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "JSON projection: --fields a.b.c on read commands (show/list/status/validate/reviews) — promotes idea ID-08",
+    "Structured filters: list milestones --where <field><op><value> and --filter <preset> (force-bypassed, spec-status=…); plus bulk detail (--include steps/acs) so agents don't fan out",
+    "Summary/rollup modes: mp validate --summary (counts by code), mp reviews pending --group-by <field>",
+    "Bulk review resolve: mp reviews pass --all --filter <preset> --verdict --reviewer --notes (sequential under the hood, per-item results)",
+    "Review-sweep/triage: mp reviews sweep classifies the pending queue into force-bypassed / manual-only / runnable buckets with counts + IDs (productizes the manual 2026-07-01 triage)",
+]
+out_of_scope = [
+    "raul human-surface changes — these are agent ergonomics; raul is a separate surface",
+    "Changing the default emission format (JSON stays default; projection/filter/summary are opt-in flags)",
+    "Rewriting the data model or persistence layer",
+    "Automating the per-AC deep-review process itself (that is review process, not ergonomics)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "--fields projects one or more dotted JSON paths on every read command that emits JSON (show/list/status/validate/reviews), returning only the projected fields"
+verification = "crates/mp/tests/agent_projection.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "list milestones --filter <preset> (e.g. force-bypassed) and --where <field><op><value> return only matching milestones in a single call, and --include steps/acs embeds full detail so no fan-out is needed"
+verification = "crates/mp/tests/agent_filters.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp validate --summary returns ok/error counts and warnings grouped by code; mp reviews pending --group-by <field> returns grouped counts"
+verification = "crates/mp/tests/agent_summary.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp reviews pass --all --filter <preset> --verdict --reviewer --notes resolves a batch in one command (sequential internally, no parallelize risk) and prints a per-item result summary"
+verification = "crates/mp/tests/reviews_bulk.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp reviews sweep classifies the pending queue into force-bypassed / manual-only / runnable buckets with counts and IDs, built on the filter + summary primitives"
+verification = "crates/mp/tests/reviews_sweep.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "mp scratch path prints (creating if absent) a gitignored in-repo scratch directory; mp scratch new <label> creates a unique subdirectory under it; AGENTS.md and the master-planner skill instruct agents to stage scratch via mp scratch instead of reaching for /tmp"
+verification = "crates/mp/tests/scratch.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[design_decisions]]
+area = ""
+choice = "--fields accepts dotted JSON paths (e.g. milestone.spec_status, steps[].status); arrays via [i] or [] (all elements); unknown path is a HARD error (exit non-zero naming the bad path), never a silent omit; output mirrors the requested paths."
+rationale = "Agents depend on exact field names; silently omitting a misspelled path would mask mistakes - the very drift risk this milestone removes. Mirroring requested paths in output keeps projections composable."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "JSON projection (--fields)"
+goal = "Agents project specific JSON fields on read commands without slicing in shell"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Structured filters + bulk detail"
+goal = "Agents filter artifacts by field/preset and fetch full detail in one call"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Summary / rollup modes"
+goal = "Agents get counts and group-by without recomputing in shell"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Bulk review resolve"
+goal = "Agents resolve a batch of reviews in one command"
+rollback = ""
+
+[[work_packages]]
+id = "WP5"
+name = "Review-sweep / triage"
+goal = "Agents get a risk-bucketed work-plan of the pending review queue"
+rollback = ""
+
+[[work_packages]]
+id = "WP6"
+name = "In-repo scratch (mp scratch)"
+goal = "Agents get/put scratch files in-repo without external /tmp"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement --fields dotted-path projection across read emitters (show, list milestones, status, validate, reviews pending); output mirrors requested paths"
+files = []
+tests = "crates/mp/tests/agent_projection.rs"
+done_when = "Projecting milestone.spec_status on `mp show milestone <id>` returns only that field across all read commands"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Projection semantics: array indexing ([i] and [] all-elements); hard-error on unknown path, naming the offending path in the message"
+files = []
+tests = "crates/mp/tests/agent_projection.rs"
+done_when = "Arrays indexable; unknown path exits non-zero and names the bad path"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Add --filter <preset> (force-bypassed, spec-status=ready/planned) and --where <field><op><value> (ops ~= == !=) to list milestones, evaluated in one call"
+files = []
+tests = "crates/mp/tests/agent_filters.rs"
+done_when = "`--filter force-bypassed` returns exactly the force-bypassed milestones in one call"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add --include <steps|acceptance_criteria|evidence> to list milestones so agents fetch full detail without N fan-out calls"
+files = []
+tests = "crates/mp/tests/agent_filters.rs"
+done_when = "list milestones --include steps returns steps inline per milestone"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Add --summary to validate (ok/error counts + warnings grouped by code) and --group-by <field> to reviews pending (e.g. completed_at month)"
+files = []
+tests = "crates/mp/tests/agent_summary.rs"
+done_when = "validate --summary emits counts-by-code; reviews pending --group-by month emits per-group counts"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP4"
+order = 6
+action = "Add --all/--filter/--verdict/--reviewer/--notes to reviews pass; resolve sequentially under the hood (reuse per-milestone write) and print a per-item pass/fail summary"
+files = []
+tests = "crates/mp/tests/reviews_bulk.rs"
+done_when = "reviews pass --all --filter force-bypassed --verdict ok resolves the matching set in one command with a result summary"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP5"
+order = 7
+action = "Add reviews sweep (alias: triage) that buckets pending reviews into force-bypassed / manual-only / runnable with counts and IDs, built on the WP2 filters and WP3 summary primitives"
+files = []
+tests = "crates/mp/tests/reviews_sweep.rs"
+done_when = "sweep output buckets the current pending queue; counts match a fresh manual triage"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP6"
+order = 8
+action = "Implement mp scratch path (prints and creates the in-repo gitignored scratch dir, resolved relative to project root / MP_HOME) and mp scratch new <label> (unique subdir under it); add the scratch dir to .gitignore"
+files = []
+tests = "crates/mp/tests/scratch.rs"
+done_when = "mp scratch path prints an existing in-repo dir; mp scratch new foo creates a unique subdir; the dir is gitignored"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP6"
+order = 9
+action = "Document the scratch convention in AGENTS.md and the master-planner skill so agents stage scratch via mp scratch path/new instead of /tmp"
+files = []
+tests = "manual: accepted - AGENTS.md + skill text review"
+done_when = "AGENTS.md and skill text instruct agents to use mp scratch for in-repo scratch files"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-01"
+branch = ""
+evidence = "milestone complete"
+
+[[findings]]
+id = "F-01"
+severity = "high"
+category = "correctness"
+description = "filter silent default (fixed)"
+status = "fixed"
+author = "reviewer-x"
+fixed_in = "75bb3b2"
+created = "2026-07-01"
+resolved = "2026-07-01"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

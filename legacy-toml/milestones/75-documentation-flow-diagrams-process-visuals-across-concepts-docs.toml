@@ -1,0 +1,285 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "75"
+title = "Documentation flow diagrams — process visuals across concepts docs"
+slug = "documentation-flow-diagrams-process-visuals-across-concepts-docs"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Readers grasp key Master Plan workflows at a glance via mermaid diagrams in concept docs, plus a dedicated RAUL.md human entry guide — without duplicating M48 static model diagrams or maintaining parallel methodology prose."
+
+[problem]
+description = "M48 shipped static resource/anatomy/command-hierarchy diagrams in SPEC.md and MP-COMMANDS.md, but most *process* flows remain ASCII boxes or prose-only. Dogfooding M70 handoff showed the gap: a sequence diagram made the ceremony click instantly. EXECUTION-MODES, AGENT-PLAYBOOK, PM-WORKFLOWS, INSTALL, and post-M64 execute→review→remediate are high-traffic paths with weak visual affordances. No catalog ties diagram type to doc purpose (sequence for ceremonies, flowchart for pipelines, graph for data — per M48)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Audit docs/concepts/** and produce a prioritized flow-diagram backlog (doc, flow name, recommended diagram type, audience)",
+    "Add docs/concepts/00-Concepts.md visual index section linking each diagram to its home doc",
+    "Diagram style guide snippet: when to use sequenceDiagram vs flowchart vs graph TD vs keep ASCII",
+    "Audience routing model: shared concepts, mp agent commands, raul human display (single-source policy)",
+    "docs/concepts/02 - Getting Started/RAUL.md — human PM entry guide (routes to concepts; daily raul commands; links TUI walkthrough; MP-COMMANDS section 22 becomes pointer)",
+    "EXECUTION-MODES.md: handoff ceremony sequence (check → handoff → baseline → diff → pause) reflecting M70 baseline",
+    "AGENT-PLAYBOOK.md or EXECUTION-MODES: execute → review → remediate loop (M64) + agent session start flow",
+    "PM-WORKFLOWS.md: upgrade intake funnel ASCII to flowchart (or hybrid) where it improves scanability",
+    "INSTALL.md: harness install path diagram (make/mp → harness registry → doctor)",
+    "WALKTHROUGH.md: cross-link new handoff/diff commands where M03 timeline references handoff",
+    "Broken/stale diagram audit: verify existing mermaid in SPEC, WALKTHROUGH, MP-COMMANDS still renders and matches shipped commands",
+]
+out_of_scope = [
+    "Replacing M48 resource/anatomy/command-hierarchy diagrams (maintain only if drift found)",
+    "Full prose rewrite of every concepts doc",
+    "raul TUI screenshots or interactive diagrams",
+    "Clap-derived command table generation (parked as idea ID-10)",
+    "Diagrams inside plan milestone TOML or skill template (docs zone only unless one-line cross-link)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Visual index in 00-Concepts.md lists every shipped flow diagram with doc link and diagram type"
+verification = "manual: accepted — docs link and mermaid render review"
+status = "passed"
+evidence = "00-Concepts visual index + style guide + audit table; links fixed to AGENT-PLAYBOOK §9 and EXECUTION-MODES §5.1"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "EXECUTION-MODES documents handoff baseline + plan diff flow with valid mermaid sequenceDiagram"
+verification = "manual: accepted — mermaid render + command accuracy review"
+status = "passed"
+evidence = "EXECUTION-MODES §5.1 sequenceDiagram: check, handoff, baseline, plan diff, pause, handoff-show"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "Execute→review→remediate and agent session-start flows documented with diagrams in AGENT-PLAYBOOK or EXECUTION-MODES"
+verification = "manual: accepted — mermaid render review"
+status = "passed"
+evidence = "AGENT-PLAYBOOK §9: execute→review→remediate sequence + session-start flowchart; reviews pass flags accurate"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "INSTALL.md and PM-WORKFLOWS include at least one new process diagram each; existing SPEC/WALKTHROUGH mermaid validated for drift"
+verification = "manual: accepted — docs audit checklist"
+status = "passed"
+evidence = "PM-WORKFLOWS funnel + INSTALL harness flowchart; MP-COMMANDS drift: plan diff, reviews, handoff-show/report"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "RAUL.md human PM entry guide in Getting Started: routes to concepts, daily raul commands, TUI walkthrough; MP-COMMANDS section 22 points to RAUL.md"
+verification = "manual: accepted — docs link and human PM review"
+status = "passed"
+evidence = "RAUL.md human PM entry; MP-COMMANDS §22 pointer; Getting Started README + 00-Concepts links"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Audit, visual index, audience model"
+goal = "Catalog flows, add 00-Concepts visual index + diagram style guide + human/agent doc routing"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Execution and agent flows"
+goal = "Handoff, review loop, session-start diagrams in EXECUTION-MODES and AGENT-PLAYBOOK"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "PM and install flows"
+goal = "PM funnel and install/harness diagrams"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Drift pass, raul index, and RAUL.md"
+goal = "Validate mermaid drift; index raul docs; author Getting Started RAUL.md human entry guide"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Audit docs/concepts: list every process flow, target doc, diagram type, audience; note raul doc gap"
+files = []
+tests = "manual: accepted — docs audit review"
+done_when = "Audit table exists in 00-Concepts or linked doc"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Add 00-Concepts visual index + diagram style guide + audience routing (concepts shared, mp agent, raul human, single-source policy)"
+files = []
+tests = "manual: accepted — docs review"
+done_when = "Index links diagrams; routing documents maintenance model"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "EXECUTION-MODES: sequenceDiagram for handoff check baseline plan diff handoff-show pause per M70"
+files = []
+tests = "manual: accepted — mermaid render review"
+done_when = "Sequence renders; commands accurate"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "AGENT-PLAYBOOK: execute review remediate sequence + session-start flowchart"
+files = []
+tests = "manual: accepted — mermaid render review"
+done_when = "Diagrams present; cross-linked from EXECUTION-MODES"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "PM-WORKFLOWS: upgrade intake funnel to flowchart"
+files = []
+tests = "manual: accepted — mermaid render review"
+done_when = "Funnel diagram renders"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "INSTALL harness install flow diagram; WALKTHROUGH cross-links handoff and plan diff"
+files = []
+tests = "manual: accepted — docs review"
+done_when = "Install diagram and walkthrough links present"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP4"
+order = 7
+action = "Drift pass: validate SPEC WALKTHROUGH MP-COMMANDS mermaid vs shipped commands"
+files = []
+tests = "manual: accepted — mermaid drift checklist"
+done_when = "Existing diagrams accurate post-M70 M74"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP4"
+order = 8
+action = "Raul docs index: 00-Concepts links raul-tui-walkthrough and MP-COMMANDS section 22; Getting Started human PM entry"
+files = []
+tests = "manual: accepted — docs link check"
+done_when = "Human reader finds raul path without grep"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8.1"
+work_package = "WP4"
+order = 9
+action = "Author docs/concepts/02 - Getting Started/RAUL.md: human PM entry (what raul is, daily commands, links to concepts workflows, TUI walkthrough); slim MP-COMMANDS section 22 to pointer; link from 00-Concepts and Getting Started README"
+files = []
+tests = "manual: accepted — human PM doc review"
+done_when = "Human PM can onboard from RAUL.md without reading MP-COMMANDS; no duplicated methodology prose"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = ["S8"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

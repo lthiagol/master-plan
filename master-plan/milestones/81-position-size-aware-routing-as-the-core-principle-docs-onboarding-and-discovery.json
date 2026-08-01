@@ -1,0 +1,178 @@
+{
+  "milestone": {
+    "id": "81",
+    "title": "Position size-aware routing as the core principle — docs, onboarding, and discovery",
+    "slug": "position-size-aware-routing-as-the-core-principle-docs-onboarding-and-discovery",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "92"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-01",
+    "updated": "2026-07-04",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "The first thing a new user (human or agent) learns about mp is the size-aware intake model: the right artifact for the right size of work (track for a small fix, milestone for a feature, idea to park, backlog to defer). Size-awareness is framed everywhere — README, getting-started, concept docs — as mp's core differentiating principle, not a footnote in an AGENTS.md routing table."
+  },
+  "problem": {
+    "description": "mp's strongest differentiator is its size-aware intake routing (idea / track / backlog / milestone / bugfix, plus full/hybrid/minimal profiles). Böckeler's Oct 2025 review of Kiro/spec-kit/Tessl identifies the lack of size-appropriate workflows as THE missing capability in SDD tooling ('one workflow to fit all sizes? ... an effective SDD tool would have to provide flexibility for a few different core workflows, for different sizes and types of changes'), and mocks tools that turn a one-line bug into 16 acceptance criteria. mp already solves this but buries it: onboarding teaches milestones first, the routing table lives inside AGENTS.md, and there is no published decision guide. As a result users reach for a milestone on a tiny fix — the exact anti-pattern mp exists to prevent. This milestone makes the existing capability legible and central. Pure docs/positioning, no routing-logic changes."
+  },
+  "scope": {
+    "in_scope": [
+      "Rewrite getting-started / onboarding so size-to-artifact routing (track vs milestone vs idea vs backlog) is taught FIRST, before milestone mechanics",
+      "Publish a routing decision guide (clarity x size 2x2 or flowchart) mapping problem shape to the recommended artifact",
+      "Update README and concept docs to frame size-awareness as mp's core differentiating principle",
+      "Add cross-links so every milestone doc nudges small work toward tracks and unclear/later work toward ideas"
+    ],
+    "out_of_scope": [
+      "New artifact types or changes to the intake routing logic (routing already exists and works)",
+      "An automated 'where does this belong?' recommender command (separate future idea)",
+      "The raul TUI rework (tracked separately)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Getting-started / onboarding documentation leads with size-to-artifact routing before milestone mechanics",
+      "verification": "manual: accepted - onboarding doc review",
+      "status": "passed",
+      "evidence": "S1-S4 done in commit 96a9c4e. Routing decision guide (SIZE-ROUTING.md) live, with verified cross-links from AGENT-QUICKSTART.md, 00-Concepts.md, README.md, AGENT-PLAYBOOK.md, EXECUTION-PATH.md, PM-WORKFLOWS.md, ADOPTION-CHECKLIST.md, and Getting Started README.md. mp validate: 0 errors, 0 warnings."
+    },
+    {
+      "id": "AC-02",
+      "description": "A published routing decision guide maps problem shape (clarity x size) to the recommended artifact (track/milestone/idea/backlog)",
+      "verification": "manual: accepted - guide review",
+      "status": "passed",
+      "evidence": "S1-S4 done in commit 96a9c4e. Routing decision guide (SIZE-ROUTING.md) live, with verified cross-links from AGENT-QUICKSTART.md, 00-Concepts.md, README.md, AGENT-PLAYBOOK.md, EXECUTION-PATH.md, PM-WORKFLOWS.md, ADOPTION-CHECKLIST.md, and Getting Started README.md. mp validate: 0 errors, 0 warnings."
+    },
+    {
+      "id": "AC-03",
+      "description": "README and concept docs frame size-awareness as mp's core differentiating principle, not a footnote",
+      "verification": "manual: accepted - docs review",
+      "status": "passed",
+      "evidence": "S1-S4 done in commit 96a9c4e. Routing decision guide (SIZE-ROUTING.md) live, with verified cross-links from AGENT-QUICKSTART.md, 00-Concepts.md, README.md, AGENT-PLAYBOOK.md, EXECUTION-PATH.md, PM-WORKFLOWS.md, ADOPTION-CHECKLIST.md, and Getting Started README.md. mp validate: 0 errors, 0 warnings."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Onboarding & routing guide",
+      "goal": "Getting-started rewrite and routing decision guide",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Positioning & cross-links",
+      "goal": "README and concept docs frame size-awareness as core principle",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Rewrite getting-started/onboarding to teach size-to-artifact routing before milestone mechanics",
+      "files": [
+        "docs/concepts"
+      ],
+      "tests": "manual: accepted — onboarding doc review",
+      "done_when": "Onboarding leads with track vs milestone vs idea vs backlog",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Publish routing decision guide (clarity x size flowchart) mapping problem shape to artifact",
+      "files": [
+        "docs/concepts"
+      ],
+      "tests": "manual: accepted — guide review",
+      "done_when": "Decision guide published and linked from onboarding",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Update README and concept docs to position size-awareness as mp core differentiator; add cross-links nudging small work to tracks",
+      "files": [
+        "README.md",
+        "docs/concepts"
+      ],
+      "tests": "manual: accepted — docs review",
+      "done_when": "Size-awareness is headline principle in README and concepts",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-close",
+      "order": 4,
+      "action": "Review all doc links and cross-references for routing consistency",
+      "files": [
+        "docs",
+        "README.md"
+      ],
+      "tests": "manual: accepted — link review",
+      "done_when": "Cross-links nudge small work to tracks and unclear work to ideas",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-04",
+    "branch": "",
+    "evidence": "S1-S4 done in commit 96a9c4e. Routing decision guide (SIZE-ROUTING.md) live, with verified cross-links from AGENT-QUICKSTART.md, 00-Concepts.md, README.md, AGENT-PLAYBOOK.md, EXECUTION-PATH.md, PM-WORKFLOWS.md, ADOPTION-CHECKLIST.md, and Getting Started README.md. mp validate: 0 errors, 0 warnings."
+  }
+}

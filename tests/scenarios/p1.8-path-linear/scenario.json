@@ -1,0 +1,16 @@
+{
+  "id": "p1.8-path-linear",
+  "phase": "implemented",
+  "description": "Linear milestone deps produce deterministic suggested path",
+  "fixture": "projects/linear-deps",
+  "command": ["path", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/path.json",
+    "fs_unchanged": true
+  },
+  "notes": "Fixture and golden deferred until mp path ships (P1.8)."
+}

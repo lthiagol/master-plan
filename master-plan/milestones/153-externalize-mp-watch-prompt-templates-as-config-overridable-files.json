@@ -1,0 +1,365 @@
+{
+  "milestone": {
+    "id": "153",
+    "title": "externalize mp watch prompt templates as config-overridable files",
+    "slug": "externalize-mp-watch-prompt-templates-as-config-overridable-files",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "149"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-10",
+    "updated": "2026-07-14",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-14T13:34:42.132667+00:00"
+  },
+  "intent": {
+    "outcome": "mp watch's lifecycle-stage prompt templates (execute, self-review, external-review, remediate, approve) live as files under templates/watch/<stage>.md that users can override per-project without recompiling, with the hardcoded Rust templates as compiled-in defaults."
+  },
+  "problem": {
+    "description": "M149 deliberately hardcodes prompt templates in Rust ('fewer moving parts' per the design decision). Once v1 proves the loop, users will want to tune prompts per project or per team without forking mp. Externalising the templates to config-overridable files (with the compiled defaults as fallback) is the natural next step; it is explicitly out-of-scope for M149 and captured here so it is not lost."
+  },
+  "scope": {
+    "in_scope": [
+      "templates/watch/<stage>.md template files shipping with the toolkit",
+      "Project-local override path (e.g. master-plan/watch/<stage>.md or a config pointer) that shadows the defaults",
+      "build_prompt reads file-or-default with clear logging of which source was used",
+      "Template interpolation tests retained from M149 S6"
+    ],
+    "out_of_scope": [
+      "Per-AC or per-milestone-type prompt variants",
+      "A prompt-template editor UI"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Prompt templates ship as files under templates/watch/<stage>.md (execute, self-review, external-review, remediate, approve). The M149 hardcoded Rust templates become the compiled-in defaults, byte-equivalent to the files.",
+      "verification": "cargo test -p mp --test watch_template_files",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_template_override --no-fail-fast: 36 passed (22 retained S6 + 11 S2 + 3 S1). cargo nextest run -p mp --no-fail-fast (excluding G2 gate): 1710 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. mp milestone verify: 3/3 ACs runnable-pass with command-output evidence. 5 files extracted, include_str! compile-time byte-equivalence, override resolution wired into DriveOps::plan_dir, prompt_source event emitted per stage."
+    },
+    {
+      "id": "AC-02",
+      "description": "A project-local override path (master-plan/watch/<stage>.md, or a config pointer) shadows the defaults. build_prompt logs which source (default vs override) was used for each stage so overrides are visible.",
+      "verification": "cargo test -p mp --test watch_template_override",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_template_override --no-fail-fast: 36 passed (22 retained S6 + 11 S2 + 3 S1). cargo nextest run -p mp --no-fail-fast (excluding G2 gate): 1710 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. mp milestone verify: 3/3 ACs runnable-pass with command-output evidence. 5 files extracted, include_str! compile-time byte-equivalence, override resolution wired into DriveOps::plan_dir, prompt_source event emitted per stage."
+    },
+    {
+      "id": "AC-03",
+      "description": "The M149 S6 interpolation property tests (watch_prompts.rs) pass unchanged against the file-loaded templates — every stage interpolates a fixture milestone and contains the required handoff-data fields.",
+      "verification": "cargo test -p mp --test watch_prompts",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_template_override --no-fail-fast: 36 passed (22 retained S6 + 11 S2 + 3 S1). cargo nextest run -p mp --no-fail-fast (excluding G2 gate): 1710 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. mp milestone verify: 3/3 ACs runnable-pass with command-output evidence. 5 files extracted, include_str! compile-time byte-equivalence, override resolution wired into DriveOps::plan_dir, prompt_source event emitted per stage."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "override-location",
+      "choice": "project-local overrides live under master-plan/watch/<stage>.md, alongside the plan",
+      "rationale": "Keeps prompt customization with the project it applies to, version-controlled with the plan, and discoverable next to master-plan/. A config pointer is reserved for teams that want a shared override outside the plan dir."
+    },
+    {
+      "area": "default-source",
+      "choice": "compiled-in Rust defaults remain, byte-equivalent to the shipped files",
+      "rationale": "mp must still build prompts with zero files on disk (e.g. fresh checkout, CI). Files are the overridable copy; the compiled strings are the reliable floor."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-EXTRACT",
+      "name": "Extract templates",
+      "goal": "Move hardcoded templates to templates/watch/*.md; keep compiled-in defaults byte-equivalent",
+      "rollback": ""
+    },
+    {
+      "id": "WP-OVERRIDE",
+      "name": "Override resolution",
+      "goal": "Project-local override path shadows defaults; build_prompt logs the source",
+      "rollback": ""
+    },
+    {
+      "id": "WP-TESTS",
+      "name": "Tests",
+      "goal": "File-existence + override + retained interpolation tests",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-EXTRACT",
+      "order": 1,
+      "action": "Extract the M149 hardcoded prompt templates into templates/watch/<stage>.md (execute, self-review, external-review, remediate, approve). Keep the compiled-in Rust defaults byte-equivalent to the files so behavior is unchanged without an override.",
+      "files": [
+        "templates/watch",
+        "crates/mp/src/watch/prompts.rs"
+      ],
+      "tests": "crates/mp/tests/watch_template_files.rs",
+      "done_when": "five template files exist; compiled defaults diff-equal the files",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --no-fail-fast: 25 passed (22 retained M149 S6 property tests + 3 new S1 file-existence/sentinel tests). cargo clippy -p mp --tests --no-deps -- -D warnings: clean. 5 template files created at templates/watch/{execute,self-review,external-review,remediate,approve}.md; ReReview stays hardcoded (see S1 done_when). Build-prompt returns (text, TemplateSource) so the source (default/override) is attributable."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-OVERRIDE",
+      "order": 2,
+      "action": "Implement override resolution: look up master-plan/watch/<stage>.md (or a config pointer), fall back to the compiled default. build_prompt logs which source it used per stage.",
+      "files": [
+        "crates/mp/src/watch/prompts.rs"
+      ],
+      "tests": "crates/mp/tests/watch_template_override.rs",
+      "done_when": "a project-local override is loaded and preferred; the log records 'override' vs 'default' per stage",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "[]"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test watch_template_override --no-fail-fast: 11 passed. cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_execution --no-fail-fast: 58 passed (47 retained + 11 new). cargo clippy -p mp --tests --no-deps -- -D warnings: clean. Override resolution wired through DriveOps::plan_dir; watch loop logs prompt_source event per stage."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-TESTS",
+      "order": 3,
+      "action": "Retain the M149 S6 interpolation property tests (watch_prompts.rs) against file-loaded templates; add file-existence and override tests.",
+      "files": [
+        "crates/mp/tests/watch_prompts.rs",
+        "crates/mp/tests/watch_template_files.rs"
+      ],
+      "tests": "cargo test -p mp watch_template",
+      "done_when": "cargo test -p mp watch_template green; watch_prompts.rs interpolation assertions still pass",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_template_override --no-fail-fast: 36 passed (22 S6 property tests retained + 14 new file/override tests). cargo nextest run -p mp --no-fail-fast (excluding known-broken G2 gate + watch suite already covered): 1710 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. S3 done_when satisfied: watch_template tests green; watch_prompts.rs interpolation assertions still pass against file-loaded templates."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-14",
+    "branch": "",
+    "evidence": "cargo nextest run -p mp --test watch_prompts --test watch_template_files --test watch_template_override --no-fail-fast: 36 passed (22 retained S6 + 11 S2 + 3 S1). cargo nextest run -p mp --no-fail-fast (excluding G2 gate): 1710 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. mp milestone verify: 3/3 ACs runnable-pass with command-output evidence. 5 files extracted, include_str! compile-time byte-equivalence, override resolution wired into DriveOps::plan_dir, prompt_source event emitted per stage."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "cli-staleness",
+      "description": "HIGH-2 from code review: templates/watch/{self-review,external-review}.md omitted the REQUIRED --category argument on mp reviews finding add. CLI rejects missing-category with 'the following required arguments were not provided: --category <CATEGORY>'. Fixed by adding --category <name> to both templates' example commands.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "df6a80f5d8b375b543eae66506011e1f39f7fba7",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Without --category the agent's first finding fails. Test in watch_prompts.rs asserts the templates mention --category; that test now passes."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "cli-staleness",
+      "description": "HIGH-3 from code review: templates/watch/execute.md taught non-existent 'mp milestone ac criterion pass'. Actual surface is  (M93 alias) or  (long form). Fixed by replacing the old form with the canonical 'mp milestone ac pass <id> <AC_ID>' call.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "df6a80f5d8b375b543eae66506011e1f39f7fba7",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "The old form would have made every per-AC pass step error out. Property test now explicitly asserts the canonical form is present AND the legacy form is absent."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "cli-staleness",
+      "description": "HIGH-1 from code review: templates/watch/{self-review,external-review}.md taught --severity <info|minor|major> and <minor|major|blocker> but CLI accepts only <low|medium|high>. Fixed by updating both templates to reference --severity <low|medium|high>; FindingDraft::validate rejects the legacy sets.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "df6a80f5d8b375b543eae66506011e1f39f7fba7",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Prompt-injection or environment-version drift could surface the legacy severity set. Updated the file bodies AND the watch_prompts.rs property tests to assert the canonical set; a future regression on either side will fail the gate."
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "category": "override-safety",
+      "description": "HIGH-4 from code review: an override file without a {header} placeholder silently drops the SAFETY preamble and trust-boundary tags. Fixed by adding override_is_safe() guard in resolve_template: if the override's text is empty or lacks the {header} placeholder, fall through to the compiled default. The watch loop still observes prompt_source events but never sees a header-less override.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "df6a80f5d8b375b543eae66506011e1f39f7fba7",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Defense-in-depth against operator typos that would silently break prompt-injection guards. Added 3 tests in watch_template_override.rs covering (a) headerless override refused, (b) empty override refused, (c) headered override honored."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "documentation",
+      "description": "MEDIUM-2 from code review: operators writing <plan_dir>/watch/re-review.md see no warning that the file is being ignored (ReReview is intentionally hardcoded). Fixed by: (a) README.md documents this loudly under 'Caveats' and the 'Adding a new stage' checklist, (b) the in-code module docs at crates/mp/src/watch/prompts.rs:ReReview explanation, (c) the new test rereview_override_file_is_silently_ignored_at_render_time pins the behavior at the rendering layer.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "8c7df59ba25a149290b88e9809b7fbe99bc3b473",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Documentation is the right discipline for a 6th-stage-not-yet-extended contract; adding an active warning would require per-call state-tracking which the pure build_prompt_with cannot afford. The README + module docs + new test pin the contract for operators."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "api-design",
+      "description": "LOW-4 from code review: build_prompt_with takes 5 positional args. Fixed by introducing BuildPromptRequest struct + build_prompt_with_request helper. The legacy 5-arg form now delegates to the struct so the public API is unchanged for current callers. New test build_prompt_request_struct_matches_legacy_positional_args pins the equivalence.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "8c7df59ba25a149290b88e9809b7fbe99bc3b473",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Future knobs (caller identity, log context, etc.) extend the struct rather than growing the positional-arg count past clippy's 7-arg ceiling. Not a behavioral change; purely a refactor for forward-compat."
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "log-emission",
+      "description": "MEDIUM-1 from code review: no integration test asserting that prompt_source log events land in <plan_dir>/.mp/watch.log. Fixed by adding tests/watch_log_prompt_source.rs with 4 tests pinning the JSONL emission via a real WatchLogger attached to a DriveOps mock: default-case, override-case (with absolute path), parseable JSONL shape, and timestamp-bearing entries.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "8c7df59ba25a149290b88e9809b7fbe99bc3b473",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "S2 done_when said 'the log records override vs default per stage' but the contract had no end-to-end test. Without this, a refactor that silently drops the log_event call would slip past the gate. New tests pin the surface for future agents."
+    },
+    {
+      "id": "F-08",
+      "severity": "high",
+      "category": "correctness",
+      "description": "templates/watch/external-review.md files `mp reviews finding add` without `--phase external`. The CLI documents that an empty phase is treated as self-phase; add_finding_with_phase therefore does not enter external remediation from lifecycle=self-reviewed/reviewed. In mp watch this can leave the state machine waiting forever for the Reviewed target after the coordinator filed a real external finding. Add `--phase external`, pin its presence in watch_prompts tests, and add an end-to-end lifecycle regression showing the external finding enters remediation rather than being classified as self-phase.",
+      "status": "fixed",
+      "author": "pi-m153-external-reviewer",
+      "fixed_in": "8413e26",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "external-review template files findings without --phase external",
+      "rationale": "This is executable prompt behavior. A coordinator following the shipped template records the wrong finding phase and can wedge the automated review loop.",
+      "confidence": "high",
+      "tags": [
+        "m153",
+        "watch-template",
+        "external-review",
+        "phase",
+        "lifecycle"
+      ]
+    },
+    {
+      "id": "F-09",
+      "severity": "high",
+      "category": "security",
+      "description": "crates/mp/src/watch/prompts.rs:340-368 exports load_override through crates/mp/src/watch/mod.rs, but the helper returns override text without calling override_is_safe. That contradicts M153 F-04, whose security contract refuses empty or header-less overrides so the SAFETY preamble cannot be dropped. The helper has no production caller and is used only by integration tests, making it an unsafe parallel path. Either remove it from the public API and test lookup through build_prompt_with_request, or apply the same safety validation and add headerless/empty regression tests against this exported path.",
+      "status": "fixed",
+      "author": "pi-m153-external-reviewer",
+      "fixed_in": "8413e26",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "public load_override bypasses the mandatory safety-header guard",
+      "rationale": "A public sibling loader that bypasses the security invariant is a future regression path; callers can obtain an override accepted as ProjectOverride even though the canonical renderer refuses it.",
+      "confidence": "high",
+      "tags": [
+        "m153",
+        "override",
+        "safety",
+        "api-parity"
+      ]
+    },
+    {
+      "id": "F-10",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "crates/mp/src/commands/watch.rs:668-680 uses build_prompt(stage, milestone), which passes both override_dir and plan_dir as None and discards TemplateSource. Consequently `mp watch --dry-run` renders a compiled-default prompt even when the real state machine will load <plan_dir>/watch/<stage>.md, violating dry-run honesty. Thread ctx.plan_dir into build_prompt_with_request, expose prompt_source in the dry-run milestone entry, and add a CLI regression proving a project-local override changes the dry-run preview and reports its source.",
+      "status": "fixed",
+      "author": "pi-m153-external-reviewer",
+      "fixed_in": "8413e26",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "mp watch --dry-run always previews compiled defaults",
+      "rationale": "The dry-run is the operator preview of what watch will send. Showing a different prompt from the live run defeats safe validation of custom overrides.",
+      "confidence": "high",
+      "tags": [
+        "m153",
+        "dry-run",
+        "override",
+        "preview",
+        "parity"
+      ]
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "category": "observability",
+      "description": "crates/mp/src/watch/prompts.rs:266-283 uses `if let Ok(text)` for both override rungs and silently falls through for PermissionDenied, invalid UTF-8, IsADirectory, and other I/O failures; an empty/header-less override is also silently dropped. The resulting TemplateSource::CompiledDefault and prompt_source log are indistinguishable from no override file. Preserve NotFound as the normal fallback, but carry a refusal/read-error diagnostic for present invalid overrides and emit a structured override_refused or prompt_source warning event. Add tests for headerless, invalid UTF-8/directory, and no-file cases so only NotFound is silent.",
+      "status": "fixed",
+      "author": "pi-m153-external-reviewer",
+      "fixed_in": "8413e26",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "invalid or unreadable overrides silently collapse to default",
+      "rationale": "The security fallback is safe but operationally opaque; operators cannot tell that the override they intended to use was rejected.",
+      "confidence": "high",
+      "tags": [
+        "m153",
+        "override",
+        "errors",
+        "logging",
+        "observability"
+      ]
+    },
+    {
+      "id": "F-12",
+      "severity": "medium",
+      "category": "robustness",
+      "description": "crates/mp/src/watch/prompts.rs:330-335 calls fs::read_to_string directly with no regular-file check or byte cap. A FIFO can block mp watch indefinitely and an oversized file can allocate large memory and amplify prompt cost before the safety check runs. Centralize override reads behind symlink_metadata/regular-file validation and a documented MAX_OVERRIDE_BYTES limit, reject symlinks/non-regular/oversized inputs with an observable diagnostic, and add regressions for a directory, symlink or FIFO-safe non-regular fixture, and an oversized file.",
+      "status": "fixed",
+      "author": "pi-m153-external-reviewer",
+      "fixed_in": "8413e26",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "override reader accepts non-regular and unbounded files",
+      "rationale": "Project-local files are operator-controlled, but a malformed path should not hang or exhaust the automation process. The reader comment already identifies size and symlink guards as missing policy hooks.",
+      "confidence": "high",
+      "tags": [
+        "m153",
+        "override",
+        "file-safety",
+        "size-limit",
+        "non-regular"
+      ]
+    }
+  ]
+}

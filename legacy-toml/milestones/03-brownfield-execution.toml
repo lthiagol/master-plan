@@ -1,0 +1,90 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "03"
+title = "Brownfield and execution"
+slug = "brownfield-execution"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["02"]
+effort = "L"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Domain specs, path engine, execution handoff, challenge."
+
+[problem]
+description = "P4 brownfield + P1.8–P1.9 execution path."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "specs",
+    "brownfield",
+    "path",
+    "execution",
+    "challenge",
+]
+out_of_scope = [
+    "export",
+    "meta plan",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "p4_brownfield tests"
+verification = "cargo test -p mp --test p4_brownfield"
+status = "passed"
+evidence = "shipped; cargo test -p mp green"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "shipped; cargo test -p mp green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

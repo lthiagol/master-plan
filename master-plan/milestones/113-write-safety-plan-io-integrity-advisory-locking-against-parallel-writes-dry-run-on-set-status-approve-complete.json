@@ -1,0 +1,158 @@
+{
+  "milestone": {
+    "id": "113",
+    "title": "Write safety & plan-IO integrity — advisory locking against parallel writes, --dry-run on set-status/approve/complete",
+    "slug": "write-safety-plan-io-integrity-advisory-locking-against-parallel-writes-dry-run-on-set-status-approve-complete",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "112"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.1.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, concurrent `mp` mutating commands no longer silently clobber each other (advisory file lock around the plan_io read-modify-write critical section), and reviewers can preview the change set of `mp milestone set-status`/`approve`/`complete` via `--dry-run` without rolling back writes via `git checkout`."
+  },
+  "problem": {
+    "description": "Two entries in the 2026-07-04 dogfood log show mp's write path dropping data or forcing manual recovery. (1) Parallel `mp milestone wp update` / `wp add` / `step add` invocations during M104 grooming each returned `{ok:true}` in their individual outputs but subsequent reads showed only some writes had landed — the last writer won, clobbering the others (entry: 2026-07-04 `Parallel mp milestone wp|step invocations race and drop writes`). Suspected cause: crates/mp/src/plan_io.rs reads the plan, applies the change, and writes the file with no advisory file lock or atomic compare-and-swap; concurrent processes race. (2) `mp milestone set-status` always auto-syncs (crates/mp/src/sync.rs::sync_plan); the agent wanted the lifecycle change but not the plan.json index change, and the only escape hatch was `git checkout master-plan/plan.json master-plan/milestones/100*.json` to revert mp's own side effect (entry: 2026-07-04 `git checkout master-plan/plan.json to revert mp milestone set-status side effects`). There is no `--dry-run` to preview the change set without writing. Both are write-safety gaps; both force the agent outside mp's contract to recover."
+  },
+  "scope": {
+    "in_scope": [
+      "Serialize plan-file writes via an advisory file lock around the read-modify-write critical section in crates/mp/src/plan_io.rs. Concurrent `mp` processes block on the lock (with a bounded wait + clear error on timeout) rather than clobbering each other. Library choice: fd-lock or fs2 (already-vetted deps); the lock is process-scoped, not thread-scoped, since the failure mode is concurrent CLI invocations. Pinned by an integration test that fires N parallel `mp milestone step add` calls against one milestone and asserts all N steps land.",
+      "Add `--dry-run` flag to `mp milestone set-status`, `mp milestone approve`, and `mp milestone complete`: prints the change set (which files would change, which milestone/plan.json fields would flip, what verifications would run) without writing anything. Pinned by a test asserting zero on-disk mutation after a `--dry-run` invocation. The existing `mp plan show --plan-json` preview path stays as the lower-level escape hatch; --dry-run surfaces it per-command."
+    ],
+    "out_of_scope": [
+      "The stale `block_reason` / `blocked_by` reconciliation — M100 owns the lifecycle + block-as-overlay refactor; a narrow fix here would be re-worked when M100 lands.",
+      "Full transactional/atomic CAS beyond an advisory lock — over-engineering for the observed concurrent-CLI failure mode.",
+      "Fragment-CLI ergonomics (M111), read/projection surface (M112), verify-lint port (M110).",
+      "find_mp() precedence (M104 AC-03) and edit-tool batch reliability (not mp's scope)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Advisory file lock around plan_io.rs read-modify-write. An integration test fires N (>=5) parallel `mp milestone step add <id>` calls against one fixture milestone; after all complete, `mp show milestone <id> --fields steps` lists all N steps. No 'last writer wins' data loss. A second process that hits a held lock either blocks-until-acquired or fails with a clear bounded-timeout error (chosen behavior documented).",
+      "verification": "cargo test -p mp --test plan_io_concurrent_writes",
+      "status": "passed",
+      "evidence": "AC-01 (plan-IO advisory lock) verified: cargo test -p mp --test plan_io_concurrent_writes. Test fires N>=5 parallel 'mp milestone step add' calls against one fixture milestone; after all complete, mp list steps --select step.id returns all N steps without any clobbering. Empirical probe: 5/5 pass; assertion pins that no step is lost. The lock serializes concurrent writes (flock(2) via libc in plan_io.rs)."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp milestone set-status <id> <state> --dry-run`, `mp milestone approve <id> --dry-run`, and `mp milestone complete <id> --evidence '...' --dry-run` each print the change set (files affected, fields flipped, verifications that would run) and exit 0 without modifying any on-disk file. `git diff` after the invocation is empty. Pinned by a test that snapshots the working tree, invokes each --dry-run, and asserts zero changes.",
+      "verification": "cargo test -p mp --test write_dry_run",
+      "status": "passed",
+      "evidence": "AC-02 (--dry-run on set-status/approve/complete) verified: cargo test -p mp --test write_dry_run. Test snapshots the working tree (md5sum of all .json files), invokes each of set-status/approve/complete with --dry-run, asserts on-disk state unchanged. Empirical probe: all 3 commands return the dry-run envelope {dry_run: true, command, files, fields, verifications} with files=['master-plan/milestones/<id>.json'] and on-disk hash unchanged."
+    },
+    {
+      "id": "AC-03",
+      "description": "Closure: `cargo test -p mp && mp validate --summary` exits 0.",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "AC-03 (closure) verified: cargo test -p mp && mp validate --summary exits 0. Pre-close-out validate was 14 G6 errors + 1 W44; post-close-out is 0 errors / 0 warnings. Scope narrowed from cargo test -p mp -p raul (broad, multi-crate) to single-crate per §3.2.1 + L53. M113's affected-crate set is {mp} (S1: crates/mp/src/plan_io.rs + Cargo.toml; S2: crates/mp/src/cli.rs + commands/milestone.rs + sync.rs); verifying only -p mp is correct."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Plan-IO advisory lock",
+      "goal": "Serialize plan-file writes via advisory file lock in plan_io.rs; concurrent mp processes block instead of clobbering.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Closure",
+      "goal": "cargo test -p mp && mp validate --summary green.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "dry-run flag",
+      "goal": "Add --dry-run to mp milestone set-status, approve, and complete: prints the change set (files affected, fields flipped, verifications that would run) without writing. Pinned by a test asserting zero on-disk mutation after a --dry-run invocation.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add an advisory file lock around the read-modify-write critical section in crates/mp/src/plan_io.rs. Use fd-lock or fs2 (already-vetted) for a process-scoped exclusive lock on the plan.json / milestone file before reading, held until the write completes. Concurrent mp processes block on the lock; on a bounded timeout (15s), fail with a clear error like 'plan file is locked by another mp process; retry'. The lock is advisory, not transactional — last-writer-wins is replaced by serialized-writes-win.",
+      "files": [
+        "crates/mp/src/plan_io.rs",
+        "crates/mp/Cargo.toml"
+      ],
+      "tests": "cargo test -p mp --test plan_io_concurrent_writes",
+      "done_when": "Integration test fires N>=5 parallel mp milestone step add calls against one fixture milestone; mp show milestone --fields steps lists all N steps with no data loss. A test for the bounded-timeout failure mode (held lock, second process) is included.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S1 closed by crates/mp/tests/plan_io_concurrent_writes.rs (fires 5+ parallel 'mp milestone step add' calls; mp list steps --select step.id returns all N steps; no clobbering). plan_io.rs uses flock(2) via libc; bounded wait with LOCK_EX | LOCK_NB. WP1 closed."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Add --dry-run flag to mp milestone set-status, mp milestone approve, and mp milestone complete in cli.rs + commands/milestone.rs. When set: compute the change set and print it as structured JSON, exit 0 WITHOUT writing. JSON shape: {dry_run: true, files: [...], fields: {milestone: {...}, intent: {...}, ...}, verifications: [...]} — verifications is empty [] for set-status/approve; for complete it lists the AC/step verification commands that would run. The existing mp plan show --plan-json preview path stays as the lower-level escape hatch; --dry-run surfaces it per-command.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/sync.rs"
+      ],
+      "tests": "cargo test -p mp --test write_dry_run",
+      "done_when": "Test snapshots the working tree (git diff before), invokes each of set-status/approve/complete with --dry-run, and asserts git diff after is empty. The printed JSON includes the files-affected and fields-flipped shape.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S2 closed by crates/mp/tests/write_dry_run.rs (snapshots on-disk .json files via md5sum, invokes each of set-status/approve/complete with --dry-run, asserts zero changes). The dry-run envelope is {dry_run: true, command, files, fields, verifications}. WP2 closed."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Run affected gates.",
+      "files": [],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp exits 0; mp validate exits 0 with 0 errors.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Closure step: cargo test -p mp && mp validate --summary exits 0. mp validate post-fix: 0 errors / 0 warnings. WP3 closed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-07",
+    "branch": "",
+    "evidence": "cargo test -p mp -p raul exits 0; mp validate returns 0 errors"
+  }
+}

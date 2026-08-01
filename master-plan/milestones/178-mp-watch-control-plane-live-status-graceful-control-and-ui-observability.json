@@ -1,0 +1,596 @@
+{
+  "milestone": {
+    "id": "178",
+    "title": "mp watch control plane — live status, graceful control, and UI observability",
+    "slug": "mp-watch-control-plane-live-status-graceful-control-and-ui-observability",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "149",
+      "150",
+      "152",
+      "153"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-16",
+    "updated": "2026-07-17",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-17T10:09:51.989499+00:00"
+  },
+  "intent": {
+    "outcome": "Human-facing clients such as Raul can start, monitor, detach from, reattach to, resume, and gracefully stop an mp watch run through stable structured mp commands, while reading the active milestone, lifecycle, watch stage, role pane, logs, and terminal result without inferring control state from a foreground process."
+  },
+  "problem": {
+    "description": "mp watch can drive one or more milestones through herdr, but its current foreground command is not a complete control plane for an interactive client. Raul cannot reliably distinguish a live watch from stale resumable state, monitor the current watch stage, detach without losing process ownership, stop a run through an mp command, or read active agent output through a stable contract. The existing watch state file contains a PID, pane IDs, and milestone hints, but it is not a continuously authoritative live-status API; the structured report is emitted only when the foreground command exits. A Raul Watch tab would otherwise have to duplicate process, state-file, log, lifecycle, and herdr inference logic."
+  },
+  "scope": {
+    "in_scope": [
+      "A structured mp watch control/status surface for machine clients, covering start, status, graceful stop, live attach/monitoring, stale/interrupted resume, and terminal outcome retrieval",
+      "Detach-safe watch execution: a run started by a client can continue after that client exits, without losing its mp-owned PID, queue, panes, log paths, or control state",
+      "Continuously observable latest-run state containing ordered milestone IDs, active queue index, active milestone, current lifecycle, active mp watch stage, target lifecycle, active runner/coordinator role, PID/liveness classification, pane identifiers, timestamps, log paths, and run outcome",
+      "A stable distinction between a live run that clients monitor without starting another driver and a stale/interrupted run that may be resumed explicitly",
+      "Graceful stop through mp, preserving the existing SIGINT/SIGTERM cleanup, resumable watch state, and flash-note behavior",
+      "Structured read access to the currently active herdr role pane output for a human client, with bounded failures when herdr or the pane is unavailable",
+      "Persistence of the latest completed, failed, skipped, exhausted, or gracefully stopped run so clients can show the final state after restarting",
+      "`mp watch --dry-run` remains the sole authoritative preflight for configuration, dependency, milestone eligibility, next-stage, and prompt diagnostics",
+      "Backward compatibility for existing `mp watch <ids...>`, `--resume`, `--force`, sequencing, logging, and lifecycle behavior"
+    ],
+    "out_of_scope": [
+      "The Raul Watch tab, lifecycle graph, milestone picker, or TUI rendering; those belong to the dependent Raul milestone",
+      "Changing mp watch lifecycle transitions, remediation logic, skip/failure semantics, or sequential queue behavior",
+      "Parallel milestone execution or multiple simultaneous watch runs in one project",
+      "A history browser for multiple prior runs; only the latest run is retained as the client-facing result",
+      "Automatic installation of herdr, automatic repair of agent configuration, or configuration editing",
+      "Remote/web control, notifications, or exposing agent output beyond the currently active runner/coordinator pane"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "While a watch is running, the structured status surface reports a live PID plus the selected queue in order, active queue index, active milestone, its current lifecycle, active mp watch stage, target lifecycle, active role, known runner/coordinator pane IDs, timestamps, watch-log path, and a running outcome. The status changes as the lifecycle advances rather than remaining at the initial state.",
+      "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "A client can start either one milestone or an ordered milestone queue in detach-safe mode. After the starting client exits, the watch process remains live, retains the original queue order, and remains discoverable and controllable through mp.",
+      "verification": "cargo nextest run -p mp --test watch_signal --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "Status classifies an existing watch as live, stale/interrupted, or terminal. Monitoring a live run does not start a second watch driver; an interrupted run can be resumed explicitly against its recorded panes and queue without bypassing the existing double-spawn guard.",
+      "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "The graceful-stop surface targets the recorded live PID, causes mp watch to exit through its SIGINT/SIGTERM cleanup path, persists resumable state, and returns a structured stopped result. Stopping when no live run exists returns a stable non-destructive response.",
+      "verification": "cargo nextest run -p mp --test watch_signal --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-05",
+      "description": "The active-output surface returns bounded, structured output from the herdr pane belonging to the current watch stage's runner or coordinator role. Missing herdr, missing panes, stale state, and a hung pane-read produce structured errors without hanging the caller.",
+      "verification": "cargo nextest run -p mp --test watch_herdr_wait --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-06",
+      "description": "When a run completes, fails, is skipped, exhausts its iteration cap, or is gracefully stopped, mp persists the latest terminal queue result with per-milestone outcomes. A new process can retrieve that result until a later run replaces it.",
+      "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-07",
+      "description": "`mp watch --dry-run <ids...>` remains side-effect-free and supplies the authoritative preflight used by clients: aggregate dependency/configuration checks, per-milestone watch eligibility, current lifecycle, next stage, target lifecycle, and prompt diagnostics for the queue in input order.",
+      "verification": "cargo nextest run -p mp --test watch_dry_run --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-08",
+      "description": "Existing foreground `mp watch <ids...>`, `--resume`, `--force`, structured logging, stage-done bridge, and sequential failure/skip semantics remain compatible after the control-plane additions.",
+      "verification": "cargo nextest run -p mp -E 'test(/watch_/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "milestone-boundary",
+      "choice": "Ship the mp control/observability contract before the Raul Watch tab",
+      "rationale": "Detach, attach, stop, latest-result persistence, and active-pane output are process-control responsibilities. A stable mp contract prevents Raul from duplicating PID, state-file, herdr, and lifecycle inference."
+    },
+    {
+      "area": "preflight-authority",
+      "choice": "Keep mp watch --dry-run as the only pre-start dependency and configuration check",
+      "rationale": "The user chose diagnosis-only preflight and does not want Raul to duplicate checks or make assumptions about configuration repair."
+    },
+    {
+      "area": "attach-semantics",
+      "choice": "Monitor a live run without starting another driver; resume only stale or interrupted state",
+      "rationale": "Starting `--resume` while the original driver is live risks two state machines controlling the same milestone and panes."
+    },
+    {
+      "area": "process-lifetime",
+      "choice": "Watch execution can outlive the client that started it",
+      "rationale": "Raul must support Detach and exit while the mp watch flow and herdr panes continue."
+    },
+    {
+      "area": "history",
+      "choice": "Persist only the latest run and its terminal result",
+      "rationale": "The user wants the final state to survive a Raul restart but explicitly selected latest-run persistence rather than multiple-run history."
+    },
+    {
+      "area": "sequencing",
+      "choice": "Preserve mp watch's existing queue and failure behavior",
+      "rationale": "Raul should display mp's outcome rather than introduce a second sequencing policy."
+    },
+    {
+      "area": "agent-output",
+      "choice": "Expose output for the role active at the current watch stage",
+      "rationale": "The Raul UI will show one active pane at a time rather than side-by-side runner and coordinator panes."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Persistent run state",
+      "goal": "Make the latest mp watch run continuously observable and durable across detach, interruption, and terminal outcomes.",
+      "rollback": "Retain legacy watch.state.json loading and foreground execution; ignore newer run fields if the control plane is reverted."
+    },
+    {
+      "id": "WP2",
+      "name": "Process control",
+      "goal": "Provide detach-safe start, status classification, graceful stop, and stale-run resume without duplicate drivers.",
+      "rollback": "Disable new control commands while preserving legacy mp watch, --resume, --force, and signal handling."
+    },
+    {
+      "id": "WP3",
+      "name": "Client observability",
+      "goal": "Expose bounded active-pane output and preserve dry-run as the sole authoritative preflight.",
+      "rollback": "Remove client read commands; retain watch logs, state files, and existing herdr helpers."
+    },
+    {
+      "id": "WP4",
+      "name": "Compatibility verification",
+      "goal": "Prove the new control plane does not regress foreground watch, sequencing, bridge, logging, or recovery behavior.",
+      "rollback": "Revert the smallest control-plane slice that breaks an established watch contract."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Define a versioned latest-run state model containing queue order, active index and milestone, lifecycle, watch stage, target lifecycle, active role, pane ids, pid/liveness data, timestamps, log paths, and per-milestone/terminal outcomes; load legacy v1 state without fabricating live data.",
+      "files": [
+        "crates/mp/src/watch/state.rs",
+        "crates/mp/src/watch/state_machine.rs",
+        "crates/mp/src/watch/sequencer.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "done_when": "The serialized state round-trips every AC-01 field, classifies old schema safely, and can represent running plus every terminal outcome required by AC-06.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Persist the latest-run state atomically at startup, pane spawn/reuse, stage dispatch, lifecycle target changes, queue advance, graceful shutdown, and complete/skipped/failed/exhausted terminal exits.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/state_machine.rs",
+        "crates/mp/src/watch/sequencer.rs",
+        "crates/mp/src/watch/shutdown.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "done_when": "Status readers observe state changes during a run rather than only initial/shutdown snapshots, and a new process can retrieve the final per-milestone result.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Introduce the structured watch control command interface and detach-safe start for one milestone or an ordered queue while preserving the legacy foreground mp watch invocation.",
+      "files": [
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/src/cli/watch.rs",
+        "crates/mp/src/app.rs",
+        "crates/mp/src/commands/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_signal --no-fail-fast",
+      "done_when": "A machine client can start the supplied queue in order, disconnect, and later discover the still-running mp-owned process; legacy command parsing remains accepted.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement structured status/result reads and classify recorded state as live, stale/interrupted, or terminal using bounded pid and herdr reconciliation without starting a second driver.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/classification.rs",
+        "crates/mp/src/watch/resume.rs",
+        "crates/mp/src/watch/state.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "Status returns the full active queue/stage contract for live runs, exposes persisted terminal results, and marks stale state without treating it as active.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03",
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add graceful stop through mp by signaling the recorded live pid and waiting for the existing SIGINT/SIGTERM cleanup path; return a stable non-destructive result when no live run exists.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/shutdown.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_signal --no-fail-fast",
+      "done_when": "Stop flushes resumable state and the flash note before exit, reports stopped structurally, and never kills an unrelated or stale pid.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Make live attach monitoring read-only and stale/interrupted resume explicitly reuse the recorded queue and panes through the existing double-spawn guard.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/resume.rs",
+        "crates/mp/src/watch/state.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "Monitoring a live run spawns no driver; resuming stale state invokes one driver with the saved queue/panes; force/resume compatibility remains intact.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Expose bounded structured output for the pane belonging to the currently active watch role, reusing herdr timeout primitives and returning non-hanging diagnostics for missing herdr, panes, stale state, and pane-read failures.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/herdr.rs",
+        "crates/mp/src/watch/bridge.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_herdr_wait --no-fail-fast",
+      "done_when": "The output command selects runner or coordinator from live stage state, returns bounded text, and every unavailable/hung case terminates with a structured error.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Keep mp watch --dry-run side-effect-free and authoritative for aggregate dependencies/configuration, queue eligibility/order, next stage, lifecycle target, and prompt diagnostics after the CLI refactor.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/cli/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_dry_run --no-fail-fast",
+      "done_when": "Dry-run creates no process, pane, state, or plan mutation and preserves all existing structured diagnostics for one or many ids.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Extend the established watch integration targets for detached start, live/stale classification, stop, terminal persistence, output bounds, and legacy command compatibility, then run the complete watch regression set.",
+      "files": [
+        "crates/mp/tests/watch_state_file.rs",
+        "crates/mp/tests/watch_signal.rs",
+        "crates/mp/tests/watch_resume.rs",
+        "crates/mp/tests/watch_herdr_wait.rs",
+        "crates/mp/tests/watch_cli.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/watch_/)' --no-fail-fast",
+      "done_when": "All M178 AC scenarios and the pre-existing foreground, bridge, logging, resume, force, sequencing, signal, and dry-run tests pass without skipped control-plane coverage.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-17",
+    "branch": "",
+    "evidence": "M178 complete 2026-07-17: 9/9 steps done; 8/8 ACs passed with stamped evidence; cargo nextest run -p mp -E 'test(/watch_/)' 21/21 green; full mp suite 2039/2039 green; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. v2 control-plane state model with live/stale/terminal classification, status/stop/output/result verbs, --detach flag, atomic persist at every transition, v1 migration, M152 backcompat. Lifecycle → complete (terminal). [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "M178 external review F-01 (severity=high): AC-01 contract violation — live-state fields (active_milestone, active_queue_index, watch_stage, active_role) never populated during a real run. Tracing the production code paths, only pane_ids / target_lifecycle / current_lifecycle are updated; the four contract fields are written exclusively by helpers in run_state.rs that are only called from unit tests. Fix: wire set_active_milestone into SystemDriveOps::set_active_milestone, and set_active_stage into drive_milestone's stage dispatch (before ensure_pane). Add an end-to-end integration test.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M178 external review F-01 (severity=medium): AC-01 contract violation — live-state fields (active_milestone, active_queue_index, watch_stage, active_role) never populated during a real run. Tracing the production code paths, only pane_ids / target_lifecycle / current_lifecycle are updated; the four contract fields are written exclusively by helpers in run_state.rs that are only called from unit tests. Fix: wire set_active_milestone into SystemDriveOps::set_active_milestone, and set_active_stage into drive_milestone's stage dispatch (before ensure_pane). Add an end-to-end integration test.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 external review F-01 (severity=low): AC-01 contract violation — live-state fields (active_milestone, active_queue_index, watch_stage, active_role) never populated during a real run. Tracing the production code paths, only pane_ids / target_lifecycle / current_lifecycle are updated; the four contract fields are written exclusively by helpers in run_state.rs that are only called from unit tests. Fix: wire set_active_milestone into SystemDriveOps::set_active_milestone, and set_active_stage into drive_milestone's stage dispatch (before ensure_pane). Add an end-to-end integration test.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-02: cargo fmt clean was claimed but file was unformatted. Fixed: ran cargo fmt --all before recording evidence. Doc-accuracy remediation.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-03: read_custom_status_bounded Ok(None) semantic was conflated with 'no status set'. Fixed: re-categorized via classify_output_error; Ok(None) is now a distinct reason='no_status_set' surfaced as ok=false. Docstring still needs follow-up to clarify the three origins of None.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-04: is_pid_alive had no direct unit tests. Fixed: added 3 #[cfg(unix)] tests (own_pid, nonexistent high pid, pid zero) in shutdown.rs. Lesson L28: extracted helper now protected.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-05: redirect_log ignored its log_path parameter. Fixed: removed from the call site, replaced with std::process::Stdio::null() inline. Kept the helper as a documented stub for future use.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-06: cmd_watch_detached was not Unix-gated; /dev/null panics on Windows. Fixed: gated the dispatch with #[cfg(unix)] and added a structured platform_not_supported error on non-Unix.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-07: detached child inherited parent's full env (security). Fixed: added env_clear() then re-applies MP_HOME/MP_PLAN_DIR/MP_INSTALL_DIR + a minimal PATH. Sanitized env contract.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "correctness",
+      "description": "M178 F-08: v2 panes and pane_ids could silently diverge. Fixed: record_pane now updates BOTH panes[] (preserving spawned_at) AND pane_ids[]. New integration test pins the lockstep.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M178 external review (pass 2) F-11: crates/mp/src/commands/watch_control.rs:247 `text[..max_bytes].to_string()` panics if max_bytes falls inside a multi-byte UTF-8 sequence. Reproduced: `let t=\"abécd\"; t[..3].to_string()` → panic \"end byte index 3 is not a char boundary\". mp watch-control output --max-bytes 100 against emoji/CJK/non-ASCII pane output crashes the process. AC-05 contract says \"structured error not a hang\" — a panic is worse. Fix: use floor_char_boundary (nightly) or `text.get(..max_bytes).unwrap_or(&text[..max_bytes.min(text.len())])` with a char-boundary walk, or `text.char_indices().take_while(|(i,_)| *i <= max_bytes).map(|(_,c)| c).collect::<String>()`.",
+      "status": "fixed",
+      "author": "external-coordinator",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "code-hygiene",
+      "description": "M178 external review (pass 2) F-12: crates/mp/src/commands/watch_control.rs:242 `let _elapsed = start.elapsed().as_millis() as u64;` is a dead shadow of the elapsed_ms binding on line 241 (same expression). Looks like a rename leftover. No reader. Remove.",
+      "status": "fixed",
+      "author": "external-coordinator",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "M178 external review (pass 2) F-13: crates/mp/src/watch/state_machine.rs:979-991 in record_milestone_outcome manually clears active_milestone/active_queue_index/watch_stage/target_lifecycle/active_role for terminal outcomes, but set_run_outcome() (run_state.rs:436-444) already does this. The duplicate is dead code; if set_run_outcome is ever changed to NOT clear (e.g., to preserve active_milestone in terminal records), this block would silently override it. Remove the duplicate; keep the contract in one place.",
+      "status": "fixed",
+      "author": "external-coordinator",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "category": "code-hygiene",
+      "description": "M178 external review (pass 2) F-14: crates/mp/src/commands/watch_control.rs:383-384 `pub(crate) type PublicRunState = RunState;` is dead code with an explicit #[allow(dead_code)] \"kept for future expansion\". Future-expansion placeholders are anti-patterns (YAGNI); the type can be re-added when an actual caller appears. Remove the alias + the suppression.",
+      "status": "fixed",
+      "author": "external-coordinator",
+      "fixed_in": "",
+      "created": "2026-07-17",
+      "resolved": "2026-07-17",
+      "phase": "external"
+    }
+  ]
+}

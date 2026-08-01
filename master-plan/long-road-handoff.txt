@@ -1,0 +1,168 @@
+LONG-ROAD HANDOFF
+================
+
+What is "the long road"?
+------------------------
+After the M100-M103 chain (lifecycle, findings, multi-lane path, raul path
+CLI) and the M125 work (path graph, blocked lane), the dogfood plan has
+two long-horizon milestone chains sitting at lifecycle=approved. These
+are the "long road" — multiple days of execution-mode work before
+another M100-M125-sized feature lands.
+
+The two chains, in order of dependency:
+  C.  110 -> 111 -> 112 -> 113 -> 114 -> 115 -> 116 -> 117 -> 118
+        (hygiene, fragment-CLI, read, write-safety, test-sweep,
+         TUI polish, meta, verifier, dogfood close-out)
+  D.  119 -> 120 -> 121, 122 -> 123
+        (agent role dispatch, mp-flow, mp-coordinator, mp-runner, mp-handoff)
+
+The chains are independent. Pick one based on what's more pressing.
+
+Why this file
+------------
+Earlier in the session we shipped a bypass-ceremony fix (the spec/exec
+rendering + W43 validator fix, e2dad8c + 3fe941a + 6152958 + 8fdd57e
+on the master repo). That work has these dependencies that, when they
+land, set up the long road:
+
+  B-67 [v2.1.2]  M100-S2 setter overlay + dirty-milestone cleanup
+                  (the 4 setter functions in crates/mp/src/milestone.rs:
+                   block_milestone / unblock_milestone / defer_milestone /
+                   cancel_milestone should set the M100 overlay booleans
+                   AND derive execution_status from the overlay, not write
+                   legacy fields directly. After that lands, re-run
+                   `mp edit migrate-lifecycle --yes` to clean the 11 dirty
+                   milestones; after that, remove inject_legacy_status_view.)
+
+  M124           External review batch follow-ups (8 ACs, 0 WPs).
+                  Closes prior review findings including M100 ER-1
+                  critical (lifecycle not written by transitions). B-67
+                  makes M124 AC-01 (M104 ER-3) land clean.
+
+  B-68 [post-B-67]  B-64 grooming pass — convert the bypass-ceremony
+                  spec/exec rendering work into a proper mp milestone
+                  spec. Depends on B-67 (otherwise the spec re-documents
+                  a workaround that may be obsolete).
+
+Order of execution
+-----------------
+  1. B-67   (1-2 days, low risk; clears 11 dirty milestones)
+  2. M124   (decompose + execute, 3-4 days; closes 8 prior review ERs)
+  3. B-68   (1-2 hours; just-groom-the-existing-work)
+  4. Long road — pick one:
+       a. M110-M118 (hygiene + dogfooding infrastructure; 9 milestones)
+       b. M119-M123 (agent skill system; 5 milestones)
+
+Recommendation: B-67, then M124, then B-68, then the long road.
+
+Why that order
+--------------
+B-67 is the highest-leverage-per-unit-effort work in the plan. Without
+it, every state mutation after the M100 bulk migration reintroduces the
+11 dirty milestones, and M124's AC-01 doesn't land cleanly.
+
+If the long road starts with M110 (hygiene), the chain delivers 9
+incremental milestones with the M118 "dogfood backlog close-out" as
+the self-referential payoff. Pure process work.
+
+If the long road starts with M119 (agent role dispatch), the chain
+delivers the role-dispatch / mp-flow / coordinator / runner / handoff
+skill system. Strategic for the team's dogfooding workflow but doesn't
+address the 11 dirty milestones, doesn't close prior review findings,
+and doesn't fix M100 ER-1.
+
+Open Qs
+-------
+- M119 and M124 are both at 0 WPs. They need a `mp milestone decompose
+  <id>` pass before they can be executed. The decompose pass is part
+  of the work, not a separate step.
+- M110-M118 chain: the upstream ones (M110 hygiene, M111 fragment-CLI)
+  are already decomposed and ready to execute. M114-M118 are also ready.
+- M119-M123: only M119 is the gate. Until M119 is decomposed and executed,
+  M120-M123 stay parked.
+- M124: 8 ACs but 0 WPs. The ACs are concrete enough to decompose
+  straightforwardly; expect a 1-2 day grooming pass.
+
+What to do if you're picking this up
+------------------------------------
+1. Read the milestone path recommendation note at
+   `~/ai-notes/projects/personal/master-plan/2026-07-06-next-milestone-paths-recommendation.md`
+   for the full effort / complexity / gains comparison.
+2. Confirm execution mode (`mp execution status`).
+3. Start with B-67 unless something has changed in the dogfood plan
+   (run `mp validate` and `mp status --summary` to verify state).
+4. After B-67, run the bulk migration a second time — it should be a
+   no-op (idempotent). Confirm 0 dirty milestones.
+5. Decompose M124, execute, run review.
+6. Then choose the long road (M110-M118 or M119-M123) and start
+   executing in order.
+
+What NOT to do
+--------------
+- Don't do M119 first. The 5-milestone chain looks like a quick win
+  but it's strategic infrastructure, not urgent cleanup.
+- Don't merge refactor branches that contain undone setter fixes; the
+  B-67 work is the load-bearing piece.
+- Don't file the long-road work as a single mp milestone; the
+  dependencies between the 9 (or 5) child milestones are real and
+  matter for execution-mode handoff.
+
+Status as of 2026-07-06
+-----------------------
+  Tests:        1123 passed
+  Validate:     0 warnings
+  master HEAD:  8fdd57e (post-merge of refactor)
+  Backlog:      6 open items (B-62, B-64, B-65, B-66, B-67, B-68)
+  Stash:        stash@{0} holds other-agent WIP (B-65/B-66 followup)
+  Bypass-ceremony precedent: in active use. Bypass when the work is
+    bounded, isolated, and test-pinnable; log the rationale in
+    dogfood-log.md (mp-dogfood-log.md at the tool repo).
+
+That's the handoff. Good luck to whoever picks this up.
+</content>
+</invoke>
+=== 2026-07-06 update (session follows the original handoff) ===
+
+The pre-work above landed. Sequence executed:
+
+  - B-67 (and B-62, B-64, B-68) closed via `mp backlog resolve`.
+    Reason text in master-plan/backlog.json.
+  - M100 ER-1..ER-9 + 12 post-self-review remediations applied.
+    See commits 7349c96 (code) and fabda45 (plan). New tests in
+    crates/mp/tests/lifecycle_setter_overlay.rs and
+    crates/mp/tests/migrate_plan_json_idempotent.rs.
+  - M100 + M95 force-completed to lifecycle=complete via
+    `mp milestone complete <id> --force`; the G7 transient was the
+    last validation residue.
+  - M124 decomposed (8 WPs + 8 steps via mp) and reports
+    execution_ready alongside M110.
+
+State now:
+
+  master HEAD:    fabda45 (latest of 3 commits in this session)
+  Validate:       errors=0 warnings=0
+  Migration:      idempotent on rerun (rewritten=0 skipped=122)
+  Tests:          `cargo test -p mp -- --test-threads=1` is green
+  Backlog active: B-65, B-66 (review-lane, in stash@{0}), B-69
+                  (long-road sequencing, post-M124), B-70
+                  (post-path-A test-infra flake)
+  M124 execution_ready, M110 execution_ready
+  Mode:           planning (switch to autonomous to claim steps)
+
+Three sessions of context, pointers only:
+
+  Plan zone state: master-plan/plan.json, master-plan/milestones/*.json
+                   master-plan/backlog.json
+  Code zone state: crates/mp/src/{milestone,migrate,...}.rs
+                   crates/mp/tests/lifecycle_setter_overlay.rs (new)
+  Audit trail:     mp-dogfood-log.md (entry `points-at: M100`)
+                   crates/mp/tests/common/mod.rs `run_with_retry`
+                   crates/mp/src/install.rs (recursive-cargo removal)
+  Obsidian todo:   ~/ai-notes/projects/personal/master-plan/master-plan-todo.md
+                   has a Status 2026-07-06 section appended
+
+Recommended next step (no opinion injected otherwise): switch to
+autonomous mode and start M124 S1 (AC-01, M104 ER-3 gate reroute) per
+the load-bearing-first design_decisions in M124. Completion of M124
+unblocks the M124 → M110 → ... → M118 long-road sequencing tracked
+under B-69.

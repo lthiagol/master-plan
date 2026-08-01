@@ -1,0 +1,267 @@
+{
+  "milestone": {
+    "id": "174",
+    "title": "M169 review remediations — Tab/click on Settings wipes staged edits, set_config_value coercion shadow, partial-commit silent, AC-01 wrap, HashMap order",
+    "slug": "m169-review-remediations-tab-click-on-settings-wipes-staged-edits-set-config-value-coercion-shadow-partial-commit-silent-ac-01-wrap-hashmap-order",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "cancelled",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": true,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "176"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-15",
+    "updated": "2026-07-15",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-15T17:49:50.091619+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, the M169 review findings F-01..F-05 (Entry 30 in mp-dogfood-log.md) are all resolved. Pressing Tab or clicking the Settings tab while staged edits exist preserves them (no silent reload). The set_config_value / mp config set coercion surface produces the same on-disk type as the in-memory staged row (no string→bool flicker). apply_settings_save rolls back partial commits and surfaces a clear error on commit-time failure. AC-01 lane-nav wrap is implemented and tested. apply_settings_save iterates staged_edits in deterministic key order."
+  },
+  "problem": {
+    "description": "M169 shipped green tests (522 raul + 2328 full-suite) but the live TUI quietly wipes staged edits on Tab/click-on-Settings (AC-06 violation), shadows mp's parse_bool coercion while staging (so the row shows 'yes' but on-disk becomes true), silently commits a partial batch on save errors, never implements the AC-01 lane-wrap, and iterates HashMap without sort (non-deterministic JSON diff). All five are real defects surfaceable in a single TUI session; the existing test suite does not pin any of them. Entry 30 in mp-dogfood-log.md documents repro recipes for all four findings."
+  },
+  "scope": {
+    "in_scope": [
+      "Fix F-01 (HIGH, AC-06 violation): in Action::NextLane (crates/raul/src/tui/action.rs:234) and Action::JumpLane, skip the load_data_for_lane() call when the target lane is the active lane AND the lane holds mutable user state (Settings). Concretely: introduce a `lane_state_owned_by_user(lane) -> bool` predicate and gate the load_data_for_lane() call on its negation. Mouse-click on the Settings tab while already on Settings must also skip the reload.",
+      "Fix F-02 (MEDIUM, set_config_value shadow): refactor apply_settings_commit_edit (crates/raul/src/tui/action.rs:529-543) and apply_settings_save (action.rs:548-592) to route ALL staged_edits through a single parse_via_mp(value, key_path) helper that shells out to `mp config set --dry-run <key> <value>` and reads back the coerced value via stdout. Drop the local true/false/i64/f64 fall-through in set_config_value (action.rs:616-638). The in-memory staged row shows the coerced value (no flicker).",
+      "Fix F-03 (MEDIUM, partial commit): in apply_settings_save, if commit k fails after commit k-1 succeeded, roll back the k-1 commit by re-reading the on-disk config and writing the pre-batch snapshot. Surface a focused flash_message: `Partial save failed: {error}. Rolled back {k-1} of {N} edits.` Update AC-05 description to require the rollback.",
+      "Fix F-04 (LOW, AC-01 wrap): in tab_move_down / tab_move_up (app.rs:992-1008) implement the wrap — on Tab at the last lane, advance to the first lane (and symmetrically for Shift+Tab at lane 0). Add a unit test tab_wrap_at_ends_cycles_to_first_lane and shift_tab_wrap_at_start_cycles_to_last_lane.",
+      "Fix F-05 (LOW, HashMap iteration order): change staged_edits from HashMap<String, String> to BTreeMap<String, String> in app.rs SettingsState. Update apply_settings_save to iterate the BTreeMap (already deterministic). Add a test that asserts dry-run + commit order are key-sorted.",
+      "Add crates/raul/tests/m169_review_remediations.rs with at least 5 end-to-end tests: (1) tab_on_settings_preserves_staged_edits, (2) yes_for_bool_field_keeps_coerced_value_in_memory, (3) partial_save_failure_rolls_back_committed_edits, (4) tab_at_last_lane_wraps_to_first, (5) staged_edits_iterated_in_key_order. Add crates/raul/tests/repro_recipes from dogfood-log Entry 30 verbatim as test pins.",
+      "After each fix lands, resolve the corresponding dogfood-log reference (the F-01..F-05 numbering is the closed milestone's finding namespace, not new B-NN entries)."
+    ],
+    "out_of_scope": [
+      "Reverting M169's Settings-as-lane design — the design is correct; the bugs are in the lane-agnostic dispatcher's coupling to lane state, not in the lane choice itself.",
+      "Touching Action::PrevLane or non-Tab lane navigation paths — same fix applies if symptoms reproduce, but Entry 30 only surfaced Tab + mouse-click.",
+      "Removing set_config_value entirely — it's still used by other paths (auto-rehydrate on save); only the staging path is being rewritten.",
+      "Touching the Settings UI chrome (footer affordances, grouped flat list, BF-03 layout from M169) — preserved.",
+      "Adding a global 'rollback last save' action — F-03 is automatic rollback on commit failure; an explicit user-driven undo is a different track."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Pressing Tab on the Settings lane while staged edits exist preserves the edits; the Settings pane re-renders with the same staged state. The same applies to a mouse-click on the Settings tab while on Settings. (F-01 closed.)",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/tab_on_settings_preserves_staged_edits|click_on_settings_preserves_staged_edits/)' --no-fail-fast ; all green ; manual smoke: open Settings, stage `ui.color = no`, press Tab → staged edit still highlighted ; press Tab again → overview ; press Tab → back to Settings ; edit still staged [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Staging `ui.color = yes` shows the coerced value (`true`) in the row buffer while editing, not the raw string `yes`. The on-disk save produces the bool `true` (mp's parse_bool coercion). (F-02 closed.)",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/yes_for_bool_field_keeps_coerced_value|set_config_value_matches_mp_parse_bool/)' --no-fail-fast ; all green [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "apply_settings_save rolls back any committed edit when a later edit in the batch fails. The footer flash surfaces `Partial save failed: {error}. Rolled back {k-1} of {N} edits.` (F-03 closed.)",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/partial_save_failure_rolls_back/)' --no-fail-fast ; all green [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Pressing Tab on the last lane (`Lane::ordered().last()`) advances active_lane to the first lane; Shift+Tab on lane 0 cycles to the last lane. The wrap is symmetric. (F-04 closed.)",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/tab_wrap_at_ends_cycles|shift_tab_wrap_at_start_cycles/)' --no-fail-fast ; all green [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "staged_edits is BTreeMap<String, String>; apply_settings_save iterates it in key-sorted order; the on-disk config diff is deterministic across runs. (F-05 closed.)",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/staged_edits_iterated_in_key_order/)' --no-fail-fast ; all green [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "cargo nextest run -p raul --no-fail-fast is green (522 → ≥527, 5 new tests) ; cargo nextest run --no-fail-fast --manifest-path Cargo.toml remains green (2328 → ≥2333) ; cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings clean ; cargo fmt --all -- --check clean ; mp validate exits 0.",
+      "verification": "cargo nextest run -p raul --no-fail-fast ; cargo nextest run --no-fail-fast --manifest-path Cargo.toml ; cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings ; cargo fmt --all -- --check ; mp validate",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "crates/raul/tests/repro_recipes.rs (or M169_review_remediations.rs) carries the verbatim repro recipes from mp-dogfood-log.md Entry 30 (the `tab_on_settings_wipes_staged_edits` and `yes_for_bool_field_keeps_string_in_memory_state` test bodies) as regression pins. Future AC-tampering cannot re-introduce the bugs without breaking the tests.",
+      "verification": "manual: cargo nextest run -p raul -E 'test(/repro_recipes|tab_on_settings_wipes_staged_edits|yes_for_bool_field/)' --no-fail-fast ; all green (negative-control tests: assert the bug doesn't reappear) [manual-auto-prefix: 2026-07-16]",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "M169 Settings remediation",
+      "goal": "Fix the five M169 review findings (F-01..F-05 from Entry 30 in mp-dogfood-log.md): Tab/click Settings wipes staged edits; set_config_value shadows mp coercion; partial-commit silent; AC-01 wrap; HashMap iteration order.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Fix F-01 (HIGH, AC-06 violation): in Action::NextLane (crates/raul/src/tui/action.rs:234) and Action::JumpLane, skip load_data_for_lane() call when target lane is the active lane AND lane holds mutable user state (Settings). Introduce lane_state_owned_by_user(lane) -> bool predicate; gate load_data_for_lane() on its negation. Mouse-click on Settings tab while on Settings also skips reload.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/tab_on_settings_preserves_staged_edits|click_on_settings_preserves_staged_edits/)' --no-fail-fast",
+      "done_when": "Tab on Settings preserves staged edits; mouse-click on Settings tab preserves them; tests green",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Fix F-02 (MEDIUM, set_config_value shadow): refactor apply_settings_commit_edit and apply_settings_save in crates/raul/src/tui/action.rs to route ALL staged_edits through a single parse_via_mp(value, key_path) helper that shells out to 'mp config set --dry-run <key> <value>' and reads back the coerced value via stdout. Drop local true/false/i64/f64 fall-through in set_config_value (action.rs:616-638).",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/mp/src/config_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/yes_for_bool_field_keeps_coerced_value|set_config_value_matches_mp_parse_bool/)' --no-fail-fast",
+      "done_when": "In-memory staged row shows coerced value; on-disk save matches parse_bool output",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Fix F-03 (MEDIUM, partial commit): in apply_settings_save, if commit k fails after commit k-1 succeeded, roll back k-1 by re-reading on-disk config and writing the pre-batch snapshot. Surface focused flash_message: 'Partial save failed: {error}. Rolled back {k-1} of {N} edits.' Update AC-05 description to require rollback.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/flash_message.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/partial_save_failure_rolls_back/)' --no-fail-fast",
+      "done_when": "Partial failure rolls back prior commits; flash message surfaces rollback",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Fix F-04 (LOW, AC-01 wrap): in tab_move_down / tab_move_up (app.rs:992-1008) implement wrap — on Tab at the last lane, advance to the first lane (and symmetrically for Shift+Tab at lane 0). Add tests tab_wrap_at_ends_cycles_to_first_lane and shift_tab_wrap_at_start_cycles_to_last_lane.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/tests/m169_review_remediations.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/tab_wrap_at_ends_cycles|shift_tab_wrap_at_start_cycles/)' --no-fail-fast",
+      "done_when": "Tab at last lane → first lane; Shift+Tab at first → last; both directions tested",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Fix F-05 (LOW, HashMap iteration order): change staged_edits from HashMap<String, String> to BTreeMap<String, String> in app.rs SettingsState. Update apply_settings_save to iterate the BTreeMap (already deterministic). Add test that asserts dry-run + commit order are key-sorted.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/staged_edits_iterated_in_key_order/)' --no-fail-fast",
+      "done_when": "staged_edits is BTreeMap; dry-run + commit order deterministic",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Add crates/raul/tests/m169_review_remediations.rs with at least 5 end-to-end tests covering F-01..F-05 (1) tab_on_settings_preserves_staged_edits, (2) yes_for_bool_field_keeps_coerced_value_in_memory, (3) partial_save_failure_rolls_back_committed_edits, (4) tab_at_last_lane_wraps_to_first, (5) staged_edits_iterated_in_key_order. Paste repro recipes from mp-dogfood-log.md Entry 30 verbatim as regression pins in crates/raul/tests/repro_recipes.rs.",
+      "files": [
+        "crates/raul/tests/m169_review_remediations.rs",
+        "crates/raul/tests/repro_recipes.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/repro_recipes|tab_on_settings_wipes_staged_edits|yes_for_bool_field/)' --no-fail-fast",
+      "done_when": "≥5 new tests green; repro recipes from dogfood log Entry 30 ship as regression pins (negative control)",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Run the canonical full-suite gate: cargo nextest run -p raul --no-fail-fast (≥522 → ≥527, 5 new tests) ; cargo nextest run --no-fail-fast --manifest-path Cargo.toml (≥2328 → ≥2333) ; cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings ; cargo fmt --all -- --check ; mp validate.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast && cargo nextest run --no-fail-fast --manifest-path Cargo.toml && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && cargo fmt --all -- --check && mp validate",
+      "done_when": "All commands exit 0; mp validate exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

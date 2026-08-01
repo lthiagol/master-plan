@@ -1,0 +1,13 @@
+---
+description: Spec-driven planning for this repo. Use the CPD skills (mp-flow, mp-coordinator, mp-runner) and mp CLI for all plan work.
+globs:
+alwaysApply: false
+---
+
+# Master Plan
+
+Read the plan directory `AGENTS.md` (`master-plan/` or `.mp/` per project config).
+
+- All plan reads/writes via **`mp`** — never edit plan files by hand.
+- Load the **mp-flow** / **mp-coordinator** / **mp-runner** skills for the planning and execution lifecycle (optional: **spec-grill** for adversarial spec co-design).
+- See toolkit docs under `MP_HOME/docs/` (e.g. `AGENT-PLAYBOOK.md`, `AGENT-READINESS.md`).

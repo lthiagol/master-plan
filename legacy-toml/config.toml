@@ -1,0 +1,36 @@
+# Preset for mp init --profile full
+# Copied to master-plan/config.toml on init (merged with toolkit defaults).
+
+[workflow]
+profile = "full"
+
+[workflow.artifacts]
+brief = true
+backlog = true
+milestones = true
+tracks = true
+ideas = true
+decisions = true
+
+[workflow.plan]
+in_repo = true
+location = "master-plan"
+
+[workflow.gates]
+strictness = "full"
+
+[archive]
+auto_purge_days = 0
+archive_on_milestone_delete = true
+archive_on_track_cancel = true
+
+[git]
+auto_commit = false
+commit_on_milestone_complete = false
+
+[next]
+prefer = "milestone"
+
+[planning]
+require_min_out_of_scope = 2
+require_min_acceptance_criteria = 1

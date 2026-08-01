@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://master-plan.dev/schemas/plan.schema.json",
+  "title": "Plan",
+  "description": "Project charter and plan index (plan.toml).",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "stack": { "type": "array", "items": { "type": "string" } },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "created": { "type": "string" },
+        "target_version": { "type": "string" },
+        "planning_status": {
+          "type": "string",
+          "enum": ["planning", "ready-for-execution", "in-execution", "release-candidate"]
+        },
+        "planning_phase": {
+          "type": "string",
+          "enum": ["brief", "charter", "milestones", "execution"]
+        }
+      }
+    },
+    "charter": {
+      "type": "object",
+      "properties": {
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "non_goals": { "type": "array", "items": { "type": "string" } },
+        "deferred": { "type": "array", "items": { "type": "string" } },
+        "principles": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "lines_of_code": { "type": "integer" },
+        "unit_tests": { "type": "integer" },
+        "integration_tests": { "type": "integer" },
+        "coverage_percent": { "type": "number" },
+        "checked_at": { "type": "string" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["planning", "autonomous"] },
+        "handoff_at": { "type": "string" },
+        "handoff_by": { "type": "string" },
+        "strategy": {
+          "type": "string",
+          "enum": ["deps_only", "resume_then_ready", "priority_first", "manual"]
+        },
+        "interleave": { "type": "string", "enum": ["milestone", "step"] },
+        "focus_milestone": { "type": "string" },
+        "focus_through_step": { "type": "string" }
+      }
+    }
+  }
+}

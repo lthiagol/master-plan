@@ -1,0 +1,15 @@
+{
+  "id": "m67-validate-after-write",
+  "phase": "implemented",
+  "description": "validate passes on fixture representing post step-add write state",
+  "fixture": "projects/write-post-step-add",
+  "command": ["validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_contains": "\"ok\": true",
+    "fs_unchanged": false
+  }
+}

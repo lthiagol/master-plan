@@ -1,0 +1,16 @@
+{
+  "id": "walkthrough-validate-ok",
+  "phase": "implemented",
+  "description": "OAuth walkthrough fixture — handoff-ready M03 passes validate",
+  "fixture": "projects/walkthrough-oauth",
+  "command": ["validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": false
+  },
+  "notes": "See docs/WALKTHROUGH.md for full interview → handoff narrative."
+}

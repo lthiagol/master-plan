@@ -1,0 +1,306 @@
+[[ideas]]
+id = ""
+title = ""
+body = ""
+status = "archived"
+tags = []
+source = "conversation"
+created = ""
+promoted_to = ""
+
+[[ideas]]
+id = "ID-01"
+title = "mp milestone create --example command"
+body = "Emit a minimal validating milestone JSON example to reduce pilot H5 cryptic-schema failures. Source: master-plan-pilot.md H5."
+status = "archived"
+tags = []
+source = "conversation"
+created = "2026-06-24"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-02"
+title = "raul CLI name - pick a backronym before v0"
+body = "Candidate R-A-U-L backronyms for the human-facing PM CLI (codename raul = 'the project-manager CLI', to be built in M40): (1) Read And Understand Log; (2) Review And Update Lane; (3) Reviewing And Understanding Layer. Decide before raul v0. Captured from the mp adoption planning session."
+status = "archived"
+tags = [
+    "naming",
+    "raul",
+]
+source = "planning"
+created = "2026-06-27"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-03"
+title = "Native dependency/impact queries in mp (reverse deps + blast radius)"
+body = "Today, answering dependency questions about a milestone requires ad-hoc scripts over mp show --format json. Real questions hit during planning: (1) reverse deps -- does anything depend on M39? (looped mp show milestone over all planned milestones and inspected depends_on); (2) path-pin involvement -- do any pins reference M39? (mp path list-pins + filter); (3) transitive blast radius -- if I block/delete/reorder this milestone, what is affected? mp already has a forward dependency graph (crates/mp/src/graph.rs, mp graph), but there is no native QUERY/REVERSE dimension. Proposed: mp milestone dependents <id> (who depends on this) and mp milestone deps <id> (what this depends on), both --format json; and mp milestone impact <id> that returns the transitive blast radius (reverse deps + any path pins involving the id + path implications). Bonus: mp path list-pins --milestone <id> filter. Removes the need to hand-parse JSON for every dependency/impact check and makes block/delete/reorder decisions self-service. Note: would also have caught the M45/M46 depends_on drop silently during mp milestone create."
+status = "archived"
+tags = [
+    "mp-cli",
+    "dependencies",
+    "graph",
+    "path",
+]
+source = "planning session"
+created = "2026-06-28"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-04"
+title = "raul: complete the review surface (tracks + backlog views M46 missed)"
+body = """
+After M41 made mp agent-only (only --format json/toml) and M46 added raul inbox/validate/decision/execution to cover the human views M41 dropped, two surfaces were MISSED: raul has no 'tracks' and no 'backlog' subcommand. Today there is no human-readable way to list tracks or backlog. A reviewer (human or agent) must pipe 'mp list tracks --format json' through an external tool (jq/python) to get a readable view, and if that parse fails they reach for grepping the plan TOML directly, which is a plan-zone violation.
+
+Observed in the wild during the M38/41/43/44/45/46 review session: I ran 'mp list tracks --format json' through python to get a flat one-line-per-track view, and when my parse of the nested shape failed I fell back to grepping master-plan/tracks/*.toml. The same gap applies to backlog.
+
+Scope when tackled: add 'raul tracks' (list + show item) and 'raul backlog' (list) reading via the M44 shared read layer over mp JSON, mirroring how raul milestones/show/inbox already work. This completes M46 AC-04's 'no human capability lost vs pre-2.0' promise, which today is technically violated for tracks/backlog.
+
+Related: ID-03 (native dependency/impact queries) — same theme of 'agent/reviewer cannot get what they need without reshaping mp JSON externally'. Also surfaced a secondary bug while checking this: 'mp list tracks --format toml' emits JSON instead of TOML (the list commands ignore the format flag) — worth fixing alongside or as its own tweak.
+
+Source: discovered during post-v2.0 review cleanup (commit 84ef021)."""
+status = "archived"
+tags = [
+    "raul",
+    "review-surface",
+    "m46-followup",
+    "m41-followup",
+]
+source = "conversation"
+created = "2026-06-29"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-05"
+title = "Dedicated mp planner agent (full read + mp, optimized for planning runs)"
+body = """
+A dedicated agent profile (custom-agent/subagent role) for harnesses (opencode, cursor, codex, claude, pi, etc.) that has full Master-Plan read capabilities and direct mp write access, purpose-built to optimize planning sessions - fast spec/groom/step/decompose work without the context overhead and tool-noise of a general coding agent.
+
+Distinct from the master-planner SKILL.md (which teaches ANY agent the plan workflow): this is a dedicated agent ROLE with a scoped tool surface - read everything in the plan zone, mp writes for spec/plan/state mutations, and minimal code-zone tools - tuned for planning throughput and lower token cost on long planning runs.
+
+Owner vision: 'an agent that has full read capabilities and can use mp so we can optimize when running planning.'
+
+Depends on M51 (install/distribution architecture) for the agent-profile install rail - M51 deploys binaries + skill + convention file + AGENT PROFILES per harness; this idea is the planner profile itself that M51 would deploy. Sequence: M51 (install rail) then this (the profile).
+
+Open design questions for when it becomes a milestone: (1) which harnesses' agent-profile formats to target first (opencode custom agents, cursor subagents, pi extensions); (2) the exact tool-permission scope (read-all + mp-only writes? allow raul?); (3) whether it ships as one canonical profile adapted per harness or per-harness variants; (4) how it interacts with autonomous execution mode (mp execution handoff).
+
+Source: owner vision, captured during M51 install-architecture spec discussion."""
+status = "open"
+tags = [
+    "agent-profile",
+    "planning",
+    "m51-dependency",
+    "future",
+]
+source = "conversation"
+created = "2026-06-29"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-06"
+title = "raul = Review, Approval, Unblock Loop"
+body = "Decided: RAUL stands for Review, Approval, Unblock Loop. Closed ID-02 with this choice."
+status = "archived"
+tags = [
+    "naming",
+    "raul",
+]
+source = "decision"
+created = "2026-06-29"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-07"
+title = "Agent profiles: plan / execution / review roles (deploy via install)"
+body = "Extracted from M51 during the M51 split. Define 3 agent profile SKILL templates (plan-agent: read + mp-write; execution-agent: code-zone + step-done; review-agent: read-only) under templates/profiles/, deployed via mp install. Parked as an idea because the role definitions and tool-permission model are net-new product design that needs a spec interview before they are milestone-ready. Re-enter as a milestone when the role boundaries are validated."
+status = "open"
+tags = [
+    "install",
+    "agents",
+    "needs-spec",
+]
+source = "conversation"
+created = "2026-06-29"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-08"
+title = "mp show/list --fields <paths>: JSON projection"
+body = "Shipped via M79 WP1 (--fields dotted-path JSON projection on read commands), 2026-07-01. Originally extracted from M53 S5."
+status = "archived"
+tags = [
+    "cli",
+    "json",
+    "needs-validation",
+]
+source = "conversation"
+created = "2026-06-29"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-09"
+title = "In-repo temp/scratch folder so agents never need external tmp access"
+body = "Shipped via M79 WP6 (mp scratch path / mp scratch new + gitignore + AGENTS.md/skill convention), 2026-07-01."
+status = "archived"
+tags = [
+    "agent-ux",
+    "tooling",
+    "needs-validation",
+]
+source = "conversation"
+created = "2026-06-30"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-10"
+title = "Doc generation: clap-derived command tables + optional snippet includes"
+body = """
+Park optional doc-automation so we do not duplicate mp vs raul command reference by hand.
+
+Problem: MP-COMMANDS.md §1–21 (mp) and §22 (raul) plus the mp→raul mapping table drift when CLI changes. Workflow prose and mermaid in docs/concepts should stay hand-authored (M75); only mechanical command surfaces are good generation candidates.
+
+Proposed scope (future milestone):
+- Generate mp command tree + raul command list from clap metadata (crates/mp, crates/raul) into a committed markdown fragment or MP-COMMANDS subsection
+- Optional: mdBook/includes or build.rs step to embed shared mermaid snippets (e.g. handoff sequence) in multiple docs without copy-paste
+- CI check: regen diff fails PR if clap changed but docs fragment not updated
+- Explicitly NOT: auto-generate methodology prose, AGENT-PLAYBOOK, or EXECUTION-MODES flows
+
+Depends on: M75 audience-routing model (shared concepts + split command reference). Related: M48 command-hierarchy diagram drift.
+
+Trigger: when MP-COMMANDS §22 grows painful to maintain or M71 adds many raul commands."""
+status = "open"
+tags = [
+    "docs",
+    "tooling",
+    "raul",
+    "mp",
+    "backlog",
+]
+source = "planning"
+created = "2026-06-30"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-11"
+title = "Dedicated RAUL.md — human PM entry guide (extract from MP-COMMANDS §22)"
+body = """
+Human-facing docs are scattered: MP-COMMANDS §22 (buried in agent-oriented manual), raul-tui-walkthrough.md (TUI only), no Getting Started human path. M75 S8 adds index links but not a cohesive guide.
+
+Recommendation: add docs/concepts/02 - Getting Started/RAUL.md (or 07 - Human PM/) as the single human entry — not a duplicate of all concepts, but:
+- What raul is (Review, Approval, Unblock Loop) and when humans use it vs mp/agents
+- Daily commands: status, show, next, path, execution, inbox, validate, reviews
+- Link to raul-tui-walkthrough.md for TUI
+- Link to shared workflow docs (EXECUTION-MODES handoff, PM-WORKFLOWS) with human callouts only
+- mp→raul mapping table moved or mirrored here; MP-COMMANDS §22 becomes short pointer to RAUL.md
+
+Do NOT duplicate methodology prose — RAUL.md routes to concepts. Command detail can later be clap-generated (see doc-generation idea).
+
+Trigger: after M75 index work, or alongside M71 raul dashboard when human surface expands."""
+status = "dismissed"
+tags = [
+    "docs",
+    "raul",
+    "human-pm",
+    "getting-started",
+]
+source = "planning"
+created = "2026-06-30"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-12"
+title = "M76 audit matrix"
+body = "Consumed by M76 (done/verified, 2026-06-30) - the audit matrix guided M76's human-format removal. Closed 2026-07-01."
+status = "archived"
+tags = ["M76"]
+source = "conversation"
+created = "2026-06-30"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-13"
+title = "Raul TUI: rework Path lane — execution aside, separate Tweaks/Ideas/Grooming lanes"
+body = """
+Raul TUI lane model may be overcrowded or conflating concerns. Today Path shows suggested next execution; Tweaks/Bugfixes are track lanes; grooming and ideas live in inbox/overview or mp CLI only.
+
+Proposal: rework the Path lane and sidebar/tab navigation so execution (next step / path queue) is visually separate from planning triage lanes — dedicated surfaces for tweaks, ideas, and grooming (spec review / decompose needed), instead of folding them into a generic inbox or path preview.
+
+Open design questions: does Path become execution-only? Do Ideas get a lane (M77 deferred)? Does grooming pull from mp inbox grooming items into its own lane? How does this interact with M91 top-tab layout?
+
+Park until M91 ships; then spec interview for lane split vs inbox grouping."""
+status = "open"
+tags = [
+    "raul",
+    "tui",
+    "navigation",
+    "path",
+    "inbox",
+]
+source = "conversation"
+created = "2026-07-02"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-14"
+title = "Raul TUI: milestone tree view — hierarchy and dependencies in list"
+body = """
+Milestone list in raul TUI is flat (table/list by id). Hard to see depends_on chains, sequencing, or parent/child grouping at a glance.
+
+Proposal: add a tree (or indented hierarchy) view mode in the Milestones lane — show milestones nested or connected by depends_on / path order, similar to a file tree or git log --graph. Toggle flat list vs tree; optional highlight for blockers on the critical path.
+
+Leverage existing mp graph / depends_on data (mp show milestone, mp path, mp graph) via reads layer — no hand-maintained hierarchy field required unless we want explicit grouping.
+
+Complements M91 list scroll and top tabs; may be a follow-up milestone after layout shell stabilizes."""
+status = "open"
+tags = [
+    "raul",
+    "tui",
+    "milestones",
+    "graph",
+    "dependencies",
+]
+source = "conversation"
+created = "2026-07-02"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-15"
+title = "Raul TUI: board visual refresh — compact columns, milestone boxes"
+body = """
+M84 review board (Kanban by review_state) works functionally but is visually dense — many text lines per column/lane, hard to scan many milestones at once.
+
+Proposal: enhance Board lane rendering — fewer lines per card, draw bordered boxes/cards for each milestone (ratatui Block/Paragraph), clearer column headers, tighter use of vertical space. Status icons and review_state color from M86 should carry into box headers.
+
+Out of scope for M91 (layout shell only) unless a small polish pass fits; likely its own S/M milestone after M91 + M87."""
+status = "open"
+tags = [
+    "raul",
+    "tui",
+    "board",
+    "visual",
+]
+source = "conversation"
+created = "2026-07-02"
+promoted_to = ""
+
+[[ideas]]
+id = "ID-16"
+title = "Raul TUI: color and theme audit — palette pass for readability"
+body = """
+M85 wired theme palettes; M86 added badges, icons, and markdown colors. Ad-hoc usage may still leave poor contrast, inconsistent accent usage, or --color off gaps on some lanes.
+
+Proposal: systematic audit of raul TUI (and key CLI tables) across themes (default, light, etc.) and icon modes — document which semantic slots (accent/success/warn/danger/dim) apply where, fix low-contrast pairs, align Board/Overview/Milestone detail/list lanes. Optional: screenshot-style golden render tests or checklist for 80-col and 120-col terminals.
+
+Related to board box refresh and tree view ideas; can run as polish milestone or track after M91 lands."""
+status = "open"
+tags = [
+    "raul",
+    "tui",
+    "theme",
+    "color",
+    "visual",
+    "accessibility",
+]
+source = "conversation"
+created = "2026-07-02"
+promoted_to = ""

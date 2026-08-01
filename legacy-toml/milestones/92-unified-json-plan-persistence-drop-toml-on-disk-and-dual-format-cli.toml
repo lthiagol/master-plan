@@ -1,0 +1,387 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "92"
+title = "Unified JSON plan persistence — drop TOML on-disk and dual-format CLI"
+slug = "unified-json-plan-persistence-drop-toml-on-disk-and-dual-format-cli"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = ["82"]
+effort = "L"
+risk = "med"
+change_kind = ""
+priority = "high"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Plan artifacts under master-plan/ are JSON on disk and JSON at the mp CLI boundary — one canonical shape, one serde path. Agents read and write through mp only (unchanged rule); stdout from mp show/list/status matches the persisted document model without TOML↔JSON conversion. Humans continue to use raul; they never need to open raw plan files. TOML is removed from the plan store, init templates, fixtures, and format-dispatch code."
+
+[problem]
+description = "Master Plan stores canonical state as TOML (milestones/*.toml, plan.toml, tracks, ideas, reviews, …) but exposes JSON to coding agents (M76 default). Every read/write pays a format boundary: load TOML → struct → JSON stdout; JSON stdin → struct → TOML write. That made sense when plan files were human-readable artifacts in git; it no longer does — humans use raul, hand-edit is forbidden, and the product is agent-first. The dual format adds store.rs complexity, --format toml debug mode, fixture drift, and two mental models for the same MilestoneFile. With JSON Schema already validating agent I/O, persisting JSON completes the design: store what you serve."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Migration script: convert master-plan/**/*.toml → **/*.json (milestones, plan index, config, tracks, backlog, ideas, reviews, brief, decisions, annotations, sessions, archive, challenge files) with round-trip validation",
+    "Apply M82 lean-spec field drops during migration (single pass: strip ceremony + convert TOML→JSON — no separate M82 file re-baseline)",
+    "store.rs and all plan I/O: read/write JSON only; remove toml::from_str/to_string_pretty on plan artifacts",
+    "Path resolution: milestone files become milestones/{id}-{slug}.json; update find_milestone_file, reviews spec_path, archive paths, init templates",
+    "mp validate, schema enforcement, and sync_plan index against JSON files",
+    "CLI format dispatch: remove TOML codec from read commands; --format raw passthrough of on-disk JSON where debug needed; graph DOT unchanged",
+    "mp init / install templates: scaffold JSON plan dir",
+    "Refresh tests/fixtures/projects/* and tests/scenarios/* golden output",
+    "Update STORAGE.md, SPEC.md §13.7, DECISIONS.md (new ADR superseding TOML-on-disk), AGENTS.md, master-planner skill, MP-COMMANDS.md",
+    "raul mp_runner: confirm no --format toml assumptions (already JSON-default per M76)",
+]
+out_of_scope = [
+    "SQLite/Turso or any database backend (ADR-013 unchanged)",
+    "Separate on-disk re-baseline before migration (M82 schema drops applied here, not in a prior tree rewrite)",
+    "Allowing agents to hand-edit plan JSON files directly",
+    "Human-readable mp output (raul only)",
+    "Migrating non-plan config outside master-plan/ (e.g. Cargo.toml, GitHub Actions)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Migration script converts this repo's master-plan/ and all tests/fixtures/projects/* from TOML to JSON with zero validate errors before and after (content equivalence on normalized struct, not byte-identical TOML)"
+verification = "crates/mp/tests/json_migration.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "No .toml files remain under plan dirs in dogfood master-plan/ or test fixtures (except explicitly documented non-plan exclusions if any)"
+verification = "scripts/check-plan-json-only.sh"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "store.rs plan I/O uses JSON only — no toml:: parse/serialize on plan artifact load/write paths in crates/mp/src/"
+verification = "crates/mp/tests/store_json_only.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp show milestone <id> default JSON output is produced by the same serialize path as write_milestone (no separate TOML load → JSON emit branch)"
+verification = "crates/mp/tests/show_parity.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp validate exit 0 on dogfood plan; make test-fixtures exit 0"
+verification = "make test-fixtures"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "make test-scenarios exit 0 — golden CLI scenarios updated for JSON persistence side effects if any"
+verification = "make test-scenarios"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "mp init in a temp dir creates JSON plan artifacts (.json extensions); mp doctor passes"
+verification = "crates/mp/tests/init_json.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "STORAGE.md and SPEC.md §13.7 document JSON-canonical persistence; DECISIONS.md records ADR superseding TOML-on-disk"
+verification = "manual: accepted — doc/ADR review in milestone completion"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "cargo test -p mp exit 0"
+verification = "cargo test -p mp"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Migration script"
+goal = "TOML→JSON conversion applying M82 lean field drops in single pass"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Store & CLI I/O"
+goal = "store.rs JSON-only, path resolution, format dispatch, show/write parity"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Init & templates"
+goal = "mp init/install scaffold JSON plan dir"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Fixtures & scenarios"
+goal = "Refresh test fixtures and golden CLI scenarios"
+rollback = ""
+
+[[work_packages]]
+id = "WP5"
+name = "Docs & ADR"
+goal = "STORAGE, SPEC, DECISIONS, AGENTS, MP-COMMANDS"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Build migration script: convert master-plan/**/*.toml to JSON, strip M82 ceremony fields, round-trip validate on normalized struct"
+files = [
+    "crates/mp/src",
+    "scripts",
+]
+tests = "crates/mp/tests/json_migration.rs"
+done_when = "Migration script converts dogfood plan with zero validate errors"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Run migration on dogfood master-plan/ and add scripts/check-plan-json-only.sh gate"
+files = [
+    "master-plan",
+    "scripts/check-plan-json-only.sh",
+]
+tests = "scripts/check-plan-json-only.sh"
+done_when = "No .toml plan artifacts remain under master-plan/"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Migrate tests/fixtures/projects/* to JSON"
+files = ["tests/fixtures/projects"]
+tests = "make test-fixtures"
+done_when = "All fixture projects are JSON and validate green"
+status = "pending"
+covers_ac = [
+    "AC-01",
+    "AC-05",
+]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Rewrite store.rs plan load/write for JSON only; remove toml parse/serialize on plan artifacts"
+files = ["crates/mp/src/store.rs"]
+tests = "crates/mp/tests/store_json_only.rs"
+done_when = "No toml:: plan I/O paths remain in store.rs"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Update path resolution to milestones/{id}-{slug}.json; sync_plan, reviews spec_path, archive paths"
+files = [
+    "crates/mp/src/paths.rs",
+    "crates/mp/src/sync.rs",
+]
+tests = "crates/mp/tests/json_migration.rs"
+done_when = "All plan path helpers resolve .json artifacts"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Remove TOML codec from read commands; add --format raw passthrough; ensure show uses same serialize path as write"
+files = [
+    "crates/mp/src/output.rs",
+    "crates/mp/src/commands/show.rs",
+]
+tests = "crates/mp/tests/show_parity.rs"
+done_when = "mp show JSON matches persisted document shape"
+status = "pending"
+covers_ac = ["AC-04"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP3"
+order = 7
+action = "Update mp init and install templates to scaffold JSON plan artifacts"
+files = [
+    "templates",
+    "crates/mp/src/commands/init.rs",
+]
+tests = "crates/mp/tests/init_json.rs"
+done_when = "mp init creates .json plan files and mp doctor passes"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP3"
+order = 8
+action = "Audit raul mp_runner for --format toml assumptions; fix if any"
+files = ["crates/raul/src/mp_runner.rs"]
+tests = "cargo test -p raul"
+done_when = "raul shells to mp with JSON-default contract only"
+status = "pending"
+covers_ac = ["AC-09"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP4"
+order = 9
+action = "Update tests/scenarios golden output for JSON persistence side effects"
+files = [
+    "tests/scenarios",
+    "crates/mp/tests/scenarios_runner.rs",
+]
+tests = "make test-scenarios"
+done_when = "make test-scenarios exit 0"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S10"
+work_package = "WP5"
+order = 10
+action = "Update STORAGE.md, SPEC.md §13.7, DECISIONS.md ADR superseding TOML-on-disk, AGENTS.md, master-planner skill, MP-COMMANDS.md"
+files = [
+    "docs",
+    "AGENTS.md",
+    "templates/skills",
+]
+tests = "manual: accepted — doc/ADR review in milestone completion"
+done_when = "Docs describe JSON-canonical persistence"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = [
+    "S1",
+    "S9",
+]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S11"
+work_package = "WP-close"
+order = 11
+action = "Full verification: mp validate, make test-fixtures, cargo test -p mp"
+files = []
+tests = "cargo test -p mp"
+done_when = "mp validate and cargo test -p mp exit 0"
+status = "pending"
+covers_ac = [
+    "AC-05",
+    "AC-09",
+]
+depends_on_steps = ["S10"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

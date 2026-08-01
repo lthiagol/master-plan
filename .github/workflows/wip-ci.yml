@@ -1,0 +1,43 @@
+name: wip-ci
+
+on:
+  push:
+    branches: [wip]
+  pull_request:
+    branches: [wip]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+          shared-key: master-plan
+
+      - name: Install nextest
+        run: cargo install cargo-nextest --locked --version '^0.9'
+
+      - name: Install ripgrep
+        # Required by scripts/check-consumer-surface.sh (part of `make lint`).
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep
+
+      # raul tests shell out to `mp` via find_mp (PATH / MP_HOME).
+      # Provide the just-built release binaries — same contract as `make dev-env`.
+      - name: Build release binaries
+        run: make build
+
+      - name: Put mp + raul on PATH
+        run: echo "$GITHUB_WORKSPACE/target/release" >> "$GITHUB_PATH"
+
+      - name: make ci
+        env:
+          NEXTTEST: 1
+        run: make ci

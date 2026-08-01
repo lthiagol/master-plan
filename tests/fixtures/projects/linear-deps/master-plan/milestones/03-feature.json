@@ -1,0 +1,62 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "feature tests pass",
+      "evidence": "",
+      "id": "AC-01",
+      "status": "pending",
+      "verification": "cargo test feature"
+    }
+  ],
+  "intent": {
+    "outcome": "Feature shipped."
+  },
+  "milestone": {
+    "created": "2026-06-17",
+    "depends_on": [
+      "02"
+    ],
+    "effort": "M",
+    "execution_status": "planned",
+    "id": "03",
+    "risk": "low",
+    "slug": "feature",
+    "spec_status": "ready",
+    "title": "Feature",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Need feature on core."
+  },
+  "scope": {
+    "in_scope": [
+      "feature"
+    ],
+    "out_of_scope": [
+      "core",
+      "polish"
+    ]
+  },
+  "steps": [
+    {
+      "action": "Implement feature",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "done_when": "tests pass",
+      "id": "S1",
+      "order": 1,
+      "status": "pending",
+      "tests": "cargo test feature",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Ship feature",
+      "id": "WP1",
+      "name": "Feature",
+      "rollback": "git revert feature"
+    }
+  ]
+}

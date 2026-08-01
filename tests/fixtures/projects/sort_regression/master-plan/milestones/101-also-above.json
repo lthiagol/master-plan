@@ -1,0 +1,52 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "also-above done",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "manual: fixture"
+    }
+  ],
+  "intent": {
+    "outcome": "Milestone 101 — second id in the above-100 cluster."
+  },
+  "milestone": {
+    "created": "2026-07-04",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "101",
+    "risk": "low",
+    "slug": "also-above",
+    "spec_status": "verified",
+    "title": "Also 101",
+    "updated": "2026-07-04"
+  },
+  "problem": {
+    "description": "Numeric, lex-disordered vs 09-11."
+  },
+  "scope": {
+    "in_scope": ["101"],
+    "out_of_scope": []
+  },
+  "steps": [
+    {
+      "action": "Do 101",
+      "covers_ac": ["AC-01"],
+      "done_when": "done",
+      "id": "S1",
+      "status": "done",
+      "tests": "manual: fixture",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Bootstrap 101",
+      "id": "WP1",
+      "name": "WP1",
+      "rollback": "n/a"
+    }
+  ]
+}

@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://master-plan.dev/schemas/milestone.schema.json",
+  "title": "Milestone",
+  "description": "Lean spec-driven milestone (2.0). Implementation plan (work_packages/steps) is only valid when spec_status is ready or later.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9]{2,}(\\.[0-9]+)*$",
+      "description": "Milestone ID (e.g. 03). Split children: 03.1, 03.2. See docs/IDS.md. Minimum 2 digits (zero-padded for single-digit ids); no upper bound."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "spec_status": {
+      "type": "string",
+      "enum": ["draft", "interview", "review", "ready", "implemented", "verified"],
+      "default": "draft",
+      "description": "Legacy spec status (M100 migration window). New code should read lifecycle. Removed once migration is complete."
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": ["planned", "in-progress", "done", "blocked", "deferred", "cancelled"],
+      "default": "planned",
+      "description": "Legacy execution status (M100 migration window). New code should read lifecycle. Removed once migration is complete."
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "groomed",
+        "approved",
+        "in-progress",
+        "executed",
+        "self-reviewed",
+        "reviewed",
+        "complete",
+        "remediation"
+      ],
+      "default": "draft",
+      "description": "Single linear lifecycle state (M100). Replaces spec_status + execution_status. The executor's end-state is `executed` (work finished, awaiting review); terminal is `complete` (reviewed + findings resolved). Orthogonal overlays (blocked/deferred/needs_regrooming/cancelled) are separate fields."
+    },
+    "blocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Overlay (M100): milestone is blocked. Retains blocked_at/block_reason/blocked_by."
+    },
+    "needs_regrooming": {
+      "type": "boolean",
+      "default": false,
+      "description": "Overlay (M100): milestone needs to be re-groomed."
+    },
+    "cancelled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Overlay (M100): terminal exit. Distinct from complete."
+    },
+    "deferred": {
+      "type": "boolean",
+      "default": false,
+      "description": "Overlay (M100): deferred from active consideration."
+    },
+    "deferred_reason": {
+      "type": "string",
+      "description": "Reason for the deferred overlay."
+    },
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9]{2,}(\\.[0-9]+)*$" },
+      "default": []
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["S", "M", "L"],
+      "default": "S"
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "med", "high"],
+      "default": "low"
+    },
+    "change_kind": {
+      "type": "string",
+      "enum": ["greenfield", "delta", "track"],
+      "default": "greenfield",
+      "description": "P4: delta milestones reference specs/ domain files. M196: track milestones bypass the review gate (the track fast-path); see docs/milestone-lifecycle/review.md."
+    },
+    "intent": {
+      "type": "object",
+      "required": ["outcome"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One verifiable sentence describing the end state."
+        }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "in_scope": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "out_of_scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "Minimum 2 exclusions required before spec_status review."
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/acceptance_criterion" },
+      "minItems": 1,
+      "description": "Minimum 1 required before spec_status review."
+    },
+    "design_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/design_decision" }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/open_question" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "work_packages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/work_package" },
+      "description": "Merge/rollback grouping. Only valid when spec_status is ready or later."
+    },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/step" },
+      "description": "Implementation steps (S1, S3.1, …). See docs/IDS.md."
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "branch": { "type": "string" },
+        "evidence": { "type": "string" }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "description": "P4: required when change_kind is delta. Merged into specs/ on complete.",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Domain id — specs/{domain}.toml"
+        },
+        "base_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Domain version this delta applies to"
+        },
+        "added": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/delta_added" }
+        },
+        "modified": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/delta_modified" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/delta_removed" }
+        }
+      },
+      "required": ["domain", "base_version"]
+    }
+  },
+  "$defs": {
+    "acceptance_criterion": {
+      "type": "object",
+      "required": ["description", "verification"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^AC-[0-9]{2}$" },
+        "description": { "type": "string" },
+        "verification": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "passed", "failed"],
+          "default": "pending"
+        },
+        "evidence": { "type": "string" }
+      }
+    },
+    "design_decision": {
+      "type": "object",
+      "required": ["area", "choice", "rationale"],
+      "properties": {
+        "area": { "type": "string" },
+        "choice": { "type": "string" },
+        "rationale": { "type": "string" }
+      }
+    },
+    "open_question": {
+      "type": "object",
+      "required": ["question"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^Q-[0-9]{2}$" },
+        "question": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved"],
+          "default": "open"
+        },
+        "answer": { "type": "string" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "category", "description", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^F-[0-9]{2}$" },
+        "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "author": { "type": "string" },
+        "fixed_in": { "type": "string" },
+        "created": { "type": "string" },
+        "resolved": { "type": "string" },
+        "phase": {
+          "type": "string",
+          "enum": ["self", "external", ""],
+          "description": "M101: review phase that owns this finding. Findings with phase=self (or empty per M125 legacy convention) gate done→self-reviewed; findings with phase=external gate self-reviewed→reviewed. Empty string is the legacy default for pre-M125 findings and is treated as self-phase by the gating helpers."
+        },
+        "anchor": {
+          "type": "object",
+          "description": "M101: optional hunk-shaped anchor (path/commit/new_range/old_range/hunk_index/side). Absent → no behavior change.",
+          "properties": {
+            "path": { "type": "string" },
+            "commit": { "type": "string" },
+            "new_range": { "$ref": "#/$defs/range" },
+            "old_range": { "$ref": "#/$defs/range" },
+            "hunk_index": { "type": "integer", "minimum": 0 },
+            "side": { "type": "string", "enum": ["old", "new", ""],
+              "description": "M101: which side of the diff the anchor targets. Empty string is the legacy 'no side recorded' default." }
+          }
+        },
+        "thread": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding_thread_entry" },
+          "description": "M101: reviewer↔executor conversation thread. Thread replies append without affecting transition gating."
+        },
+        "summary": {
+          "type": "string",
+          "description": "M101: short title for the finding (hunk-compatible)."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "M101: longer reasoning for why this finding matters (hunk-compatible)."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high", ""],
+          "description": "M101: reviewer confidence in the finding. Empty string is the legacy default for findings filed before M105 added confidence validation; is_valid_confidence accepts empty as the 'unspecified' sentinel."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "M101: free-form tags for grouping findings."
+        }
+      }
+    },
+    "range": {
+      "type": "object",
+      "required": ["start_line", "end_line"],
+      "properties": {
+        "start_line": { "type": "integer", "minimum": 0 },
+        "end_line": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "finding_thread_entry": {
+      "type": "object",
+      "required": ["author", "at", "body"],
+      "properties": {
+        "author": { "type": "string" },
+        "at": { "type": "string", "description": "RFC3339 timestamp" },
+        "body": { "type": "string" }
+      }
+    },
+    "work_package": {
+      "type": "object",
+      "required": ["name", "goal"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^WP[0-9]+$" },
+        "name": { "type": "string" },
+        "goal": { "type": "string" },
+        "rollback": { "type": "string" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["id", "action", "done_when"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^S[0-9]+(\\.[0-9]+)*$",
+          "description": "Outline step ID: S1, S3, S3.1, S3.1.2"
+        },
+        "work_package": { "type": "string", "pattern": "^WP[0-9]+$" },
+        "order": { "type": "integer", "minimum": 0 },
+        "action": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tests": { "type": "string" },
+        "done_when": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in-progress", "done", "skipped"],
+          "default": "pending"
+        },
+        "covers_ac": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^AC-[0-9]{2}$" }
+        }
+      }
+    },
+    "delta_added": {
+      "type": "object",
+      "required": ["statement"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^REQ-[0-9]{2}$" },
+        "statement": { "type": "string" },
+        "scenarios": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "delta_modified": {
+      "type": "object",
+      "required": ["target", "before", "after"],
+      "properties": {
+        "target": { "type": "string" },
+        "before": { "type": "string" },
+        "after": { "type": "string" }
+      }
+    },
+    "delta_removed": {
+      "type": "object",
+      "required": ["target", "reason"],
+      "properties": {
+        "target": { "type": "string" },
+        "reason": { "type": "string" },
+        "replacement": { "type": "string" }
+      }
+    }
+  }
+}

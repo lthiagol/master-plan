@@ -1,0 +1,446 @@
+{
+  "milestone": {
+    "id": "188",
+    "title": "Schema and JSON input hardening",
+    "slug": "schema-and-json-input-hardening",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "187"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T13:26:55.635124+00:00"
+  },
+  "intent": {
+    "outcome": "mini_schema fails closed on unsupported or malformed schemas; all JSON/@file/--file/stdin inputs share bounded, project-root-contained reading; milestone create accepts the same document through every input form."
+  },
+  "problem": {
+    "description": "mini_schema uses a keyword blacklist and silently ignores unknown types and invalid regexes. json_input canonicalizes only the parent before following a leaf symlink. milestone create --file bypasses the bounded key-validating path used by --json. Several durable loaders and stdin remain unbounded."
+  },
+  "scope": {
+    "in_scope": [
+      "Explicit mini_schema keyword/type allowlist; Validator::new fail-closed compile including regex compile-at-new",
+      "Oracle parity for every supported construct including annotation.schema.json",
+      "Canonical full-path project-root containment for @file/--file; symlink only if target stays under canonical root",
+      "Unified milestone create input for inline/@file/--file/stdin with 32MiB cap and identical key validation",
+      "All durable JSON loaders and stdin bounded while reading (not metadata-only)",
+      "Regression coverage landed in existing suite_validate, suite_milestone, and mini_schema_parity binaries (no new test stubs)"
+    ],
+    "out_of_scope": [
+      "PlanWriteTxn / multi-file transactions (Group A / M187 — prerequisite, already complete)",
+      "Lifecycle transition ownership and Raul lifecycle mapping (Group C / M189)",
+      "Watch state-machine correctness (Group D / M190)",
+      "Raul selection/approval/timestamp fixes (Group E / M191)",
+      "Repository trust gating and install/display hardening (Group F / M192)",
+      "Comment remediation and architecture cleanup (Group G / M193)",
+      "Creating new integration-test binaries such as json_input or store_bounded_loaders stubs"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mini_schema rejects unknown/misspelled keywords, unknown types, malformed type arrays, invalid regexes, wrong keyword value types, and unresolved/unsupported $refs at Validator::new (regexes compile once); json_input canonicalizes the full existing candidate path and allows symlinks only when the target remains under the canonical project root (escaping/broken fail closed); every durable JSON loader and stdin is bounded while reading (not metadata-only), including challenge, brief, track, archive metadata, session-path, and generic collection loaders.",
+      "verification": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_validate --no-fail-fast → 89 passed, 0 failed (exit 0). Stage-9 remediation: cyclic $ref rejected at Validator::new (direct+indirect+anyOf); ASCII \\d; integer accepts 1.0; reviews/path discovery bounded; challenge size errors preserved; O_NOFOLLOW canonical open. [per-AC exact; not skip-verify]"
+    },
+    {
+      "id": "AC-02",
+      "description": "mini_schema stays in parity with the jsonschema oracle for every supported construct, including every active embedded schema and annotation.schema.json.",
+      "verification": "cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast → 9 passed, 0 failed (exit 0). Includes parity_integer_accepts_integral_floats and parity_pattern_digit_is_ascii (U+0665). [per-AC exact; not skip-verify]"
+    },
+    {
+      "id": "AC-03",
+      "description": "Milestone create routes inline JSON, @file, --file, and stdin through one pipeline (bounded read → parse Value → validate keys → deserialize) with identical key-validation errors, the same 32MiB cap, and the same project-root containment policy for every file form.",
+      "verification": "cargo nextest run -p mp --test suite_milestone --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_milestone --no-fail-fast → 100 passed, 0 failed (exit 0). [per-AC exact; not skip-verify]"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp crate with tests compiles under Clippy with warnings denied after mini_schema, json_input, store, and create-input hardening.",
+      "verification": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "cargo clippy -p mp --tests --no-deps -- -D warnings → exit 0. cargo fmt --all -- --check → exit 0. [per-AC exact; not skip-verify]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "mini_schema",
+      "choice": "Replace the unsupported-keyword blacklist with an explicit keyword and type allowlist; distinguish schema keywords from property names under properties and $defs; reject unknown assertions, unknown types, malformed type arrays, invalid regexes, malformed keyword values, and unresolved/unsupported refs during Validator::new; compile regexes once into the compiled representation; keep oracle parity for every supported construct including annotation.schema.json.",
+      "rationale": "Fail-open mini_schema silently accepts schemas that do not mean what authors intend; compile-time rejection and compiled regexes make validation fail closed and avoid per-call recompile cost."
+    },
+    {
+      "area": "path_containment",
+      "choice": "Canonicalize the complete existing candidate path and the project root before open; compare canonical paths for containment; allow a symlink only when its complete canonical target remains under the canonical root; reject escaping and broken symlinks; apply the same policy to both @file and --file.",
+      "rationale": "Parent-only canonicalization lets a leaf symlink escape the project root while appearing contained."
+    },
+    {
+      "area": "create_input",
+      "choice": "Introduce one create-input pipeline (bounded read → parse Value → validate keys → deserialize typed input) and route inline JSON, @file, --file, and stdin through it; apply the same root-containment policy and 32MiB cap to every file form; preserve source-specific context only in error messages, not behavior.",
+      "rationale": "milestone create --file currently bypasses the bounded key-validating path used by --json, so the same document can succeed or fail depending on how it is supplied."
+    },
+    {
+      "area": "bounded_loaders",
+      "choice": "Route every durable JSON loader through one bounded reader; bound stdin incrementally while reading from the opened handle (not metadata-only size checks) so sparse files, growth after metadata inspection, and pipes cannot bypass the cap; preserve resource-specific context in wrapper errors.",
+      "rationale": "Metadata-only caps and unbounded stdin leave plan loaders open to oversized or growing inputs."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "mini_schema fail-closed compile",
+      "goal": "Explicit keyword/type allowlist; Validator::new rejects malformed schemas; regex compile-at-new; oracle parity including annotation.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Path containment and bounded loaders",
+      "goal": "Canonical full-path containment for @file/--file; all durable JSON loaders and stdin bounded while reading.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Unified create-input pipeline",
+      "goal": "One create pipeline for inline/@file/--file/stdin with identical key validation and 32MiB cap.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Replace mini_schema unsupported-keyword blacklist with an explicit keyword and type allowlist; distinguish schema keywords from property names under properties and $defs; during Validator::new reject unknown assertions, unknown types, malformed type arrays, invalid regexes, malformed keyword values (required/enum/minLength/minItems/minimum/items/anyOf/properties/$defs), and unresolved/unsupported refs; compile regexes once into the compiled representation; keep schema-path-precise errors.",
+      "files": [
+        "crates/mp/src/mini_schema.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Validator::new fails closed on the Finding-3 regression matrix; supported regexes are compiled once and reused; property names under properties/$defs are not treated as schema keywords.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test suite_validate --no-fail-fast: 83 passed, exit 0; includes nested $defs unresolved-ref regression"
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Extend suite_validate mini_schema unit/fixture coverage for unknown/misspelled keywords, unknown/mixed type arrays, invalid regex, wrong keyword value types, and missing internal $ref; ensure mp-oracle mini_schema_parity covers every active embedded schema including annotation.schema.json.",
+      "files": [
+        "crates/mp/tests/suite_validate.rs",
+        "crates/mp/tests/suites/mini_schema_unit.rs",
+        "crates/mp/tests/suites/mini_schema_fixtures.rs",
+        "crates/mp-oracle/tests/mini_schema_parity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast && cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast",
+      "done_when": "suite_validate and mini_schema_parity both green; annotation.schema.json is in the oracle parity set; no new test binary stubs created.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "suite_validate: 83 passed; mini_schema_parity: 7 passed; exits 0"
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "In json_input, canonicalize the complete existing candidate path and project root before open; compare canonical paths for containment; allow symlinks only when the complete canonical target remains under the canonical root; reject escaping and broken symlinks; apply the same bounded contained reader to both @file and --file; open/read only after the containment check.",
+      "files": [
+        "crates/mp/src/json_input.rs",
+        "crates/mp/tests/suite_validate.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Leaf symlink outside root, path through escaping symlinked directory, and broken symlinks are rejected; contained relative/absolute paths and in-root symlinks follow the documented policy; @file and --file share the policy. Coverage lives under suite_validate (no new json_input test binary).",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "suite_validate containment regressions passed; 83 total, exit 0"
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Route every durable JSON loader through one bounded reader; bound stdin incrementally while reading from the opened handle (not metadata-only); enforce the cap so sparse files, growth after metadata inspection, and pipes cannot bypass it; cover challenge, brief, track, archive metadata, session-path, and generic collection loaders; preserve resource-specific context in wrapper errors. Add table-driven oversized/exact-limit/pipe cases under suite_validate.",
+      "files": [
+        "crates/mp/src/json_input.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/tests/suite_validate.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Oversized inputs fail for every durable loader; exact-limit payloads remain accepted; stdin/pipe over the cap is rejected while reading; no new store_bounded_loaders test binary.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "suite_validate bounded loader/stdin/exact-limit regressions passed; 83 total, exit 0"
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Introduce one milestone create-input pipeline (bounded read → parse Value → validate keys → deserialize typed input); route inline JSON, @file, --file, and stdin through it; apply the same root-containment policy and 32MiB cap to every file form; preserve source-specific context only in error messages. Parameterize suite_milestone create tests across all input forms for valid/invalid payloads, dropped/unknown keys, oversized payloads, and escaped paths.",
+      "files": [
+        "crates/mp/src/milestone/spec.rs",
+        "crates/mp/tests/suite_milestone.rs",
+        "crates/mp/tests/suites/milestone_create.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_milestone --no-fail-fast",
+      "done_when": "Identical documents succeed or fail identically across inline/@file/--file/stdin; unknown keys and oversized/escaped inputs share error behavior; suite_milestone green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test suite_milestone --no-fail-fast: 100 passed, exit 0"
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Audit other commands that accept both --json and --file for the same create-input divergence; route any remaining divergent paths through the shared bounded contained reader; confirm mp compiles under Clippy with -D warnings.",
+      "files": [
+        "crates/mp/src/milestone/spec.rs",
+        "crates/mp/src/json_input.rs",
+        "crates/mp/src/store.rs"
+      ],
+      "tests": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "done_when": "No remaining --json/--file behavioral divergence for create-equivalent inputs; clippy -D warnings clean for mp with tests.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo clippy -p mp --tests --no-deps -- -D warnings: exit 0; only milestone create/update expose both --json and --file and both use shared reader"
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "AC suites independently green: suite_validate 83 passed; mini_schema_parity 7 passed; suite_milestone 100 passed; scoped Clippy and fmt exit 0. Definitive full workspace suite excluding only repo_plan_validates_via_mini_schema exited 0. --skip-verify used because mp completion cross-contaminated AC-01 suite_validate into AC-02 mp-oracle target; recorded in mp-dogfood-log Entry 23. [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The first strict create-key allowlist treated historical spec_status/execution_status/lifecycle hints as unknown, breaking suite_milestone fixtures. Remediated by recognizing those compatibility keys while retaining create-owned lifecycle defaults and rejecting genuinely unknown keys.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/milestone/spec.rs"
+      },
+      "summary": "Create key allowlist initially rejected known compatibility hints"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Self-review found that malformed nested $defs schemas were compiled for keyword/type validity but their resolved compiled nodes were discarded, so a missing root reference inside nested $defs could escape the reference-resolution pass. Remediated with a recursive raw-schema reference walk and regression.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/mini_schema.rs"
+      },
+      "summary": "Nested $defs references needed recursive resolution checking"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Validator::new accepts mutually recursive $defs (A→B→A, or any pure $ref cycle) because references resolve by name only. validate() then recurses forever on $ref and aborts the process with a stack overflow. Reproduced with a two-node $defs cycle: compile Ok, iter_errors aborts. Finding 3 / AC-01 require unresolved or unsupported refs to fail closed at Validator::new; cyclic refs are unsupported and must be rejected at compile (visited-set / recursion guard), not deferred to validation-time crash. Self-refs reached only through properties/items (data-driven) are fine and already terminate.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/mini_schema.rs",
+        "new_range": {
+          "start_line": 374,
+          "end_line": 374
+        },
+        "side": "new"
+      },
+      "summary": "Cyclic $ref compiles then stack-overflows on validate"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "AC-02 requires mini_schema parity with jsonschema for every supported construct, but focused reproducers diverge: (1) pattern ^\\\\d$ accepts Unicode digit U+0665 in mini (Rust regex Unicode classes) while jsonschema/ECMAScript rejects it; (2) type integer rejects JSON 1.0 in mini (serde_json stores it as f64; as_i64 is None) while jsonschema accepts it as an integer. Active embedded schemas mostly use [0-9] and integer literals without .0, so production fixtures pass, but oracle coverage is empty-object/smoke and does not pin these dialects. Either align mini with the JSON Schema dialect the oracle uses, or document and test an explicit supported subset and fail closed on patterns outside it.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/mini_schema.rs",
+        "new_range": {
+          "start_line": 443,
+          "end_line": 443
+        },
+        "side": "new"
+      },
+      "summary": "Oracle parity gaps for pattern and integer"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "AC-01 / Finding 12 require every durable JSON loader to use the streaming bounded reader. store loaders for challenge/brief/track/archive/session/collections were migrated, but reviews::load_reviews still uses std::fs::read_to_string on reviews.json, and paths::read_config_at / find_milestone_in_ctx still read config.json and session milestone.json unbounded. Oversized or sparse hostile files on those paths bypass the 64MiB incremental cap. Route them through store::read_text_bounded (or json_input::read_file_bounded) with the same resource-specific error wrappers.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/reviews.rs",
+        "new_range": {
+          "start_line": 67,
+          "end_line": 67
+        },
+        "side": "new"
+      },
+      "summary": "reviews.json and path discovery still unbounded"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "correctness",
+      "description": "load_challenge (and similarly load_domain_spec) wraps read_text_bounded with context 'challenge not found: …' / 'domain spec … not found'. An oversized file correctly refuses to load, but the outer context claims the resource is missing. Reproduced: sparse file at MAX_PLAN_FILE_BYTES+1 yields 'challenge not found: … exceeds 67108864 bytes'. Preserve the bounded-reader message; use not-found only for missing paths (or map io::ErrorKind::NotFound).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/store.rs",
+        "new_range": {
+          "start_line": 549,
+          "end_line": 549
+        },
+        "side": "new"
+      },
+      "summary": "Size-limit failures mislabeled as not found"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "security",
+      "description": "json_input::read_contained_file canonicalizes then File::open on the resolved PathBuf. That narrows the race versus re-resolving the original symlink path (as noted in-comment), but does not use O_NOFOLLOW / openat of a verified regular file. Between canonicalize and open, the canonical path can be replaced with a symlink escaping the project root; open will follow it. Finding 8 asked for a practical open strategy that reduces check/open races — residual TOCTOU remains on the final open. Prefer open with O_NOFOLLOW (or equivalent) after confirming the canonical target is a regular file, then read from the fd.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/json_input.rs",
+        "new_range": {
+          "start_line": 64,
+          "end_line": 64
+        },
+        "side": "new"
+      },
+      "summary": "Canonical open still follows replacement symlink (TOCTOU)"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "process",
+      "description": "AC-01–AC-04 share one identical evidence blob ending in [skip-verify: AC and step verifications skipped], including AC-04 whose verification is clippy. Stage-7 handoff and mp-dogfood-log Entry 23 correctly document the complete-cache cross-contamination bug that forced --skip-verify, and this stage-8 session independently re-ran the exact AC commands green (suite_validate 83, mini_schema_parity 7, suite_milestone 100, clippy -D warnings). Per code-review-lessons L51/L53, do not leave copy-pasted skip-verify evidence as the durable record: after remediation (or when the cache bug is fixed), re-complete / re-stamp each AC with that AC's own command output so evidence matches verification.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ba041b6",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "master-plan/milestones/188-schema-and-json-input-hardening.json"
+      },
+      "summary": "Identical skip-verify evidence stamped on all ACs"
+    },
+    {
+      "id": "F-09",
+      "severity": "high",
+      "category": "correctness",
+      "description": "mp milestone verify 188 fails AC-02 even though acceptance_criteria[AC-02].verification is correct and the exact command exits 0 when run outside verify. Root cause: ac_verify::rewrite_legacy_cargo_test_invocations blindly replaces --test mini_schema_parity with --test suite_validate mini_schema_parity:: via LEGACY_TEST_BINARY_MAP (integration_test_map.rs), which is scoped for the mp crate's consolidated suite_validate binary. AC-02 uses -p mp-oracle --test mini_schema_parity (a real mp-oracle test binary); after rewrite, nextest asks mp-oracle for suite_validate and fails with 'no test target named suite_validate in mp-oracle package'. Same cross-package contamination as dogfood Entry 23 / stage-7 --skip-verify workaround. F-08 re-stamped per-AC evidence correctly, but the verify gate remains false-red. Fix: scope the legacy rewrite to -p mp (or equivalent package-aware match), and/or stop mapping names that are live binaries in other crates. Reproducer: mp milestone verify 188 → AC-02 exit 101; cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast → 9 passed.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/ac_verify.rs",
+        "new_range": {
+          "start_line": 396,
+          "end_line": 396
+        },
+        "side": "new"
+      },
+      "summary": "Legacy test-map rewrite breaks mp-oracle AC verify"
+    }
+  ]
+}

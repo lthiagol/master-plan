@@ -1,0 +1,92 @@
+[brief]
+status = "done"
+created = "2026-06-18"
+completed = "2026-06-30"
+
+[[topics]]
+id = "T01"
+key = "problem"
+title = "Problem & motivation"
+prompt = "What problem are you solving? Why does this project exist? Why now?"
+body = "Coding agents need a structured way to plan, track, and execute software engineering tasks. Existing project management tools are designed for humans, not agents. This toolkit provides a spec-driven pipeline where agents can autonomously decompose, implement, and verify work against a formal plan stored in TOML files co-located with the codebase."
+status = "filled"
+builtin = true
+required = true
+order = 1
+
+[[topics]]
+id = "T02"
+key = "audience"
+title = "Who is it for?"
+prompt = "Primary users or consumers. Who is explicitly NOT the audience?"
+body = "Primary audience: LLM-based coding agents (opencode, cursor, and similar AI coding assistants) that need to autonomously plan and execute multi-step software engineering work. Secondary audience: human developers who want to review, approve, or override agent plans. Explicitly NOT for: traditional project management (Jira/Linear users), non-technical stakeholders, or manual planning workflows."
+status = "filled"
+builtin = true
+required = true
+order = 2
+
+[[topics]]
+id = "T03"
+key = "capabilities"
+title = "Rough capabilities"
+prompt = "What might it do? Brainstorm features or behaviors — rough is fine, no ordering yet."
+body = "Plan initialization (mp init), milestone CRUD with spec-driven lifecycle, step-by-step execution tracking with dependency management, validation gates (G1-G13), spec authoring via interview or co-design, autonomous execution with agent handoff, brownfield analysis for existing projects, install and distribution via harness registry, fuzzy search across plan artifacts, milestone/step archival, configurable code review gate, annotation system for human-in-the-loop approval, raul TUI for human review and interaction, dogfooding the toolkit on itself."
+status = "filled"
+builtin = true
+required = true
+order = 3
+
+[[topics]]
+id = "T04"
+key = "constraints"
+title = "Constraints"
+prompt = "Time, budget, stack preferences, platform, team size, legal, or technical limits."
+body = "Rust only (single language stack to minimize agent confusion). No external databases or services -- everything is filesystem-based TOML. Must run on Linux and macOS with no extra runtime dependencies beyond the compiled binary. No network calls. Schema changes must preserve backward compatibility for plan files. Human interaction is read-only via raul TUI/CLI; all plan mutations are agent-driven through mp."
+status = "filled"
+builtin = true
+required = true
+order = 4
+
+[[topics]]
+id = "T05"
+key = "inspiration"
+title = "Inspiration & references"
+prompt = "Similar products, links, repos, or experiences you want to learn from or avoid."
+body = "Inspired by: Spec-Driven Development patterns from AI coding agents (spec-first, verify-later), Docker CLI command nesting for discoverability, Cargo workspace/package structure for multi-crate Rust projects, and the Unix philosophy of small composable tools (mp + raul as separate binaries). Avoids: heavy web-based PM tools, config-as-code approaches that mix plan state with app config, and YAML-based specs."
+status = "filled"
+builtin = true
+required = false
+order = 5
+
+[[topics]]
+id = "T06"
+key = "unknowns"
+title = "Unknowns & open questions"
+prompt = "What don't you know yet? What needs research or a spike?"
+body = "Can mp handle concurrent agent sessions? What happens when two agents race on the same milestone? How should the dogfood plan version itself as the toolkit evolves? Is the brief format expressive enough for brownfield migrations? How do we handle plan-sync across branches? How should we handle corrupted or hand-edited plan files? These are tracked as open questions in specific milestones."
+status = "filled"
+builtin = true
+required = true
+order = 6
+
+[[topics]]
+id = "T07"
+key = "success"
+title = "What success looks like"
+prompt = "How will you know this worked? Vague is OK — we'll sharpen this in the charter."
+body = "Agents can autonomously complete a full milestone lifecycle in this repo (dogfooding test passes). mp validate reports zero errors. CI pipeline is green. Another agent can pick up SESSION-HANDOFF.md and execute without human intervention. All 12 spec-ready milestones can be completed autonomously in order."
+status = "filled"
+builtin = true
+required = true
+order = 7
+
+[[topics]]
+id = "T08"
+key = "non_starters"
+title = "Explicit non-starters"
+prompt = "What are you probably NOT doing in v1? Ideas to park, not reject forever."
+body = "NOT a replacement for Jira/Linear or traditional PM dashboards. NOT a CI/CD pipeline or build system. NOT a code review tool. NOT a collaboration platform for distributed human teams. NOT a general-purpose task tracker. NOT a graphical tool -- all plan visualization is terminal-based."
+status = "filled"
+builtin = true
+required = true
+order = 8

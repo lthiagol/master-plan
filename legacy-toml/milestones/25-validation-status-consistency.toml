@@ -1,0 +1,147 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "25"
+title = "Validation & status consistency"
+slug = "validation-status-consistency"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-24"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "validate, plan gaps, inbox, and status give consistent signals about plan completeness and execution readiness."
+
+[problem]
+description = "Pilot M7/M9/H2: `plan gaps` reports major missing step tests while `validate` stays ok:true; `mp inbox` shows phantom empty-id placeholders on fresh init; `planning_status` stays 'planning' even when `execution check` says can_handoff:true."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = []
+out_of_scope = [
+    "changing the gate model itself",
+    "reworking the inbox data model beyond filtering",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "validate and plan gaps agree on step tests: validate enforces step tests when strictness=full, OR docs state plan gaps is the mandatory post-decompose check"
+verification = "plan missing step tests: validate and plan gaps give consistent pass/fail under strictness=full"
+status = "passed"
+evidence = "validate now checks step.tests under strictness=full; plan_gaps already does; gaps_validate_agree.rs tests pass"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp inbox filters items with empty id/description (no phantom placeholders); mp status inbox_count is 0 right after init"
+verification = "manual: fresh mp init → mp inbox empty, inbox_count 0"
+status = "passed"
+evidence = "inbox filters ideas/backlog with empty ids; inbox_phantoms.rs tests confirm 0 count on fresh init"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "planning_status transitions to ready-for-execution when can_handoff, OR mp status (human) surfaces can_handoff prominently"
+verification = "decomposed milestone with can_handoff:true → status reflects readiness"
+status = "passed"
+evidence = "status includes can_handoff boolean; status_readiness.rs tests pass"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Consistency fixes"
+goal = "Make validate, plan gaps, inbox, and status agree on plan completeness and execution readiness"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Reconcile validate and plan gaps on step tests: under strictness=full either validate enforces step tests or docs state plan gaps is the mandatory post-decompose check, so both give consistent pass/fail"
+files = [
+    "crates/mp/src/plan_gaps.rs",
+    "crates/mp/src/validate.rs",
+]
+tests = "crates/mp/tests/gaps_validate_agree.rs: plan missing step tests -> validate and plan gaps give consistent pass/fail under strictness=full"
+done_when = "validate and plan gaps agree on missing step tests under strictness=full"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "mp inbox: filter out items with empty id/description (no phantom placeholders); ensure mp status inbox_count is 0 right after a fresh mp init"
+files = [
+    "crates/mp/src/inbox.rs",
+    "crates/mp/src/status.rs",
+]
+tests = "crates/mp/tests/inbox_phantoms.rs: fresh mp init -> mp inbox empty and status inbox_count 0"
+done_when = "Fresh init yields an empty inbox and inbox_count 0"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "planning_status vs can_handoff: transition planning_status to ready-for-execution when execution check reports can_handoff, or surface can_handoff prominently in mp status (human)"
+files = [
+    "crates/mp/src/execution.rs",
+    "crates/mp/src/status.rs",
+]
+tests = "crates/mp/tests/status_readiness.rs: decomposed milestone with can_handoff true -> status reflects readiness"
+done_when = "A decomposed, can_handoff milestone is reflected as ready-for-execution in status"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-25"
+branch = ""
+evidence = "All 3 steps done, 3 ACs passed, 7 new tests, full suite green"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

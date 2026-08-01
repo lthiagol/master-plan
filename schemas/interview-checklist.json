@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InterviewChecklist",
+  "description": "Interview rounds mapped to template fields. mp interview checklist reads this file.",
+  "brief": {
+    "template": "templates/defaults/brief.toml",
+    "required_for_done": [
+      "topics[problem]",
+      "topics[audience]",
+      "topics[capabilities]",
+      "topics[constraints]",
+      "topics[unknowns]",
+      "topics[success]",
+      "topics[non_starters]"
+    ],
+    "rounds": [
+      {
+        "id": "brief-1-orientation",
+        "fields": ["topics[problem]", "topics[audience]"],
+        "questions": [
+          "What problem are you solving? Why does this project exist?",
+          "Who is it for — and who is it NOT for?"
+        ]
+      },
+      {
+        "id": "brief-2-shape",
+        "fields": ["topics[capabilities]", "topics[constraints]"],
+        "questions": [
+          "Brainstorm what it might do — rough ideas, no ordering yet.",
+          "Any hard constraints on stack, platform, time, or scope?"
+        ]
+      },
+      {
+        "id": "brief-3-context",
+        "fields": ["topics[inspiration]", "topics[unknowns]"],
+        "optional": true,
+        "questions": [
+          "Any references, similar products, or repos to learn from?",
+          "What don't you know yet? What needs research?"
+        ]
+      },
+      {
+        "id": "brief-4-direction",
+        "fields": ["topics[success]", "topics[non_starters]"],
+        "questions": [
+          "What would success look like, even vaguely?",
+          "What are you probably NOT doing in v1?"
+        ]
+      }
+    ]
+  },
+  "charter": {
+    "template": "templates/defaults/plan.toml",
+    "required_for_ready": [
+      "project.name",
+      "project.description",
+      "charter.goals",
+      "charter.non_goals"
+    ],
+    "rounds": [
+      {
+        "id": "charter-1-product",
+        "fields": ["project.name", "project.description"],
+        "questions": [
+          "What is this project? Give a one-sentence description.",
+          "Who are the primary users or consumers?"
+        ]
+      },
+      {
+        "id": "charter-2-stack",
+        "fields": ["project.stack", "project.platforms"],
+        "questions": [
+          "What languages, frameworks, and platforms are you targeting?",
+          "Are there hard constraints (single binary, no DB, offline-only)?"
+        ]
+      },
+      {
+        "id": "charter-3-goals",
+        "fields": ["charter.goals", "charter.non_goals"],
+        "questions": [
+          "What must v1 accomplish? List 3–5 must-have goals.",
+          "What is explicitly out of scope for v1?"
+        ]
+      },
+      {
+        "id": "charter-4-principles",
+        "fields": ["charter.principles"],
+        "optional": true,
+        "questions": [
+          "Are there governing principles? (e.g. test-first, minimal deps, library-first)",
+          "Any quality bars the agent should always follow?"
+        ]
+      },
+      {
+        "id": "charter-5-success",
+        "fields": ["project.target_version"],
+        "questions": [
+          "What is the target version or milestone for v1?",
+          "How will we know v1 is done?"
+        ]
+      }
+    ]
+  },
+  "milestone": {
+    "template": "templates/defaults/milestone.toml",
+    "phase_1_spec": {
+      "required_for_review": [
+        "intent.outcome",
+        "problem.description",
+        "scope.in_scope",
+        "scope.out_of_scope",
+        "acceptance_criteria"
+      ],
+      "recommended_for_review": [
+        "design_decisions",
+        "open_questions"
+      ],
+      "rounds": [
+        {
+          "id": "spec-1-intent",
+          "phase": 1,
+          "fields": ["intent.outcome", "problem.description"],
+          "questions": [
+            "What should be true when this is done? One verifiable sentence.",
+            "Why is this needed now — feature, bug, or tech debt?"
+          ]
+        },
+        {
+          "id": "spec-2-scope",
+          "phase": 1,
+          "fields": ["scope.in_scope", "scope.out_of_scope"],
+          "questions": [
+            "What is in scope for this milestone specifically?",
+            "What are we NOT doing? (Minimum 2 exclusions.)",
+            "Defer anything to the backlog?"
+          ]
+        },
+        {
+          "id": "spec-3-acceptance",
+          "phase": 1,
+          "fields": ["acceptance_criteria"],
+          "questions": [
+            "How do we verify each outcome? Test commands or manual checks.",
+            "Definition of done for this milestone?"
+          ]
+        },
+        {
+          "id": "spec-4-design",
+          "phase": 1,
+          "fields": ["design_decisions"],
+          "optional": true,
+          "questions": [
+            "Technical choices to lock before coding?",
+            "I can propose options from the codebase — want me to?"
+          ]
+        },
+        {
+          "id": "spec-5-gaps",
+          "phase": 1,
+          "fields": ["open_questions"],
+          "questions": [
+            "Anything still unclear or undecided?",
+            "What could go wrong that isn't obvious?"
+          ]
+        },
+        {
+          "id": "spec-6-sequencing",
+          "phase": 1,
+          "fields": ["milestone.depends_on", "milestone.effort", "milestone.risk"],
+          "questions": [
+            "Dependencies on other milestones?",
+            "Effort: S (hours), M (days), L (week+)?",
+            "Risk: low, med, or high?"
+          ]
+        }
+      ]
+    },
+    "phase_2_implementation": {
+      "requires_spec_status": "ready",
+      "required_for_execution": ["work_packages"],
+      "rounds": [
+        {
+          "id": "impl-1-decomposition",
+          "phase": 2,
+          "fields": ["work_packages", "steps"],
+          "questions": [
+            "How should we slice this into merge-friendly work packages?",
+            "For each step: which files, which tests, done-when criteria?",
+            "Rollback strategy per work package?"
+          ]
+        }
+      ]
+    }
+  },
+  "track_item": {
+    "template": "templates/defaults/track.toml",
+    "required_to_start": ["title", "problem", "steps"],
+    "required_verification": ["done_when", "verification"],
+    "rounds": [
+      {
+        "id": "track-1-quick",
+        "fields": ["problem", "verification", "done_when", "steps"],
+        "questions": [
+          "What is broken or wrong?",
+          "How do we verify the fix?",
+          "What steps or files are involved?"
+        ]
+      }
+    ]
+  },
+  "implementation_plan": {
+    "template": "templates/defaults/milestone.toml",
+    "requires_spec_status": "ready",
+    "required_for_execution": ["work_packages"],
+    "checks": [
+      { "id": "plan-wp-exists", "rule": "at least one work package", "severity": "blocker" },
+      { "id": "plan-steps-exist", "rule": "each WP has at least one step", "severity": "blocker" },
+      { "id": "plan-step-action", "rule": "each step has action and done_when", "severity": "major" },
+      { "id": "plan-step-tests", "rule": "each step has tests or manual verification noted", "severity": "major" },
+      { "id": "plan-ac-coverage", "rule": "each AC referenced by at least one step", "severity": "major" },
+      { "id": "plan-closure-wp", "rule": "closure WP for verify/lint", "severity": "minor" }
+    ],
+    "rounds": [
+      {
+        "id": "plan-1-structure",
+        "fields": ["work_packages"],
+        "questions": [
+          "How should this milestone slice into merge-friendly work packages?",
+          "Is there a closure WP for verification and lint?"
+        ]
+      },
+      {
+        "id": "plan-2-steps",
+        "fields": ["steps"],
+        "questions": [
+          "For each step: files, tests, and done-when criteria?",
+          "Any step too large for one PR?"
+        ]
+      },
+      {
+        "id": "plan-3-coverage",
+        "fields": ["acceptance_criteria", "steps"],
+        "questions": [
+          "Does every acceptance criterion map to at least one step?",
+          "Any AC with no verification path in the plan?"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,196 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "53"
+title = "Fuzzy search across plan artifacts (mp search)"
+slug = "fuzzy-search-across-plan-artifacts-mp-search"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Users and agents can fuzzy-search all plan artifacts (milestones, steps, ideas, tracks, decisions) with a single mp search command, getting ranked results without external tools or manual parsing."
+
+[problem]
+description = "Finding a milestone, step, idea, or track item by name/topic currently requires either: (1) parsing mp list --format json output with external tools (jq, python), (2) grepping TOML files directly (plan-zone violation), or (3) remembering exact IDs. There's no single quick-search command. The fuzzy-matcher crate provides lightweight, zero-dependency fuzzy matching that works on in-memory strings — ideal for searching plan artifacts already loaded into Rust structs. This directly benefits humans (quick lookup) and agents (structured JSON results with relevance scores, fewer roundtrips)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp search <query> command that fuzzy-matches against all plan artifacts",
+    "--type milestone|step|idea|track|decision flag to narrow search scope",
+    "--format json output with relevance scores, artifact type, ID, title/summary, and matched field",
+    "--format human output as a ranked table with colored scores",
+    "--limit N to cap results (default 20)",
+    "Matches against: milestone title, intent.outcome, problem.description, step action, AC description, idea title/body, track item title/problem, decision summary",
+    "DIY fuzzy scorer (substring match weighted by position/density/coverage) — no new crate, per the dependency-diet direction (M21/M22)",
+]
+out_of_scope = [
+    "Full-text search over plan files on disk (we search already-loaded data)",
+    "Frecency or history tracking (vanilla fuzzy scoring only)",
+    "TUI/search UI (human format uses terminal table)",
+    "Indexing or persistent state (search is always live against current data)",
+    "Adding the fuzzy-matcher crate (DIY scorer instead)",
+    "A --fields JSON-projection option for mp show/list (separate idea)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp search 'install' returns M51 Install & distribution architecture and M56 Unified harness registry, ranked by relevance"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "passed"
+evidence = "Implemented via task agent"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp search 'install' --type milestone returns only milestones, mp search --type step returns only steps"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "passed"
+evidence = "Implemented via task agent"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp search 'zzz-nonexistent' returns empty results (not an error)"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "passed"
+evidence = "Implemented via task agent"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Core search engine"
+goal = "Implement the fuzzy search engine: add fuzzy-matcher dep, build SearchResult struct, implement search across milestone/step/idea/track/decision data"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "CLI + tests"
+goal = "Wire up mp search CLI command, human/JSON output formatting, and integration tests"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Create crates/mp/src/search.rs with a SearchResult struct and a DIY fuzzy score function (no external crate — substring match weighted by position, density, and coverage). Respects the dependency-diet direction (M21/M22). No new entry in Cargo.toml."
+files = []
+tests = "cargo test -p mp --test fuzzy_search"
+done_when = "fuzzy-matcher in Cargo.toml; crates/mp/src/search.rs exists with SearchResult struct and search function signature"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Implement the search engine logic in crates/mp/src/search.rs: iterate milestones with their steps and ACs, ideas, track items, and decisions; run the DIY scorer on each text field; collect and deduplicate results sorted by score descending."
+files = []
+tests = "cargo test -p mp --test fuzzy_search"
+done_when = "Search impl iterates all artifact types, runs fuzzy_match on text fields, deduplicates and sorts by score descending"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Add 'mp search <query>' CLI command with --type milestone|step|idea|track|decision, --limit N (default 20), and --format json/human flags. JSON output includes relevance scores, artifact type, ID, title, matched field. Human output prints a ranked table."
+files = []
+tests = "cargo test -p mp --test fuzzy_search"
+done_when = "mp search <query> works with --type, --limit, --format json/human; CLI tests pass"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S2"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Write integration tests for mp search: fuzzy match returns ranked results, --type filter scopes correctly, empty query returns no results, results include scores and matched fields. Create crates/mp/tests/fuzzy_search.rs."
+files = []
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "fuzzy_search.rs tests pass: fuzzy match returns ranked results, --type filters work, empty query returns empty"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Document mp search in docs/concepts/06 Reference/MP-COMMANDS.md and verify the command appears in mp --help. Document --type, --limit, --format json/human flags with examples."
+files = []
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "mp search documented and visible in mp --help"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "Implemented via task agent"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

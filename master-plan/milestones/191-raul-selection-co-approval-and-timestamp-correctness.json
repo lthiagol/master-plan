@@ -1,0 +1,352 @@
+{
+  "milestone": {
+    "id": "191",
+    "title": "Raul selection, co-approval, and timestamp correctness",
+    "slug": "raul-selection-co-approval-and-timestamp-correctness",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "189"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T15:31:42.817133+00:00"
+  },
+  "intent": {
+    "outcome": "Visible TUI rows and actions always target the same entity; co-approval confirms only after all commands succeed; durable and display timestamps share one strict RFC3339 parser with offset handling."
+  },
+  "problem": {
+    "description": "Annotation render uses visible_annotations while selection indexes the raw vector. confirm_co_approval sets confirmed before validation and discards approve errors. mp-model accepts impossible RFC3339 shapes; Raul humanize ignores timezone offsets."
+  },
+  "scope": {
+    "in_scope": [
+      "Canonical visible-annotation projection for render/cursor/actions",
+      "Load full thread; filter only client-side",
+      "Co-approval Choosing→Executing→Confirmed with failure returning to Choosing",
+      "Shared strict RFC3339 parser (T separator; reject space) with calendar and offset validation",
+      "Audit milestone/inbox lists for the same raw/visible mismatch"
+    ],
+    "out_of_scope": [
+      "Watch preflight/idle (Group D)",
+      "Lifecycle transition table (Group C beyond shared timestamp/lifecycle helpers)",
+      "Terminal control-character sanitization (Group F)",
+      "Comment cleanup (Group G)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Canonical visible-annotation projection drives render, cursor, keyboard, and mouse; mixed open/resolved with open-only filter; filter toggles re-anchor safely; resolve/reopen/co-approval target the highlighted row. Runner adds crates/raul/tests/tui_annotation_selection.rs covering Finding 7A.",
+      "verification": "cargo nextest run -p raul -E 'test(/annotation_selection|visible_annotation/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-02",
+      "description": "Co-approval confirms only after full success; enter-without-choice, resolve/reopen failure, approve failure, retry, and single confirm-on-success are covered. Runner adds crates/raul/tests/tui_co_approval.rs covering Finding 7B.",
+      "verification": "cargo nextest run -p raul -E 'test(/co_approval/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-03",
+      "description": "Shared strict RFC3339 parser accepts leap day/Z/fractional seconds/±offsets and rejects invalid calendar/time/offset and space separator. Runner adds crates/mp-model/tests/rfc3339.rs covering Finding 11.",
+      "verification": "cargo nextest run -p mp-model -E 'test(/rfc3339/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-04",
+      "description": "Raul humanize applies timezone offsets via the shared parser; positive/negative offsets crossing UTC day boundaries match epoch conversion.",
+      "verification": "cargo nextest run -p raul -E 'test(/^tui::humanize::tests::/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-05",
+      "description": "Existing annotation TUI suite remains green after selection/projection changes (regression baseline).",
+      "verification": "cargo nextest run -p raul --test tui_annotation --no-fail-fast",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-06",
+      "description": "raul selection/co-approval/humanize changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp-model RFC3339 parser changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p mp-model --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "visible-annotation-projection",
+      "choice": "Define one canonical ordered visible-annotations projection used for rendering, cursor limits, selected_annotation, keyboard actions, and mouse hit testing; preserve selection by annotation ID across filter changes; always load the complete thread and filter only in the client projection.",
+      "rationale": "Render uses visible_annotations while selection indexes the raw vector, so resolve/reopen/co-approval hit the wrong row (Finding 7A)."
+    },
+    {
+      "area": "co-approval-confirm-after-success",
+      "choice": "Co-approval states are Choosing → Executing → Confirmed; validate before state change; execute resolve/reopen and milestone approve with checked results; mark Confirmed only after the full operation succeeds; failure returns to Choosing with an actionable error and keeps the modal retryable.",
+      "rationale": "confirm_co_approval sets confirmed before validation and discards mp milestone approve errors (Finding 7B)."
+    },
+    {
+      "area": "rfc3339-shared-parser",
+      "choice": "Provide one standards-compliant RFC3339 parser at a shared seam (mp-model); validate calendar dates, leap years, time ranges, fractional seconds, and offset ranges; apply offsets to epoch; require strict T separator and reject the relaxed space form; reuse for durable audit timestamps and Raul humanization — no second handwritten datetime.",
+      "rationale": "mp-model accepts impossible RFC3339 shapes and Raul humanize ignores timezone offsets (Finding 11)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Visible annotation selection",
+      "goal": "Canonical visible-annotations projection for render/cursor/actions; load full thread; audit milestone/inbox lists for raw/visible mismatch.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Co-approval confirm-after-success",
+      "goal": "Choosing→Executing→Confirmed; confirm only after all commands succeed; retryable on failure.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Shared RFC3339 parser",
+      "goal": "Strict shared RFC3339 parser in mp-model; Raul humanize reuses it with offset handling.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Define one canonical ordered visible-annotations projection; use it for rendering, cursor limits, selected_annotation, keyboard actions, and mouse hit testing; preserve selection by annotation ID across filter changes; reset/re-anchor when selected annotation becomes hidden.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/render/overlays.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/annotation_selection|visible_annotation/)' --no-fail-fast",
+      "done_when": "Mixed resolved/open with open-only; filter toggle while cursor on hidden item; keyboard and mouse select the same item; resolve/reopen/co-approval target highlighted row.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Always load the complete annotation thread from mp and filter only in the canonical client projection; do not apply open-only filtering in both mp and Raul. Audit milestone and inbox lists for the same raw-list/visible-list mismatch and fix the same way.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_annotation --no-fail-fast",
+      "done_when": "Toggling open-only can reveal previously hidden rows; milestone/inbox lists share ID-keyed visible projection; tui_annotation green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Add crates/raul/tests/tui_annotation_selection.rs with Finding 7A regression cases (mixed filter, cursor re-anchor, resolve/reopen/co-approval target, keyboard/mouse parity).",
+      "files": [
+        "crates/raul/tests/tui_annotation_selection.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_annotation_selection --no-fail-fast",
+      "done_when": "New test binary exists and AC-01 -E filter matches ≥1 passing test.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Validate annotation, milestone, and selected action before changing co-approval state; execute resolve/reopen and milestone approval with checked results; do not discard mp milestone approve errors; mark confirmed only after full success; keep modal retryable on failure with actionable error; refresh annotations best-effort without masking primary error.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/co_approval/)' --no-fail-fast",
+      "done_when": "States are Choosing→Executing→Confirmed; failure returns to Choosing; enter-without-choice and command failures covered.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add crates/raul/tests/tui_co_approval.rs covering enter-without-choice, resolve/reopen failure, approve failure, retry after failure, and full success marks confirmed exactly once.",
+      "files": [
+        "crates/raul/tests/tui_co_approval.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_co_approval --no-fail-fast",
+      "done_when": "New test binary exists and AC-02 -E filter matches ≥1 passing test.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Provide one standards-compliant RFC3339 parser in mp-model; validate real calendar dates, leap years, time ranges, fractional seconds, and timezone offset ranges; apply offsets when converting to epoch; require strict T separator; reject relaxed space form.",
+      "files": [
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp-model/src/lib.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model -E 'test(/rfc3339/)' --no-fail-fast",
+      "done_when": "Valid leap day/Z/fractional/±offsets accepted; invalid calendar/time/offset and space separator rejected.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Reuse the shared parser for durable audit timestamps and Raul humanization; remove any second handwritten datetime path in humanize.rs; apply timezone offsets in display conversion.",
+      "files": [
+        "crates/raul/src/tui/humanize.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p raul -E 'test(/^tui::humanize::tests::/)' --no-fail-fast",
+      "done_when": "Humanize tests cover offset day-boundary cases; no duplicate parser remains.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Add crates/mp-model/tests/rfc3339.rs with Finding 11 cases (leap day valid/invalid, month/day/hour/minute/second/offset, ±offsets, fractional, Z, strict T vs space).",
+      "files": [
+        "crates/mp-model/tests/rfc3339.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --test rfc3339 --no-fail-fast",
+      "done_when": "New test binary exists and AC-03 -E filter matches ≥1 passing test; clippy clean.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "M191 Group E: visible annotation projection/ID selection, retryable co-approval confirm-after-success, strict shared RFC3339 parser; all 7 AC commands passed; focused binaries 8/8; fmt and diff checks clean"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Finding 7B residual: CoApprovalAction::Reject always calls `annotation reopen`, but EnterCoApproval only admits status open|addressed. Real `mp annotation reopen` rejects both (already open / cannot reopen from addressed) and only accepts resolved. Therefore Reject cannot succeed on any annotation the modal can open. Stage-6 tests mask this with a status-agnostic fake mp that always exits 0 on reopen (L1/L2). Fix: implement Reject as a real decline path for open/addressed approval-requests (or gate Reject to resolved-only and allow entry), and add a regression that uses status-faithful mp semantics.",
+      "status": "fixed",
+      "author": "coordinator-stage8",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/action.rs",
+        "new_range": {
+          "start_line": 529,
+          "end_line": 529
+        },
+        "side": "new"
+      },
+      "summary": "Co-approval Reject never succeeds for enterable annotations",
+      "confidence": "high",
+      "tags": [
+        "co-approval",
+        "7B"
+      ]
+    }
+  ]
+}

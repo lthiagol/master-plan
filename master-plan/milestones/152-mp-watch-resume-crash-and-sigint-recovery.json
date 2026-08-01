@@ -1,0 +1,299 @@
+{
+  "milestone": {
+    "id": "152",
+    "title": "mp watch --resume — crash and SIGINT recovery",
+    "slug": "mp-watch-resume-crash-and-sigint-recovery",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "149"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-10",
+    "updated": "2026-07-14",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-14T04:27:05.740095+00:00"
+  },
+  "intent": {
+    "outcome": "If mp watch is interrupted (crash, SIGINT, closed laptop), re-running it detects the in-flight milestone and any live herdr panes and re-attaches instead of re-spawning duplicate agents or losing track of progress."
+  },
+  "problem": {
+    "description": "M149's scope lists graceful SIGINT/SIGTERM shutdown (marking in-flight milestones) but not resumption. The whole value proposition of mp watch is 'walk away' — but a single interrupted run that cannot resume forces the user back to manual lifecycle driving, defeating the purpose. Re-attaching to existing herdr panes (herdr agent attach, herdr agent list) and reconciling against plan.json lifecycle is the operability gap that makes mp watch production-grade."
+  },
+  "scope": {
+    "in_scope": [
+      "On startup, query herdr agent list for existing role-runner-N / role-coordinator-N panes and reconcile against the target milestone's lifecycle",
+      "mp watch --resume re-attaches to live panes; mp watch (default) refuses to double-spawn if a pane already exists for the role, unless --force",
+      "Crash-safe watch state file (.mp/watch.state.json) recording the active milestone, pane ids, and last-known lifecycle",
+      "Tests for resume-after-sigint and pane-already-exists detection"
+    ],
+    "out_of_scope": [
+      "Distributed / multi-host orchestration",
+      "Re-driving a milestone whose lifecycle already advanced past the interrupted stage (skip cleanly instead)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp watch writes a crash-safe .mp/watch.state.json recording the active milestone id(s), the herdr pane ids per role (role-runner-N, role-coordinator-N), and the last-observed lifecycle. Writes are atomic (temp + rename), matching mp's other plan-write paths.",
+      "verification": "cargo test -p mp --test watch_state_file",
+      "status": "passed",
+      "evidence": "All 5 steps done, all 4 ACs passed with non-prose evidence. Tests: watch_state_file (20), watch_resume (16), watch_no_double_spawn (8), watch_signal (9), inline state (12), inline resume (10), inline shutdown (4) — 79 tests across the M152 surface. Full mp test suite: 1672 tests pass. cargo fmt + clippy clean. Integration-test gate: scripts/m152_integration_tests.sh."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp watch --resume queries herdr agent list, reconciles live panes against the target milestone's current lifecycle, and re-attaches to existing panes instead of re-spawning. A pane that died is re-spawned; a pane still working is left alone.",
+      "verification": "cargo test -p mp --test watch_resume",
+      "status": "passed",
+      "evidence": "All 5 steps done, all 4 ACs passed with non-prose evidence. Tests: watch_state_file (20), watch_resume (16), watch_no_double_spawn (8), watch_signal (9), inline state (12), inline resume (10), inline shutdown (4) — 79 tests across the M152 surface. Full mp test suite: 1672 tests pass. cargo fmt + clippy clean. Integration-test gate: scripts/m152_integration_tests.sh."
+    },
+    {
+      "id": "AC-03",
+      "description": "Default mp watch (no --resume) refuses to double-spawn if a role pane already exists for the active milestone, exiting non-zero with a clear 'use --resume or --force' message unless --force is given.",
+      "verification": "cargo test -p mp --test watch_no_double_spawn",
+      "status": "passed",
+      "evidence": "All 5 steps done, all 4 ACs passed with non-prose evidence. Tests: watch_state_file (20), watch_resume (16), watch_no_double_spawn (8), watch_signal (9), inline state (12), inline resume (10), inline shutdown (4) — 79 tests across the M152 surface. Full mp test suite: 1672 tests pass. cargo fmt + clippy clean. Integration-test gate: scripts/m152_integration_tests.sh."
+    },
+    {
+      "id": "AC-04",
+      "description": "SIGINT/SIGTERM handler marks the in-flight milestone (flash note in plan), flushes watch.state.json, and exits cleanly so a subsequent --resume can pick up.",
+      "verification": "cargo test -p mp --test watch_signal",
+      "status": "passed",
+      "evidence": "All 5 steps done, all 4 ACs passed with non-prose evidence. Tests: watch_state_file (20), watch_resume (16), watch_no_double_spawn (8), watch_signal (9), inline state (12), inline resume (10), inline shutdown (4) — 79 tests across the M152 surface. Full mp test suite: 1672 tests pass. cargo fmt + clippy clean. Integration-test gate: scripts/m152_integration_tests.sh."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "state-source-of-truth",
+      "choice": "watch.state.json is operational scratch; plan.json lifecycle remains authoritative for milestone state",
+      "rationale": "The state file only tracks pane ids and pid for re-attachment. Milestone progress is always re-derived from plan.json on resume so a stale or deleted state file never corrupts plan truth."
+    },
+    {
+      "area": "double-spawn-default",
+      "choice": "default refuses to double-spawn; --force opts in",
+      "rationale": "Two runner panes on one milestone cause duplicate work and conflicting plan writes. Refusing by default protects the unwary; --force is the explicit override for the confident operator."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-STATE",
+      "name": "watch.state.json",
+      "goal": "Crash-safe state file schema + atomic read/write helpers",
+      "rollback": ""
+    },
+    {
+      "id": "WP-RECONCILE",
+      "name": "Pane reconciliation",
+      "goal": "herdr agent list -> reconcile live panes vs target lifecycle",
+      "rollback": ""
+    },
+    {
+      "id": "WP-SIGNAL",
+      "name": "Signal handling",
+      "goal": "SIGINT/SIGTERM graceful shutdown: mark milestone, flush state",
+      "rollback": ""
+    },
+    {
+      "id": "WP-TESTS",
+      "name": "Tests",
+      "goal": "state file, resume, double-spawn, signal coverage",
+      "rollback": ""
+    },
+    {
+      "id": "WP-RESUME",
+      "name": "Resume and double-spawn guard",
+      "goal": "resume re-attach path plus default refuse-to-double-spawn plus force override",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-STATE",
+      "order": 1,
+      "action": "Define watch.state.json schema (active milestone ids, pane ids per role, last lifecycle, pid) and atomic write helpers (temp + rename) under .mp/.",
+      "files": [
+        "crates/mp/src/watch/state.rs"
+      ],
+      "tests": "crates/mp/tests/watch_state_file.rs",
+      "done_when": "watch writes .mp/watch.state.json atomically; a killed run leaves a valid (not torn) file",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-RECONCILE",
+      "order": 2,
+      "action": "Implement pane reconciliation: query herdr agent list, match role-runner-N / role-coordinator-N labels, classify each as live-working / idle / dead against the target milestone lifecycle.",
+      "files": [
+        "crates/mp/src/watch/resume.rs",
+        "crates/mp/src/herdr.rs"
+      ],
+      "tests": "crates/mp/tests/watch_resume.rs",
+      "done_when": "reconcile(target) classifies panes correctly from a herdr agent list fixture",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-RESUME",
+      "order": 3,
+      "action": "Implement --resume: re-attach to live panes, re-spawn dead ones, skip milestones whose lifecycle already advanced past the interrupted stage. Default (no --resume) refuses to double-spawn existing role panes unless --force.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/resume.rs"
+      ],
+      "tests": "crates/mp/tests/watch_resume.rs",
+      "done_when": "mp watch --resume re-attaches to fixture live panes; default mp watch exits non-zero on existing panes; --force overrides",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-SIGNAL",
+      "order": 4,
+      "action": "Install SIGINT/SIGTERM handler: on signal, write a flash note to the in-flight milestone, flush watch.state.json, exit 0 so --resume can continue. Never leave a half-spawned pane untracked.",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch/state.rs"
+      ],
+      "tests": "crates/mp/tests/watch_signal.rs",
+      "done_when": "SIGINT during a run leaves a flushed state file and a milestone flash note; exit code 0",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP-TESTS",
+      "order": 5,
+      "action": "Integration tests: state-file atomicity, resume re-attach, double-spawn refusal + force, signal flush.",
+      "files": [
+        "crates/mp/tests"
+      ],
+      "tests": "scripts/m152_integration_tests.sh",
+      "done_when": "cargo test -p mp watch_resume green across all four scenarios",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S3",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-14",
+    "branch": "",
+    "evidence": "All 5 steps done, all 4 ACs passed with non-prose evidence. Tests: watch_state_file (20), watch_resume (16), watch_no_double_spawn (8), watch_signal (9), inline state (12), inline resume (10), inline shutdown (4) — 79 tests across the M152 surface. Full mp test suite: 1672 tests pass. cargo fmt + clippy clean. Integration-test gate: scripts/m152_integration_tests.sh."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "data-loss",
+      "description": "F-01 — upsert_panes_from_cache overwrites spawned_at and drops last_status (crates/mp/src/commands/watch.rs:556-580, called at lines 326 and 372). The state file's pane entries lose their original spawn timestamp and any observed agent-status: every re-upsert writes `spawned_at: now_rfc3339()` and `last_status: None`, regardless of what was there before. Real impact: a user reviewing watch.state.json after a crash cannot tell when a pane was first spawned or what status it had last. Forensic value of the state file degrades on every re-save. Fix: PaneHandle (in watch/herdr.rs) should carry the original spawned_at and last_status, and upsert_panes_from_cache should preserve them when populating the state. Alternatively, extend PaneState with a \"do not overwrite these fields\" semantic.",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-02 — graceful_shutdown hardcodes target_lifecycle=\"self-reviewed\" (crates/mp/src/commands/watch.rs:387-392). The shutdown path persists the in-flight milestone with `target_lifecycle: \"self-reviewed\"` regardless of where the milestone actually was. If the milestone was interrupted at lifecycle=reviewed (waiting for target=Complete via the Approve prompt), the persisted state claims target=\"self-reviewed\" — a lie. On --resume, the state machine uses this to short-circuit plan.json reads; a wrong target means the resume path may bail early or not at the right lifecycle. Fix: persist the actual target the sequencer was waiting for (thread the StagePlan through to shutdown), or omit target_lifecycle when the source isn't known.",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "layering",
+      "description": "F-03 — WatchState::load_from writes warnings via eprintln! (crates/mp/src/watch/state.rs:194-212). Library code writing to stderr directly is a layering smell: the caller might be in a context where stderr is not appropriate (JSON output mode, log capture, daemon mode), and the warning has no structured envelope (severity, milestone, path metadata). Real impact: repeated `mp watch --resume` runs against a corrupt state file spam stderr with `warning: ignoring unreadable watch state ...`. Tests that pipe stderr see the warning pollute their combined-stdout-stderr assertions. Fix: route through `tracing::warn!` (or surface as a struct member on the result) so the caller controls logging.",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "doc-vs-behavior",
+      "description": "F-04 — --force semantic vs. behavior mismatch (crates/mp/src/commands/watch.rs:267-339, cli help at crates/mp/src/cli/mod.rs:268-275). The CLI help says `--force` \"opts in to ignoring that check\" — the gate. But the implementation reuses the existing panes after the gate is bypassed (same as --resume), pre-populating ops.pane_cache from the reconciliation result. A user choosing --force likely expects fresh pane spawns (the flag's name suggests overriding). Real impact: users running `mp watch --force` to recover from a stuck pane get the same pane re-attached, not a fresh one. Fix: either (a) update the help text + AC-03 docs to clarify \"--force: bypass gate, then reuse like --resume\", or (b) implement --force as \"bypass gate, kill existing panes, spawn fresh\". The current code silently does (a) while the docs imply (b).",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "dead-code",
+      "description": "F-05 — WatchState::path instance method is unused dead code (crates/mp/src/watch/state.rs:165-174). The method `pub fn path(&self, plan_dir: &Path) -> PathBuf { Self::path_for(plan_dir) }` exists but is never called anywhere in the codebase. The canonical accessor is `WatchState::path_for`. The instance method just adds a duplicate API surface. Fix: delete the instance method, or if it's intended for downstream consumers, document why it exists and where it's used.",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "code-quality",
+      "description": "F-06 — build_initial_state ignores _ctx and _ops parameters (crates/mp/src/commands/watch.rs:550-555). The function is just a thin wrapper around `WatchState::fresh(ids)` with two params marked `_ctx` and `_ops` that are never used. Real impact: the function signature implies it does more than it does, which makes grep-based reasoning harder and encourages future maintainers to \"fix\" the unused params by adding logic that drifts from the simple shape. Fix: either inline the call (`WatchState::fresh(ids)` directly at the call site) or remove the unused params.",
+      "status": "fixed",
+      "author": "external-review(M152)",
+      "fixed_in": "e8033aa",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14"
+    }
+  ]
+}

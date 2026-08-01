@@ -1,0 +1,52 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "old-3 done",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "manual: fixture"
+    }
+  ],
+  "intent": {
+    "outcome": "Old milestone 11 (just after the lex 100-zone)."
+  },
+  "milestone": {
+    "created": "2026-07-04",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "11",
+    "risk": "low",
+    "slug": "old-3",
+    "spec_status": "verified",
+    "title": "Old 11",
+    "updated": "2026-07-04"
+  },
+  "problem": {
+    "description": "Pre-100 milestone, second tier."
+  },
+  "scope": {
+    "in_scope": ["old-3"],
+    "out_of_scope": []
+  },
+  "steps": [
+    {
+      "action": "Do old-3",
+      "covers_ac": ["AC-01"],
+      "done_when": "done",
+      "id": "S1",
+      "status": "done",
+      "tests": "manual: fixture",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Bootstrap old-3",
+      "id": "WP1",
+      "name": "WP1",
+      "rollback": "n/a"
+    }
+  ]
+}

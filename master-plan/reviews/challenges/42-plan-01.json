@@ -1,0 +1,25 @@
+{
+  "challenge": {
+    "closed": "2026-06-28",
+    "created": "2026-06-28",
+    "id": "CH-42-01",
+    "milestone_id": "42",
+    "scope": "plan",
+    "status": "closed",
+    "summary": ""
+  },
+  "findings": [
+    {
+      "action": "no-change",
+      "action_ref": "",
+      "category": "gap",
+      "description": "Manual plan challenge of M40+M42 against the raul/decoupling big picture. 7 gaps found, all applied directly as step/decision changes: (1) M42 stale re mp-model -> added S1.1 mp-model slot step; (2) raul test paths pointed at crates/mp/tests -> repointed to crates/raul/tests + clarified tests/raul vs crates/raul/tests; (3) JSON freeze ordered after consumers -> D-011 ADR-008 pulled it forward; (4) MpRunner context unspecified -> expanded S2 done_when (cwd/project-root forwarding, missing-mp error); (5) no JSON audit -> added S2.1 audit gate before renderers; (6) mp-model untested -> expanded S0 done_when (serde round-trip tests); (7) M38<->raul alias coordination -> folded into D-011. Affirmed: model.rs is a true leaf (extraction low-risk); JSON completeness holds across status/show/path/next-step.",
+      "id": "F-01",
+      "resolution": "All 7 gaps already applied as M40/M42 step changes + D-011; see milestones 40/42 steps and decisions.toml D-011",
+      "severity": "major",
+      "status": "resolved",
+      "target": "M40, M42",
+      "title": "M40/M42 plan challenge: 7 gaps found and applied"
+    }
+  ]
+}

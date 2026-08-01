@@ -1,0 +1,39 @@
+{
+  "strategy": "resume_then_ready",
+  "interleave": "milestone",
+  "baseline_milestone_order": ["01", "02", "03"],
+  "ready_milestones": ["02"],
+  "actions": [
+    {
+      "rank": 1,
+      "type": "step",
+      "milestone": {
+        "id": "02",
+        "display": "M02",
+        "title": "Core",
+        "execution_status": "in-progress"
+      },
+      "step": {
+        "id": "S1",
+        "action": "Add core types",
+        "status": "pending"
+      },
+      "work_package": {
+        "id": "WP1",
+        "name": "Core"
+      },
+      "reason": "resume in-progress work"
+    }
+  ],
+  "blocked": [
+    {
+      "milestone": "03",
+      "reason": "depends_on not done"
+    },
+    {
+      "milestone": "02",
+      "step": "S2",
+      "reason": "depends_on_steps not done"
+    }
+  ]
+}

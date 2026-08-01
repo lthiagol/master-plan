@@ -1,0 +1,53 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "GET /health returns 200",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "cargo test health"
+    }
+  ],
+  "intent": {
+    "outcome": "API boots and health check responds."
+  },
+  "milestone": {
+    "change_kind": "greenfield",
+    "created": "2026-06-01",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "01",
+    "risk": "low",
+    "slug": "foundation",
+    "spec_status": "verified",
+    "title": "Foundation",
+    "updated": "2026-06-05"
+  },
+  "scope": {
+    "in_scope": [
+      "Cargo workspace",
+      "HTTP server",
+      "health route"
+    ],
+    "out_of_scope": [
+      "Auth",
+      "OAuth",
+      "Admin UI"
+    ]
+  },
+  "verification": {
+    "branch": "main",
+    "date": "2026-06-05",
+    "evidence": "fixture"
+  },
+  "work_packages": [
+    {
+      "goal": "Minimal API",
+      "id": "WP1",
+      "name": "Bootstrap",
+      "rollback": "git restore .",
+      "steps": []
+    }
+  ]
+}

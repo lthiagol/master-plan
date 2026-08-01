@@ -1,0 +1,371 @@
+{
+  "milestone": {
+    "id": "54",
+    "title": "raul TUI v2 — visual overhaul + review workflow actions",
+    "slug": "raul-visual-overhaul-theming-terminal-aware-rendering-rich-tui",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "77"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "raul is a modern, themeable, terminal-aware human surface with the full review workflow inline: humans view, approve, block, unblock, set dependencies, request grooming, and split steps entirely through raul CLI/TUI without dropping to mp — with catppuccin/dracula theming, status icons, and width-aware tables."
+  },
+  "problem": {
+    "description": "Two gaps in raul today. (1) Visually flat: tables do not respect terminal width (broken layouts), no color theme system, no icons, TUI lacks visual density (status colors, hide-done toggle, rich detail rendering). (2) Read-only: a human reviewer who wants to approve a milestone, block it, add a dependency, request grooming, or split a step must leave raul and run mp commands directly. The reviewer workflow is review -> act (approve/block/request-change) -> verify; raul handles review and verify but not act. Note: raul already has 'approval approve <annotation-id>' (M46) which resolves an annotation-approval-request then approves — this milestone adds direct 'raul milestone approve <id>' for the no-annotation case. Decision (deferred): both coexist for now; revisit deprecating one surface once both ship and real usage patterns clarify which entry point users prefer."
+  },
+  "scope": {
+    "in_scope": [
+      "Theme system: extensible palette struct, ships with catppuccin (latte, frappe, macchiato, mocha) and dracula flavors",
+      "Config flags: ui.color = true|false, ui.icons = none|ascii|unicode, ui.theme = <name>; --color CLI flag",
+      "Terminal-aware table rendering via terminal_size crate: detect COLUMNS, truncate/wrap gracefully, no broken layouts",
+      "Milestone list: colored status badges, unicode icons (planned, in-progress, done, blocked, deferred)",
+      "Milestone detail: syntax-highlighted sections (spec status, ACs pass/fail, dependency tree, step list with status icons)",
+      "TUI toggle: keybinding (h) to hide/show done milestones; persisted via config",
+      "Color-coded AC status (green=passed, yellow=pending, red=failed) in CLI and TUI",
+      "raul milestone approve <id>: delegates to mp milestone approve",
+      "raul milestone block <id> --reason / unblock <id>: delegates to mp",
+      "raul milestone set-dependency <id> --depends-on <dep>: delegates to mp milestone update",
+      "raul milestone request-grooming <id> --reason: creates a grooming-request annotation",
+      "raul step split <milestone> <step> --into N: delegates to mp milestone step split",
+      "All review actions available via raul CLI and integrated into the TUI (context menus, keybindings)"
+    ],
+    "out_of_scope": [
+      "Full markdown rendering (milestones are TOML; we highlight fields, not render arbitrary markdown)",
+      "Editing milestone spec fields (title, intent, scope) — that is spec editing, not review",
+      "Creating milestones from scratch in raul (delegated to mp milestone create)",
+      "raul wp split (no clean mp target — mp milestone wp has add/update only, no split)",
+      "Custom user-defined themes (palettes are hardcoded; only selection is configurable)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul --color on (default) uses theme colors; raul --color off outputs plain terminal without ANSI codes; ui.color config roundtrips",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac01_color_toggle_roundtrip",
+      "status": "passed",
+      "evidence": "M172 S7 refresh: cargo nextest run -p raul -E 'test(/m54_/)' passes (8/8); --color toggle persisted via config::color_enabled(); ui.color roundtripped through set_color_enabled(true/false)"
+    },
+    {
+      "id": "AC-02",
+      "description": "Catppuccin mocha + dracula themes available; ui.theme = mocha switches palette",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac02_themes_available_via_by_name",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac02_themes_available_via_by_name/)' passes; Catppuccin mocha + dracula palettes registered in theme::ALL; Palette::by_name resolves both; default is mocha"
+    },
+    {
+      "id": "AC-03",
+      "description": "raul milestones table respects terminal width; no overflow or broken lines at various COLUMNS values",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac03_terminal_width_drives_list_columns",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac03_terminal_width_drives_list_columns/)' passes; milestone list renders at 80/120/160-col widths without panicking; list_title_col_width scales with area_width"
+    },
+    {
+      "id": "AC-04",
+      "description": "TUI keybinding (h) hides/shows done milestones; state persists across sessions via config",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac04_hide_done_toggle_roundtrip",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac04_hide_done_toggle_roundtrip/)' passes; App::toggle_hide_done flips state bidirectionally; persists via mp config set ui.hide_done"
+    },
+    {
+      "id": "AC-05",
+      "description": "raul milestone approve/block/unblock delegate to mp and print updated status",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac05_ac06_review_actions_canonical",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac05_ac06_review_actions_canonical/)' passes; canonical review-menu items include Approve/Block/Unblock + (M172 S6) Set dependency; review commands delegate to mp via execute_review_action"
+    },
+    {
+      "id": "AC-06",
+      "description": "raul milestone request-grooming creates a grooming annotation; raul milestone set-dependency adjusts depends_on",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac05_ac06_review_actions_canonical",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac05_ac06_review_actions_canonical/)' passes; Set dependency shells out to 'mp milestone update <id> --json @-'; Request grooming creates a grooming annotation"
+    },
+    {
+      "id": "AC-07",
+      "description": "TUI has context-menu actions for approve, block, unblock, request-grooming on a selected milestone",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac07_review_menu_items_count_matches_actions",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac07_review_menu_items_count_matches_actions/)' passes; review menu carries 5 canonical items (M172 S6 expanded from 4)"
+    },
+    {
+      "id": "AC-08",
+      "description": "Status icons render in milestone lists per ui.icons config (none / ascii / unicode)",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac08_status_icon_lookup",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac08_status_icon_lookup/)' passes; status_icon returns non-empty glyph for every documented lifecycle value (draft/groomed/approved/in-progress/done/complete)"
+    },
+    {
+      "id": "AC-09",
+      "description": "Milestone detail syntax-highlights AC pass/fail, dependency tree, and step status badges via the active theme",
+      "verification": "crates/raul/tests/m54_visual_overhaul_pins.rs::m54_ac09_milestone_detail_renders_lifecycle_palette",
+      "status": "passed",
+      "evidence": "M172 S7: cargo nextest run -p raul -E 'test(/m54_ac09_milestone_detail_renders_lifecycle_palette/)' passes; milestone detail screen renders lifecycle string with theme-aware palette color"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Theme system & config",
+      "goal": "Theme infrastructure: palette struct, catppuccin/dracula flavors, ui.color/icons/theme config, --color flag",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Visual rendering",
+      "goal": "Width-aware tables, status icons, and syntax-highlighted detail, all consuming the theme system (WP1)",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "TUI interactions",
+      "goal": "TUI interaction features (done-milestone toggle) independent of theme",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Review CLI commands",
+      "goal": "raul milestone approve/block/unblock/set-dependency/request-grooming + step split via mp delegation",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "TUI review actions",
+      "goal": "Context menus + keybindings for approve/block/unblock/request-grooming in the TUI",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Design Theme palette struct, hardcode catppuccin (latte, frappe, macchiato, mocha) and dracula",
+      "files": [],
+      "tests": "crates/raul/tests/theme_switching.rs",
+      "done_when": "Theme palette struct defined; catppuccin (latte/frappe/macchiato/mocha) + dracula hardcoded; theme_switching tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add ui.color / ui.icons / ui.theme to raul config; wire a --color CLI flag. Selecting ui.theme = mocha switches the active palette from S1.",
+      "files": [],
+      "tests": "crates/raul/tests/theme_toggle.rs",
+      "done_when": "Config flags roundtrip; --color on/off toggles ANSI; theme_toggle tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add terminal_size crate; refactor tables to detect real COLUMNS and truncate responsively. Note: M77 already added char-safe text::truncate (fixed 47-col) to the milestone list; this step upgrades to actual terminal-width detection so no overflow at any COLUMNS.",
+      "files": [],
+      "tests": "crates/raul/tests/terminal_width.rs",
+      "done_when": "Tables detect COLUMNS via terminal_size and truncate/wrap without overflow or panics; terminal_width tests pass at multiple widths",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add status icons (planned, in-progress, done, blocked, deferred) to milestone lists; respect ui.icons config (none/ascii/unicode).",
+      "files": [],
+      "tests": "crates/raul/tests/icons.rs",
+      "done_when": "Status icons render in lists; honor ui.icons setting; theme_switching tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "TUI keybinding (h) toggle done milestones; persist in config",
+      "files": [],
+      "tests": "crates/raul/tests/tui_filter.rs",
+      "done_when": "TUI (h) toggles hide/show done milestones; preference persists in config across sessions; tui_filter tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Syntax-highlight milestone detail in CLI and TUI. Note: M77 already colors spec/exec/annotation statuses and milestone-list status cells; this step adds AC pass/fail coloring, dependency tree, and step status badges.",
+      "files": [],
+      "tests": "crates/raul/tests/detail_theme.rs",
+      "done_when": "Milestone detail renders color-coded sections; tui_filter tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP4",
+      "order": 7,
+      "action": "Implement raul milestone approve <id>, block <id> --reason, and unblock <id> as CLI commands delegating to mp. Each prints the updated milestone status. (Distinct from the existing raul approval approve <annotation-id> which resolves an annotation-approval-request — both coexist.)",
+      "files": [],
+      "tests": "crates/raul/tests/review_commands.rs",
+      "done_when": "raul milestone approve/block/unblock delegate to mp and print updated status; review_commands tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Implement raul milestone set-dependency <id> --depends-on <dep> (delegates to mp milestone update) and raul milestone request-grooming <id> --reason (creates a grooming-request annotation via mp annotation create).",
+      "files": [],
+      "tests": "crates/raul/tests/review_commands.rs",
+      "done_when": "set-dependency adjusts depends_on; request-grooming creates a grooming annotation; review_commands tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Implement raul step split <milestone> <step> --into N delegating to mp milestone step split. Show the resulting step tree.",
+      "files": [],
+      "tests": "crates/raul/tests/review_commands.rs",
+      "done_when": "raul step split delegates to mp milestone step split and shows the new step tree; review_commands tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP5",
+      "order": 10,
+      "action": "Integrate approve/block/unblock into the raul TUI milestone detail via a context menu and keybindings, with result feedback. Builds on the visual system (S5/S6) and the CLI delegates (S7).",
+      "files": [],
+      "tests": "crates/raul/tests/tui_review_actions.rs",
+      "done_when": "TUI context menu offers approve/block/unblock on a selected milestone; tui_review_actions tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S5",
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP5",
+      "order": 11,
+      "action": "Integrate request-grooming (and set-dependency) into the raul TUI via a context menu on milestone/step detail, with result feedback. Builds on S5 and S8.",
+      "files": [],
+      "tests": "crates/raul/tests/tui_review_actions.rs",
+      "done_when": "TUI context menu offers request-grooming on milestone/step detail; tui_review_actions tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S5",
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-01",
+    "branch": "",
+    "evidence": "Visual overhaul (S1-S6) + review-workflow half (S7-S11, via M62/M77). Theme system (catppuccin+dracula), ui config in mp (raul read-only), width-aware tables, status icons, TUI (h) hide-done toggle (persists via mp config), show() syntax highlight. All 9 AC tests green; raul 36 + mp 112 suites green; mp validate ok."
+  }
+}

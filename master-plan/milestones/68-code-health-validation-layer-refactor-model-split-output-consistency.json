@@ -1,0 +1,229 @@
+{
+  "milestone": {
+    "id": "68",
+    "title": "Code health: validation layer refactor + model split + output consistency",
+    "slug": "code-health-validation-layer-refactor-model-split-output-consistency",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-30",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Validation and verification logic has a single source of truth per gate; ac_verify has one execution path; mp-model is split into modules; duplicate gate invocations are removed; Human format behavior is explicit (removed or documented as alias). Contributors can find gate logic without reading an 800-line file."
+  },
+  "problem": {
+    "description": "Review session identified organizational debt that does not block shipping but raises maintenance cost and drift risk. validate.rs is an 815-line monolith mixing full-plan scan, per-milestone gates (G1–G14), track/annotation rules, and command-time gate helpers (validate_milestone_ready, validate_milestone_start_execution) — G1/G4/G14 logic is duplicated between paths. ac_verify.rs has near-duplicate run_one/run_step_test and verify_milestone/verify_step_tests blocks (~170 lines of copy-paste). mp-model is a single 1032-line lib.rs god-file while TomlResource trait is declared but never implemented. Gate checks run twice on milestone execution start (commands/milestone.rs then milestone.rs inside with_milestone_mut). commands/common.rs emit() accepts a human parameter but ignores it — Fmt::Human and Fmt::Json both print pretty JSON, which contradicts M41 'mp is agent-only'. plan_gaps.rs and validate.rs overlap on coverage/readiness concepts with different report shapes."
+  },
+  "scope": {
+    "in_scope": [
+      "Split validate.rs into focused modules (e.g. validate/plan.rs, validate/milestone_gates.rs, validate/tracks.rs, validate/report.rs) with shared issue() helper — no behavior change, cargo test -p mp green",
+      "Extract shared gate functions used by both validate_plan and command-time paths (G1, G4, G8, G14) to eliminate duplication",
+      "Refactor ac_verify.rs: single run_test(value) -> Result path used by both AC verification and step-test guardrail",
+      "Remove duplicate validate_milestone_start_execution call chain (command handler OR domain, not both)",
+      "Split mp-model/src/lib.rs into modules (milestone.rs, plan.rs, track.rs, config.rs, normalize.rs) — re-export from lib.rs for stable paths",
+      "Remove or implement TomlResource trait (pick one: delete dead trait or wire store.rs through it)",
+      "Clarify Fmt::Human in mp: either remove Human variant from agent commands or document in cli.rs/AGENTS.md that Human is JSON alias (M41 agent-only — no raul-style tables)",
+      "Document plan_gaps vs validate responsibility boundary in ARCHITECTURE.md (when to call which)"
+    ],
+    "out_of_scope": [
+      "Behavior changes to gate thresholds (owned by M66)",
+      "cli.rs arg definition split (1049 lines — separate milestone if needed after validate split)",
+      "pub(crate) module boundary / lib.rs re-export reduction (future API hygiene)",
+      "raul human formatting (raul owns human output)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "validate.rs split into submodules; no single file over 400 lines in validate/",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+    },
+    {
+      "id": "AC-02",
+      "description": "G4/G8/G14 gate logic exists in one function per gate, called from both validate_plan and command-time paths",
+      "verification": "crates/mp/tests/gate_matrix.rs",
+      "status": "passed",
+      "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+    },
+    {
+      "id": "AC-03",
+      "description": "ac_verify has no duplicate run/verify blocks (single execution path)",
+      "verification": "crates/mp/tests/complete_guardrail.rs",
+      "status": "passed",
+      "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp-model split into modules with lib.rs re-exports; mp-model unit tests still pass",
+      "verification": "cargo test -p mp-model",
+      "status": "passed",
+      "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+    },
+    {
+      "id": "AC-05",
+      "description": "ARCHITECTURE.md documents validate vs plan_gaps boundary and Human format policy",
+      "verification": "manual: accepted — docs review",
+      "status": "passed",
+      "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should validate/ submodules mirror gate codes (g4.rs) or layer (plan.rs, milestone.rs)?",
+      "status": "resolved",
+      "answer": "Suggestion: layer-based (plan.rs, milestone.rs, tracks.rs, report.rs). Gate-per-file fragments too fast when one gate spans plan+milestone; layer matches how contributors reason about validate."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "validate.rs split",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Gate dedup + ac_verify",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "mp-model split + docs",
+      "goal": "",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Split validate.rs into validate/ submodules (plan, milestone_gates, tracks, report) — refactor only, no behavior change",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "No validate submodule over 400 lines; cargo test -p mp green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Extract shared gate functions (G4, G8, G14) called from validate_plan and command-time paths",
+      "files": [],
+      "tests": "crates/mp/tests/gate_matrix.rs",
+      "done_when": "Single function per gate, gate_matrix passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Refactor ac_verify.rs to single run_test execution path; remove duplicate verify blocks",
+      "files": [],
+      "tests": "crates/mp/tests/complete_guardrail.rs",
+      "done_when": "ac_verify deduped; complete_guardrail passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Remove duplicate validate_milestone_start_execution call (command handler OR domain, not both)",
+      "files": [],
+      "tests": "crates/mp/tests/workflow_gates.rs",
+      "done_when": "Execution start validates once",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Split mp-model lib.rs into modules; delete or wire TomlResource trait",
+      "files": [],
+      "tests": "cargo test -p mp-model",
+      "done_when": "mp-model modules split; cargo test -p mp-model green",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Document Human=JSON alias policy and validate vs plan_gaps boundary in ARCHITECTURE.md; note in cli.rs if Human kept",
+      "files": [],
+      "tests": "manual: accepted — docs review",
+      "done_when": "ARCHITECTURE.md updated",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-30",
+    "branch": "",
+    "evidence": "M68: validate/ module split, shared G4/G8/G14 gates, ac_verify run_test dedup, mp-model modules, ARCHITECTURE.md boundary docs"
+  }
+}

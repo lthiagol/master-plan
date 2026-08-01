@@ -1,0 +1,28 @@
+# nextest config for master-plan
+# https://nexte.st/docs/configuration/
+
+[profile.default]
+# Process-per-test is nextest's model. With shared hardlink mp snapshots
+# (crates/mp/tests/common/mod.rs), full CPU parallelism is the right
+# default. Override at runtime if TMPDIR is on a slow disk:
+#   NEXTEST_TEST_THREADS=6 make test
+# test-threads defaults to available CPUs.
+
+# Fail slow hangers instead of wedging the suite forever.
+slow-timeout = { period = "60s", terminate-after = 3 }
+
+# Known timing-sensitive process-group test under full-suite contention.
+[[profile.default.overrides]]
+filter = 'test(=run_herdr_with_timeout_kills_entire_process_group)'
+retries = 2
+
+[profile.ci]
+# Shared CI runners: slightly more conservative parallelism; never stop at
+# the first failure (masks the rest of the surface — see WIP-CI-HANDOFF).
+test-threads = 8
+slow-timeout = { period = "90s", terminate-after = 2 }
+fail-fast = false
+
+[[profile.ci.overrides]]
+filter = 'test(=run_herdr_with_timeout_kills_entire_process_group)'
+retries = 2

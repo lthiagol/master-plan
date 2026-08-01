@@ -1,0 +1,28 @@
+[workspace]
+members = ["crates/mp-model", "crates/mp", "crates/mp-oracle", "crates/raul"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0-rc1"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+crossterm = "0.29"
+
+# Test profile — kept minimal on purpose.
+#
+# We deliberately stay at dev's opt-level (0) for tests. opt-1 was tried
+# before but in practice lost wall-clock overall: opt-1 codegen is slower
+# to *compile* than opt-0, while our integration tests (subprocess spawn +
+# JSON assert) barely benefit from the marginal runtime speedup. M159
+# measured an ~17s wall-clock drop on cold `cargo nextest run` on this
+# Mac; the rest of `make test`'s win comes from clippy splitting out
+# into `make lint` (see Makefile).
+#
+# `debug = "line-tables-only"` keeps backtraces useful without full debuginfo
+# bulk — most of our test binaries under target/ stay small enough that the
+# spawn + hardlink/copy cost in nextest's process-per-test stays bounded.
+[profile.test]
+opt-level = 0
+debug = "line-tables-only"

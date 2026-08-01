@@ -1,0 +1,223 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "90"
+title = "Dogfooding ergonomics — agent doc split, review discovery, CLI gap closure"
+slug = "dogfooding-ergonomics-agent-doc-split-review-discovery-cli-gap-closure"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["88"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Agents dogfooding this repo get a thin root AGENTS.md, rich plan-dir AGENTS.md with flow recipes and self-discovery hooks, and mp CLI fixes for review/spec queues without jq or grep."
+
+[problem]
+description = "While dogfooding (Jul 2026): agents used jq/rg on mp output to answer 'what needs review?' despite mp reviews pending + mp inbox + mp list --spec-status review existing. Root AGENTS.md duplicates master-plan/AGENTS.md (~270 lines vs ~220), bloating every code session. --fields projection fails on list milestones (id) and show milestone (review_state). Inbox has no kind filter for review-only views. No single command merges execution-review queue and spec-approval queue."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Root AGENTS.md slimmed: repo purpose, dogfood pointer, plan vs code zone one-liner, dev commands table, link to master-plan/AGENTS.md + AGENT-READINESS",
+    "master-plan/AGENTS.md: canonical mp workflows (session start, plan, execute, review, remediate, track) as numbered flow recipes; discovery table pointing to --help, AGENT-READINESS, MP-COMMANDS, graph explain",
+    "mp reviews status (or extend mp status): pending_review_count + spec-review milestones + suggested next review action in one JSON blob",
+    "mp inbox --filter spec-review|execution-review|review (subset of actionable items)",
+    "Fix or document --fields paths for list milestones and computed review_state on show milestone --summary",
+    "Enrich mp reviews pending with optional --summary per item (steps done/total, open findings)",
+    "Track items or backlog entries for gaps deferred from this milestone during grooming",
+    "Integration tests for new/changed CLI surface",
+]
+out_of_scope = [
+    "Full rewrite of docs/MP-COMMANDS.md",
+    "raul TUI changes for review dashboard",
+    "Changing mp JSON default or removing jq entirely from agent workflows globally",
+    "Implementing every historical dogfood gap in one milestone — park overflow in track/backlog",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Root AGENTS.md is under ~80 lines and defers plan workflows to master-plan/AGENTS.md"
+verification = "manual: accepted — line count + link check"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "master-plan/AGENTS.md has session-start flow, plan-only flow, execute flow, review flow, and a discovery section (where to learn commands without duplicating MP-COMMANDS)"
+verification = "manual: accepted — doc structure review"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "One mp read command returns both execution-review pending (M86-style) and spec-review milestones (M80-style) without shell filtering"
+verification = "crates/mp/tests/review_discovery.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp inbox supports filtering to review-related items only (spec approval + execution review queue)"
+verification = "crates/mp/tests/review_discovery.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "cargo test -p mp passes"
+verification = "cargo test -p mp"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Agent doc split"
+goal = "Slim root AGENTS.md; expand master-plan/AGENTS.md with numbered flow recipes and discovery table"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Review discovery CLI"
+goal = "Unified review status read, inbox filters, --fields fixes, reviews pending --summary"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Slim root AGENTS.md: repo purpose, dogfood pointer, plan vs code zone, dev commands table, links to master-plan/AGENTS.md and AGENT-READINESS (target under ~80 lines)"
+files = ["AGENTS.md"]
+tests = "manual: accepted — line count + link check"
+done_when = "Root AGENTS.md is under ~80 lines and defers plan workflows to master-plan/AGENTS.md"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Expand master-plan/AGENTS.md: session-start, plan-only, execute, review/remediate, track flows as numbered recipes; discovery table for --help, AGENT-READINESS, MP-COMMANDS, graph explain"
+files = ["master-plan/AGENTS.md"]
+tests = "manual: accepted — doc structure review"
+done_when = "master-plan/AGENTS.md has all required flow sections and discovery table"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Add mp reviews status (or extend mp status) returning pending_review_count, spec-review milestones, and suggested next review action in one JSON blob; fix/document --fields paths for list milestones and review_state on show --summary"
+files = [
+    "crates/mp/src/commands/reviews.rs",
+    "crates/mp/src/commands/status.rs",
+]
+tests = "crates/mp/tests/review_discovery.rs"
+done_when = "One mp read returns execution-review pending and spec-review milestones without shell filtering"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add mp inbox --filter spec-review|execution-review|review; enrich mp reviews pending with optional --summary per item (steps done/total, open findings)"
+files = [
+    "crates/mp/src/commands/inbox.rs",
+    "crates/mp/src/commands/reviews.rs",
+]
+tests = "crates/mp/tests/review_discovery.rs"
+done_when = "mp inbox --filter review returns only review-related actionable items"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP-close"
+order = 5
+action = "Run full mp test suite; fix regressions from review discovery changes"
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp exit 0"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-02"
+branch = ""
+evidence = "cargo test -p mp exit 0"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

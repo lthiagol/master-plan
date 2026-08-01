@@ -1,0 +1,137 @@
+{
+  "decisions": [
+    {
+      "id": "",
+      "date": "",
+      "summary": "",
+      "context": "",
+      "milestone": ""
+    },
+    {
+      "id": "D-001",
+      "date": "2026-06-18",
+      "summary": "Dogfood master-plan/ for toolkit tracking",
+      "context": "handoff.md remains session bridge; mp owns plan artifacts",
+      "milestone": ""
+    },
+    {
+      "id": "D-002",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: Session on-disk layout — sessions/ tree",
+      "context": "Decision: Option A — master-plan/sessions/<id>/ with session.toml + scoped milestone(s). Supersedes PENDING state. Aligns ADOPTION-PROFILES §9. Unblocks M08.",
+      "milestone": "08"
+    },
+    {
+      "id": "D-003",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: One active session per git branch",
+      "context": "Decision: auto_bind_branch=true; at most one active session per branch name. Explicit mp session focus deferred to v0.3 if needed. Unblocks M08.",
+      "milestone": "08"
+    },
+    {
+      "id": "D-004",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: Single root master-plan/ per repo",
+      "context": "Decision: one plan dir at repo root for monorepos; per-crate plan dirs deferred. Unblocks M09 monorepo scope.",
+      "milestone": "09"
+    },
+    {
+      "id": "D-005",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: v1 adoption — full on toolkit repo, hybrid via fixture",
+      "context": "This repo: full profile + root AGENTS.md + master-plan/ in git. Work pattern: hybrid-work fixture + ADOPTION-CHECKLIST §3. M08 session path integration deferred.",
+      "milestone": ""
+    },
+    {
+      "id": "D-006",
+      "date": "2026-06-18",
+      "summary": "PENDING: v0.3 release semver — v1.0.0 vs v0.2.0",
+      "context": "M11 NC-01/NC-02. Blocks S3–S7 of M11. User must decide before tag.",
+      "milestone": ""
+    },
+    {
+      "id": "D-007",
+      "date": "2026-06-18",
+      "summary": "PENDING: session focus persistence design",
+      "context": "M13 NC-01/NC-02. Blocks S2–S5. Options: config.toml, session.toml, env MP_SESSION.",
+      "milestone": ""
+    },
+    {
+      "id": "D-008",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: v1.0.0 direct stable on Gitea",
+      "context": "Resolves M11 NC-01/NC-02. Tag v1.0.0; publish via Gitea releases.",
+      "milestone": ""
+    },
+    {
+      "id": "D-009",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: session focus in config.toml; error if unset",
+      "context": "Resolves M13 NC-01/NC-02. focused_session in [workflow.session]; next-step errors when no focus.",
+      "milestone": ""
+    },
+    {
+      "id": "D-010",
+      "date": "2026-06-18",
+      "summary": "ACCEPTED: Homebrew in lthiagol/homebrew-tap pinned to tags",
+      "context": "Resolves M14 NC-01/NC-02. Tap https://github.com/lthiagol/homebrew-tap; formula pins to tagged releases.",
+      "milestone": ""
+    },
+    {
+      "id": "D-011",
+      "date": "2026-06-28",
+      "summary": "ADR-008: mp --format json is the frozen stable programmatic agent API; mp's command names are the stable invocation surface",
+      "context": "Two consumers now depend on mp's external surface being stable: external agents (JSON) and raul CLI (JSON + command-name shell-out). (1) FREEZE: --format json output shapes are the stable agent API — verb/grouping changes (M38) must NOT alter JSON shapes. This formalizes what was de-facto stable (previously scoped under M38/S2) and is pulled forward because raul (M40) depends on it before M38 runs. (2) COMMAND NAMES: raul shells out using current mp command names (status, list milestones, show milestone, next-step, path, idea create, digest, graph), so M38's deprecated-alias plan MUST cover every command raul invokes, keeping raul working through the v2.0 transition. Decoupling boundary: raul links ONLY the pure mp-model types crate; all plan operations cross the mp JSON process boundary.",
+      "milestone": "40"
+    },
+    {
+      "id": "D-012",
+      "date": "2026-06-28",
+      "summary": "Supersede D-011 clause 2: 2.0 ships mp+raul together with hard command renames, no deprecated aliases or transition period",
+      "context": "D-011 clause 2 mandated deprecated aliases for every renamed mp command so raul and external consumers keep working across the v2.0 transition. The 2.0 release reverses this: backward compatibility is not a concern (clean break from v1.4.0; git tag shows v1.0.0..v1.4.0 exist), and mp and raul ship in the SAME release, so raul shell-outs (crates/raul/src/mp_runner.rs run/run_raw) are repointed to the new command names in-lockstep with zero aliases needed. D-011 clause 1 (freeze of --format json output shapes as the stable agent API) REMAINS in force. Net effect: M38 design and the M45 implementation hard-rename commands and update raul/tests/skill/docs in the same change; no deprecation shims, no hidden alias surface, no removal timeline.",
+      "milestone": ""
+    },
+    {
+      "id": "D-013",
+      "date": "2026-06-28",
+      "summary": "ADR-008: Drop mp human output formats (human/markdown/pr-body), keep json+raw only. All human views move to raul. The mp OutputFormat enum reduces to Json + Raw. Deleted surfaces: render.rs (render_milestone_human, render_track_human), export.rs (full file + all internal renderers), human/markdown/pr-body match arms in emit() and all call sites. Kept: digest.rs, graph.rs (command body stays; raul needs json output). Consumers (scenarios, tests, docs, SKILL.md, AGENTS.md) migrated before removal. 6 test functions and 63 doc references require migration.",
+      "context": "Audit of mp human output surfaces (M41/S1):\n\n## Surfaces to DROP\n\n### 1. OutputFormat enum (cli.rs:4-12)\n- DROP: Human (default), Markdown, PrBody\n- KEEP: Json, Raw\n\n### 2. render.rs (159 lines) — DELETE entire file\n- render_milestone_human() — human markdown rendering\n- render_track_human() — human markdown rendering\n- milestone_json_value(), track_json_value() — relocate to a json module\n\n### 3. export.rs (261 lines) — DELETE entire file\n- export_plan() + 6 internal render functions (render_charter, render_plan_status, render_milestone_list, render_backlog, render_ideas)\n\n### 4. commands/common.rs — emit() function\n- DROP: Fmt::Human match arm (lines 21-31)\n- DROP: Fmt::Markdown | Fmt::PrBody match arm (lines 35-45)\n- KEEP: Fmt::Json, Fmt::Raw\n\n### 5. Human call sites in commands/\n- commands/show.rs: render_milestone_human calls (lines 29,51) → JSON only\n- commands/status.rs: Fmt::Human branch (line 63) → JSON only\n- commands/list.rs: Fmt::Human branch (line 56) → JSON only\n- commands/track.rs: render_track_human (line 25) → JSON only\n- commands/path.rs: Fmt::Human branch (line 34) → JSON only\n- commands/milestone.rs: render_verify_human (line 201) → JSON only\n- commands/session.rs: Fmt::Markdown|PrBody export (lines 36-49) → JSON only\n- commands/export.rs: Fmt::Human branch (line 15) → DELETE with export.rs\n\n### 6. Raul dependencies on mp JSON output — ALL KEPT\n- raul status → mp status --format json\n- raul milestones → mp list milestones --format json\n- raul show → mp show milestone <id> --format json\n- raul next → mp next-step --format json\n- raul path → mp path --format json\n- raul digest → mp digest --format json\n- raul graph → mp graph --format json\n- raul idea create → mp idea create --json @- --format json\n\n## Consumer migration needed BEFORE removal\n\n### Test files (6 test functions):\n1. crates/mp/tests/format_human.rs: list_milestones_format_human → migrate assertions to json\n2. crates/mp/tests/format_human.rs: status_format_human → migrate to json\n3. crates/mp/tests/format_human.rs: path_format_human → migrate to json\n4. crates/mp/tests/status_readiness.rs:21: --format human → --format json\n5. crates/mp/tests/p5_polish_batch.rs:178: --format markdown → --format json\n6. crates/mp/tests/skill_context.rs:26: --output markdown → remove output arg\n\n### Doc files (~63 references):\n- master-plan/AGENTS.md: lines 16,114-119 → route to raul\n- templates/skills/master-planner/SKILL.md:39 → route to raul\n- templates/AGENTS-TEMPLATE.md: lines 242,247,253,362,365\n- ARCHITECTURE.md: lines 166,179\n- docs/concepts/**/*.md: dozens of references across 15+ files\n\n### Golden scenarios (10 scenarios):\n- All already use --format json in the runner — NO CHANGE needed",
+      "milestone": ""
+    },
+    {
+      "id": "D-014",
+      "date": "2026-06-28",
+      "summary": "ADR-009 (M38/S1): Target command taxonomy for v2.0 CLI group redesign",
+      "context": "## Target Command Taxonomy (Docker-style object groups)\n\n### Top-level lifecycle verbs (13 commands)\ninit, install, uninstall, doctor, validate, sync, status, next (collapsed from next+next-step), path, execution, inbox, hygiene, git, interview, list, show\n\n### Object groups (noun-first, ~20 groups)\n- **plan** { show, edit, goals, nongoals, principles, metrics } — absorbs: Plan, Metrics\n- **brief** { todo, list, show, edit, add, done } — absorbs: Brief\n- **milestone** { create, approve, decompose, list, show, verify, complete, criteria, questions, block, unblock, groom, challenge, step, wp } — absorbs: Milestone, Groom, Challenge, Step, Wp\n- **idea** { create, list, show, update, dismiss, archive, remove, promote } — absorbs: Idea\n- **backlog** { add, list, resolve, promote } — absorbs: Backlog\n- **track** { add, list, show, start, done, cancel, promote, archive, restore, purge } — absorbs: Track, Archive(track), Restore(track), Purge(track)\n- **session** { start, list, show, focus, unfocus, archive, export, promote } — absorbs: Session\n- **decision** { add, list, remove } — absorbs: Decision\n- **annotation** { create, list, show, update, resolve, reopen, remove } — absorbs: Annotation (M43)\n- **release** { current, set, list } — absorbs: Release\n- **changelog** { init, add, show, generate } — absorbs: Changelog\n- **config** { show, set, get } — absorbs: Config\n- **brownfield** { scan } — absorbs: Brownfield\n- **specs** { init, show, delta } — absorbs: Specs, Delta\n- **skill** { context } — absorbs: Skill\n- **digest** { ... } — standalone sub: digest\n- **graph** { ... } — standalone sub: graph\n- **note** { add, list, remove } — absorbs: Note\n\n### Every current command mapped to target path\n| Current | Target |\n|---------|--------|\n| init | init |\n| install | install |\n| uninstall | uninstall |\n| doctor | doctor |\n| validate | validate |\n| sync | sync |\n| status | status |\n| next | next (collapsed) |\n| next-step | REMOVED (collapsed into next) |\n| path | path |\n| execution | execution |\n| inbox | inbox |\n| hygiene | hygiene |\n| git | git |\n| interview | interview |\n| list milestones | list milestones |\n| list ideas | list ideas |\n| list tracks | list tracks |\n| list sessions | list sessions |\n| list specs | list specs |\n| list decisions | list decisions |\n| list annotations | list annotations |\n| show milestone | show milestone |\n| show archived | show archived |\n| plan * | plan {show,edit,goals,nongoals,principles,metrics} |\n| metrics * | plan metrics |\n| brief * | brief * |\n| milestone * (except groom/challenge) | milestone * |\n| groom milestone | milestone groom |\n| challenge * | milestone challenge |\n| step * | milestone step |\n| wp * | milestone wp |\n| idea * | idea * |\n| backlog * | backlog * |\n| track * | track * |\n| archive * | track archive / milestone archive / session archive / idea archive |\n| restore * | track restore / milestone restore |\n| purge * | track purge |\n| session * | session * |\n| decision * | decision * |\n| annotation * | annotation * |\n| release * | release * |\n| changelog * | changelog * |\n| config * | config * |\n| brownfield * | brownfield * |\n| specs * | specs * |\n| delta * | specs delta |\n| skill * | skill * |\n| digest | digest |\n| graph | graph |\n| note * | note * |\n| interview | interview |\n| (export) | REMOVED (M41) |\n\n### Key decisions\n(a) next + next-step collapsed into single 'next' — agent uses mp next for both the single step and full path; raul already provides 'raul next' for humans\n(b) annotation (M43) is a first-class object group 'annotation' placed alphabetically between backlog and brief in the subcommand list\n(c) verb-first standalones (archive, restore, purge, groom, challenge, note, delta, metrics) mapped to object-group homes as documented above\n\n### JSON shape freeze (D-011 clause 1)\nAll --format json output shapes are unchanged. Only verb/grouping changes.",
+      "milestone": "38"
+    },
+    {
+      "id": "D-015",
+      "date": "2026-06-28",
+      "summary": "ADR-010 (M38/S2): v2.0 rename strategy — hard rename, no aliases, raul repoint in-lockstep",
+      "context": "Rename Strategy: hard rename, no deprecated aliases, no transition period. v1.4.0 to v2.0.0 clean break. JSON shape freeze (D-011 clause 1): --format json output byte-identical to pre-rename. Raul shell-outs repointed in same change: mp status, list milestones, show milestone, next-step->next, path, idea create, digest, graph, annotation create all unchanged or repointed. No deprecated clap alias attrs.",
+      "milestone": "38"
+    },
+    {
+      "id": "D-016",
+      "date": "2026-06-28",
+      "summary": "ADR-011 (M38/S3): v2.0 rename impact assessment — per-surface change notes",
+      "context": "Impact assessment for v2.0 CLI rename per ADR-009 taxonomy. Surfaces: SKILL.md (command tables updated), AGENTS.md (command tables updated), MP-COMMANDS.md (full reference rewritten), AGENT-PLAYBOOK.md (few references), EDGE-CASES.md (few references), golden scenarios (cmd names in scenario.json), integration tests (cmd names in test args), fixtures (none affected, cmd names in test code), raul source (mp_runner.rs repoint, commands/mp runner calls), docs/concepts/* tree (all human format refs already updated in M41)",
+      "milestone": "38"
+    },
+    {
+      "id": "D-017",
+      "date": "2026-06-28",
+      "summary": "ADR-012 (M38/S4): v2.0 versioning decision — clean break, no transition",
+      "context": "Versioning: v1.4.0 to v2.0.0 clean-break major bump. No deprecation timeline, no alias period. Prior tags v1.0.0 through v1.4.0 exist; 2.0 is a breaking jump. D-012 supersedes D-011 clause 2 (alias mandate voided for 2.0). Coordinated with M41 human-output removal and M45 CLI grouping implementation — all ship under single v2.0 release.",
+      "milestone": "38"
+    },
+    {
+      "id": "D-18",
+      "date": "2026-07-03",
+      "summary": "ADR-014: JSON-canonical plan persistence",
+      "context": "M92 drops TOML on disk; JSON is canonical at rest and at the CLI boundary. Agent-first product; humans use raul; hand-edit forbidden; JSON Schema already validates I/O — persist what you serve. Supersedes the prior TOML-on-disk decision.",
+      "milestone": "92"
+    }
+  ]
+}

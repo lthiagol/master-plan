@@ -1,0 +1,277 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "67"
+title = "Test suite gap closure: kill stubs, harden CI, add missing workflow coverage"
+slug = "test-suite-gap-closure-kill-stubs-harden-ci-add-missing-workflow-coverage"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Every test file in crates/mp/tests/ asserts real behavior or is deleted. CI gates merge on fixtures and scenarios. Core agent/human workflows have integration coverage. raul can be tested against ephemeral plans without coupling to dogfood state."
+
+[problem]
+description = "Despite M28/M47 test hardening, review found the suite gives false confidence in several areas. Seven integration test files are compile-only stubs (concurrency, note, idea_dup, hybrid_session_path, session_branch, session_focus_path, schema_validate) — they pass cargo test but assert nothing. Two top-level commands have zero coverage: mp digest and mp uninstall. Secondary agent workflows are thin: track start/cancel/archive, backlog resolve, milestone defer/reopen/unblock/question, step split/fail. All 12 golden scenarios are read-only — no write-path regression on fixtures. CI runs mp validate, test-fixtures, and test-scenarios with continue-on-error: true — regressions can merge unnoticed. raul integration tests hit the live dogfood ./master-plan/ plan (no TempDir TestEnv) — plan edits break unrelated raul tests; raul_backlog_list_runs flakiness is tracked in M63 but raul lacks isolated fixture tests generally. ~14 legacy batch test files (p4_, ws_, m07_) violate AGENTS.md capability naming and duplicate narrower tests."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Delete or implement all 7 compile-only stub test files — each must assert behavior or be removed",
+    "Add tests for mp digest and mp uninstall",
+    "Add integration tests for track lifecycle (start, cancel), backlog resolve, milestone defer/reopen (pick highest-value 3 flows)",
+    "Add 2-3 golden write scenarios on fixtures (init → create milestone → step add chain → validate)",
+    "Remove continue-on-error from plan.yml for test-fixtures and test-scenarios (keep or tighten validate step)",
+    "Introduce raul TestEnv pattern (temp plan + MP_HOME) for at least status/show/path commands — reduce dogfood coupling",
+    "Audit and merge/rename worst legacy batch files per AGENTS.md naming convention (at least ws1/ws2/p13 brief duplicates → charter_edit/brief_import); document remaining debt in ARCHITECTURE or AGENTS.md if not all renamed in one pass",
+]
+out_of_scope = [
+    "100% command coverage matrix (P3 backlog)",
+    "Human --format human output golden tests",
+    "Rewriting all 94 integration files in one milestone",
+    "M63 raul flaky test fix (owned by M63)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "No _compiles()-only stub tests remain in crates/mp/tests/"
+verification = "scripts/audit-stub-tests.sh"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp digest and mp uninstall have integration test coverage"
+verification = "crates/mp/tests/digest.rs"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "At least 2 new golden write scenarios pass in make test-scenarios"
+verification = "make test-scenarios"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "plan.yml fixture and scenario jobs fail the workflow on regression (no continue-on-error)"
+verification = "manual: accepted — CI config review"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "raul status test runs against TempDir plan without requiring dogfood master-plan/"
+verification = "crates/raul/tests/status.rs"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Track start + backlog resolve integration tests pass"
+verification = "crates/mp/tests/track_lifecycle.rs"
+status = "passed"
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[[open_questions]]
+id = "Q-01"
+question = "CI plan.yml has three jobs with continue-on-error:true: (1) mp validate on live dogfood master-plan/, (2) make test-fixtures on static fixtures, (3) make test-scenarios on golden CLI output. Fixtures/scenarios catch code regressions in isolation; validate on dogfood can fail from plan-only edits unrelated to the PR diff. Which jobs should block merge?"
+status = "resolved"
+answer = "Suggestion — phased: Phase 1 (M67 S6): remove continue-on-error from test-fixtures and test-scenarios only — they are deterministic and high signal. Phase 2 (new track or M67 follow-up): either drop continue-on-error on validate once dogfood is always clean, OR run mp validate against a pinned fixture project instead of live master-plan/ so plan edits and code regressions decouple. Do NOT block on all three in one step without fixing validate input coupling first."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Stub cleanup and audit script"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Missing command coverage"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Golden write scenarios and CI"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "raul isolation"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement or delete all 7 compile-only stub tests (concurrency owned by M66 — skip if M66 lands first; note, idea_dup, hybrid_session_path, session_branch, session_focus_path, schema_validate)"
+files = []
+tests = "scripts/audit-stub-tests.sh"
+done_when = "No empty _compiles stubs remain"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Add scripts/audit-stub-tests.sh to detect empty test bodies; wire into make check or CI"
+files = []
+tests = "scripts/audit-stub-tests.sh"
+done_when = "Audit script fails on stub pattern"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Add integration tests for mp digest and mp uninstall"
+files = []
+tests = "crates/mp/tests/digest.rs"
+done_when = "digest and uninstall commands covered"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add track lifecycle and backlog resolve integration tests"
+files = []
+tests = "crates/mp/tests/track_lifecycle.rs"
+done_when = "track start/cancel and backlog resolve covered"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Add 2-3 golden write scenarios (init, create milestone, step add, validate) on fixtures"
+files = []
+tests = "make test-scenarios"
+done_when = "make test-scenarios passes new write scenarios"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "Remove continue-on-error from plan.yml test-fixtures and test-scenarios jobs"
+files = []
+tests = "manual: accepted — CI config review"
+done_when = "CI fails on fixture/scenario regression"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP4"
+order = 7
+action = "Introduce raul TestEnv with temp plan; migrate status test off dogfood plan"
+files = []
+tests = "crates/raul/tests/status.rs"
+done_when = "raul status test uses isolated fixture"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP1"
+order = 8
+action = "Merge/rename worst legacy batch test duplicates (ws1/ws2/p13 brief flows into charter_edit/brief_import) or document remaining debt"
+files = []
+tests = "cargo test -p mp"
+done_when = "At least 3 legacy batch files removed or renamed"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "scripts/audit-stub-tests.sh; cargo test -p mp --test digest --test track_lifecycle; cargo test -p raul --test status; make test-scenarios"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

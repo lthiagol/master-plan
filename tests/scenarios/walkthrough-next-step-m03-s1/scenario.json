@@ -1,0 +1,16 @@
+{
+  "id": "walkthrough-next-step-m03-s1",
+  "phase": "implemented",
+  "description": "next-step returns M03 S1 on walkthrough fixture",
+  "fixture": "projects/walkthrough-oauth",
+  "command": ["next", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/next-step.json",
+    "fs_unchanged": true
+  },
+  "notes": "Autonomous loop iteration 1 — docs/WALKTHROUGH.md Phase 4."
+}

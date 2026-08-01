@@ -1,0 +1,15 @@
+{
+  "id": "p0-validate-g1-fail",
+  "phase": "implemented",
+  "description": "Milestone in-progress before spec ready fails gate G1",
+  "fixture": "projects/gate-g1-fail",
+  "command": ["validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 2,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": false
+  }
+}

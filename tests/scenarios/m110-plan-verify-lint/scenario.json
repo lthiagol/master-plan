@@ -1,0 +1,15 @@
+{
+  "id": "m110-plan-verify-lint",
+  "phase": "implemented",
+  "description": "mp plan verify-lint flags broad-scope verification on synthetic fixture",
+  "fixture": "projects/verify-lint-broad",
+  "command": ["plan", "verify-lint"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/verify-lint.json",
+    "fs_unchanged": true
+  }
+}

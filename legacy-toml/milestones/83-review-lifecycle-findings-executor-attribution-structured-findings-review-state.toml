@@ -1,0 +1,258 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "83"
+title = "Review lifecycle & findings — executor attribution, structured findings, review_state"
+slug = "review-lifecycle-findings-executor-attribution-structured-findings-review-state"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "high"
+created = "2026-07-01"
+updated = "2026-07-01"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = "opencode-m83-2026-07-01"
+
+[intent]
+outcome = "Every milestone tracks its full execute→review→remediate cycle: who executed it, who reviewed it, what findings were raised (with severity and open/fixed status), and where each was fixed. A derived review_state (pending-review, reviewed-clean, reviewed-with-findings, remediated, verified) makes the cycle observable across the project, so a reviewer/maintainer can answer 'what was found, what's still open, who fixed it' without grepping chat or notes prose."
+
+[problem]
+description = "mp records only a flat review verdict (reviewer + verdict + a free-text notes paragraph) via mp reviews pass. It captures neither who EXECUTED the milestone nor structured FINDINGS (issues with severity/status) nor remediation links (which commit fixed a finding). The execute→review→remediate contract (M64) is enforced but not observable: the M77/M78/M79 independent reviews left their findings only in review notes prose and chat — unstructured, untrackable, and lost to history. There is no way to list open findings across the project, no executor attribution, and no lifecycle state distinguishing 'done but unreviewed' from 'reviewed with open issues' from 'remediated'. This milestone closes that gap (the raul Kanban board that visualizes it is a separate follow-up, M84)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Executor attribution: mp milestone complete --executor <name> records who/what executed; surfaced in mp show and raul",
+    "Structured findings on reviews: [[reviews.findings]] with id (F-NN), severity (high/medium/low), category, description, status (open/fixed/wontfix), fixed_in (commit/ref)",
+    "Finding commands: mp reviews finding add <mid> --severity --category --desc; mp reviews finding resolve <mid> <fid> --commit <ref>; mp reviews finding list [--open]",
+    "Derived review_state per milestone (pending-review / reviewed-clean / reviewed-with-findings / remediated / verified), computed from execution_status + reviews + open findings; exposed in mp status/show",
+    "mp reviews lifecycle — a cross-project rollup of milestones by review_state (counts + ids), for at-a-glance health",
+    "mp show milestone renders executor, reviewers, and the findings list (open findings surfaced)",
+    "mp validate warns on done-but-unreviewed milestones (review hygiene)",
+]
+out_of_scope = [
+    "The raul TUI Kanban board view — separate milestone M84 (consumes this data)",
+    "Review assignment / request workflow (who SHOULD review) — defer; this tracks reviews that happened",
+    "Changing the existing mp reviews pass verdict model (additive only)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp milestone complete --executor <name> records the executor; mp show milestone surfaces it"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp reviews finding add <mid> --severity --category --desc creates a finding (id F-NN, status open); mp reviews finding list [--open] returns them"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp reviews finding resolve <mid> <fid> --commit <ref> sets status fixed and records fixed_in; resolved findings leave review_state remediated/verified"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "A derived review_state is computed per milestone and exposed in mp status / mp show (pending-review / reviewed-clean / reviewed-with-findings / remediated / verified)"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp reviews lifecycle returns a cross-project rollup of milestones grouped by review_state (counts + ids)"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "mp validate warns on milestones that are execution_status=done but have no review recorded (review hygiene gate)"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Executor attribution"
+goal = "Record who/what executed a milestone; surface in show."
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Findings model & commands"
+goal = "Structured [[findings]] on milestones + add/resolve/list commands."
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Derived review_state"
+goal = "Compute pending-review/open-findings/remediated/reviewed-clean; expose in status/show."
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Lifecycle rollup & validate gate"
+goal = "Cross-project review_state rollup + validate hygiene gate."
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add executed_by field to the milestone model; mp milestone complete --executor <name> records it; mp show milestone surfaces it"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "complete --executor persists executed_by; show displays it"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Add [[findings]] to the milestone model (id F-NN, severity, category, description, status open, author, fixed_in, timestamps); mp reviews finding add <mid> --severity --category --desc [--author] creates F-NN with status open"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "reviews finding add creates an open F-NN finding persisted on the milestone"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "mp reviews finding resolve <mid> <fid> --commit <ref> sets status=fixed + fixed_in; mp reviews finding list <mid> [--open] returns findings"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "resolve marks fixed + fixed_in; list returns findings (filtered by --open)"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "mp show milestone renders the findings list (open findings surfaced, severity shown)"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "show milestone includes findings with severity + status"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Derive review_state per milestone (pending-review / open-findings / remediated / reviewed-clean) from execution_status + reviews + open findings; expose in mp status and mp show"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "review_state derived and shown in status + show for each done milestone"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP4"
+order = 6
+action = "mp reviews lifecycle returns a cross-project rollup of milestones grouped by review_state (counts + ids)"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "reviews lifecycle returns counts + ids per review_state"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP4"
+order = 7
+action = "mp validate warns on milestones that are execution_status=done but have no review recorded (review hygiene gate)"
+files = []
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "validate emits a warning code for done-but-unreviewed milestones"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-01"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

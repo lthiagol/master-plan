@@ -1,0 +1,176 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "57"
+title = "Configurable code review gate (workflow.steps.code_review)"
+slug = "configurable-code-review-gate-workflow-steps-code-review"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["43"]
+effort = "S"
+risk = "medium"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Projects can opt into a mandatory code review step: when workflow.steps.code_review = true, a milestone cannot complete until its review step is done, and mp milestone list-pending-review shows milestones waiting for review."
+
+[problem]
+description = "There is no implementation-stage review gate. mp milestone complete fires as soon as ACs pass, so a human reviewer has no enforced checkpoint between 'implemented' and 'done'. Note: the annotation system (M43) already provides SPEC-stage review via review-request and approval-request annotations (gated by G14, resolved through raul approval approve). This milestone adds the IMPLEMENTATION-stage complement: a post-AC, pre-complete code review gate. They are complementary — annotations review the plan, code_review reviews the implementation — not redundant."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Add workflow.steps.code_review = true|false to ProjectConfig (default false)",
+    "When code_review is enabled, mp milestone complete checks that a review step exists and is done before allowing completion (a new gate, alongside G6/G7)",
+    "mp milestone list-pending-review: lists milestones that are implemented but waiting for code review",
+    "Positioning: workflow.steps.code_review is implementation-stage review (after ACs pass, before complete). Spec-stage review uses the M43 annotation system (review-request / approval-request). The two are complementary, not overlapping.",
+    "AGENTS.md / docs update documenting the optional review step, the new gate, and how it relates to annotation-based approval",
+]
+out_of_scope = [
+    "Auto-assigning reviewers or integration with code-review tooling (GH PRs, etc.)",
+    "Changing default milestone flow (code_review defaults to false; opt-in only)",
+    "Spec-stage review — that is the M43 annotation system (review-request / approval-request); this milestone is implementation-stage only",
+    "raul TUI surface for review actions (that is M54)",
+    "The install/distribution work (M51)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "workflow.steps.code_review = true blocks mp milestone complete until a review step is done; returns a clear gate error otherwise"
+verification = "crates/mp/tests/workflow_gates.rs"
+status = "passed"
+evidence = "Code review gate (G15) on workflow.steps.code_review; config roundtrip; milestone list-pending-review; code_review_gate tests"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone list-pending-review shows milestones waiting for code review"
+verification = "crates/mp/tests/workflow_gates.rs"
+status = "passed"
+evidence = "Code review gate (G15) on workflow.steps.code_review; config roundtrip; milestone list-pending-review; code_review_gate tests"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "With code_review = false (default), milestone completion is unchanged (no regression)"
+verification = "crates/mp/tests/workflow_gates.rs"
+status = "passed"
+evidence = "Code review gate (G15) on workflow.steps.code_review; config roundtrip; milestone list-pending-review; code_review_gate tests"
+
+[[design_decisions]]
+area = ""
+choice = "Code review gate as a workflow step"
+rationale = "The code_review step is a post-AC, pre-complete verification step, not a spec-stage gate. It lives in workflow.steps.code_review config and is checked during mp milestone complete. Separate from M43 annotation system."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Code review gate"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 1
+action = "Add a regression test confirming that with code_review = false (default), milestone completion is unchanged."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "Regression test confirms default-off behavior matches pre-change completion"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 2
+action = "Add workflow.steps.code_review = true|false to ProjectConfig (default false). Roundtrip via mp config show/set."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "workflow.steps.code_review config key exists, roundtrips, defaults to false"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 3
+action = "Implement the review gate: mp milestone complete checks workflow.steps.code_review; if true, require a review step to be done before allowing completion (new gate alongside G6/G7). Return a clear error naming the missing review step."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "mp milestone complete returns a gate error when code_review=true and review step is not done; completes when review step is done"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 4
+action = "Implement mp milestone list-pending-review: lists milestones that are implemented but whose review step is not done."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "mp milestone list-pending-review lists implemented milestones waiting for code review"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S2"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "Code review gate (G15) on workflow.steps.code_review; config roundtrip; milestone list-pending-review; code_review_gate tests"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

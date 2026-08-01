@@ -1,0 +1,258 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "88"
+title = "Agent health rollups — milestone summary, finding batch ops, jq-loop prevention"
+slug = "agent-health-rollups-milestone-summary-finding-batch-ops-jq-loop-prevention"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["79"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "Agents remediating or reviewing milestones get first-class mp commands for health rollups and finding batch writes — eliminating the ad-hoc mp show | jq and silent no-op update patterns that caused the M85 remediation loop (session ses_0df3)."
+
+[problem]
+description = "During M85 remediation (session ses_0df3, Jul 2026) an agent ran mp show milestone 85 | jq ~60 times to compute step/AC/finding counts and check verification evidence. It then looped on mp milestone update --json with a findings array — returning ok:true but persisting nothing — before hand-editing TOML with sed. M79 shipped --fields, validate --summary, and reviews sweep, but not per-milestone health rollups or finding batch resolve. Agents also did not know mp reviews finding * exists (mp --help | grep finding finds nothing). Postmortem: session-ses_0df3.md."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp show milestone <id> --summary: step/AC/finding counts, review_state, force_bypassed flag",
+    "mp reviews finding list <id>: summary block (open/fixed/total/other)",
+    "mp reviews finding resolve <id> --all: batch resolve open findings",
+    "mp milestone update --json: hard-error on unsupported fields with redirect hints",
+    "AGENTS.md + AGENT-READINESS + AGENT-PLAYBOOK: jq replacements, loop guard, remediation commands",
+    "Integration tests in agent_summary.rs and review_lifecycle.rs",
+]
+out_of_scope = [
+    "raul human-surface changes",
+    "mp execution report --summary (follow-up)",
+    "mp help keyword search / topics index",
+    "--fields aggregation expressions",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp show milestone <id> --summary returns JSON with steps, acceptance_criteria, findings counts, review_state, and verification.force_bypassed"
+verification = "crates/mp/tests/agent_summary.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp reviews finding list <id> includes summary counts (full milestone, not just filtered list)"
+verification = "crates/mp/tests/agent_summary.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp reviews finding resolve <id> --all resolves every open finding and returns resolved_count"
+verification = "crates/mp/tests/agent_summary.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp milestone update --json with findings field exits non-zero redirecting to mp reviews finding commands"
+verification = "crates/mp/tests/review_lifecycle.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "AGENTS.md and AGENT-READINESS document --summary, batch resolve, loop guard; say not to pipe mp to jq for health checks"
+verification = "manual: accepted — doc review"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "cargo test -p mp passes"
+verification = "cargo test -p mp"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[design_decisions]]
+area = ""
+choice = "Use --summary flag on show milestone (not a new top-level command)"
+rationale = "Matches M79 opt-in rollup pattern; agents already run show milestone during remediation."
+
+[[design_decisions]]
+area = ""
+choice = "Finding status vocabulary stays open → fixed (not resolved)"
+rationale = "review_state and lifecycle rollup key off fixed; M85 loop used wrong resolved status."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Main"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Health rollup"
+goal = "mp show milestone --summary"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Finding batch ops"
+goal = "finding list summary and resolve --all"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Write guards"
+goal = "Reject unsupported milestone update fields"
+rollback = ""
+
+[[work_packages]]
+id = "WP5"
+name = "Agent docs"
+goal = "Document jq replacements and loop guard"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add milestone_health.rs and show milestone --summary flag"
+files = [
+    "crates/mp/src/milestone_health.rs",
+    "crates/mp/src/commands/show.rs",
+    "crates/mp/src/cli.rs",
+]
+tests = "crates/mp/tests/agent_summary.rs"
+done_when = "show_milestone_summary_rollup test passes"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Add summary to reviews finding list and resolve --all batch command"
+files = [
+    "crates/mp/src/commands/reviews.rs",
+    "crates/mp/src/reviews.rs",
+]
+tests = "crates/mp/tests/agent_summary.rs"
+done_when = "finding_resolve_all_open test passes"
+status = "done"
+covers_ac = [
+    "AC-02",
+    "AC-03",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP3"
+order = 3
+action = "Reject unsupported fields in milestone update JSON with redirect hints"
+files = ["crates/mp/src/milestone.rs"]
+tests = "crates/mp/tests/review_lifecycle.rs"
+done_when = "milestone_update_rejects_findings_field test passes"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP4"
+order = 4
+action = "Update AGENTS.md AGENT-READINESS AGENT-PLAYBOOK and master-plan AGENTS.md"
+files = [
+    "AGENTS.md",
+    "docs/concepts/01 - Agent Integration/AGENT-READINESS.md",
+    "docs/concepts/01 - Agent Integration/AGENT-PLAYBOOK.md",
+    "master-plan/AGENTS.md",
+]
+tests = "manual: accepted — doc review"
+done_when = "Docs list --summary, resolve --all, loop guard, no-jq guidance"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP5"
+order = 5
+action = "Run full mp test suite and validate"
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp exits 0"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-02"
+branch = ""
+evidence = "cargo test -p mp exit 0"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

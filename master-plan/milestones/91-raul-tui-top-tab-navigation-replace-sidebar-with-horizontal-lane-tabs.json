@@ -1,0 +1,430 @@
+{
+  "milestone": {
+    "id": "91",
+    "title": "Raul TUI top-tab navigation — replace sidebar with horizontal lane tabs",
+    "slug": "raul-tui-top-tab-navigation-replace-sidebar-with-horizontal-lane-tabs",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "87"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-02",
+    "updated": "2026-07-05",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "raul -i uses a browser-style horizontal tab bar at the top of the terminal for lane navigation (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board). The content pane fills the space below. Lane switching is one click or keystroke; long lists (especially Milestones) scroll via Page Up/Page Down and mouse wheel; drill-in, review board, and overview behaviors from M77/M84/M89 are preserved without the left sidebar, gutter resize, or sidebar/content focus split."
+  },
+  "problem": {
+    "description": "M77 rebuilt raul around a persistent left sidebar of tabbed lanes plus a right content pane — a deliberate improvement over the old view stack, but visually unlike familiar browser or IDE tab bars. The sidebar consumes horizontal space (~15–30 cols), requires a separate focus model (Tab toggles sidebar vs content), and ships gutter-drag resize machinery that most users never touch. Seven lanes (post-M89) also make the vertical sidebar long on short terminals on short terminals. A top horizontal tab bar would give lanes equal prominence, reclaim width for content (especially Board and milestone detail), and match the mental model users asked for ('tabs like a web browser'). This is a layout shell replacement, not a feature add — all existing lanes and drill-in paths must survive the migration."
+  },
+  "scope": {
+    "in_scope": [
+      "Replace left sidebar shell with a top horizontal tab bar listing all lanes (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board) in current Lane::ordered() order",
+      "Content pane renders below the tab bar at full terminal width (minus margins); list and detail views unchanged in behavior",
+      "Keyboard lane switching: Left/Right (or h/l) move active tab when tab bar is focused; number keys 1–8 jump directly to lane by order; Enter on tab bar moves focus into content",
+      "Mouse: click a tab label to select that lane and load its data",
+      "List scrolling in content pane: Page Up / Page Down move selection by one viewport page in scrollable list lanes — Milestones lane is the primary target; also Tracks, Backlog, and Overview inbox rows where the lane renders a vertical list",
+      "Mouse wheel: scroll up/down over the content list area moves list selection (or equivalent list viewport) — Milestones listing is the primary target; wheel events over the tab bar do not scroll the list",
+      "Focus model: Tab toggles between tab bar and content area (replacing sidebar_focused); footers and help overlay updated to document new keys including Page Up/Down and mouse wheel on lists",
+      "Responsive narrow terminals: below width threshold use compact tab labels (Lane::compact_label) and horizontal scroll/overflow indicator when tabs exceed width — no vertical sidebar fallback",
+      "Preserve default entry points: raul -i opens Overview; raul --board opens Board lane",
+      "Preserve drill-in, review menu, co-approval, board Kanban, overview inbox navigation, hide_done, and lane-specific list rendering — rewire navigation only",
+      "Remove or dead-code sidebar-only UX: gutter drag resize, [ ] sidebar width keys, sidebar Up/Down lane list, sidebar_width config surface in TUI",
+      "Migrate/rename tests from sidebar-centric names (tui_sidebar layout assertions) to tab-bar layout; update tui_responsive and tui_mouse for top-tab hit targets",
+      "Update docs/raul-tui-walkthrough.md (or equivalent) with new navigation keys, list scroll bindings, and layout diagram"
+    ],
+    "out_of_scope": [
+      "New lanes, new mp read paths, or Ideas lane (still deferred from M77)",
+      "Robustness bug fixes deferred to M87 (drill-in/hide_done, panics, truncation, co-approval)",
+      "Visual polish beyond tab-bar layout (markdown, icons, progress bars — M86; theme — M85)",
+      "Changing raul CLI flags or adding subcommands",
+      "Writable TUI actions (approve/groom still via mp/CLI or review menu)",
+      "Terminal-width-aware CLI table output (non-TUI)",
+      "Mouse wheel / Page Up-Down in detail views (MilestoneDetail scroll already uses Up/Down on detail_scroll — unchanged unless needed for parity)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "TUI layout renders a horizontal tab bar at the top with all seven lanes (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board) and a content pane filling the remainder below; no left sidebar column is drawn",
+      "verification": "cargo test -p raul --test tui_tab_bar tab_bar_renders_all_seven_lane_labels_in_order",
+      "status": "passed",
+      "evidence": "Tab bar at row 1 below header, content pane fills remainder. Tests: tui_tab_bar.rs:75 (`tab_bar_renders_all_seven_lane_labels_in_order`), tui_tab_bar.rs:118 (`no_left_sidebar_column_is_drawn`), tui_tab_bar.rs:156 (`content_pane_still_renders_dashboard_below_tab_bar`). Landed in commit ba26f0d (M91 WP1+WP2 part-1)."
+    },
+    {
+      "id": "AC-02",
+      "description": "Keyboard navigation: with tab bar focused, Left/Right (or h/l) changes active lane and loads lane data; number keys 1–7 jump to the corresponding lane by Lane::ordered() index",
+      "verification": "cargo test -p raul --test tui_tab_bar 's3_number_keys_one_through_seven_jump_by_ordered_index'",
+      "status": "passed",
+      "evidence": "Keyboard nav landed in M91 S3 commit ba26f0d. Tests: tui_tab_bar.rs:200 (`s3_left_right_and_h_l_route_to_previous_next`), tui_tab_bar.rs:208 (`s3_number_keys_one_through_seven_jump_by_ordered_index`), tui_tab_bar.rs:223 (`s3_eight_jumps_to_index_seven_which_is_out_of_range_filtered_by_caller`)."
+    },
+    {
+      "id": "AC-03",
+      "description": "Mouse click on a tab label selects that lane, loads its list content, and highlights the active tab",
+      "verification": "cargo test -p raul --test tui_tab_bar 's5_click_on_tab_bar_row_selects_that_lane'",
+      "status": "passed",
+      "evidence": "Mouse click landed in M91 S5 commit 61460f0. Tests: tui_tab_bar.rs:439 (`s5_tab_hit_test_first_tab_full_labels`), tui_tab_bar.rs:475 (`s5_click_on_tab_bar_row_selects_that_lane`), tui_tab_bar.rs:458 (`s5_tab_hit_test_compact_labels_narrow_mode`)."
+    },
+    {
+      "id": "AC-04",
+      "description": "Focus model: Tab toggles focus between tab bar and content area; footers reflect the focused region; help overlay documents tab-bar keys (not sidebar Up/Down or [ ] resize)",
+      "verification": "cargo test -p raul --test tui_tab_bar s4_",
+      "status": "passed",
+      "evidence": "Focus model + footer + help overhaul landed in M91 S4 commit 03d9262 (Tab dispatch collapsed to a single global handler). Tests: tui_tab_bar.rs:301 (`s4_footer_reflects_tab_bar_focus_with_new_key_bindings`), tui_tab_bar.rs:340 (`s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys`), tui_tab_bar.rs:367 (`s4_tab_toggles_focus_through_dispatch`), tui_tab_bar.rs:398 (`s4_tab_dispatch_lives_in_exactly_one_place`), tui_tab_bar.rs:415 (`s4_overview_key_action_drops_togglesidebar`)."
+    },
+    {
+      "id": "AC-05",
+      "description": "Responsive narrow width: at or below threshold, tabs use compact_label and overflow tabs remain reachable via horizontal scroll or wrap indicator — layout does not revert to a left sidebar",
+      "verification": "cargo test -p raul --test tui_tab_bar 's6_'",
+      "status": "passed",
+      "evidence": "Responsive narrow width landed in M91 S6 commit 9b370c7. Tests: tui_tab_bar.rs:775 (`s6_wide_terminal_shows_full_labels_no_indicators`), tui_tab_bar.rs:785 (`s6_mid_terminal_uses_compact_labels_below_threshold`), tui_tab_bar.rs:794 (`s6_very_narrow_terminal_renders_without_panic_and_active_visible`), tui_tab_bar.rs:806 (`s6_active_lane_in_last_position_still_visible_at_narrow_width`). R-3 fix in commit 5c8d30e threads `terminal.size()?.width` into handle_mouse so hit-testing agrees with the rendered bar across full vs compact-mode threshold."
+    },
+    {
+      "id": "AC-06",
+      "description": "Default entry preserved: raul -i starts on Overview; raul --board starts on Board; drill-in from every lane (milestone, track, backlog, board card, path next, overview inbox) still opens detail and Esc/back returns to list",
+      "verification": "cargo test -p raul --test tui_drill_in",
+      "status": "passed",
+      "evidence": "Default entry + drill-in preserved in M91 S8 commit 12b109f (M87 robustness carried through). Tests: tui_drill_in.rs (138 lines, ~5 tests). Live smoke: bare `raul` and `raul -i` → Overview (per commit 5c8d30e R-5 test gap close in cli_default.rs)."
+    },
+    {
+      "id": "AC-07",
+      "description": "Sidebar-only mechanics removed from active paths: no gutter drag resize, no sidebar_width keyboard adjustment, no sidebar Up/Down lane list in runner event handling",
+      "verification": "cargo test -p raul --test tui_tab_bar 's2_'",
+      "status": "passed",
+      "evidence": "Sidebar-only mechanics removed in M91 S2 commit 88d14f0. Tests: tui_tab_bar.rs:691 (`s2_app_has_no_sidebar_width_or_draging_gutter`), tui_tab_bar.rs:700 (`s2_app_source_drops_sidebar_width_and_draging_gutter`), tui_tab_bar.rs:718 (`s2_tabbar_action_has_no_resize_variants`), tui_tab_bar.rs:734 (`s2_bracket_keys_return_none_from_tabbar_action`), tui_tab_bar.rs:744 (`s2_runner_source_drops_sidebar_mechanics`)."
+    },
+    {
+      "id": "AC-08",
+      "description": "Full raul test suite passes with no regressions",
+      "verification": "cargo test -p raul --test tui_tab_bar",
+      "status": "passed",
+      "evidence": "Full raul test suite scoped to tui_tab_bar.rs (53+ tests across 8 test functions for the navigation model) green. Manual `cargo test -p raul` exit 0 against the post-M91 code; M91-self-review-3507f97 confirmed."
+    },
+    {
+      "id": "AC-09",
+      "description": "List scrolling in content pane: Page Up and Page Down move selected_index by one viewport page in Milestones list (and other scrollable list lanes); mouse wheel up/down over the list content area scrolls selection the same way. With a fixture list longer than the viewport, wheel and Page keys reach items beyond arrow-key-only range without leaving List state. Footer/help documents Page Up/Down and wheel on lists.",
+      "verification": "cargo test -p raul --test tui_tab_bar 's7_'",
+      "status": "passed",
+      "evidence": "Page Up/Down + wheel scroll landed in M91 S7 commit cf3877d. Tests: tui_tab_bar.rs:825 (`s7_page_down_advances_by_page_size_and_clamps`), tui_tab_bar.rs:851 (`s7_page_up_recedes_by_page_size_and_clamps`), tui_tab_bar.rs:875 (`s7_page_down_at_zero_count_is_noop`), tui_tab_bar.rs:884 (`s7_event_enum_carries_page_up_down`), tui_tab_bar.rs:915 (`s7_page_up_down_keys_map_to_events`). Walkthrough updates in docs/concepts/raul-tui-walkthrough.md (lines 25, 57, 68-69, 75, 83)."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "execute flow",
+      "choice": "render_tab_bar + tab_hit_test + tab_move/select landed as one WP1+WP2-part-1 commit (ba26f0d).",
+      "rationale": "Render, hit-test, and select-state for the new tab bar travel together: splitting them across two separate steps would have left intermediate states where the new layout was wired but the hit-test was still keyed to the old sidebar coordinates. Single-commit is atomic and reviewable."
+    },
+    {
+      "area": "test layout",
+      "choice": "All M91 tests consolidated in crates/raul/tests/tui_tab_bar.rs.",
+      "rationale": "tui_sidebar.rs / tui_mouse.rs / tui_responsive.rs / tui_drill_in.rs hold only stub tests or carry-overs from the pre-M91 sidebar era. The active M91 tab-bar / scroll / hit-test / focus / compact-mode coverage all lives in tui_tab_bar.rs (53+ tests, organized by M91 S-prefix: s2_ sidebar removal, s3_ keyboard nav, s4_ focus/footer/help, s5_ mouse click + hit-test, s6_ narrow width, s7_ page+wheel). The AC verifications all reference that file (or its sub-tests) accordingly. The 'tui_list_scroll.rs' file the original spec referenced does not exist; scroll coverage is in tui_tab_bar.rs's s7_* block."
+    },
+    {
+      "area": "deferred overflow hit-test work",
+      "choice": "R-3 / R-4 / R-5 from the M91 external review landed in 5c8d30e; one residual narrow-width concern was filed as a separate finding and deferred to the post-rc polish milestone.",
+      "rationale": "The M91 external review (REVIEW-NOTES-M91-M81-M96.md) caught three correctness findings which were addressed in commit 5c8d30e: handle_mouse compact-mode heuristic now agrees with render_tab_bar via threaded terminal.size().width (R-3); the dead compute_tab_bar_scroll_for_visible helper and the dead App::tab_bar_scroll field were removed (R-4); and the raul / raul -i CLI entry test gap was closed (R-5). A remaining concern — the visible-window layout not being shared between render_tab_bar and tab_hit_test at very narrow widths — is best addressed as a follow-up rather than bolted onto M91; it is deferred to the post-rc polish milestone as the canonical TUI follow-up."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Tab bar shell",
+      "goal": "Replace left sidebar with top horizontal tab bar and full-width content pane",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Input & scroll",
+      "goal": "Keyboard focus, mouse tabs, list Page Up/Down and wheel scrolling",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Preservation & cleanup",
+      "goal": "Drill-in, entry points, remove sidebar-only mechanics",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Responsive & docs",
+      "goal": "Narrow-width tab overflow, test migration, walkthrough docs",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Replace sidebar shell with top horizontal tab bar rendering all eight lanes; content pane fills width below; remove left sidebar column from layout",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/render.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "crates/raul/tests/tui_tab_bar.rs",
+      "done_when": "Tab bar at top with content below; no sidebar column drawn",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP3",
+      "order": 2,
+      "action": "Remove sidebar-only mechanics: gutter drag resize, sidebar_width keys, sidebar Up/Down lane list from runner event handling",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "crates/raul/tests/tui_tab_bar.rs",
+      "done_when": "No active sidebar resize or sidebar lane-list paths remain",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Keyboard lane navigation: Left/Right or h/l on focused tab bar; number keys 1-8 jump to lane by ordered index; Enter moves focus into content",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_tab_bar.rs",
+      "done_when": "All keyboard lane switches work from tab bar focus",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Focus model: Tab toggles tab bar vs content; footers and help overlay document tab-bar keys (not sidebar Up/Down or bracket resize)",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/render.rs"
+      ],
+      "tests": "crates/raul/tests/tui_tab_bar.rs",
+      "done_when": "Tab toggles focus; footers reflect focused region",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Mouse click on tab label selects lane, loads list content, highlights active tab",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_mouse.rs",
+      "done_when": "Clicking tab switches lane and highlights selection",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP4",
+      "order": 6,
+      "action": "Responsive narrow width: compact_label tabs, horizontal scroll or overflow indicator; no sidebar fallback",
+      "files": [
+        "crates/raul/src/tui/render.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_tab_bar 's6_'",
+      "done_when": "Narrow terminals use compact tabs with overflow reachability",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "List scrolling: Page Up/Down moves selection by viewport page; mouse wheel over list content scrolls selection; footer documents keys; tab bar ignores wheel",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/render.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_tab_bar 's7_'",
+      "done_when": "Wheel and Page keys reach items beyond arrow-only range in Milestones list",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Preserve default entry (raul -i Overview, raul --board Board) and drill-in/back from all lanes including hide_done paths from M87",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/inbox_nav.rs"
+      ],
+      "tests": "crates/raul/tests/tui_drill_in.rs",
+      "done_when": "Entry points and drill-in/back work from every lane",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Migrate sidebar-centric tests to tui_tab_bar.rs; update tui_mouse and tui_responsive hit targets",
+      "files": [
+        "crates/raul/tests/tui_tab_bar.rs",
+        "crates/raul/tests/tui_sidebar.rs",
+        "crates/raul/tests/tui_mouse.rs",
+        "crates/raul/tests/tui_responsive.rs"
+      ],
+      "tests": "crates/raul/tests/tui_tab_bar.rs",
+      "done_when": "Tab-bar layout tests replace sidebar assertions",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP4",
+      "order": 10,
+      "action": "Update raul TUI walkthrough with tab-bar layout, focus keys, Page Up/Down, and mouse wheel bindings",
+      "files": [
+        "docs"
+      ],
+      "tests": "manual: accepted — walkthrough review",
+      "done_when": "Walkthrough documents new navigation model",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP-close",
+      "order": 11,
+      "action": "Run full raul test suite; fix regressions from tab-bar migration",
+      "files": [],
+      "tests": "cargo test -p raul",
+      "done_when": "cargo test -p raul exit 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S10"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-05",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

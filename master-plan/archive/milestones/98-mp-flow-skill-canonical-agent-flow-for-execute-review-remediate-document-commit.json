@@ -1,0 +1,161 @@
+{
+  "milestone": {
+    "id": "98",
+    "title": "mp-flow skill — canonical agent flow for execute → review → remediate → document → commit",
+    "slug": "mp-flow-skill-canonical-agent-flow-for-execute-review-remediate-document-commit",
+    "lifecycle": "groomed",
+    "execution_status": "blocked",
+    "blocked": true,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "119"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-03",
+    "updated": "2026-07-05",
+    "blocked_at": "2026-07-05T22:44:17.083127+00:00",
+    "block_reason": "user will handle that later",
+    "blocked_by": "user",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "M98's original monolithic scope (the mp-flow skill covering all 8 stages as a single artifact) has been split into three role-specific skills per the user's two-agent / four-role architecture: (a) `mp-flow` (M120) is the cross-role orchestration — the 8-stage timeline, the role-binding table, the hand-off contract; (b) `mp-coordinator` (M121) is the planning + reviewing deep-dive; (c) `mp-runner` (M122) is the executing + fixing deep-dive. M123 (`mp-handoff`) carries the cross-cutting hand-off protocol. M98 is preserved as the historical anchor; the canonical work lives in M120/M121/M122/M123. Single source of truth principle: the timeline is in M120, the role deep-dives are in M121/M122, the hand-off is in M123. The cross-role flow skill (M120) and the role-specific skills (M121/M122) explicitly back-link to M98 as the historical spec."
+  },
+  "problem": {
+    "description": "M98 was the original monolithic mp-flow skill spec. The two-agent / four-role architecture (coordinator = planning + reviewing, runner = executing + fixing) requires the role-specific deep-dives to live in their own skills, not conflated with the cross-role timeline. The monolithic M98 content is now split: (a) the 8-stage timeline and role-binding table live in M120 (mp-flow cross-role orchestration); (b) the planning + reviewing deep-dive lives in M121 (mp-coordinator); (c) the executing + fixing deep-dive lives in M122 (mp-runner); (d) the two-round review hand-off protocol lives in M123 (mp-handoff). M98 stays as the historical anchor; the design_decisions below reference the new milestones."
+  },
+  "scope": {
+    "in_scope": [
+      "Skill registry: each skill at templates/skills/<name>/SKILL.md with a companion manifest entry (id, display name, optional consumes: doc artifacts it depends on)",
+      "mp install --skills <a,b,c|all> selector (default all-known); unknown name errors with the list of registered names",
+      "mp install --check: non-writing bidirectional validation — every registry entry resolves on disk and every consumed artifact (e.g. a Pattern: block) has an owner skill; exits non-zero with a precise diff on mismatch",
+      "Refactor install.rs to iterate the registry instead of hardcoding master-planner + spec-grill (backward compatible: default deploys the full registered set, no regression)",
+      "SKILL.md covers the mp-flow 8-stage flow with concrete mp commands per stage: 1 session start, 2 claim & execute, 3 review, 4 remediate, 5 re-review, 6 document, 7 commit, 8 hand off",
+      "Sub-doc flow-stages.md with detailed per-stage checklists including the gotchas surfaced during M93/M94/M95 (gate parity, dry-run honesty, op-arg up-front validation, no-op semantics)",
+      "Skill explicitly forbids same-session self-review and explains why (L5 of docs/code-review-lessons.md)",
+      "mp-flow EXTRACTS the execution sections from master-planner §10/11 (master-planner keeps a one-line back-link); single source of truth — no duplication",
+      "Install hook: mp-flow registers via the new skill registry (mp install --skills=mp-flow deploys it)",
+      "Worked-example artifact: running the skill against M93 or M94 produces a committed transcript at docs/mp-flow-walkthrough-M<M>.md containing the 8 stage headings",
+      "make mp-flow-lint target asserts SKILL.md + flow-stages.md contain the 8 stage headings and the required mp commands (automated content gate)",
+      "Integration tests in crates/mp/tests/install_skills.rs covering the --skills selector, unknown-skill error, --check pass/fail, and default=all parity"
+    ],
+    "out_of_scope": [
+      "Code-review automation (covered by M99 mp-code-review)",
+      "Replacing master-planner or spec-grill (mp-flow is the executor; those are planning)",
+      "Duplicating master-planner execution content — mp-flow extracts/relocates it with a back-link (single source of truth)",
+      "Per-harness skill enablement policies and skill versioning/migration (all harnesses get the same set)",
+      "Agent role dispatch (idea ID-07 agent profiles)",
+      "Authoring Pattern: blocks in docs/code-review-lessons.md (owned by M99) — M98 only builds the generic --check mechanism"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp install --skills mp-flow deploys only mp-flow (+ shared convention); master-planner is not deployed when omitted",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "mp install --skills bogus exits non-zero and lists the registered skill names",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "mp install --check exits 0 when the registry and consumed artifacts are consistent; exits non-zero with a precise diff when a registered skill file is missing OR a consumed artifact has no owner skill",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "mp install with no --skills deploys the full registered set — no regression vs today (master-planner + spec-grill still deploy)",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Adding a new skill requires only templates/skills/<name>/SKILL.md + a manifest entry; no install.rs edit (registry-driven deploy)",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "SKILL.md defines the 8-stage flow with concrete mp commands per stage, explicitly enumerating: 1 session start, 2 claim & execute, 3 review, 4 remediate, 5 re-review, 6 document, 7 commit, 8 hand off",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "flow-stages.md has per-stage checklists including the gotchas surfaced during M93/M94/M95 (gate parity, dry-run honesty, op-arg up-front validation, no-op semantics)",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Skill explicitly forbids same-session self-review and cites L5 of docs/code-review-lessons.md as the reason",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "Single-source invariant: the execute->review->remediate procedure appears in exactly one skill (mp-flow); master-planner keeps only a one-line back-link. Verified by grep across templates/skills/",
+      "verification": "crates/mp/tests/install_skills.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "Worked-example artifact: running the skill against M93 or M94 produces a committed transcript at docs/mp-flow-walkthrough-M<M>.md containing all 8 stage headings",
+      "verification": "manual: transcript file present with 8 headings",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-11",
+      "description": "make mp-flow-lint target asserts SKILL.md + flow-stages.md contain the 8 stage headings and the required mp commands; fails the build otherwise",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-12",
+      "description": "cargo test -p mp exits 0 (covers install/uninstall round-trips for AC-01..AC-05)",
+      "verification": "cargo test -p mp",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "mp-flow extracts (relocated) the execute->review->remediate content from master-planner §10/11; master-planner keeps a one-line back-link. After the two-agent / four-role split, the cross-role timeline lives in M120 (mp-flow) and the role-specific deep-dives live in M121 (mp-coordinator) and M122 (mp-runner). M120 is the canonical home; M98 is the historical anchor.",
+      "rationale": "Single source of truth. The original M98 spec overlapped with master-planner's execution sections; duplicating would cause the same drift M99's doc->skill generation tries to prevent. Extracting (not copying) makes mp-flow the canonical executor procedure while master-planner stays the planning entry point."
+    },
+    {
+      "area": "",
+      "choice": "The skill registry + mp install --skills/--check ships in a separate milestone (M119 — Agent role dispatch + skill registry foundation) rather than folded into M98",
+      "rationale": "The registry is install-plane (CLI + manifest schema + --check validator) while M98's content is the skill-plane (SKILL.md + flow-stages.md + worked-example); folding them doubled M98's scope. Splitting gives the user one tangible thing to unblock (M119) before the larger content work (M98) lands. The schema was widened in commits 3ebaee4 + dc6052e to ^[0-9]{2,}(\\.[0-9]+)*$ (2-or-more digits, no upper bound); the original 'schema-capped at 2 digits (max 99)' rationale referenced a constraint that no longer exists. M99 (mp-code-review) then depends on M119 for the registry and --check, parallel to M98."
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

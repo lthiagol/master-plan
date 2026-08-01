@@ -1,0 +1,230 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "63"
+title = "M62 follow-up: make the completion guardrail catch bare-path tests + commit remediation + fix flaky raul test"
+slug = "m62-follow-up-make-the-completion-guardrail-catch-bare-path-tests-commit-remediation-fix-flaky-raul-test"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "M"
+risk = "medium"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "The completion guardrail actually catches failing Rust tests declared as bare .rs paths (the repo's dominant convention), so the root cause M62 was built to fix is truly closed. The M62 work is committed, and the raul suite is deterministic."
+
+[problem]
+description = "M62 shipped a completion guardrail (mp milestone complete refuses on failing step tests), but it is inert for the dominant step-test convention. ac_verify::classify() (crates/mp/src/ac_verify.rs:30) only treats a tests value as Runnable if its first token is cargo/make/grep/rg/test/ls or starts with ./ or /. Bare relative paths like crates/mp/tests/workflow_gates.rs fall through to Manual and are SKIPPED. But that is exactly the AGENTS.md convention, and it is what M57's steps declare (all four -> crates/mp/tests/workflow_gates.rs). So the guardrail would NOT have caught M57's 7 failing tests — the root cause is unfixed for this repo. Breadth: 148 of 403 step tests (37%) are bare paths the guardrail silently skips. Separately: all M62 remediation work is UNCOMMITTED (25 modified + 4 new files) despite the handoff requiring per-milestone commits. And raul_backlog_list_runs is flaky (fails in the full suite, passes in isolation — test pollution)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Fix classify() COMPREHENSIVELY: default to Runnable for any value that isn't 'manual:' or empty (so bash -c, scripts/*.sh, mp/git commands, and shell loops are all executed), and translate bare .rs paths under crates/ to cargo test invocations (derive crate + test name: crates/mp/tests/x.rs -> cargo test -p mp --test x). Today 154/412 step-test values (37%) are misclassified as Manual and skipped — not just .rs paths but also scripts/audit-step-tests.sh (6x), mp (5x), git, and shell !.",
+    "Add a regression test proving the guardrail now blocks completion when a step test fails — both a bare-path .rs test AND a non-.rs command form (the exact M57 scenario that slipped through, plus the broader coverage).",
+    "Commit all currently-uncommitted M62 remediation work, one commit per remediated milestone (M48/M52/M54/M57), per the handoff. (Largely satisfied by commit f0797e9 — verify and mark done.)",
+    "Fix the raul_backlog_list_runs flakiness (test isolation — likely shared cwd/state leaking between tests); it must pass deterministically across repeated full-suite runs.",
+    "Update the AGENTS.md step-testing convention to state what the guardrail runs: non-manual values run as-is, bare .rs paths run via cargo test, manual:/empty are skipped. Note that placeholder/prose values will now surface as failures (correct behavior — they violate the single-path-or-command convention).",
+]
+out_of_scope = [
+    "Re-doing the remediation code (M57/M54/M52 are correctly implemented; only the guardrail's coverage and hygiene are in scope).",
+    "Adding new product features.",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "classify() defaults non-manual/non-empty values to Runnable and translates bare .rs paths to cargo test; a failing value of ANY form (bare .rs, bash -c, scripts/*.sh, mp/git) blocks mp milestone complete"
+verification = "crates/mp/tests/complete_guardrail.rs"
+status = "passed"
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "Regression: the guardrail blocks the exact M57 scenario (a milestone whose bare-path .rs step test fails) AND a non-.rs command-form failure — root cause demonstrably closed"
+verification = "crates/mp/tests/complete_guardrail.rs"
+status = "passed"
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "raul_backlog_list_runs passes deterministically — 10 consecutive cargo test -p raul full-suite runs with zero failures"
+verification = "for i in $(seq 10); do cargo test -p raul >/dev/null 2>&1 || exit 1; done"
+status = "passed"
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "All M62 remediation work is committed (git status clean)"
+verification = 'bash -c "test -z "$(git status --porcelain)""'
+status = "passed"
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "cargo test -p mp && cargo test -p raul both fully green with no failures and no flaky-test exclusions"
+verification = "cargo test -p mp && cargo test -p raul"
+status = "passed"
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[[design_decisions]]
+area = ""
+choice = "Fix classify() by DEFAULTING to Runnable for any value that is not empty or manual:-prefixed, rather than expanding the allowlist of first-tokens."
+rationale = "The allowlist (cargo/make/grep/rg/test/ls + ./ or / prefix) is what caused the blind spot — it missed 37% of step-test values including scripts/*.sh, bash -c, mp/git commands, and shell !. Defaulting to Runnable aligns with the AGENTS.md convention (non-manual values ARE meant to be runnable) and surfaces placeholder/prose values as failures instead of silently skipping them."
+
+[[design_decisions]]
+area = ""
+choice = "Translate bare .rs paths under crates/ to cargo test -p <crate> --test <name> before executing; do not run the path directly."
+rationale = "A bare .rs path is not an executable command (running crates/mp/tests/x.rs as-is fails). Deriving crate + test name from the path lets the guardrail actually exercise Rust test files, which is the dominant convention (and the exact M57 form that slipped through)."
+
+[[design_decisions]]
+area = ""
+choice = "Keep the existing --force bypass on mp milestone complete (records the bypass in evidence); do not remove it."
+rationale = "Single-user project. The bypass is an escape hatch for legitimate edge cases; the audit trail (evidence) makes abuse visible. Hard-blocking would risk agents finding worse workarounds. The classify() fix is the real close; the bypass stays as-is."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Commit M62 remediation (uncommitted)"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Guardrail bare-path coverage"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Flaky raul test"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Convention docs"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "URGENT: all M62 remediation work is currently UNCOMMITTED in the working tree (25 modified + 4 new files) despite the handoff requiring per-milestone commits. Commit it now, one commit per remediated milestone (M57 config-key fix, M54 review CLI+TUI, M52 W30/W31+auto-close, M48 verification, plus guardrail/dogfood/brief). This is first because the work is at risk of loss."
+files = []
+tests = 'bash -c "test -z \"$(git status --porcelain)\""'
+done_when = "All M62 remediation work committed; git status clean; per-milestone commits present"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Fix crates/mp/src/ac_verify.rs classify() COMPREHENSIVELY, not just for .rs paths. Change the default so any value that is not empty and does not start with manual: is treated as Runnable and executed; translate bare .rs paths under crates/ to cargo test -p <crate> --test <name> before executing. Today the allowlist (cargo/make/grep/rg/test/ls + ./ or / prefix) causes 154/412 step-test values (37%) to be misclassified as Manual and skipped — including scripts/audit-step-tests.sh, mp/git commands, and shell ! — so the guardrail never runs them."
+files = []
+tests = "crates/mp/tests/complete_guardrail.rs"
+done_when = "classify() defaults non-manual/non-empty to Runnable; .rs paths translated to cargo test; a failing value of any form (bare .rs, bash -c, scripts/*.sh, mp, git) blocks completion; complete_guardrail tests pass"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Add a regression test to complete_guardrail.rs: construct a milestone whose step tests value is a bare .rs path pointing at a deliberately-failing test, and assert mp milestone complete refuses. This is the proof that the root cause M62 was built to fix is now actually closed."
+files = []
+tests = "crates/mp/tests/complete_guardrail.rs"
+done_when = "Regression test proves a milestone with a failing bare-path .rs step test is blocked from completion (the exact M57 scenario)"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S2"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Fix the raul_backlog_list_runs flakiness. It fails in the full suite but passes in isolation, indicating test pollution (shared cwd or state between tests). Isolate the test (unique temp dirs, no shared mutable state) so the full raul suite is deterministic."
+files = []
+tests = "for i in $(seq 10); do cargo test -p raul >/dev/null 2>&1 || exit 1; done"
+done_when = "raul_backlog_list_runs passes deterministically across 10 consecutive full-suite runs"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP4"
+order = 5
+action = "Update the AGENTS.md step-testing convention to document what the completion guardrail actually executes: bare .rs paths under crates/ are run via cargo test; explicit commands (cargo/make/grep/rg/test/ls/./) run as-is; manual: values are skipped. Keeps the bare-path convention while making the guardrail cover it."
+files = []
+tests = "manual: accepted - AGENTS.md convention review"
+done_when = "AGENTS.md step-testing convention states what the guardrail runs (bare .rs -> cargo test, commands -> run, manual: -> skipped)"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "Remediation verified (6d3d457): generalized bare.rs guardrail, clean complete without --force; evidence refreshed on re-complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

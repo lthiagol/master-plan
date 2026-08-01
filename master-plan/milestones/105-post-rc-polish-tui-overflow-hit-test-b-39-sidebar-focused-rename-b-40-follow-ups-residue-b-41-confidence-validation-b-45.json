@@ -1,0 +1,369 @@
+{
+  "milestone": {
+    "id": "105",
+    "title": "Post-rc polish — TUI overflow hit-test (B-39), sidebar_focused rename (B-40), follow_ups residue (B-41), confidence validation (B-45)",
+    "slug": "post-rc-polish-tui-overflow-hit-test-b-39-sidebar-focused-rename-b-40-follow-ups-residue-b-41-confidence-validation-b-45",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "104",
+      "107",
+      "91"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-04",
+    "updated": "2026-07-05",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this milestone, the non-blocking cleanup from the M91/M81/M96 and M100-M103 review passes is closed out: the raul TUI tab bar handles overflow correctly across the full narrow-window range (successor to M91's R-9, which R-3 partially fixed for compact-mode), the field/method names match their post-M91 meaning (full sidebar → tab_bar rename across 5 names × ~40 occurrences), the on-disk milestone files carry no dropped-schema residue (follow_ups + 8 other dropped keys stripped), and the findings model validates confidence at the same layer severity is validated."
+  },
+  "problem": {
+    "description": "Four review findings are real but non-blocking for the rc release. They span TUI rendering (B-39: overflow hit-test divergence — successor to M91 external review's R-9 finding, R-3 only fixed the < 60 cols compact-mode case), naming hygiene (B-40: App::sidebar_focused and its 4 sibling names — toggle_sidebar_focus, sidebar_move_up/down, handle_sidebar_key — no longer mean sidebar after M91's tab-bar shell), data residue (B-41: 85/108 milestone files still carry empty follow_ups:[] arrays despite M82 dropping the key), and model validation (B-45/F-4: Finding.confidence accepts any string). Each is low-to-medium severity and none block the rc, but leaving them open turns review findings into permanent debt."
+  },
+  "scope": {
+    "in_scope": [
+      "B-39 (medium, R-9 successor from M91 review): extract the visible-window layout from render_tab_bar into a shared helper so tab_hit_test knows which tabs were drawn and at which columns; the narrow-overflow subset + ◂/▸ indicators + … ellipsis case must be covered (R-3 only fixed the compact-mode < 60 cols heuristic). Add a regression test for click-on-hidden-tab.",
+      "B-40 (low): full rename of 5 names × ~40 occurrences: App::sidebar_focused → tab_bar_focused; App::toggle_sidebar_focus → toggle_tab_bar_focus; App::sidebar_move_up → tab_move_up; App::sidebar_move_down → tab_move_down; handle_sidebar_key → handle_tab_bar_key. Sources: crates/raul/src/tui/{render.rs, runner.rs, app.rs} and tests/{tui_sidebar.rs, tui_tab_bar.rs, tui_mouse.rs, board_view.rs, tui_responsive.rs, welcome_overview.rs, truncation.rs}. Land as a single rename commit (the prior decision to defer was for blast radius; M91's own R-3/R-4/R-5 remediation did not retake this work).",
+      "B-41 (low): add `mp edit strip-dropped-keys` one-shot utility. Strips DROPPED_CEREMONY_KEYS (currently {behavior, context, requirements, success_criteria, assumptions, interface, risks, technical_context, follow_ups}) from all milestone files in scope. Idempotent — re-running is a no-op. Asserts post-run: grep -c '\"follow_ups\": \\[\\]' master-plan/milestones/*.json returns 0 AND mp validate --summary stays 0/0.",
+      "B-45 (low, model-layer only): add is_valid_confidence() helper at the model layer and validate confidence in add_finding_with_phase (crates/mp/src/reviews.rs:433) mirroring the existing severity guard at reviews.rs:454-456. Define valid set as {low, medium, high} plus empty-string (the current default when no confidence is set). Does not depend on M101 — confidence's CLI shape is M101's scope; B-45 is the model + add_finding layer guard only."
+    ],
+    "out_of_scope": [
+      "Any new TUI feature work beyond the B-39 hit-test fix",
+      "Lifecycle gate re-expression (covered by M104)",
+      "Sort regression fix (covered by M104)",
+      "Bulk lifecycle migration application to the 108 milestones (separate from B-41 follow_ups sweep; depends on M104 landing first)",
+      "The CLI surface for confidence (M101 lands that). B-45 is the model + add_finding layer guard."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "B-39 (R-9 successor from M91 review): clicking a visible tab in an overflow-rendered bar (narrow terminal where render_tab_bar emits a subset + ◂/▸ + …) selects the correct lane; clicking on a position covered by …/◂/▸ indicators does NOT trigger a wrong/hidden tab. tab_hit_test and render_tab_bar share the same layout computation.",
+      "verification": "cargo test -p raul --test tui_mouse overflow_hit_test_selects_visible_only",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    },
+    {
+      "id": "AC-02",
+      "description": "B-40 (part A, field + toggle): App::sidebar_focused renamed to tab_bar_focused; App::toggle_sidebar_focus renamed to toggle_tab_bar_focus. All occurrences across crates/raul/src/tui/{render, runner, app}.rs and the test surface renamed to match.",
+      "verification": "! grep -rlE 'sidebar_focused|toggle_sidebar_focus' crates/raul/src/ crates/raul/tests/ | grep -q .",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    },
+    {
+      "id": "AC-03",
+      "description": "B-40 (part B, methods + handler): App::sidebar_move_up renamed to tab_move_up; App::sidebar_move_down renamed to tab_move_down; fn handle_sidebar_key renamed to handle_tab_bar_key. All occurrences across crates/raul/src/tui/{app, runner}.rs and the test surface renamed to match.",
+      "verification": "! grep -rlE 'sidebar_move|handle_sidebar_key' crates/raul/src/ crates/raul/tests/ | grep -q .",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    },
+    {
+      "id": "AC-04",
+      "description": "B-41: `mp edit strip-dropped-keys` runs cleanly, removes all DROPPED_CEREMONY_KEYS occurrences from all milestone files in scope (currently 85 of 108 files carry `follow_ups: []`), and is idempotent (re-running on a clean plan is a no-op). Post-run, mp validate --summary stays 0/0.",
+      "verification": "crates/mp/tests/scripts/m105-s4-verify.sh",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    },
+    {
+      "id": "AC-05",
+      "description": "B-45: is_valid_confidence() helper exists at the model layer; add_finding_with_phase rejects non-{low, medium, high, \"\"} confidence values, mirroring the existing severity guard at reviews.rs:454-456 (same error-message shape: 'invalid confidence: X (expected low, medium, high, or empty)').",
+      "verification": "cargo test -p mp --lib reviews::tests::confidence_validation",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    },
+    {
+      "id": "AC-06",
+      "description": "Closure: cargo test -p mp -p raul green (0 failures) and mp validate on the dogfood plan is 0/0.",
+      "verification": "cargo test -p mp -p raul && mp validate --summary",
+      "status": "passed",
+      "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "M105 dependency chain",
+      "choice": "depends_on = [104, 107, 91]",
+      "rationale": "B-41 (follow_ups residue sweep) touches the same milestone files that the bulk lifecycle migration (M104) will rewrite; doing the sweep after M104 lands avoids a double-write. M107 is the external-review remediation chain (verifier-cancellation defense in depth). M91 is the source of B-40's rename debt — its design decision (`sidebar_focused` to limit blast radius across ~25 references) explicitly defers the rename to a follow-up, and M91's R-9 explicitly defers B-39 to a dedicated TUI milestone. Coordinating M91 + M105 avoids re-litigating layout decisions M91 is settling. The other items (B-41, B-45) have no real dependency but M91 keeps the post-rc polish in one shippable set."
+    },
+    {
+      "area": "B-39 scope as R-9 successor",
+      "choice": "Treat B-39 as the canonical follow-up to M91 review's R-9 finding. Coordinate with M91's tab_bar shell.",
+      "rationale": "M91 landed the tab-bar shell (S1–S7) and the R-3 / R-4 / R-5 remediations; M91 review explicitly filed R-9 (overflow render diverges from tab_hit_test at narrow widths) as deferred to a dedicated TUI milestone. M105 is that milestone. We don't re-litigate M91's compact-mode < 60 cols heuristic that R-3 already wired; B-39 covers the wider overflow-subset + indicators case that R-3 does not."
+    },
+    {
+      "area": "B-40 rename target",
+      "choice": "tab_bar_focused (and 4 sibling renames: toggle_tab_bar_focus, tab_move_up, tab_move_down, handle_tab_bar_key)",
+      "rationale": "focused_pane was considered but is too generic now that the board pane exists. tab_bar_focused is unambiguous and matches the render function name (render_tab_bar). Sibling renames are derived mechanically (sidebar → tab_bar in move methods, handle_sidebar_key → handle_tab_bar_key to match the new field name). The renames are complete — no 'sidebar' alias is preserved."
+    },
+    {
+      "area": "B-40 rename shape",
+      "choice": "Single rename commit covering all 5 names × ~40 occurrences. Same shape as M97's lean-milestones rename pattern.",
+      "rationale": "Splitting into per-file or per-method commits would create intermediate states where the field name and the methods/move calls would diverge (a half-renamed state would fail tests). Single commit is atomic and reviewable; the test surface is rewritten alongside the production rename."
+    },
+    {
+      "area": "Q-01: B-41 implementation",
+      "choice": "`mp edit strip-dropped-keys` one-shot utility in the mp runtime",
+      "rationale": "The bug is one-shot (the validate_create_milestone_keys guard already prevents new writes carrying dropped keys; only the 85 historical files need cleaning). The utility strips every key in DROPPED_CEREMONY_KEYS from every milestone file in scope. Idempotent by construction: re-running the utility on a clean plan is a no-op (no key matches, no file rewrites). Adding it to `mp edit` rather than a new top-level subcommand keeps the namespace surface area flat — `mp edit` is the right place for milestone-shape mutations."
+    },
+    {
+      "area": "B-45 scope discipline",
+      "choice": "Model-layer + add_finding layer only. Does not depend on M101.",
+      "rationale": "Finding::confidence is currently `String` with a 'low | medium | high' comment but no validation. The guard belongs at the same architectural layer as the severity guard in reviews.rs:454-456 — i.e., inside add_finding_with_phase plus an is_valid_confidence() helper. The CLI surface for confidence (M101 AC-08) is a different concern; B-45 establishes the model invariant that M101 will respect via tests."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "B-39 TUI overflow hit-test (R-9 successor)",
+      "goal": "Share the visible-window layout between render_tab_bar and tab_hit_test so click coordinates during narrow-window overflow select the visible tab, not a hidden one.",
+      "rollback": "Revert crates/raul/src/tui/render.rs and runner.rs to M91 R-3 state."
+    },
+    {
+      "id": "WP2",
+      "name": "B-40 sidebar → tab_bar full rename",
+      "goal": "Rename 5 names × ~40 occurrences across crates/raul/src/tui/ {render, runner, app}.rs and the test surface (tui_sidebar.rs, tui_tab_bar.rs, tui_mouse.rs, board_view.rs, tui_responsive.rs, welcome_overview.rs, truncation.rs). Land as one commit.",
+      "rollback": "Revert the rename commit (git revert)."
+    },
+    {
+      "id": "WP3",
+      "name": "B-41 strip-dropped-keys utility",
+      "goal": "Add `mp edit strip-dropped-keys` one-shot utility to the mp CLI. Strips every DROPPED_CEREMONY_KEYS entry from every milestone file in scope. Idempotent — re-running is a no-op. Post-run, the plan carries 0 \"follow_ups\": [] instances and mp validate --summary stays 0/0.",
+      "rollback": "Remove the subcommand and the test. Note that the 85 historical milestone files will still carry the empty arrays; re-running the sweep is then a one-line `jq` loop."
+    },
+    {
+      "id": "WP4",
+      "name": "B-45 confidence enum validation",
+      "goal": "Add is_valid_confidence() helper at the model layer; validate confidence in add_finding_with_phase, mirroring the severity guard at reviews.rs:454-456. Valid set = {low, medium, high, \"\"}.",
+      "rollback": "Revert crates/mp/src/reviews.rs and crates/mp-model/src/milestone.rs to M83/M94 state."
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure verification",
+      "goal": "Run the affected gates (cargo test -p mp --lib, the affected crates/raul tests, mp edit strip-dropped-keys dry-run, mp validate --summary) and record evidence.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extract the visible-window layout computation from render_tab_bar into a shared helper; have tab_hit_test use the same helper so click coordinates during overflow only hit visible tabs.",
+      "files": [
+        "crates/raul/src/tui/render.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/tests/tui_mouse.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_mouse overflow_hit_test_selects_visible_only",
+      "done_when": "Click on a tab hidden by ◂/▸/…/subset indicators does NOT trigger selection; visible-tab clicks still select the correct lane; regression test passes deterministically across 5 runs.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Rename App::sidebar_focused → tab_bar_focused and App::toggle_sidebar_focus → toggle_tab_bar_focus across crates/raul/src/tui/{render, runner, app}.rs and the test surface.",
+      "files": [
+        "crates/raul/src/tui/render.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "! grep -rlE 'sidebar_focused|toggle_sidebar_focus' crates/raul/src/ crates/raul/tests/ | grep -q .",
+      "done_when": "Grep finds 0 hits in crates/raul/src/ and crates/raul/tests/; cargo test -p raul green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Rename App::sidebar_move_up → tab_move_up; App::sidebar_move_down → tab_move_down; fn handle_sidebar_key → handle_tab_bar_key. Same single-commit discipline as S2 (one logical commit covers all 5 names; S2 + S3 split for AC accountability).",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "! grep -rlE 'sidebar_move|handle_sidebar_key' crates/raul/src/ crates/raul/tests/ | grep -q .",
+      "done_when": "Grep finds 0 hits; cargo test -p raul green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Add `mp edit strip-dropped-keys` one-shot utility. Strips every key in crates/mp/src/milestone.rs::DROPPED_CEREMONY_KEYS from every milestone file. Idempotent. Includes a unit test that runs the utility against a tmp fixture, asserts idempotency, and confirms mp validate stays 0/0.",
+      "files": [
+        "crates/mp/src/commands/edit.rs",
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/milestone.rs",
+        "crates/mp/tests/strip_dropped_keys.rs"
+      ],
+      "tests": "crates/mp/tests/scripts/m105-s4-verify.sh",
+      "done_when": "`mp edit strip-dropped-keys` exits 0, removes all DROPPED_CEREMONY_KEYS occurrences, is idempotent on re-run, and mp validate stays 0/0.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP4",
+      "order": 5,
+      "action": "Add is_valid_confidence() helper at the model layer; validate confidence in add_finding_with_phase, mirroring the existing severity guard at reviews.rs:454-456. Valid set = {low, medium, high, \"\"}.",
+      "files": [
+        "crates/mp/src/reviews.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --lib reviews::tests::confidence_validation",
+      "done_when": "Tests pass: invalid confidence values are rejected with the same error message shape as the severity guard; valid values (including empty string) accepted.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP-close",
+      "order": 6,
+      "action": "Closure verification.",
+      "files": [
+        "crates/mp/",
+        "crates/raul/"
+      ],
+      "tests": "cargo test -p mp -p raul && mp validate --summary",
+      "done_when": "Full cargo test -p mp -p raul green; mp validate 0/0.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-05",
+    "branch": "",
+    "evidence": "M105 B-39/B-40/B-41/B-45 complete. 6/6 ACs passed. (Same evidence as before; post-execution code review filed 9 entries in mp-dogfood-log.md and addressed in-scope items — relocated verify script from master-plan/milestones/ to crates/mp/tests/scripts/, updated M105 spec fields, added explanatory comment to tab_hit_test, hardened the post_strip_validate_summary_stays_green test comment.)"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "External review: visible_tab_x_ranges ignored right ellipsis before the last visible tab; render and hit-test column walks disagreed. Remediated in crates/raul/src/tui/render.rs.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "External review: overflow tests only validated hit-test vs layout helper, not render parity. Remediated: added overflow_hit_test_matches_render_column_walk in crates/raul/tests/tui_mouse.rs.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "correctness",
+      "description": "External review: width<6 indicator budget underflow in compute_tab_bar_layout. Remediated: active-lane-only layout for width<6.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "correctness",
+      "description": "External review: strip_dropped_keys_from_path non-atomic write. Remediated: write via .json.tmp then rename.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "External review: m105-s4-verify.sh hardcoded master-plan/milestones path. Remediated: MP_PLAN_DIR env override.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "External review: stale sidebar wording in tests/comments. Remediated: tab_bar_starts_focused rename.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "",
+      "created": "2026-07-05",
+      "resolved": "2026-07-05"
+    }
+  ]
+}

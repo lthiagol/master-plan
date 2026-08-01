@@ -1,0 +1,33 @@
+[package]
+name = "mp-oracle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Oracle parity tests for mp — pulls in jsonschema + its transitive tree only for the 2 oracle tests. Kept out of crates/mp so the dev-time test profile does not re-link the 69 mp test binaries that don't need it (M161)."
+
+# This crate is test-only by intent — it has NO public lib API. Its
+# presence in the workspace exists purely to give `jsonschema` and its
+# 30-crate transitive tree (fancy-regex, uuid-simd, email_address, idna,
+# referencing, fraction, ahash, …) a dedicated link target. Cargo still
+# compiles a lib target because integration tests under `tests/` must
+# link against a crate lib; the lib is a stub (src/lib.rs) with no
+# public items, and tests under `tests/` are the only consumers of the
+# [dev-dependencies] below.
+
+[dev-dependencies]
+# Oracle: dev-only validator used for parity checks against mp::mini_schema.
+# This is the whole reason the crate exists — jsonschema must NOT be a
+# dev-dep of mp itself (see M161).
+jsonschema = { version = "0.46.5", default-features = false, features = ["resolve-file"] }
+
+# mp is a dev-dep so oracle tests can call mp::mini_schema::Validator
+# directly (parity test) and can spawn the mp CLI subprocess (e2e test).
+mp = { path = "../mp" }
+
+# Test helpers (TestEnv::new uses TempDir; assertions use serde_json).
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+tempfile = { version = "3", default-features = false, features = ["getrandom"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = { version = "0.2", default-features = false }

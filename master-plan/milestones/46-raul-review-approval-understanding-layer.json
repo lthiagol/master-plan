@@ -1,0 +1,244 @@
+{
+  "milestone": {
+    "id": "46",
+    "title": "raul: review, approval & understanding layer",
+    "slug": "raul-review-approval-understanding-layer",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-28",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "raul becomes the human-facing review, approval, and understanding layer for a Master-Plan project: humans review the plan and act on review requests, approve work via a structured approval flow (agents request approval through mp; humans approve through raul; optionally a human-guided co-approval mode where human and agent iterate together before sign-off), and UNDERSTAND the plan through explainer/onboarding surfaces. Agents stay focused on mp; humans live in raul."
+  },
+  "problem": {
+    "description": "After 2.0, mp is agent-only (M41) and raul has a minimal review TUI (M44) plus CLI views for a handful of queries. But the human side is incomplete in three ways. (1) APPROVAL is not a first-class flow: M43/M44 let a human resolve an approval-request annotation and delegate mp milestone approve, but there is no structured agent-requests / human-approves loop and no way for a human to guide an agent through an approval decision together. (2) raul's REVIEW surface has gaps: M41 drops mp inbox/validate/decision/execution human views and raul has no equivalents, so humans lose those capabilities. (3) raul does not help humans UNDERSTAND a plan they did not author (why is a milestone blocked, what does gate G14 mean, what is the plan health, onboarding). This milestone makes raul the coherent review+approval+understanding surface. UX polish is explicitly deferred (this milestone delivers function; a later UX pass refines it)."
+  },
+  "scope": {
+    "in_scope": [
+      "Approval flow: formalize the agent-requests-via-mp / human-approves-via-raul loop on top of M43 approval-request annotations + G14. Agent side uses mp annotation create (kind=approval-request) and reads resolution via mp; human side uses raul to review the request and approve/resolve it (delegating mp milestone approve + mp annotation resolve).",
+      "Co-approval mode: a human-guided flow where a human and an agent step through an approval decision together in raul (agent presents the spec/change, human reviews inline, they iterate, human signs off) - the G14 gate clears only on the human's final resolve. Distinct from solo human approval (M44).",
+      "Understanding surface: raul explainers - why a milestone is blocked (G14 + other gates), what each gate means, plan health overview, and an onboarding walkthrough for humans new to a project. Read-only, computed from mp --format json.",
+      "Review surface completion: add raul equivalents for the human views M41 dropped - raul inbox, raul validate (human-readable validation report), raul decision, raul execution - so no human capability lost in 2.0.",
+      "Wire all new raul views/actions through the shared read layer (M44 S1) and delegate every write to mp (raul never writes plan files).",
+      "Docs: extend MP-COMMANDS/raul docs and master-planner SKILL.md with the review/approval/understanding workflows."
+    ],
+    "out_of_scope": [
+      "Rebuilding raul's UX/design system (deferred to a later UX-polish milestone; this milestone delivers function, not polish)",
+      "Changing the mp annotation data model or G14 gate (those are M43; this milestone consumes them)",
+      "Making raul write plan files (hard rule: raul delegates all writes to mp)",
+      "A GUI or web surface (raul stays a CLI + TUI)",
+      "Automated approval (a human is always in the loop; the co-approval mode pairs human+agent, never agent-alone sign-off)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Approval flow works end-to-end: an agent requests approval via mp annotation create (approval-request), the milestone shows G14-blocked, a human approves via raul (review + delegate mp milestone approve + mp annotation resolve), and G14 clears",
+      "verification": "crates/raul/tests/approval_flow.rs + manual walkthrough",
+      "status": "passed",
+      "evidence": "approval_flow.rs passes"
+    },
+    {
+      "id": "AC-02",
+      "description": "Co-approval mode: a human and agent iterate on an approval decision together in raul before the human signs off; G14 clears only on final human resolve",
+      "verification": "manual: accepted - co-approval walkthrough",
+      "status": "passed",
+      "evidence": "co-approval TUI implemented and accepted"
+    },
+    {
+      "id": "AC-03",
+      "description": "Understanding surface: raul renders why-blocked explainers (G14 + gates), gate explainers, plan health overview, and an onboarding walkthrough, all read-only from mp json",
+      "verification": "manual: accepted - explainer review",
+      "status": "passed",
+      "evidence": "explainer views render from mp json"
+    },
+    {
+      "id": "AC-04",
+      "description": "Review surface completion: raul inbox/validate/decision/execution equivalents exist, covering every human view M41 dropped (no human capability lost vs pre-2.0)",
+      "verification": "crates/raul/tests/ review tests + manual parity check vs the M41 dropped-views list",
+      "status": "passed",
+      "evidence": "review_tests.rs passes all 6 tests"
+    },
+    {
+      "id": "AC-05",
+      "description": "raul writes no plan files: every write delegates to mp; a gate test asserts no plan-file write path in raul source",
+      "verification": "crates/raul/tests/no_write_gate.rs",
+      "status": "passed",
+      "evidence": "no_write_gate.rs passes"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Approval flow",
+      "goal": "Formalize the agent-requests-via-mp / human-approves-via-raul loop on top of M43 approval-request annotations + G14, plus a human-guided co-approval mode.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Understanding surface",
+      "goal": "Read-only explainer views computed from mp json: why-blocked, gate explainers, plan health, onboarding.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Review surface completion",
+      "goal": "raul equivalents for the human views M41 dropped (inbox/validate/decision/execution); all via the shared read layer, all writes delegated to mp.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Docs",
+      "goal": "Document the review/approval/understanding workflows; note UX polish deferred.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "raul approval review surface: list pending approval-request annotations, show the requesting milestone/spec context, and an approve action that delegates mp milestone approve + mp annotation resolve (clearing G14). The agent side already requests via mp annotation create (M43); this is the human raul side.",
+      "files": [],
+      "tests": "crates/raul/tests/approval_flow.rs",
+      "done_when": "raul lists pending approval requests with context; approve delegates mp milestone approve + mp annotation resolve; G14 clears; crates/raul/tests/approval_flow.rs passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Co-approval mode: a paired human+agent flow in raul where the agent presents the change, the human reviews inline, they iterate, and the human signs off. G14 clears only on the final human resolve. Distinct from solo human approval (M44).",
+      "files": [],
+      "tests": "manual: accepted - co-approval walkthrough",
+      "done_when": "Co-approval flow works end-to-end (agent presents, human iterates, human signs off, G14 clears); walkthrough documented",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Explainer views: why-blocked (G14 and other gates), gate explainers (what each gate means in plain language), and a plan-health overview. All read-only from mp --format json; raul performs no gate logic itself.",
+      "files": [],
+      "tests": "manual: accepted - explainer review",
+      "done_when": "why-blocked, gate explainers, and plan-health views render read-only from mp json; manual review passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Onboarding walkthrough for humans new to a project: a readable plan summary, current focus, and how-to-get-started. Read-only from mp json.",
+      "files": [],
+      "tests": "manual: accepted - onboarding walkthrough",
+      "done_when": "Onboarding walkthrough renders read-only; manual review passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Add raul inbox, raul validate (human-readable validation report), raul decision, and raul execution - covering every human view M41 dropped so no human capability is lost vs pre-2.0. Wire all through the M44 shared read layer.",
+      "files": [],
+      "tests": "crates/raul/tests/ review tests",
+      "done_when": "raul inbox/validate/decision/execution exist and cover the M41 dropped-views list; wired through shared read layer; review tests + manual parity check pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Gate test asserting raul writes no plan files (no plan-file write path in raul source); every write delegates to mp. Confirm all new views use the shared read layer and contain no write logic.",
+      "files": [],
+      "tests": "crates/raul/tests/no_write_gate.rs",
+      "done_when": "crates/raul/tests/no_write_gate.rs passes; raul source has no plan-file write path; all writes delegated to mp",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP4",
+      "order": 7,
+      "action": "Extend raul docs (MP-COMMANDS raul section) and master-planner SKILL.md with the review/approval/understanding workflows. Note that UX polish is explicitly deferred to a later milestone (this milestone delivers function, not polish).",
+      "files": [],
+      "tests": "manual: accepted - doc review",
+      "done_when": "raul docs + SKILL.md document the three workflows; deferred-UX note present; manual doc review passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-28",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

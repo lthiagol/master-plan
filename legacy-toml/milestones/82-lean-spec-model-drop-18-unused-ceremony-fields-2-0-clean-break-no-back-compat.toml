@@ -1,0 +1,191 @@
+[milestone]
+id = "82"
+title = "Lean spec model — drop 18 unused ceremony fields (2.0 clean break, no back-compat)"
+slug = "lean-spec-model-drop-18-unused-ceremony-fields-2-0-clean-break-no-back-compat"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["90"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "high"
+created = "2026-07-01"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "A milestone spec contains only fields that earn their place: intent.outcome, problem.description, scope (in/out), acceptance_criteria, design_decisions, open_questions, milestone metadata, and work_packages/steps/verification. The ~18 proven-unused section fields are removed from schema, templates, validate, create, show, raul, docs, and skills. On-disk artifact re-baseline (strip empty scaffolding) ships in M92 migration — single pass with TOML→JSON, not a separate M82 file sweep."
+
+[problem]
+description = "A complete 2026-07-01 field census across all 80 milestones proved 18 spec fields are 100% unused (never filled in a single milestone): the entire section objects [behavior] (scenarios, edge_cases), [interface] (endpoints, config_keys, cli_commands, entities), [requirements] (functional, needs_clarification), [context] (related, references), [technical_context] (key_files, dependencies, constraints), and [delta] (changes); plus the top-level arrays success_criteria, assumptions, risks, follow_ups. This is dead ceremony: every milestone TOML carries ~18 empty scaffolding lines, the create template emits them, and the schema/validate/skills/docs all teach and carry them. This is exactly the SDD over-ceremony that Böckeler (martinfowler.com, Oct 2025) warns amplifies review overload. Confirmed load-bearing (KEEP): intent.outcome (0% empty), problem.description (0%), scope.in_scope (92%)/out_of_scope (100%), acceptance_criteria, design_decisions (16% real use), open_questions (11% real use). Note (to resolve at grooming): dropping context.references and delta removes the unused brownfield scaffolding — brownfield needs are currently served (weakly) by scope + problem.description, and should be re-confirmed rather than kept as dead fields. technical_context was nominally the Phase-2 technical home; its content moves into design_decisions / work_packages / steps."
+
+[scope]
+in_scope = [
+    "Remove the 18 proven-unused fields from milestone.schema.json, the create --example template, mp validate, mp milestone create (no scaffolding emission), mp show, raul, docs, and the master-planner/spec-grill skills",
+    "KEEP the load-bearing fields: intent.outcome, problem.description, scope, acceptance_criteria, design_decisions, open_questions, metadata, work_packages, steps, verification",
+    "Re-confirm how (if at all) brownfield references are expressed going forward, rather than reviving the dead context/delta scaffolding",
+    "Coordinate with M92: schema/template/validate changes land in the same release wave as JSON migration",
+]
+out_of_scope = [
+    "Backwards-compatibility / migration shims for pre-2.0 plans (explicit 2.0 clean break)",
+    "Separate on-disk file re-baseline pass (owned by M92 — applies M82 field drops during TOML→JSON migration, single tree touch)",
+    "Adding new spec fields or new artifact types",
+    "The raul TUI rework and the spec-review surface (M80) — separate milestones",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "milestone.schema.json, the create --example template, and mp validate no longer reference or emit any of the 18 dropped fields"
+verification = "crates/mp/tests/schema_lean.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone create writes no empty section scaffolding to new milestone files (only load-bearing fields)"
+verification = "crates/mp/tests/milestone_create.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "Lean schema enforced in code and docs; dogfood on-disk re-baseline verified by M92 AC-01 (field drops applied in migration pass, not a separate M82 file sweep)"
+verification = "crates/mp/tests/json_migration.rs"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "docs/AGENTS.md and the master-planner/spec-grill skills teach only the lean spec model (no dead sections)"
+verification = "manual: accepted — docs + skill text review"
+status = "passed"
+evidence = "cargo test -p mp exit 0"
+
+[[work_packages]]
+id = "WP1"
+name = "Lean schema & validate"
+goal = "Remove 18 ceremony fields from schema.json, mp validate, mp show, raul read paths"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Create & emit"
+goal = "Stop scaffolding empty sections in create template and mp milestone create"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Docs & skills"
+goal = "Teach lean spec model in AGENTS.md, master-planner, spec-grill"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Remove 18 unused fields from milestone.schema.json and mp validate rules; update Rust model if needed"
+files = [
+    "crates/mp/schema/milestone.schema.json",
+    "crates/mp/src/validate",
+]
+tests = "crates/mp/tests/schema_lean.rs"
+done_when = "Schema and validate no longer reference dropped fields"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Update mp show and raul milestone reads for lean field set (no dead sections in output)"
+files = [
+    "crates/mp/src/commands/show.rs",
+    "crates/raul/src",
+]
+tests = "crates/mp/tests/schema_lean.rs"
+done_when = "mp show milestone emits only load-bearing fields"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Update create --example template and mp milestone create to omit empty section scaffolding"
+files = [
+    "templates",
+    "crates/mp/src/milestone.rs",
+]
+tests = "crates/mp/tests/milestone_create.rs"
+done_when = "New milestones contain only load-bearing fields"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Update AGENTS.md, master-planner skill, spec-grill skill for lean spec model only"
+files = [
+    "AGENTS.md",
+    "templates/skills",
+]
+tests = "manual: accepted — docs + skill text review"
+done_when = "Skills and AGENTS teach lean model without dead sections"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = [
+    "S1",
+    "S2",
+    "S3",
+]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP-close"
+order = 5
+action = "Document M92 single-pass migration ownership for on-disk re-baseline; verify lean schema tests green (dogfood file proof lands in M92)"
+files = []
+tests = "manual: accepted — M92 migration applies M82 field drops in one pass"
+done_when = "M82 schema ready for M92 migration; AC-03 on-disk proof deferred to M92 AC-01"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = [
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-02"
+branch = ""
+evidence = "cargo test -p mp exit 0"

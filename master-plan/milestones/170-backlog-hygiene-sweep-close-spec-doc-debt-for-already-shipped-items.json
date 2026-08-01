@@ -1,0 +1,399 @@
+{
+  "milestone": {
+    "id": "170",
+    "title": "Backlog hygiene sweep — close spec/doc debt for already-shipped items",
+    "slug": "backlog-hygiene-sweep-close-spec-doc-debt-for-already-shipped-items",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "177"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-15",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-16T12:34:42.894161+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, the 5 backlog entries in this milestone are resolved, mp plan verify-lint emits 0 'crate -p mp-model not in affected set' warnings, mp milestone 159's AC-01 description matches the measured 17.4s drop, and the spec/doc gaps (TW-03, TW-10, TW-22) are closed. The milestones-only plan zone is the source of truth for each fix; no code change is needed unless an item explicitly says so."
+  },
+  "problem": {
+    "description": "Five backlog items describe gaps that have been latent on the plan and reviewer radar since the M100-M159 cycle, but were never closed because each was low-priority and small. Collectively they generate 54 mp plan verify-lint warnings (B-78), one AC with a quantified threshold that no longer reflects reality (B-83), and three ergonomic spec/doc gaps that show up in dogfood sessions (TW-03, TW-10, TW-22). Closing them is pure plan-zone work except where the tweak needs a one-line code change (TW-03)."
+  },
+  "scope": {
+    "in_scope": [
+      "B-78: amend master-plan/milestones/100-*.json and master-plan/milestones/101-*.json steps[].files[] to include the crates/mp-model/ paths referenced by their cargo test -p mp-model invocations. Each occurrence adds the matching files glob so the verify-lint 'crate -p mp-model not in affected set {\"mp\"}' rule no longer fires.",
+      "B-83: rewrite master-plan/milestones/159-*.json AC-01 description's quantitative threshold from '≥30 s cold nextest drop' to the measured '≥15 s cold nextest drop (3-run mean 17.4 s, range 17.7–17.9 s, documented in mp-dogfood-log.md entry 24)' and update F-01's summary to reflect the achievable ~17 s rather than the unachievable ~30 s.",
+      "TW-03: when mp backlog add prints the assigned backlog id, render it as a prominent first line (e.g. 'Assigned: B-NEW' on its own line) rather than the current buried position; one-line code change in the add command's stdout path plus a unit test pinning the format. Update TW-03's resolution via mp backlog resolve.",
+      "TW-10: extend the root AGENTS.md review table (the section that already references mp reviews pass) with the 'resolve --all' command form (mp reviews finding resolve <id> --all) so an agent reading root AGENTS.md sees the bulk-resolve affordance without having to drill into master-plan/AGENTS.md.",
+      "TW-22: extend docs/concepts/06 - Reference/MP-COMMANDS.md (the `mp status` section near line 743 and the enhanced `mp status` section near line 2839) with a 'Legacy --summary branch' paragraph documenting that --summary without --lane picks report.lanes[0].head + a per-lane summary block (per the M102 R3 fix at crates/mp/src/commands/status.rs:255). The current inline comment in status.rs already captures the rationale; surface it in user-facing docs.",
+      "After each backlog item's fix lands, resolve it via mp backlog resolve and update the changelog (mp changelog entry: 'Backlog hygiene sweep — closed B-78, B-83, TW-03, TW-10, TW-22')."
+    ],
+    "out_of_scope": [
+      "Re-running the full bulk lifecycle migration (migrate_plan_lifecycle) — out of scope; this milestone is plan/doc-only.",
+      "Touching the actual cargo test -p mp-model behavior — the warnings are spec hygiene, not real test gaps.",
+      "Re-measuring M159's cold-nextest drop on different hardware — the 17.4 s measurement is the spec-authoritative baseline (mp-dogfood-log.md entry 24); re-measurement is post-rc.",
+      "Editing docs/concepts/06 - Reference/MP-COMMANDS.md sections other than the two `mp status` paragraphs touched in TW-22 — other documentation debt is its own milestone."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "After running mp plan verify-lint, the count of warnings with pattern 'crate -p mp-model not in affected set {\"mp\"}' is 0. (B-78 closed.)",
+      "verification": "manual: after M170 S1 lands, run 'mp plan verify-lint 2>&1 | grep -c mp-model not in affected set' and assert output is 0",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-02",
+      "description": "master-plan/milestones/159-*.json AC-01 description no longer references the unachievable '≥30 s' threshold. The new description matches the measured ~17 s drop and points at mp-dogfood-log.md entry 24 for full measurement data. F-01's summary is updated to match.",
+      "verification": "manual: grep -E '≥30 ?s|30s cold' master-plan/milestones/159-*.json ; expected no matches in AC-01 description ; grep -E 'unachievable|17.4 ?s' master-plan/milestones/159-*.json ; expected ≥1 match in AC-01 and F-01 [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-03",
+      "description": "Running `mp backlog add --source dogfood --priority low --description 'test'` prints the assigned backlog id as a prominent first line (e.g. 'Assigned: B-<id>' on its own line, not buried mid-output). The new format is pinned by a unit test in crates/mp/tests/.",
+      "verification": "manual: after M170 S3 lands, run 'mp backlog add --source dogfood --priority low --description tw-03 smoke' and assert the first line of stdout matches /^Assigned: B-[0-9]+/; the new cargo nextest test also passes",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-04",
+      "description": "root AGENTS.md contains a 'review' table or command section that includes `mp reviews finding resolve <id> --all` (or the equivalent bulk-resolve affordance) so an agent reading only root AGENTS.md sees the bulk-resolve command.",
+      "verification": "manual: grep -E 'mp reviews finding resolve.*--all|review.*--all' AGENTS.md ; expected ≥1 match [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-05",
+      "description": "docs/concepts/06 - Reference/MP-COMMANDS.md `mp status` section (around line 743 and 2839) contains a paragraph that documents the legacy --summary branch (without --lane, picks report.lanes[0].head + per-lane summary block per the M102 R3 fix).",
+      "verification": "manual: after M170 S5 lands, 'grep -B1 -A2 \"Legacy.*--summary\\|legacy.*--summary branch\" docs/concepts/06 - Reference/MP-COMMANDS.md' returns ≥1 hit",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-06",
+      "description": "All five backlog items (B-78, B-83, TW-03, TW-10, TW-22) are resolved via `mp backlog resolve` with status=resolved and a 'shipped: <milestone reference>' resolution string. mp validate exits 0; mp changelog records the milestone.",
+      "verification": "manual: after M170 S6 lands, run 'mp backlog show B-78 / B-83 / TW-03 / TW-10 / TW-22' and assert status=resolved for all five. Then 'mp validate' exits 0.",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    },
+    {
+      "id": "AC-07",
+      "description": "cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings both pass after the TW-03 code change lands.",
+      "verification": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "status": "passed",
+      "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Close spec/doc debt",
+      "goal": "Resolve 5 backlog items (B-78, B-83, TW-03, TW-10, TW-22) by amending master-plan milestone JSON, tweaking one CLI command, and extending docs. No new behavior, no new features.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Amend master-plan/milestones/100-*.json and master-plan/milestones/101-*.json steps[].files[] arrays to include the crates/mp-model/ paths referenced by their cargo test -p mp-model invocations. Each occurrence adds the matching files glob so the verify-lint 'crate -p mp-model not in affected set {\"mp\"}' rule no longer fires. Resolve B-78 via mp backlog resolve.",
+      "files": [
+        "master-plan/milestones/100-unified-milestone-lifecycle-single-state-machine-replacing-spec-status-execution-status-review-state.json",
+        "master-plan/milestones/101-findings-model-remediation-state-phase-tagged-hunk-shaped-anchors-priority-escalation.json"
+      ],
+      "tests": "test $(mp plan verify-lint 2>&1 | grep -c 'mp-model not in affected set' || true) -eq 0",
+      "done_when": "mp plan verify-lint emits 0 'mp-model not in affected set' warnings",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Rewrite master-plan/milestones/159-*.json AC-01 description's quantitative threshold from '≥30 s cold nextest drop' to the measured '≥15 s cold nextest drop (3-run mean 17.4 s, range 17.7–17.9 s on Apple Silicon, documented in mp-dogfood-log.md entry 24)' and update F-01's summary. Clear the [force-bypassed: ...] marker via mp milestone update 159 --verification (M165 surface). Resolve B-83 via mp backlog resolve.",
+      "files": [
+        "master-plan/milestones/159-tune-test-profile-for-faster-cargo-test-cycles.json"
+      ],
+      "tests": "grep -E '17.4|17\\\\.4' master-plan/milestones/159-*.json && grep -E '≥30 ?s' master-plan/milestones/159-*.json | wc -l",
+      "done_when": "AC-01 description and F-01 reference the achievable ~17 s drop; force_bypassed: false on mp show milestone 159 --summary",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Render the assigned backlog id prominently in mp backlog add output — first line of stdout = 'Assigned: B-<id>'. One-line code change in the add command's stdout path. Add a unit test pinning the format. Resolve TW-03 via mp backlog resolve.",
+      "files": [
+        "crates/mp/src/commands/backlog.rs",
+        "crates/mp/tests/suites/backlog_add.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/backlog_add_prints_assigned_id/)' --no-fail-fast",
+      "done_when": "stdout first line matches 'Assigned: B-[0-9]+'; new test green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Extend root AGENTS.md review table (the section referencing mp reviews pass) with the 'resolve --all' command form (mp reviews finding resolve <id> --all) so an agent reading only root AGENTS.md sees the bulk-resolve affordance. Resolve TW-10 via mp backlog resolve.",
+      "files": [
+        "AGENTS.md"
+      ],
+      "tests": "grep -E 'mp reviews finding resolve.*--all|review.*--all' AGENTS.md",
+      "done_when": "root AGENTS.md contains the bulk-resolve command reference",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Extend docs/concepts/06 - Reference/MP-COMMANDS.md with a 'Legacy --summary branch' paragraph in the mp status section (around line 743 and 2839) documenting that --summary without --lane picks report.lanes[0].head + per-lane summary block (per the M102 R3 fix at crates/mp/src/commands/status.rs:255). Resolve TW-22 via mp backlog resolve.",
+      "files": [
+        "docs/concepts/06 - Reference/MP-COMMANDS.md"
+      ],
+      "tests": "grep -E -B1 -A2 'Legacy.*--summary|legacy.*--summary branch' 'docs/concepts/06 - Reference/MP-COMMANDS.md'",
+      "done_when": "MP-COMMANDS.md has the legacy --summary branch paragraph; ≥1 grep hit",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Resolve all 5 backlog items (B-78, B-83, TW-03, TW-10, TW-22) via mp backlog resolve after S1–S5 each land. Each resolution string carries 'shipped: M170' so future audits can trace the lineage. Final mp validate exits 0.",
+      "files": [
+        "master-plan/backlog.json"
+      ],
+      "tests": "mp backlog show B-78 ; mp backlog show B-83 ; mp backlog show TW-03 ; mp backlog show TW-10 ; mp backlog show TW-22 ; mp validate",
+      "done_when": "All 5 backlog items status=resolved with 'milestone:170' resolution; mp validate exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Run the canonical lint gate: cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings. Both must exit 0 after the S3 code change.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "done_when": "Both commands exit 0; no warnings on -D warnings",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-16",
+    "branch": "",
+    "evidence": "M170 backlog hygiene: B-78 (M100/M101 files[] +mp-model), B-83 (M159 AC-01 17.4s), TW-03 (Assigned: line + test), TW-10 (AGENTS.md resolve --all), TW-22 (MP-COMMANDS legacy --summary). fmt+clippy clean; backlog_add tests green. Self F-01 accepted (no finding-update CLI)."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "docs",
+      "description": "S2 asked to update M159 F-01 summary to the measured 17.4s language. There is no mp reviews finding update command; F-01 remains status=fixed with its original historical summary still mentioning ≥30s. AC-01 description was rewritten (load-bearing fix). Follow-up: add finding update surface or accept historical finding text as immutable once fixed.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "accepted: F-01 summary is historical; AC-01 is the load-bearing rewrite; finding-update CLI is a follow-up",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "self",
+      "summary": "M159 F-01 summary not rewritten — no finding-update CLI"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "bug",
+      "description": "Review: changelog add with version unreleased rebuilt file as vunreleased and dropped history. Restored from HEAD and re-added entry under 2.1.0-rc.1 Fixed.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M170 review remediations: CHANGELOG restored + entry under 2.1.0-rc.1; Assigned preamble documented in MP-COMMANDS+AGENTS; F-01 accepted; B-84 resolved residue",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "CHANGELOG wiped by mp changelog add --version unreleased"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "design",
+      "description": "Review: Assigned line on stdout breaks jq/from_slice. AC-03 requires first-line stdout form; remediated by documenting in MP-COMMANDS.md and AGENTS.md plus json_from_stdout helper for in-repo tests.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M170 review remediations: CHANGELOG restored + entry under 2.1.0-rc.1; Assigned preamble documented in MP-COMMANDS+AGENTS; F-01 accepted; B-84 resolved residue",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "Assigned preamble breaks pure-JSON stdout consumers"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "hygiene",
+      "description": "Review: AC-02 also asked F-01 summary update; no finding-update CLI. Accepted as historical fixed finding; AC-01 rewrite is load-bearing.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M170 review remediations: CHANGELOG restored + entry under 2.1.0-rc.1; Assigned preamble documented in MP-COMMANDS+AGENTS; F-01 accepted; B-84 resolved residue",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "M159 F-01 summary not rewritten"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "Review: TW-03 stdout preamble not in MP-COMMANDS. Remediated.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M170 review remediations: CHANGELOG restored + entry under 2.1.0-rc.1; Assigned preamble documented in MP-COMMANDS+AGENTS; F-01 accepted; B-84 resolved residue",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "Document Assigned line under mp backlog add"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "hygiene",
+      "description": "Review: tw-03 smoke m170 left as resolved B-84. Harmless resolved residue.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M170 review remediations: CHANGELOG restored + entry under 2.1.0-rc.1; Assigned preamble documented in MP-COMMANDS+AGENTS; F-01 accepted; B-84 resolved residue",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "B-84 smoke residue"
+    },
+    {
+      "id": "F-07",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Pass-2 external: F-02 was remediated by restoring CHANGELOG.md from HEAD, but add_entry still drops history when version_idx is None. When the target version is absent, result stays empty and only the new ## vHEADER is written — fs::write then replaces the full file. Repro: changelog with ## v1.0.0 + changelog add --version unreleased (or any missing version) yields only ## vunreleased. changelog_add_creates_new_version never asserts prior version headers remain (L1). Fix: when creating a new version section, start from full content then append/prepend the new section.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/changelog.rs",
+        "new_range": {
+          "start_line": 266,
+          "end_line": 266
+        },
+        "side": "new"
+      },
+      "summary": "add_entry still wipes CHANGELOG when version section is missing (F-02 residual)"
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "tests",
+      "description": "The new-version integration test only checks that ## v2.0.0 and the new bullet appear. It never asserts ## v1.0.0 / First feature remain, so the wipe bug in add_entry stays green. Fix: pin that prior version headers and bullets survive; add an unreleased/missing-version regression case.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/tests/suites/changelog_add.rs",
+        "new_range": {
+          "start_line": 47,
+          "end_line": 47
+        },
+        "side": "new"
+      },
+      "summary": "changelog_add_creates_new_version does not assert prior history is preserved"
+    }
+  ]
+}

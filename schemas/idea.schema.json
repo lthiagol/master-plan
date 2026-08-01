@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://master-plan.dev/schemas/idea.schema.json",
+  "title": "Idea",
+  "description": "Quick capture / reminder. Planned mp idea commands (P1.6).",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ID-[0-9]{2}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "refined", "promoted", "dismissed", "archived"],
+      "default": "open"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "source": {
+      "type": "string",
+      "default": "conversation"
+    },
+    "created": {
+      "type": "string"
+    },
+    "promoted_to": {
+      "type": "string",
+      "description": "Set when promoted: milestone:04 | backlog:B-03 | track:bugfix:BF-02"
+    }
+  }
+}
