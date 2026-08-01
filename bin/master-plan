@@ -1,0 +1,961 @@
+#!/usr/bin/env bash
+
+# master-plan: Unified CLI tool to view, sort, validate, and update master plans.
+
+set -eo pipefail
+
+# Find the master-plan directory.
+MP_DIR=""
+NO_COLOR=false
+
+# Temporary argument parsing to extract --path and --no-color
+TEMP_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --path)
+      MP_DIR="$2"
+      shift 2
+      ;;
+    --no-color)
+      NO_COLOR=true
+      shift
+      ;;
+    *)
+      TEMP_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${TEMP_ARGS[@]}"
+
+# Auto-detect master-plan folder if not specified
+if [[ -z "$MP_DIR" ]]; then
+  current_dir=$(pwd)
+  while [[ "$current_dir" != "/" ]]; do
+    if [[ -d "$current_dir/master-plan" ]]; then
+      MP_DIR="$current_dir/master-plan"
+      break
+    fi
+    current_dir=$(dirname "$current_dir")
+  done
+fi
+
+if [[ -z "$MP_DIR" || ! -d "$MP_DIR" ]]; then
+  if [[ -d "./master-plan" ]]; then
+    MP_DIR="./master-plan"
+  else
+    echo -e "\033[0;31mERROR:\033[0m master-plan directory not found." >&2
+    echo "Please run this command from a directory containing a 'master-plan/' folder," >&2
+    echo "or specify it using '--path /path/to/master-plan'." >&2
+    exit 1
+  fi
+fi
+
+# Convert to absolute path
+MP_DIR=$(cd "$MP_DIR" && pwd)
+
+# Setup colors
+if [ "$NO_COLOR" = false ] && [ -t 1 ]; then
+  COLOR_RESET="\033[0m"
+  COLOR_BOLD="\033[1m"
+  COLOR_GREEN="\033[0;32m"
+  COLOR_YELLOW="\033[0;33m"
+  COLOR_RED="\033[0;31m"
+  COLOR_BLUE="\033[0;34m"
+  COLOR_CYAN="\033[0;36m"
+  COLOR_GRAY="\033[0;90m"
+else
+  COLOR_RESET=""
+  COLOR_BOLD=""
+  COLOR_GREEN=""
+  COLOR_YELLOW=""
+  COLOR_RED=""
+  COLOR_BLUE=""
+  COLOR_CYAN=""
+  COLOR_GRAY=""
+fi
+
+# Padding printer for colorized columns
+pad_print() {
+  local text="$1"
+  local width="$2"
+  local color="$3"
+  local len=${#text}
+  local pad=$((width - len))
+  if ((pad < 0)); then
+    pad=0
+  fi
+  local padding=""
+  if ((pad > 0)); then
+    padding=$(printf "%*s" "$pad" "")
+  fi
+  echo -ne "${color}${text}${COLOR_RESET}${padding}"
+}
+
+parse_field() {
+  local file="$1"
+  local field="$2"
+  if [[ ! -f "$file" ]]; then
+    echo ""
+    return
+  fi
+  # Matches lines like: "- status: `planned`" or "- status: planned"
+  grep -i "^[[:space:]]*-[[:space:]]*$field:" "$file" | head -n 1 | sed -E 's/^[[:space:]]*-[[:space:]]*[^:]+:[[:space:]]*[`"'\'']?//; s/[`"'\'']?[[:space:]]*$//'
+}
+
+find_milestone_file() {
+  local node="$1"
+  for f in "$MP_DIR"/milestones/*.md; do
+    [[ -e "$f" ]] || continue
+    local fname
+    fname=$(basename "$f")
+    if [[ "$fname" =~ ^$node[-._\ ] || "$fname" =~ ^$node\.md$ ]]; then
+      echo "$f"
+      return
+    fi
+  done
+  # Fallback for case sensitivity or prefix differences (e.g. M01 vs 01)
+  local clean_node
+  clean_node=$(echo "$node" | sed -E 's/^M//i')
+  for f in "$MP_DIR"/milestones/*.md; do
+    [[ -e "$f" ]] || continue
+    local fname
+    fname=$(basename "$f")
+    local clean_fname
+    clean_fname=$(echo "$fname" | sed -E 's/^M//i')
+    if [[ "$clean_fname" =~ ^$clean_node[-._\ ] || "$clean_fname" =~ ^$clean_node\.md$ ]]; then
+      echo "$f"
+      return
+    fi
+  done
+}
+
+get_title() {
+  local file="$1"
+  local filename
+  filename=$(basename "$file" .md)
+  if [[ ! -f "$file" ]]; then
+    echo "$filename"
+    return
+  fi
+  local title
+  title=$(grep "^#[[:space:]]" "$file" | head -n 1 | sed -E 's/^#[[:space:]]*//')
+  if [[ -z "$title" ]]; then
+    echo "$filename" | sed -E 's/^[0-9]+-//; s/-/ /g'
+  else
+    echo "$title"
+  fi
+}
+
+get_dependencies() {
+  local node="$1"
+  local file
+  file=$(find_milestone_file "$node")
+  if [[ -z "$file" ]]; then
+    echo "none"
+    return
+  fi
+  parse_field "$file" "depends-on"
+}
+
+resolve() {
+  local node="$1"
+  for r in "${resolved[@]}"; do
+    if [[ "$r" == "$node" ]]; then
+      return
+    fi
+  done
+  for v in "${visiting[@]}"; do
+    if [[ "$v" == "$node" ]]; then
+      echo "ERROR: Circular dependency detected involving milestone $node" >&2
+      exit 1
+    fi
+  done
+
+  visiting+=("$node")
+
+  local deps
+  deps=$(get_dependencies "$node")
+  
+  local IFS_backup="$IFS"
+  IFS=', ' read -r -a dep_arr <<< "$deps"
+  IFS="$IFS_backup"
+  
+  for dep in "${dep_arr[@]}"; do
+    dep=$(echo "$dep" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+    if [[ -n "$dep" && "$dep" != "none" ]]; then
+      local dep_file
+      dep_file=$(find_milestone_file "$dep")
+      if [[ -n "$dep_file" ]]; then
+        local dep_fname
+        dep_fname=$(basename "$dep_file")
+        if [[ "$dep_fname" =~ ^(M?[0-9]+) ]]; then
+          dep="${BASH_REMATCH[1]}"
+        fi
+        resolve "$dep"
+      else
+        echo "WARNING: Milestone $node depends on $dep, but milestones/$dep file does not exist." >&2
+      fi
+    fi
+  done
+
+  local temp_visiting=()
+  for v in "${visiting[@]}"; do
+    if [[ "$v" != "$node" ]]; then
+      temp_visiting+=("$v")
+    fi
+  done
+  visiting=("${temp_visiting[@]}")
+
+  resolved+=("$node")
+}
+
+sub_order() {
+  local milestones=()
+  for file in "$MP_DIR"/milestones/*.md; do
+    [[ -e "$file" ]] || continue
+    filename=$(basename "$file")
+    if [[ "$filename" =~ ^(M?[0-9]+) ]]; then
+      milestones+=("${BASH_REMATCH[1]}")
+    fi
+  done
+
+  if [[ ${#milestones[@]} -eq 0 ]]; then
+    return
+  fi
+
+  # Numerical/version sort to establish base traversal order
+  IFS=$'\n' sorted_milestones=($(sort -V <<<"${milestones[*]}"))
+  unset IFS
+
+  resolved=()
+  visiting=()
+
+  for m in "${sorted_milestones[@]}"; do
+    resolve "$m"
+  done
+
+  for r in "${resolved[@]}"; do
+    echo "$r"
+  done
+}
+
+sub_show() {
+  local sort_mode="topological"
+  if [[ "$1" == "--numeric" || "$1" == "-n" ]]; then
+    sort_mode="numeric"
+  fi
+
+  local ordered_milestones=()
+  if [[ "$sort_mode" == "topological" ]]; then
+    ordered_milestones=($(sub_order 2>/dev/null || true))
+  fi
+
+  # Fallback to numeric sorting if topological fails or is explicitly chosen
+  if [[ ${#ordered_milestones[@]} -eq 0 ]]; then
+    sort_mode="numeric"
+    local raw_milestones=()
+    for file in "$MP_DIR"/milestones/*.md; do
+      [[ -e "$file" ]] || continue
+      filename=$(basename "$file")
+      if [[ "$filename" =~ ^(M?[0-9]+) ]]; then
+        raw_milestones+=("${BASH_REMATCH[1]}")
+      fi
+    done
+    if [[ ${#raw_milestones[@]} -gt 0 ]]; then
+      IFS=$'\n' ordered_milestones=($(sort -V <<<"${raw_milestones[*]}"))
+      unset IFS
+    fi
+  fi
+
+  if [[ ${#ordered_milestones[@]} -eq 0 ]]; then
+    echo "No milestones found in $MP_DIR/milestones/"
+    return
+  fi
+
+  echo -e "${COLOR_BOLD}Milestones Status (${sort_mode} ordering):${COLOR_RESET}"
+  echo "=========================================================================================="
+  
+  # Print Header
+  pad_print "ID" 6 "$COLOR_BOLD"
+  echo -n "| "
+  pad_print "Title" 35 "$COLOR_BOLD"
+  echo -n "| "
+  pad_print "Status" 15 "$COLOR_BOLD"
+  echo -n "| "
+  pad_print "Effort" 7 "$COLOR_BOLD"
+  echo -n "| "
+  pad_print "Risk" 6 "$COLOR_BOLD"
+  echo -n "| "
+  pad_print "Depends On" 12 "$COLOR_BOLD"
+  echo ""
+  echo "------------------------------------------------------------------------------------------"
+
+  for m in "${ordered_milestones[@]}"; do
+    local file
+    file=$(find_milestone_file "$m")
+    if [[ -z "$file" ]]; then
+      continue
+    fi
+    local title
+    title=$(get_title "$file")
+    if [[ ${#title} -gt 35 ]]; then
+      title="${title:0:32}..."
+    fi
+    local status
+    status=$(parse_field "$file" "status")
+    local effort
+    effort=$(parse_field "$file" "effort")
+    local risk
+    risk=$(parse_field "$file" "risk")
+    local deps
+    deps=$(parse_field "$file" "depends-on")
+
+    # Status displays
+    local status_display=""
+    local status_color=""
+    case "${status,,}" in
+      complete|done)
+        status_display="✅ Done"
+        status_color="$COLOR_GREEN"
+        ;;
+      in-progress|in_progress|"in progress")
+        status_display="🚧 In Progress"
+        status_color="$COLOR_YELLOW"
+        ;;
+      partial)
+        status_display="⚠️ Partial"
+        status_color="$COLOR_YELLOW"
+        ;;
+      planned)
+        status_display="🔜 Planned"
+        status_color="$COLOR_BLUE"
+        ;;
+      blocked)
+        status_display="🚫 Blocked"
+        status_color="$COLOR_RED"
+        ;;
+      deferred)
+        status_display="⏸ Deferred"
+        status_color="$COLOR_GRAY"
+        ;;
+      cancelled)
+        status_display="❌ Cancelled"
+        status_color="$COLOR_GRAY"
+        ;;
+      superseded)
+        status_display="🔄 Superseded"
+        status_color="$COLOR_GRAY"
+        ;;
+      *)
+        status_display="${status:-unknown}"
+        status_color=""
+        ;;
+    esac
+
+    # Risk displays
+    local risk_display="${risk:-—}"
+    local risk_color=""
+    case "${risk,,}" in
+      high)
+        risk_color="$COLOR_RED"
+        ;;
+      medium|med)
+        risk_color="$COLOR_YELLOW"
+        ;;
+      low)
+        risk_color="$COLOR_GREEN"
+        ;;
+    esac
+
+    pad_print "$m" 6 ""
+    echo -n "| "
+    pad_print "$title" 35 ""
+    echo -n "| "
+    pad_print "$status_display" 15 "$status_color"
+    echo -n "| "
+    pad_print "${effort:-—}" 7 ""
+    echo -n "| "
+    pad_print "$risk_display" 6 "$risk_color"
+    echo -n "| "
+    pad_print "${deps:-none}" 12 ""
+    echo ""
+  done
+  echo "=========================================================================================="
+}
+
+sub_status() {
+  local total=0
+  local done=0
+  local in_progress=0
+  local planned=0
+  local partial=0
+  local other=0
+
+  for file in "$MP_DIR"/milestones/*.md; do
+    [[ -e "$file" ]] || continue
+    total=$((total + 1))
+    local status
+    status=$(parse_field "$file" "status")
+    case "${status,,}" in
+      complete|done)
+        done=$((done + 1))
+        ;;
+      in-progress|in_progress|"in progress")
+        in_progress=$((in_progress + 1))
+        ;;
+      partial)
+        partial=$((partial + 1))
+        ;;
+      planned)
+        planned=$((planned + 1))
+        ;;
+      *)
+        other=$((other + 1))
+        ;;
+    esac
+  done
+
+  local done_pct=0
+  local ip_pct=0
+  local planned_pct=0
+  if ((total > 0)); then
+    done_pct=$((done * 100 / total))
+    ip_pct=$((in_progress * 100 / total))
+    planned_pct=$((planned * 100 / total))
+  fi
+
+  local target_ver="N/A"
+  local plan_status="N/A"
+  local curr_phase="N/A"
+  if [[ -f "$MP_DIR/STATUS.md" ]]; then
+    target_ver=$( (grep -i "target version" "$MP_DIR/STATUS.md" || true) | head -n 1 | sed -E 's/.*target version[*_ ]*:[[:space:]]*[*_]*/\n/i; s/[*_[:space:]]*$//' | tail -n 1)
+    plan_status=$( (grep -i "planning status" "$MP_DIR/STATUS.md" || true) | head -n 1 | sed -E 's/.*planning status[*_ ]*:[[:space:]]*[*_]*/\n/i; s/[*_[:space:]]*$//' | tail -n 1)
+    curr_phase=$( (grep -i "current phase" "$MP_DIR/STATUS.md" || true) | head -n 1 | sed -E 's/.*current phase[*_ ]*[|:][[:space:]]*[*_]*/\n/i; s/[|*_[:space:]]*$//' | tail -n 1)
+  fi
+
+  echo -e "${COLOR_BOLD}Master Plan Summary:${COLOR_RESET}"
+  echo "----------------------------------------"
+  echo -e "Target Version:  ${COLOR_CYAN}${target_ver:-N/A}${COLOR_RESET}"
+  echo -e "Planning Status: ${COLOR_CYAN}${plan_status:-N/A}${COLOR_RESET}"
+  echo -e "Current Phase:   ${COLOR_CYAN}${curr_phase:-N/A}${COLOR_RESET}"
+  echo ""
+  echo -e "Total Milestones: ${COLOR_BOLD}${total}${COLOR_RESET}"
+  echo -e "  ✅ Done:        ${COLOR_GREEN}${done}${COLOR_RESET} (${done_pct}%)"
+  echo -e "  🚧 In Progress: ${COLOR_YELLOW}${in_progress}${COLOR_RESET} (${ip_pct}%)"
+  echo -e "  ⚠️ Partial:     ${COLOR_YELLOW}${partial}${COLOR_RESET}"
+  echo -e "  🔜 Planned:     ${COLOR_BLUE}${planned}${COLOR_RESET} (${planned_pct}%)"
+  echo -e "  ⏸ Other:       ${COLOR_GRAY}${other}${COLOR_RESET}"
+  echo "----------------------------------------"
+}
+
+sub_next() {
+  local milestones=()
+  for file in "$MP_DIR"/milestones/*.md; do
+    [[ -e "$file" ]] || continue
+    filename=$(basename "$file")
+    if [[ "$filename" =~ ^(M?[0-9]+) ]]; then
+      milestones+=("${BASH_REMATCH[1]}")
+    fi
+  done
+
+  if [[ ${#milestones[@]} -eq 0 ]]; then
+    echo "No milestones found."
+    return
+  fi
+
+  local actionable=()
+  for m in "${milestones[@]}"; do
+    local file
+    file=$(find_milestone_file "$m")
+    local status
+    status=$(parse_field "$file" "status")
+    if [[ "${status,,}" == "planned" ]]; then
+      local deps
+      deps=$(parse_field "$file" "depends-on")
+      
+      local IFS_backup="$IFS"
+      IFS=', ' read -r -a dep_arr <<< "$deps"
+      IFS="$IFS_backup"
+      
+      local all_done=true
+      for dep in "${dep_arr[@]}"; do
+        dep=$(echo "$dep" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+        if [[ -n "$dep" && "$dep" != "none" ]]; then
+          local dep_file
+          dep_file=$(find_milestone_file "$dep")
+          if [[ -n "$dep_file" ]]; then
+            local dep_status
+            dep_status=$(parse_field "$dep_file" "status")
+            if [[ "${dep_status,,}" != "complete" && "${dep_status,,}" != "done" ]]; then
+              all_done=false
+              break
+            fi
+          else
+            all_done=false
+            break
+          fi
+        fi
+      done
+      if [ "$all_done" = true ]; then
+        actionable+=("$m")
+      fi
+    fi
+  done
+
+  if [[ ${#actionable[@]} -eq 0 ]]; then
+    echo -e "${COLOR_YELLOW}No planned milestones are currently unblocked.${COLOR_RESET}"
+    echo "Ensure that all active/in-progress milestones are finished."
+  else
+    echo -e "${COLOR_BOLD}Next Actionable Milestones (Dependencies fully met):${COLOR_RESET}"
+    echo "----------------------------------------------------------------"
+    for m in "${actionable[@]}"; do
+      local file
+      file=$(find_milestone_file "$m")
+      local title
+      title=$(get_title "$file")
+      local effort
+      effort=$(parse_field "$file" "effort")
+      local risk
+      risk=$(parse_field "$file" "risk")
+      echo -e "  - ${COLOR_GREEN}${m}${COLOR_RESET}: ${COLOR_BOLD}${title}${COLOR_RESET} (Effort: ${effort:-S}, Risk: ${risk:-low})"
+    done
+  fi
+}
+
+sub_validate() {
+  local errors=0
+  local warnings=0
+
+  echo -e "${COLOR_BOLD}Validating Master Plan consistency...${COLOR_RESET}"
+
+  if [[ ! -d "$MP_DIR" ]]; then
+    echo -e "  [${COLOR_RED}ERROR${COLOR_RESET}] master-plan directory does not exist: $MP_DIR"
+    return 1
+  fi
+
+  if [[ ! -f "$MP_DIR/STATUS.md" ]]; then
+    echo -e "  [${COLOR_RED}ERROR${COLOR_RESET}] STATUS.md is missing from $MP_DIR"
+    errors=$((errors + 1))
+  else
+    echo -e "  [${COLOR_GREEN}OK${COLOR_RESET}] STATUS.md is present"
+  fi
+
+  if [[ ! -f "$MP_DIR/backlog.md" ]]; then
+    echo -e "  [${COLOR_YELLOW}WARNING${COLOR_RESET}] backlog.md is missing from $MP_DIR"
+    warnings=$((warnings + 1))
+  else
+    echo -e "  [${COLOR_GREEN}OK${COLOR_RESET}] backlog.md is present"
+  fi
+
+  local milestones=()
+  for file in "$MP_DIR"/milestones/*.md; do
+    if [[ ! -e "$file" ]]; then
+      continue
+    fi
+    filename=$(basename "$file")
+    if [[ "$filename" =~ ^(M?[0-9]+) ]]; then
+      milestones+=("${BASH_REMATCH[1]}")
+    fi
+  done
+
+  if [[ ${#milestones[@]} -eq 0 ]]; then
+    echo -e "  [${COLOR_YELLOW}WARNING${COLOR_RESET}] No milestone markdown files found under milestones/."
+    warnings=$((warnings + 1))
+  fi
+
+  for m in "${milestones[@]}"; do
+    local file
+    file=$(find_milestone_file "$m")
+    local status
+    status=$(parse_field "$file" "status")
+
+    # Verify STATUS.md link
+    if [[ -f "$MP_DIR/STATUS.md" ]]; then
+      if ! grep -q "$m" "$MP_DIR/STATUS.md"; then
+        echo -e "  [${COLOR_YELLOW}WARNING${COLOR_RESET}] Milestone $m ($file) is not mentioned in STATUS.md"
+        warnings=$((warnings + 1))
+      fi
+    fi
+
+    # Verify dependencies exist
+    local deps
+    deps=$(parse_field "$file" "depends-on")
+    local IFS_backup="$IFS"
+    IFS=', ' read -r -a dep_arr <<< "$deps"
+    IFS="$IFS_backup"
+    for dep in "${dep_arr[@]}"; do
+      dep=$(echo "$dep" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+      if [[ -n "$dep" && "$dep" != "none" ]]; then
+        local dep_file
+        dep_file=$(find_milestone_file "$dep")
+        if [[ -z "$dep_file" ]]; then
+          echo -e "  [${COLOR_RED}ERROR${COLOR_RESET}] Milestone $m depends on $dep, but milestones/$dep file does not exist."
+          errors=$((errors + 1))
+        fi
+      fi
+    done
+  done
+
+  # Check for loops
+  if [[ ${#milestones[@]} -gt 0 ]]; then
+    if ! sub_order &>/dev/null; then
+      echo -e "  [${COLOR_RED}ERROR${COLOR_RESET}] Circular dependency detected in milestones!"
+      # trigger resolve output to find the exact loop
+      sub_order 2>&1 | grep -i "circular dependency" | sed 's/^/  /' || true
+      errors=$((errors + 1))
+    else
+      echo -e "  [${COLOR_GREEN}OK${COLOR_RESET}] No circular dependencies detected"
+    fi
+  fi
+
+  echo ""
+  if ((errors > 0)); then
+    echo -e "${COLOR_RED}Validation failed with $errors error(s) and $warnings warning(s).${COLOR_RESET}"
+    return 1
+  else
+    echo -e "${COLOR_GREEN}Validation completed with $warnings warning(s).${COLOR_RESET}"
+    return 0
+  fi
+}
+
+sub_add_milestone() {
+  local title=""
+  local order=""
+  local deps=""
+  local effort="S"
+  local risk="low"
+
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --title)
+        title="$2"
+        shift 2
+        ;;
+      --order)
+        order="$2"
+        shift 2
+        ;;
+      --depends-on)
+        deps="$2"
+        shift 2
+        ;;
+      --effort)
+        effort="$2"
+        shift 2
+        ;;
+      --risk)
+        risk="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$title" ]]; then
+    if [ -t 0 ]; then
+      echo -e "${COLOR_BOLD}Creating a new milestone...${COLOR_RESET}"
+      read -p "Milestone Title: " title
+    else
+      echo "ERROR: Title cannot be empty." >&2
+      return 1
+    fi
+  fi
+
+  if [[ -z "$order" ]]; then
+    local max=0
+    for file in "$MP_DIR"/milestones/*.md; do
+      [[ -e "$file" ]] || continue
+      local fname
+      fname=$(basename "$file")
+      if [[ "$fname" =~ ^([0-9]+) ]]; then
+        local num=$((10#${BASH_REMATCH[1]}))
+        if ((num > max)); then
+          max=$num
+        fi
+      fi
+    done
+    local next_num=$((max + 1))
+    if ((next_num < 10)); then
+      order="0$next_num"
+    else
+      order="$next_num"
+    fi
+    if [ -t 0 ]; then
+      read -p "Milestone ID (default: $order): " user_order
+      if [[ -n "$user_order" ]]; then
+        order="$user_order"
+      fi
+    fi
+  fi
+
+  if [[ "$order" =~ ^[0-9]$ ]]; then
+    order="0$order"
+  fi
+
+  if [[ -z "$deps" ]]; then
+    if [ -t 0 ]; then
+      read -p "Dependencies (comma-separated IDs, default: none): " user_deps
+      deps="${user_deps:-none}"
+    else
+      deps="none"
+    fi
+  fi
+
+  local slug
+  slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+  local filename="${order}-${slug}.md"
+  local target_file="$MP_DIR/milestones/$filename"
+
+  if [[ -f "$target_file" ]]; then
+    echo "ERROR: Milestone file already exists at $target_file" >&2
+    return 1
+  fi
+
+  # Find template
+  local template="$MP_DIR/templates/MILESTONE-TEMPLATE.md"
+  if [[ ! -f "$template" ]]; then
+    template="/home/thiago/code/skill-master-plan/templates/MILESTONE-TEMPLATE.md"
+  fi
+
+  if [[ ! -f "$template" ]]; then
+    echo "ERROR: Milestone template not found at $template" >&2
+    return 1
+  fi
+
+  mkdir -p "$MP_DIR/milestones"
+  cp "$template" "$target_file"
+  
+  sed -i "s/# {NN} Milestone Title/# $order $title/g" "$target_file"
+  sed -i "s/- status: \`planned\`/- status: \`planned\`/g" "$target_file"
+  sed -i "s/- order: \`NNN\`/- order: \`$order\`/g" "$target_file"
+  sed -i "s/- depends-on: \`none\`/- depends-on: \`$deps\`/g" "$target_file"
+  sed -i "s/- effort: \`S\`/- effort: \`$effort\`/g" "$target_file"
+  sed -i "s/- risk: \`low\`/- risk: \`$risk\`/g" "$target_file"
+
+  echo -e "${COLOR_GREEN}Created milestone file: $target_file${COLOR_RESET}"
+
+  if [[ -f "$MP_DIR/STATUS.md" ]]; then
+    local table_row="| $order | [$title](milestones/$filename) | 🔜 | ${order}.1–${order}.N | $effort | $risk | $deps | — |"
+    if grep -q "## 5. Milestone Index" "$MP_DIR/STATUS.md"; then
+      python3 -c "
+import sys
+with open('$MP_DIR/STATUS.md', 'r') as f:
+    content = f.read()
+
+header = '## 5. Milestone Index'
+row = \"\"\"$table_row\"\"\"
+if header in content:
+    parts = content.split(header)
+    table_lines = parts[1].split('\n')
+    inserted = False
+    for idx, line in enumerate(table_lines):
+        if idx > 2 and (line.strip() == '' or line.startswith('---') or line.startswith('##')):
+            table_lines.insert(idx, row)
+            inserted = True
+            break
+    if not inserted:
+        table_lines.append(row)
+    parts[1] = '\n'.join(table_lines)
+    content = header.join(parts)
+    with open('$MP_DIR/STATUS.md', 'w') as f:
+        f.write(content)
+"
+      echo -e "${COLOR_GREEN}Registered milestone in STATUS.md Milestone Index.${COLOR_RESET}"
+    else
+      echo -e "\n$table_row" >> "$MP_DIR/STATUS.md"
+      echo -e "${COLOR_YELLOW}Appended milestone row to STATUS.md (could not find Milestone Index section).${COLOR_RESET}"
+    fi
+  fi
+}
+
+sub_add_backlog() {
+  local desc=""
+  local source_cli=""
+  local suggested_cli=""
+  local priority_cli=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --desc)
+        desc="$2"
+        shift 2
+        ;;
+      --source)
+        source_cli="$2"
+        shift 2
+        ;;
+      --suggested)
+        suggested_cli="$2"
+        shift 2
+        ;;
+      --priority)
+        priority_cli="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$desc" ]]; then
+    if [ -t 0 ]; then
+      echo -e "${COLOR_BOLD}Creating a new deferred backlog item...${COLOR_RESET}"
+      read -p "Item description: " desc
+    else
+      echo "ERROR: Description cannot be empty." >&2
+      return 1
+    fi
+    if [[ -z "$desc" ]]; then
+      echo "ERROR: Description cannot be empty." >&2
+      return 1
+    fi
+  fi
+
+  local source="${source_cli:-Planning}"
+  local suggested="${suggested_cli:-Post-v1.0}"
+  local priority="${priority_cli:-Medium}"
+
+  if [[ -z "$source_cli" && -t 0 ]]; then
+    read -p "Source (default: Planning): " user_source
+    if [[ -n "$user_source" ]]; then
+      source="$user_source"
+    fi
+  fi
+  if [[ -z "$suggested_cli" && -t 0 ]]; then
+    read -p "Suggested when (default: Post-v1.0): " user_suggested
+    if [[ -n "$user_suggested" ]]; then
+      suggested="$user_suggested"
+    fi
+  fi
+  if [[ -z "$priority_cli" && -t 0 ]]; then
+    read -p "Priority (default: Medium): " user_priority
+    if [[ -n "$user_priority" ]]; then
+      priority="$user_priority"
+    fi
+  fi
+
+  local backlog_file="$MP_DIR/backlog.md"
+  if [[ ! -f "$backlog_file" ]]; then
+    local template="$MP_DIR/templates/BACKLOG-TEMPLATE.md"
+    if [[ ! -f "$template" ]]; then
+      template="/home/thiago/code/skill-master-plan/templates/BACKLOG-TEMPLATE.md"
+    fi
+    if [[ -f "$template" ]]; then
+      cp "$template" "$backlog_file"
+      echo -e "${COLOR_GREEN}Initialized backlog.md from template.${COLOR_RESET}"
+    else
+      echo "ERROR: backlog.md and template are missing." >&2
+      return 1
+    fi
+  fi
+
+  local max=0
+  local ids
+  ids=$(grep -o -E "B-[0-9]+" "$backlog_file" | sed 's/B-//' || true)
+  for id in $ids; do
+    local val=$((10#$id))
+    if ((val > max)); then
+      max=$val
+    fi
+  done
+  local next_val=$((max + 1))
+  local next_id
+  if ((next_val < 10)); then
+    next_id="B-0$next_val"
+  else
+    next_id="B-$next_val"
+  fi
+
+  local table_row="| $next_id | $desc | $source | $suggested | $priority |"
+
+  if grep -q "## 1. Active Backlog" "$backlog_file"; then
+    python3 -c "
+import sys
+with open('$backlog_file', 'r') as f:
+    content = f.read()
+
+header = '## 1. Active Backlog'
+row = \"\"\"$table_row\"\"\"
+if header in content:
+    parts = content.split(header)
+    table_lines = parts[1].split('\n')
+    inserted = False
+    for idx, line in enumerate(table_lines):
+        if idx > 2 and (line.strip() == '' or line.startswith('---') or line.startswith('##')):
+            table_lines.insert(idx, row)
+            inserted = True
+            break
+    if not inserted:
+        table_lines.append(row)
+    parts[1] = '\n'.join(table_lines)
+    content = header.join(parts)
+    with open('$backlog_file', 'w') as f:
+        f.write(content)
+"
+    echo -e "${COLOR_GREEN}Added backlog item $next_id to backlog.md.${COLOR_RESET}"
+  else
+    echo -e "\n$table_row" >> "$backlog_file"
+    echo -e "${COLOR_YELLOW}Appended backlog row to backlog.md (could not find Active Backlog section).${COLOR_RESET}"
+  fi
+}
+
+sub_help() {
+  echo -e "${COLOR_BOLD}master-plan CLI Tool${COLOR_RESET}"
+  echo "Usage: master-plan [options] <command> [args]"
+  echo ""
+  echo "Options:"
+  echo "  --path <dir>     Path to the master-plan directory (auto-detected if omitted)"
+  echo "  --no-color       Disable colorized output"
+  echo ""
+  echo "Commands:"
+  echo "  status           Show high-level statistics of the project plan"
+  echo "  show [sort]      List all milestones (default sort: topological). Use '-n' / '--numeric' for numerical sort."
+  echo "  next             List planned milestones that are unblocked and ready to start"
+  echo "  order            Print topological ordering of milestone IDs"
+  echo "  validate         Run consistency checks on milestones and planning documents"
+  echo "  add-milestone    Interactively create a milestone from the template"
+  echo "  add-backlog      Interactively add a deferred item to backlog.md"
+  echo "  help             Show this help information"
+  echo ""
+}
+
+# Command dispatching
+case "$1" in
+  status)
+    sub_status
+    ;;
+  show)
+    shift
+    sub_show "$@"
+    ;;
+  next)
+    sub_next
+    ;;
+  order)
+    sub_order
+    ;;
+  validate)
+    sub_validate
+    ;;
+  add-milestone)
+    shift
+    sub_add_milestone "$@"
+    ;;
+  add-backlog)
+    shift
+    sub_add_backlog "$@"
+    ;;
+  help|--help|-h|"")
+    sub_help
+    ;;
+  *)
+    echo "ERROR: Unknown command: $1" >&2
+    sub_help
+    exit 1
+    ;;
+esac

@@ -1,0 +1,289 @@
+{
+  "milestone": {
+    "id": "89",
+    "title": "Raul TUI welcome — plan overview lane (session snapshot of pending work)",
+    "slug": "raul-tui-welcome-plan-overview-lane-session-snapshot-of-pending-work",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "84",
+      "85"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-02",
+    "updated": "2026-07-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Opening raul -i lands on a welcome / plan-overview lane (first sidebar tab) that answers 'what is the state of the plan and what should I do?' in one screen — the same rollup a maintainer gets from mp status + mp inbox + path preview, without running separate commands or reading JSON."
+  },
+  "problem": {
+    "description": "The Board lane (M84) shows review-cycle health across milestones; the Status lane (M77) shows a thin dashboard (mode, counts, 8 inbox lines). Neither reproduces the session-start briefing agents and humans get from mp status + mp inbox: planned vs done counts, suggested next step, items awaiting approval/grooming, pending tracks/tweaks, and blockers. Maintainers still context-switch between lanes or fall back to the CLI. This milestone adds a dedicated welcome/overview lane as the default TUI entry point."
+  },
+  "scope": {
+    "in_scope": [
+      "New or renamed first sidebar lane (Home / Overview) — default when raul -i starts (raul --board still jumps to Board)",
+      "Single-screen rollup from mp status: planning_status, execution.mode, milestone execution/spec counts, pending_review_count, track_pending, inbox_count, blockers",
+      "Suggested next action + path preview (from status.suggested_path)",
+      "Full inbox list (mp inbox) rendered with kind, reason, and suggested action — grouped or sectioned (milestones to approve, grooming, tracks, ideas)",
+      "Refresh via r; palette-aware render (M85 effective_palette)",
+      "Enter on an inbox row navigates to the best lane (e.g. track → Tweaks, milestone → Milestones or drill-in hint) or copies action hint to flash line",
+      "Unit tests for snapshot builder + render output (fixture JSON, no live mp in unit tests)"
+    ],
+    "out_of_scope": [
+      "Replacing mp CLI for agents (raul remains human-facing)",
+      "Board Kanban changes (M84)",
+      "Rich markdown rendering in overview (defer to M86 if needed)",
+      "Writable actions from overview (approve/groom still via mp/CLI; navigation only)",
+      "New mp commands — consume existing status/inbox/path JSON"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul -i opens on the welcome/overview lane by default (unless --board); lane is first in sidebar order",
+      "verification": "crates/raul/tests/welcome_overview.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test welcome_overview exit 0"
+    },
+    {
+      "id": "AC-02",
+      "description": "Welcome view shows plan rollup: execution mode, milestone counts (done/planned/in-progress from status), next_action display, path preview, pending_review_count, track_pending, inbox_count",
+      "verification": "crates/raul/tests/welcome_overview.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test welcome_overview exit 0"
+    },
+    {
+      "id": "AC-03",
+      "description": "Welcome view lists all mp inbox items with kind, display/reason, and action hint; empty inbox shows explicit empty state",
+      "verification": "crates/raul/tests/welcome_overview.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test welcome_overview exit 0"
+    },
+    {
+      "id": "AC-04",
+      "description": "r refreshes from live mp status + inbox; Enter on a row navigates to the appropriate lane or shows the mp action in flash_message",
+      "verification": "crates/raul/tests/welcome_overview.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test welcome_overview exit 0"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Evolve existing Status lane into Home/Overview (not a 9th lane)",
+      "rationale": "Status is already first in sidebar and loads status+inbox; extending DashboardSnapshot avoids another lane label and matches user ask for first tab welcome screen."
+    },
+    {
+      "area": "",
+      "choice": "Default TUI start lane = Overview; --board overrides to Board only",
+      "rationale": "Welcome is the session briefing; board remains opt-in for review-cycle drill-down (M84)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "[scaffold — superseded by WP2–WP5]",
+      "goal": "Default decompose shell; execution tracked in named WPs",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Lane shell",
+      "goal": "Rename Status to Home/Overview; default TUI start lane",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Snapshot data",
+      "goal": "Extend welcome snapshot from mp status + inbox (counts, blockers, full inbox items)",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Welcome UI",
+      "goal": "Render rollup sections and grouped inbox in overview lane",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "Navigation",
+      "goal": "Refresh and Enter-to-lane / flash action hints",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP2",
+      "order": 1,
+      "action": "Rename Lane::Status to Home/Overview in sidebar labels; ensure raul -i opens on this lane by default (--board still starts on Board)",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/welcome_overview.rs",
+      "done_when": "welcome_overview_default_lane test passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP3",
+      "order": 2,
+      "action": "Extend DashboardSnapshot (or WelcomeSnapshot) with milestone execution/spec counts, blockers, and full inbox fields from mp status + mp inbox JSON",
+      "files": [
+        "crates/raul/src/tui/dashboard.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "crates/raul/tests/welcome_overview.rs",
+      "done_when": "snapshot builder unit tests cover all rollup fields from fixture JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP4",
+      "order": 3,
+      "action": "Render welcome overview: plan rollup sections + grouped inbox list with kind/reason/action; explicit empty inbox state",
+      "files": [
+        "crates/raul/src/tui/render.rs"
+      ],
+      "tests": "crates/raul/tests/welcome_overview.rs",
+      "done_when": "render tests assert rollup lines and inbox sections from fixture App state",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1.1",
+      "work_package": "WP5",
+      "order": 4,
+      "action": "Wire r refresh (reload status+inbox) and Enter on inbox row to navigate lane or set flash_message with mp action hint",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/event.rs"
+      ],
+      "tests": "crates/raul/tests/welcome_overview.rs",
+      "done_when": "navigation tests cover inbox kind routing and refresh handler",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1.1.1",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Integration gate: full welcome_overview test suite green",
+      "files": [],
+      "tests": "cargo test -p raul --test welcome_overview",
+      "done_when": "cargo test -p raul --test welcome_overview exits 0",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-02",
+    "branch": "",
+    "evidence": "cargo test -p raul --test welcome_overview exit 0"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "testing",
+      "description": "AC-04 test navigate_from_inbox is stub — does not call navigate_from_inbox_item",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "0c88190",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "testing",
+      "description": "No behavioral test for Overview r refresh calling load_dashboard",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "0c88190",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Track inbox routing uses reason.contains(bugfix) instead of action/kind",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "0c88190",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "ux",
+      "description": "Inbox lane duplicates Overview — remove from sidebar per M89 spec",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "0c88190",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "Overview inbox header uses inbox_count from status but list uses inbox_items.len",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "0c88190",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    }
+  ]
+}

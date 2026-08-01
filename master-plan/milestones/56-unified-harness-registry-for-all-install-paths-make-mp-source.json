@@ -1,0 +1,226 @@
+{
+  "milestone": {
+    "id": "56",
+    "title": "Unified harness registry for all install paths (make + mp + source)",
+    "slug": "unified-harness-registry-for-all-install-paths-make-mp-source",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "make install, make uninstall, mp install, and source-based installs all use the same harness registry, so there's one source of truth for where things go per harness."
+  },
+  "problem": {
+    "description": "Currently make install, make uninstall, and mp install each have their own hardcoded paths with no shared registry. make install uses templates/harness/ directly, mp install has its own path logic in install.rs, and there's no single place to add a new harness. Before M51 can build the v2 install engine, the foundational harness registry needs to exist and be used by all install paths. Otherwise M51 will have to fight existing path logic scattered across the codebase."
+  },
+  "scope": {
+    "in_scope": [
+      "Create HarnessDescriptor struct in crates/mp/src/harness.rs (NOT mp-model — install paths are runtime concerns; mp-model stays a pure plan-data crate) with fields: id, display_name, convention_file_name, global_skill_dir, project_skill_dir (Option), agent_profile_dir, supports_global, supports_project. Ship a default_registry() with: opencode, cursor, claude-code, gemini, codex, windsurf, cline, pi.",
+      "Add `mp install --print-paths [--harness <id>] --format json` that emits registry paths (convention file, skill dir, profile dir, bin dir) as JSON — the Make<->Rust bridge, since a Makefile cannot import a Rust struct.",
+      "Refactor Makefile install/uninstall targets to consume `mp install --print-paths` JSON instead of hardcoded templates/harness/ paths.",
+      "Refactor crates/mp/src/install.rs to use harness.rs for all path lookups instead of hardcoded agents_skill_dir/cursor_skill_dir. Keep existing CLI flags, use the registry internally.",
+      "Refactor crates/mp/src/doctor.rs to use harness.rs for path lookups instead of inline path logic.",
+      "Ensure source-based installs (cargo build + manual copy) work with the registry.",
+      "Remove or deprecate templates/harness/ directory in favor of the code-based registry."
+    ],
+    "out_of_scope": [
+      "Putting HarnessDescriptor in mp-model (install paths are runtime concerns, not plan data).",
+      "The v2 install CLI flags (--harness multi-select, --global, etc.) — that's M51's job.",
+      "Agent profile deployment (also M51).",
+      "Code review step (separate milestone).",
+      "Changing the behavior of existing install commands — only internal refactoring."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "HarnessDescriptor and default_registry() live in crates/mp/src/harness.rs; harness_by_id('opencode') returns expected paths; mp install --print-paths --harness opencode --format json emits valid path JSON",
+      "verification": "crates/mp/tests/harness_registry.rs",
+      "status": "passed",
+      "evidence": "HarnessDescriptor + default_registry in harness.rs; harness_registry tests pass"
+    },
+    {
+      "id": "AC-02",
+      "description": "make install consumes `mp install --print-paths` JSON and deploys to the same paths as mp install for each harness in the registry",
+      "verification": "manual: accepted - compare make install and mp install --print-paths output",
+      "status": "passed",
+      "evidence": "Makefile install/uninstall targets consume mp install --print-paths JSON"
+    },
+    {
+      "id": "AC-03",
+      "description": "make uninstall consumes the same JSON and removes what make install put",
+      "verification": "manual: accepted - make uninstall verification",
+      "status": "passed",
+      "evidence": "install.rs and doctor.rs refactored to use harness.rs registry; all install and doctor tests pass"
+    },
+    {
+      "id": "AC-04",
+      "description": "All existing install tests pass (install_integrity, install_source, doctor_integrity)",
+      "verification": "cargo test -p mp --test install_integrity --test install_source --test doctor_integrity",
+      "status": "passed",
+      "evidence": "cargo test -p mp --test install_integrity --test install_source --test doctor_integrity passes"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "HarnessDescriptor + registry",
+      "goal": "Create HarnessDescriptor in mp-model, build registry, export for both mp and make",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "make install/uninstall refactor",
+      "goal": "Update Makefile install/uninstall targets to use the registry",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "mp install/doctor refactor",
+      "goal": "Refactor install.rs and doctor.rs to use the shared registry",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Create HarnessDescriptor struct in crates/mp/src/harness.rs (NOT mp-model) with fields: id, display_name, convention_file_name, global_skill_dir, project_skill_dir (Option), agent_profile_dir, supports_global, supports_project. Create default_registry() returning all 8 harnesses. Export the module.",
+      "files": [],
+      "tests": "crates/mp/tests/harness_registry.rs",
+      "done_when": "HarnessDescriptor + default_registry in crates/mp/src/harness.rs; harness_registry tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Expand crates/mp/src/harness.rs as the shared bridge: helper functions (harness_by_id, convention_path, skill_dir, profile_dir) used by both mp install and make install. Add a new \"mp install --print-paths [--harness ID] --format json\" subcommand-option that emits registry paths as JSON — the Make-to-Rust bridge, since a Makefile cannot import a Rust struct.",
+      "files": [],
+      "tests": "cargo build -p mp",
+      "done_when": "harness.rs provides path helpers; mp install --print-paths emits valid JSON; cargo build -p mp passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Refactor Makefile install target to consume \"mp install --print-paths --format json\" output instead of hardcoded templates/harness/ paths. Each harness target delegates to the same JSON source of truth.",
+      "files": [],
+      "tests": "manual: accepted - make install path comparison",
+      "done_when": "make install reads paths from mp install --print-paths",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Refactor Makefile uninstall target to use the registry. Each harness target removes what install put using registry paths.",
+      "files": [],
+      "tests": "manual: accepted - make uninstall verification",
+      "done_when": "make uninstall uses registry paths",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Refactor crates/mp/src/install.rs to use harness.rs for all path lookups instead of hardcoded agents_skill_dir/cursor_skill_dir. Keep existing CLI flags but use registry internally.",
+      "files": [],
+      "tests": "cargo test -p mp --test install_integrity --test install_source",
+      "done_when": "install.rs uses registry; all install tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Refactor crates/mp/src/doctor.rs to use harness.rs for path lookups instead of inline path logic.",
+      "files": [],
+      "tests": "cargo test -p mp --test doctor_integrity",
+      "done_when": "doctor.rs uses registry; doctor tests pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-29",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

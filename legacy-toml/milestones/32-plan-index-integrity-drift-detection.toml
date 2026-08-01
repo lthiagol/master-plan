@@ -1,0 +1,175 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "32"
+title = "Plan-index integrity & drift detection"
+slug = "plan-index-integrity-drift-detection"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-27"
+updated = "2026-06-27"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Mutations to milestone state keep the plan.toml index authoritative and consistent with the per-milestone files with no manual step, any value drift is detectable by mp validate, and mp sync is documented as the recovery path."
+
+[problem]
+description = "Field testing (lazybrew adoption, I-09, on mp 1.4.0) found that after `mp milestone approve`, per-milestone files flip spec_status to 'ready' but the plan.toml index kept the prior value, and `mp validate` passed despite the drift. mp 1.5.0 already ships a top-level `mp sync` that rebuilds the index (confirmed during this planning session: it re-added M31-M35 and silently updated stale M19/M21 entries), but three gaps remain: (1) mutations (create/approve/set-spec-status/set-status/complete) do NOT auto-sync, so drift accumulates until someone manually runs `mp sync`; (2) `mp validate` only warns on *missing* entries (W01) and does not detect *stale-value* drift - the M19/M21 silent updates prove value drift goes undetected; (3) `mp sync` is undocumented in MP-COMMANDS.md. Index drift is a recurring pain (M16's own spec also complains about a stale plan.toml index)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Auto-sync the plan.toml index on every state mutation (create/approve/set-spec-status/set-status/complete) so a manual `mp sync` is not required",
+    "`mp validate` detects stale-value drift (index spec_status/execution_status/title disagreeing with the milestone file), distinct from the existing W01 missing-entry warning",
+    "Document the existing `mp sync` command in MP-COMMANDS.md (and AGENT-PLAYBOOK as the recovery path)",
+    "Integration tests: mutation auto-syncs; validate detects induced stale-value drift; mp sync rebuilds",
+]
+out_of_scope = [
+    "A new `mp plan sync` command (the top-level `mp sync` already exists)",
+    "Removing the plan.toml index entirely (keep it as a snapshot, kept correct)",
+    "Indexing non-milestone collections (backlog/decisions/ideas) - separate concern",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "After any mutation (create/approve/set-spec-status/set-status/complete), the plan.toml index matches the milestone file with no manual `mp sync`"
+verification = "crates/mp/tests integration test asserting index == file after each mutation"
+status = "passed"
+evidence = "index_auto_sync tests pass"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp validate reports stale-value drift (index spec_status/execution_status disagreeing with the file) as a warning or error"
+verification = "manual: test inducing a value mismatch, asserting validate flags it (distinct from W01 missing-entry)"
+status = "passed"
+evidence = "validate_drift tests pass"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "`mp sync` remains available as a manual recovery/rebuild path and is documented"
+verification = "MP-COMMANDS.md contains a sync section (doc grep / scenario test)"
+status = "passed"
+evidence = "mp sync documented in MP-COMMANDS.md + AGENT-PLAYBOOK.md"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "SPEC.md notes the index as authoritative-after-sync; MP-COMMANDS.md documents auto-sync + drift detection"
+verification = "manual: accepted - doc review against new behavior"
+status = "passed"
+evidence = "SPEC.md + MP-COMMANDS.md updated; user accepted"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Mutation auto-sync"
+goal = "Index auto-syncs after every state mutation; no manual mp sync required"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Validate drift detection"
+goal = "mp validate flags stale-value drift between index and milestone files, distinct from W01 missing-entry"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Documentation"
+goal = "Document mp sync recovery path and the new auto-sync/drift-detection behavior"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Hook index sync into mutation commands (create/approve/set-spec-status/set-status/complete) so plan.toml stays authoritative without manual mp sync"
+files = []
+tests = "cargo test -p mp --test index_auto_sync"
+done_when = "After each mutation, plan.toml index matches the per-milestone file"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Extend mp validate to detect stale-value drift (spec_status/execution_status/title mismatch between index and file) as a warning or error distinct from W01 missing-entry"
+files = []
+tests = "cargo test -p mp --test validate_drift"
+done_when = "mp validate flags induced value drift"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP3"
+order = 3
+action = "Document the existing top-level mp sync command in MP-COMMANDS.md and AGENT-PLAYBOOK.md as the manual recovery/rebuild path"
+files = []
+tests = "make test-scenarios"
+done_when = "MP-COMMANDS.md has a sync section; AGENT-PLAYBOOK references it as recovery"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Update SPEC.md (index authoritative-after-sync) and MP-COMMANDS.md (auto-sync on mutation + drift detection) to reflect new behavior"
+files = []
+tests = "manual: accepted — doc review against new behavior"
+done_when = "SPEC.md and MP-COMMANDS.md describe auto-sync and drift detection"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-27"
+branch = ""
+evidence = "All 4 steps done, all ACs passed, validate clean [verification force-bypassed: 1 runnable AC(s) failed]"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

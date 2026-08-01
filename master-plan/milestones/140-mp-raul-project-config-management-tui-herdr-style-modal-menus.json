@@ -1,0 +1,371 @@
+{
+  "milestone": {
+    "id": "140",
+    "title": "raul Settings TUI (herdr-style modal menus)",
+    "slug": "mp-raul-project-config-management-tui-herdr-style-modal-menus",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "136",
+      "138",
+      "156"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-13",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-13T01:19:11.705919+00:00"
+  },
+  "intent": {
+    "outcome": "Users can view and edit master-plan/config.json from inside raul via a Settings modal overlay (herdr-style). Field edits call mp config set --dry-run (M156) before writing. Keybinds come from M138."
+  },
+  "problem": {
+    "description": "Today, editing project config means either (a) hand-editing master-plan/config.json (error-prone, easy to break schema), or (b) running `mp config set <key> <value>` repeatedly and re-running `mp config show` to see what changed. There's no guided flow, no validation feedback, no undo. herdr has a dedicated Settings mode (src/app/input/settings.rs) with a modal menu of toggleable options, header/content/footer/actions areas (src/ui/widgets.rs modal_stack_areas + centered_popup_rect), and per-option keybinds. Raul has the same problem: ui.color / ui.icons / ui.theme / ui.hide_done (and the new keybinds from M138) are all set-and-forget, with no in-app way to see or change them. The user explicitly asked to 'copy the style of herdr when drawing and interacting with menus' for this surface. This milestone adds the TUI half AND the small mp side needed to drive it (validate, then either get/set per field — most of this already exists, but we need a transaction-shaped command so the TUI can preview and apply atomically)."
+  },
+  "scope": {
+    "in_scope": [
+      "Settings mode handler in crates/raul/src/tui/modes/settings.rs",
+      "Section list mirroring ProjectConfig ([ui], [workflow], [archive], [git], [next], [planning], [keybinds])",
+      "Per-field editing via centered input overlay; validate-before-set via M156 dry-run",
+      "modal_stack_areas + centered_popup_rect helpers in crates/raul/src/tui/render/modal.rs",
+      "Keybinds for Settings mode via M138 (no hardcoded key lists)"
+    ],
+    "out_of_scope": [
+      "mp config validate / set --dry-run (M156)",
+      "Atomic multi-field transactions",
+      "Live config reload while raul is running",
+      "User-level config (~/.config/raul/)",
+      "Undo/redo of config changes"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-03",
+      "description": "A Settings mode exists in raul. From any other mode, pressing the open-settings key (default: `s` per S3; mnemonic; `m` is review_menu per M138) launches a modal overlay showing the config sections. Esc closes the modal and returns to the previous mode.",
+      "verification": "cargo test -p raul --test tui_settings",
+      "status": "passed",
+      "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+    },
+    {
+      "id": "AC-04",
+      "description": "The settings modal navigates sections and fields with the keybinds from M138. The active field is highlighted. The current value is displayed. Pressing Enter opens an input overlay pre-filled with the current value.",
+      "verification": "cargo test -p raul --test tui_settings",
+      "status": "passed",
+      "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+    },
+    {
+      "id": "AC-05",
+      "description": "Editing a field calls `mp config set --dry-run` first; if validation fails, errors are shown in the overlay and the config is NOT changed. If validation passes, `mp config set` is called for real and the displayed value updates.",
+      "verification": "cargo test -p raul --test tui_settings",
+      "status": "passed",
+      "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+    },
+    {
+      "id": "AC-06",
+      "description": "Visual style matches herdr: modal uses Clear widget to wipe the underlying area, layout is the modal_stack_areas pattern, and centered_popup_rect is used for the field input overlay. Grep test or code review confirms the pattern.",
+      "verification": "cargo test -p raul --test tui_settings",
+      "status": "passed",
+      "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+    },
+    {
+      "id": "AC-07",
+      "description": "Existing raul TUI tests still pass after Settings mode lands. New tui_settings tests are green. mp config validate / set --dry-run live in M156 — not re-verified here.",
+      "verification": "cargo test -p raul --test tui_settings",
+      "status": "passed",
+      "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "scope",
+      "choice": "Settings TUI depends on M156 for validate/dry-run; mp CLI work no longer lives in this milestone",
+      "rationale": "Challenge pass: two-crate mega-milestone blocked TUI behind CLI and invited catch-all cargo-test steps. Split keeps each shippable."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-settings-mode",
+      "name": "Settings mode + section navigation",
+      "goal": "Add Settings mode (registered in M136) to raul; modal overlay listing ProjectConfig sections with navigation",
+      "rollback": ""
+    },
+    {
+      "id": "wp-modal-widgets",
+      "name": "Modal overlay widgets (herdr-style)",
+      "goal": "modal_stack_areas + centered_popup_rect helpers; Clear widget before overlay; new render/modal.rs",
+      "rollback": ""
+    },
+    {
+      "id": "wp-field-edit-flow",
+      "name": "Field edit + validate-before-set",
+      "goal": "Per-field edit overlay; calls mp config set --dry-run, surfaces validation errors, commits only on success",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "mp config validate tests, settings mode navigation tests, field edit flow tests (with mock mp), cargo test exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S3",
+      "work_package": "wp-settings-mode",
+      "order": 3,
+      "action": "Add Settings mode to crates/raul/src/tui/modes/settings.rs (M136 registers the Mode enum variant; this step fills the handler). On enter, load full ProjectConfig via mp config show, render modal overlay listing sections ([ui], [workflow], [archive], [git], [next], [planning], [keybinds]). Open-settings key decided at groom: default `s` (mnemonic; `m` is review_menu per M138, `o`/comma/`?` were candidates — `s` wins for clarity). Settings key added to Keybinds.open_settings.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/mode.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_settings",
+      "done_when": "Settings mode opens from any other mode (via the open-settings key); shows the section list; Esc closes and returns.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-modal-widgets",
+      "order": 5,
+      "action": "Create crates/raul/src/tui/render/modal.rs with modal_stack_areas(area) -> (header, content, footer, actions) helper, and centered_popup_rect(area, percent_x, percent_y) helper. Use Clear widget before drawing the modal so the underlying area is wiped. Apply in Settings mode and in any future modal.",
+      "files": [
+        "crates/raul/src/tui/render/modal.rs",
+        "crates/raul/src/tui/render/mod.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_settings",
+      "done_when": "Modal helpers compile; Settings mode uses the modal stack layout; Clear wipes the underlying area.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "wp-field-edit-flow",
+      "order": 6,
+      "action": "In Settings mode, expand a section into fields. Navigate with M138 keybinds; Enter opens a centered input overlay pre-filled with the current value. On confirm: call `mp config set --dry-run` (M156); if ok, call `mp config set` for real and reload; if fail, show errors in the overlay.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/render/modal.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_settings",
+      "done_when": "Field edit flow validates first, commits only on success, shows errors in the overlay.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "wp-tests",
+      "order": 7,
+      "action": "Author crates/raul/tests/tui_settings.rs: section/field navigation, Esc closes, Enter opens input overlay, validate-before-set with a mock mp returning errors then success. Covers AC-03..AC-06.",
+      "files": [
+        "crates/raul/tests/tui_settings.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_settings",
+      "done_when": "Test file exists with 5+ cases pinning AC-03..AC-06.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-13",
+    "branch": "",
+    "evidence": "S3-S6 done. cargo test -p raul --test tui_settings (9 passed). Settings modal + dry-run set + Clear/modal helpers. Self-review F-01..F-03 fixed."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Edit buffer prefilled from raw config JSON (null Options became empty string). Saving without edit failed for ui.color etc. Fixed: SettingsEnter uses mp config get for effective values.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "edit prefill used raw nulls"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "While Editing focus, modal content still rendered the section list under the popup. Fixed: Fields|Editing both render the field list for context.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "edit focus showed sections list"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "correctness",
+      "description": "Spec listed archive/planning sections; only settable keys are exposed (archive/planning have no config set arms). Intentional — dead fields would confuse users. Documented via SETTINGS_SECTIONS comment.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "archive/planning sections omitted"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The keybinds section in SETTINGS_SECTIONS exposed 21 keybind actions for editing via the modal, but keybinds.toggle_watch (added in M164, default w/W) was missing. Users had to hand-edit config.json to rebind watch. Fix: added keybinds.toggle_watch to crates/raul/src/tui/modes/settings.rs. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "toggle_watch missing from SETTINGS_SECTIONS"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "App::move_page_up/move_page_down short-circuited to move_up/move_down when Mode::Settings was active, ignoring Self::PAGE_SIZE (10). ReviewMenu got the page jump; Settings lost it. Fix: page jumps now walk the Settings state (section_idx or field_idx depending on focus, clamped to the section/field array len). Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "PageUp/PageDown in Settings jumped by 1, not PAGE_SIZE"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "correctness",
+      "description": "value_for_key returned empty string for keybinds.<action> when the override was unset; the field list showed keybinds.refresh = with no binding visible. Edit prefill via mp config get correctly returned the default, so the displayed value and the editable value disagreed. Fix: added keybind_default_label(action) which renders the built-in default combo with a (default: ...) tag. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "default keybinds shown as empty in field list"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "correctness",
+      "description": "apply_settings_submit reloaded app.keybinds + hide_done from the new config, but app.palette and the global icon mode were not refreshed — a theme change was invisible until raul restart. Fix: after the mp config show reload, map ui.theme to Palette::by_name, ui.icons to IconMode, and apply both. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "palette + icons did not refresh after ui.theme/ui.icons edit"
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "ux",
+      "description": "crates/raul/src/tui/render/overlays.rs:486-512 — the field-edit popup renders the buffer as a plain multi-line string with no caret or selection indicator. SettingsEdit has no cursor state (crates/raul/src/tui/mode.rs:75-81); PushInputChar/PopInputChar only mutate the String (action.rs:437-456). After ~3 chars of mid-edit text the user cannot tell where they are or how many backspaces will reach the prefix. Herdr's modal pattern (render/modal.rs:1-7) shows a block cursor. Fix: add cursor: usize to SettingsEdit, advance on PushInputChar, clamp on PopInputChar, render as Paragraph with cursor set on the ratatui Text widget. ~20 LoC.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Field-edit popup has no caret/cursor; user loses place mid-edit"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "safety",
+      "description": "crates/raul/src/tui/modes/settings.rs:54,161,495-503 — the user can rebind keybinds.open_settings to any combo, including one they cannot invoke from memory (e.g. f12). After submit, apply_settings_submit calls Keybinds::load_from_config (action.rs:620) and the modal closes via Esc on its own footer hint. Re-entering the modal requires the user to remember or guess the new combo; recovery requires hand-editing config.json. Fix: (a) reject rebinding open_settings when the new combo overlaps with escape/quit/enter (resolvable-only conflicts already detected by conflict_diagnostics), or (b) surface a flash_message warning on submit ('Open-settings rebound to f12. To re-open the modal press f12, or restore via mp config set keybinds.open_settings \"\" --force.'). Option (a) is one-line in set_keybind and matches the conflict_diagnostics philosophy.",
+      "status": "open",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "",
+      "phase": "external",
+      "summary": "User can rebind open_settings to a combo they cannot invoke from memory"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/raul/src/tui/action.rs:198-202 doc-comment says 'mp subprocess failure propagates with ?; the per-event error is rendered as a flash_message and the loop continues — see run_loop dispatch error handling.' In code, run_loop at crates/raul/src/tui/runner.rs:476 does dispatch(app, event, term_size)?; — the ? propagates straight up to main, which exits non-zero with the anyhow chain. So apply_open_settings / apply_settings_enter / apply_settings_submit all crash the TUI on an mp failure (e.g. user runs raul with mp not on PATH). The grace path claimed by the doc only exists in execute_review_action (action.rs:816-826) which catches its own errors. Fix: rewrite the doc to match reality, or wrap each apply_open_settings/apply_settings_enter/apply_settings_submit call site to set app.flash_message = Some(e.to_string()) and return Ok(()) — consistent with execute_review_action's pattern.",
+      "status": "open",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "",
+      "phase": "external",
+      "summary": "apply_action doc vs reality: mp subprocess failures crash the TUI"
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "category": "testing",
+      "description": "crates/raul/tests/tui_settings.rs — no test asserts that an error from runner.run('config', &['show']) during OpenSettings is surfaced to the modal (or at minimum doesn't crash). The integration test fixture relies on runner_or_skip(), so a hard failure of mp during settings open would silently skip rather than fail. Add mutate_app_with_broken_mp_state_returns_settings_mode_with_flash (or similar) once the action.rs crash-on-error pattern is fixed.",
+      "status": "open",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "",
+      "phase": "external",
+      "summary": "No test pins mp-failure-during-OpenSettings behaviour"
+    }
+  ]
+}

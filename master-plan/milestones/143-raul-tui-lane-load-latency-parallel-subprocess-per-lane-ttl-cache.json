@@ -1,0 +1,400 @@
+{
+  "milestone": {
+    "id": "143",
+    "title": "raul TUI lane-load latency: parallel subprocess + per-lane TTL cache",
+    "slug": "raul-tui-lane-load-latency-parallel-subprocess-per-lane-ttl-cache",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-09",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "executor",
+    "lifecycle_at": "2026-07-10T11:42:34.454480+00:00"
+  },
+  "intent": {
+    "outcome": "Switching lanes in raul's TUI feels instant — Overview, Milestones, Path, Backlog, and Board all render the new lane's data with no perceptible shell-out delay on a warm plan. A user toggling rapidly with h/l lands on each lane's data within one frame because the second-through-Nth lane visits hit a TTL cache. On cold cache, the Board and Overview lanes (the heaviest) use parallel subprocess fan-out instead of serial calls."
+  },
+  "problem": {
+    "description": "Every lane navigation in raul spawns fresh mp subprocess calls (crates/raul/src/tui/runner.rs::load_data_for_lane → load_dashboard | load_milestones | load_path_data | load_backlog | load_board). Profiling on a real plan shows: mp status ≈ 500ms (runs path_engine::build_lanes, inbox::build_inbox, reviews::pending_review_count, validate_plan, load_annotations — all of which load the plan); mp list milestones --with-findings ≈ 155ms cold / 6ms warm; mp reviews lifecycle ≈ 38ms; mp list milestones ≈ 38ms; mp path lanes ≈ 38ms. Overview lane pays 500ms (status) + 7ms (inbox) ≈ 510ms serial; Board lane pays 155ms + 38ms ≈ 190ms cold. The two subprocess calls in load_board run sequentially when they could fan out. There is no per-lane cache, so a user hammering h/l to peek at lanes pays the full load cost on every visit. The load happens on the TUI's blocking event-loop path, so the user sees a visible stall with no spinner / no feedback. M134 (smoothness) addresses render-side perf but is orthogonal to data loading. The cheapest fix is to (a) parallelize the multi-call loads and (b) add a short-TTL per-lane cache so rapid back-and-forth is instant."
+  },
+  "scope": {
+    "in_scope": [
+      "Parallel subprocess fan-out in load_board: mp list milestones --with-findings and mp reviews lifecycle run concurrently via std::thread::spawn (each thread does its MpRunner::run and sends the parsed Value back through a channel), parsed on the main thread. Eliminates ~38ms serial overhead on every Board visit.",
+      "Parallel subprocess fan-out in load_dashboard: mp status and mp inbox run concurrently. Eliminates the ~7ms inbox serialization on every Overview visit (smaller win, but consistent pattern).",
+      "Per-lane TTL cache (LaneCache in crates/raul/src/tui/lane_cache.rs): keyed by (Lane, plan_dir_mtime_secs) so a plan-file write invalidates automatically; values are the loaded Vec<...> / DashboardSnapshot / Value payloads; default TTL 2000ms, configurable via RAUL_LANE_CACHE_TTL_MS. Lookup returns Some(payload) when fresh, None otherwise.",
+      "load_data_for_lane consults the cache first; on miss, runs the load, stores the result, returns it. Cache writes are fail-silent: a failing load returns Err and does not poison the cache.",
+      "Cache invalidation hook: lane_cache.invalidate(lane) called from every successful mutation path in runner.rs — create_approval_annotation, resolve_annotation, reopen_annotation, approve/block/unblock/request-grooming, plus any other runner.rs::run_raw success. Tests pin that a mutation followed by a lane-switch fetches fresh data.",
+      "Tests in crates/raul/tests/tui_load_cache.rs: parallel join produces both values within the longer-of-the-two latency (not the sum); cache returns the same payload within TTL; cache invalidates on plan-file mtime change; mutation calls invalidate the affected lane.",
+      "Manual verification: time a 10x h/l toggle cycle before and after; expect ≤20% of the cold time on warm-cache hits."
+    ],
+    "out_of_scope": [
+      "Long-lived mp daemon / Unix-socket IPC — separate follow-up milestone. Eliminates Rust process startup cost (the 6ms baseline) but is a real piece of work; defer until we know whether the cache + parallel wins are sufficient.",
+      "Inlining path_engine::build_lanes into raul — would skip the mp status shell-out entirely but couples the two crates and bloats raul's binary. Defer.",
+      "Skipping validate_plan on mp status — a separate optimization on the mp side; track as a tweak if perf still bites after this milestone.",
+      "Render-side perf — M134 (smoothness), M135 (ViewState) cover it.",
+      "Per-call memoization at the MpRunner layer — would also help CLI tools (raul status, raul backlog), but those are out of TUI scope; revisit if it shows up in dogfood."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "load_board runs `mp list milestones --with-findings` and `mp reviews lifecycle` concurrently; total wall-clock time is max(t1, t2) + overhead, not t1 + t2. Verified by a test that injects a 100ms delay into one of the two reads and asserts the load returns in ~100ms (not ~200ms).",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-02",
+      "description": "load_dashboard runs `mp status` and `mp inbox` concurrently; total wall-clock time is max(t1, t2) + overhead. Test injects a 100ms delay into one read and asserts the load returns in ~100ms (not ~200ms).",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-03",
+      "description": "Per-lane TTL cache (LaneCache): a second visit to the same lane within 2000ms returns the cached payload without a subprocess call. Test asserts the second load counts zero MpRunner invocations (counter wrapped around the runner in the test).",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-04",
+      "description": "Plan-file mtime change invalidates the cache for all lanes (cheap mtime check, not a full hash). Test touches the plan file with a no-op write and asserts the next lane-switch re-fetches.",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-05",
+      "description": "Cache invalidation on mutation: every successful write path in runner.rs (create_approval_annotation, resolve_annotation, reopen_annotation, approve/block/unblock, request-grooming) calls lane_cache.invalidate(Overview) and lane_cache.invalidate(Milestones) (and Backlog / Board as appropriate) before returning. Test pins that a mutation followed by a same-lane re-entry sees fresh data, not the pre-mutation snapshot.",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-06",
+      "description": "Cache fail-safety: a failing load (mp subprocess returns non-zero, or JSON parse fails) returns Err to the caller and does NOT cache the failure. Test injects an mp failure and asserts the next lookup is a fresh attempt, not a cached error.",
+      "verification": "manual: cargo test -p raul --test tui_load_cache (file created during execute phase)",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    },
+    {
+      "id": "AC-07",
+      "description": "All existing raul tests still pass: cargo test -p raul exits 0. No regression in lane navigation, list rendering, detail rendering, board view, modal/overlay behavior.",
+      "verification": "cargo test -p raul",
+      "status": "passed",
+      "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "concurrency primitive",
+      "choice": "std::thread::spawn + std::sync::mpsc channel instead of tokio",
+      "rationale": "raul's TUI is synchronous on crossterm; introducing tokio would be a much larger architectural change (M138 already touches dispatch). std::thread is the lightest tool that fits. We only have 2 concurrent calls in flight per lane-load, so a single channel pair per load is fine."
+    },
+    {
+      "area": "cache key",
+      "choice": "(Lane, plan_dir_mtime_secs) not a content hash",
+      "rationale": "mtime is cheap (one stat call) and correct for the failure mode we care about — external writes (the agent editing a milestone, an mp command from another tool) invalidate the cache. A content hash would be slower and unnecessary; mtime is what M113's advisory lock already uses for write detection."
+    },
+    {
+      "area": "TTL value",
+      "choice": "TTL = 2000ms default, configurable via RAUL_LANE_CACHE_TTL_MS env var",
+      "rationale": "Long enough that h/l mashing doesn't re-fetch (one frame is ~16ms, so 2s covers ~125 lane switches); short enough that a user pausing to read sees fresh data when they come back. Configurable so we can tune from dogfood without recompiling."
+    },
+    {
+      "area": "cache location",
+      "choice": "Cache lives in the TUI runner, not the MpRunner",
+      "rationale": "MpRunner is a thin shell-out wrapper; adding caching there would also affect non-TUI callers (raul status, raul backlog CLI), which we don't want to surprise. Keeping the cache at the TUI boundary matches the scope and avoids changing public raul CLI behavior."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-parallel-loads",
+      "name": "Parallel subprocess fan-out",
+      "goal": "load_board and load_dashboard fan out independent mp calls concurrently",
+      "rollback": ""
+    },
+    {
+      "id": "wp-lane-cache",
+      "name": "Per-lane TTL cache + invalidation",
+      "goal": "LaneCache keyed by Lane + plan_dir_mtime with 2000ms TTL",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "Pin all 7 ACs in tui_load_cache.rs",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-parallel-loads",
+      "order": 1,
+      "action": "Add a parallel_pair helper (in MpRunner or in a small raul::tui::io module) that runs two closure-based MpRunner calls concurrently via std::thread::spawn + std::sync::mpsc, and returns both results. Wire it into load_board (mp list milestones --with-findings + mp reviews lifecycle) so the total wall-clock is max(t1,t2)+overhead.",
+      "files": [
+        "crates/raul/src/mp_runner.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_load_cache.rs",
+      "done_when": "load_board returns within max(t1,t2)+overhead instead of t1+t2 serial; tui_load_cache.rs::parallel_board_returns_within_max_latency passes.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-parallel-loads",
+      "order": 2,
+      "action": "Apply parallel_pair to load_dashboard (mp status + mp inbox). Same pattern as S1.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_load_cache.rs",
+      "done_when": "load_dashboard returns within max(t1,t2)+overhead; tui_load_cache.rs::parallel_dashboard_returns_within_max_latency passes.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-lane-cache",
+      "order": 3,
+      "action": "Wire LaneCache into load_data_for_lane in runner.rs: consult cache first; on miss, run load, store result, return; on hit, return cached Value. Add invalidate() calls into successful mutation paths: create_approval_annotation, resolve_annotation, reopen_annotation, approve/block/unblock/request-grooming. Failures do not invalidate.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_load_cache.rs",
+      "done_when": "Rapid h/l toggle within TTL hits cache; mutation followed by same-lane re-entry fetches fresh data; failing mutation does not invalidate.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-lane-cache",
+      "order": 4,
+      "action": "Create crates/raul/src/tui/lane_cache.rs with a LaneCache struct. Fields: per-Lane entry (Option<(Instant, serde_json::Value)>), plan_dir_mtime_secs (i64), ttl (Duration default 2s, override via RAUL_LANE_CACHE_TTL_MS env). Methods: get(lane) -> Option<Value>, put(lane, value), invalidate(lane), invalidate_all(), plan_dir_mtime(path). Cache key implicitly is (Lane, stored plan_dir_mtime_secs); a mtime change on the plan dir triggers invalidate_all on the next get.",
+      "files": [
+        "crates/raul/src/tui/lane_cache.rs"
+      ],
+      "tests": "crates/raul/tests/tui_load_cache.rs",
+      "done_when": "LaneCache compiles; unit tests for get/put/invalidate/is_fresh pass; mtime bump triggers invalidate_all.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "wp-tests",
+      "order": 5,
+      "action": "Tests + closure: pin all 7 ACs in crates/raul/tests/tui_load_cache.rs; ensure cargo test -p raul exits 0; manual before/after timing on a real plan documented in PR description.",
+      "files": [
+        "crates/raul/tests/tui_load_cache.rs"
+      ],
+      "tests": "crates/raul/tests/tui_load_cache.rs",
+      "done_when": "All 7 ACs covered; cargo test -p raul exits 0; timing measurement documented in PR description.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-10",
+    "branch": "",
+    "evidence": "All 5 steps done; all 7 ACs passed with cargo test -p raul --test tui_load_cache (12 passed) and cargo test -p raul (369 passed). Parallel fan-out via parallel_pair in load_board and load_dashboard; per-lane TTL LaneCache keyed by Lane + plan_mtime_secs with 2000ms default TTL (RAUL_LANE_CACHE_TTL_MS override); mutation paths invalidate Overview/Milestones on success. No regressions."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "M143 H1/H2 review: mtime wiring was startup-only; plan-dir lookup hardcoded master-plan/. + cwd fallback. Remediation: exposed MpRunner::mp_dir() and project_root(), added LaneCache::check_and_update_mtime, wired into load_data_for_lane. Re-review H1+H2.",
+      "status": "fixed",
+      "author": "code-review",
+      "fixed_in": "HEAD",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "performance",
+      "description": "M143 M3/L1: LaneCache deep-cloned Value on every hit; App derives Clone. Remediation: Arc<Value> storage, CacheEntry.value shared, hits are O(1) refcount bumps.",
+      "status": "fixed",
+      "author": "code-review",
+      "fixed_in": "",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "M143 M1: parallel_pair swallowed panic payload. Remediation: parallel_pair_thread_error recovers payload and tags with which side panicked.",
+      "status": "fixed",
+      "author": "code-review",
+      "fixed_in": "",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "M143 L2: set_plan_mtime_secs redundant else-branch. Remediation: collapsed to single assignment after invalidate.",
+      "status": "fixed",
+      "author": "code-review",
+      "fixed_in": "",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "Code review (remediation applied): parallel_pair rewrote to use std::thread::scope (Rust 1.63+ stable, edition 2021) instead of raw pointer casts + unsafe to satisfy 'static on thread closures. The new shape drops the unsafe block, removes the JoinHandle recovery helper (scope auto-joins and panics propagate to the existing catch_unwind in tui::runner), and keeps the same fan-out semantics. LaneCache: removed unused Clone + Default derives (Clone would deep-copy the HashMap + arc-clone each Value; Default is built explicitly via with_default_ttl). Humanize test tightened: removed unreachable 'ends_with(s ago)' and '0m ago' assertions; added a positive '5m ago' test for the < 1h bucket.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external",
+      "summary": "M143 review: replace unsafe parallel_pair with thread::scope + tighten humanize test (3 fixes)",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M143",
+        "remediated",
+        "safety"
+      ]
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "invalidate_after_lifecycle_write clears Milestones+Overview only — never Board. Approve/block/unblock leave Board cached. plan_mtime_secs is second granularity; same-second rewrite does not bump mtime. Stale Board possible for up to TTL (~2s). Also invalidate Lane::Board (and Backlog if needed). Location: runner_helpers.rs:491-493",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Lifecycle invalidate skips Board cache",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M143"
+      ]
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "On parallel_pair failure, Board falls back to empty lifecycle + warning, then puts that degraded payload. Transient mp reviews lifecycle failure sticks for TTL. Do not cache when board_warning.is_some(), or use short/zero TTL for degraded loads. Location: runner_helpers.rs:170-190",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Degraded board payload cached on parallel_pair failure",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M143"
+      ]
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "completeness",
+      "description": "Path never uses LaneCache (always shells out). Intent lists Path among warm-cache lanes; AC-03 is per-lane. Mirror Backlog: get/put Lane::Path around reads::path_lanes. Location: runner_helpers.rs:338-342",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Path lane never uses LaneCache",
+      "confidence": "medium",
+      "tags": [
+        "code-review",
+        "M143"
+      ]
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "completeness",
+      "description": "AC-05 lists annotation paths calling invalidate Overview and Milestones; code only clears Overview. Align with AC or tighten AC text. Location: runner_helpers.rs:385-397,442,484",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Annotation invalidate only clears Overview",
+      "confidence": "medium",
+      "tags": [
+        "code-review",
+        "M143"
+      ]
+    }
+  ]
+}

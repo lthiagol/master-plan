@@ -1,0 +1,369 @@
+{
+  "milestone": {
+    "id": "84",
+    "title": "raul TUI review board — Kanban of milestones by review_state, with finding drill-in",
+    "slug": "raul-tui-review-board-kanban-of-milestones-by-review-state-with-finding-drill-in",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "83"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-01",
+    "updated": "2026-07-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0",
+    "executed_by": "opencode-m84-2026-07-01"
+  },
+  "intent": {
+    "outcome": "raul has a separate TUI view (a board, toggled from the lane screen) showing every milestone as a card grouped into columns by review_state (Ready, Executing, Pending Review, Open Findings, Remediated, Verified). A maintainer sees whole-project review-cycle health at a glance: what's done-but-unreviewed, what has open findings, what's remediated. Drill-in on a card opens the milestone detail + its findings thread (open findings highlighted). State changes still flow through mp commands (no in-board editing)."
+  },
+  "problem": {
+    "description": "raul's TUI lanes (M77) are per-milestone-depth: great for inspecting one milestone, blind to cross-project review-cycle health. After M77/M78/M79 the reviewer/maintainer cannot see, in one place, which milestones are executed-but-unreviewed, which carry open findings, or which are remediated — that state lives in mp (made observable by M83) but has no raul visualization. This milestone adds a Kanban-style board view that consumes M83's review_state + findings and renders the whole cycle. It is an additive view (the existing lane screen stays); movement between columns is driven by mp state changes, not drag-and-drop."
+  },
+  "scope": {
+    "in_scope": [
+      "New raul TUI board view, toggled from the lane screen (e.g. key 'b') or via raul --board; existing lane screen remains",
+      "Columns = review_state (Ready, Executing, Pending Review, Open Findings, Remediated, Verified); cards = milestones",
+      "Card shows id, title, executor, and open-findings count; empty columns still labeled",
+      "Enter drills into the milestone detail + findings list (open findings highlighted, with severity)",
+      "Keyboard navigation across columns and cards; board refreshes from live mp data (review_state + findings)",
+      "Responsive layout (columns collapse on narrow terminals)"
+    ],
+    "out_of_scope": [
+      "The review_state / findings data model — owned by M83 (this milestone consumes it)",
+      "Drag-and-drop / in-board state editing (state changes via mp commands, not the TUI)",
+      "Replacing the existing lane screen (additive view)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul TUI has a board view (toggle or raul --board) rendering milestones as cards grouped into review_state columns",
+      "verification": "crates/raul/tests/board_view.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test board_view exit 0"
+    },
+    {
+      "id": "AC-02",
+      "description": "Each card shows id, title, executor, and open-findings count; empty columns are labeled",
+      "verification": "crates/raul/tests/board_view.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test board_view exit 0"
+    },
+    {
+      "id": "AC-03",
+      "description": "Enter on a card drills into the milestone detail + findings thread, with open findings highlighted by severity",
+      "verification": "crates/raul/tests/board_view.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test board_view exit 0"
+    },
+    {
+      "id": "AC-04",
+      "description": "Keyboard navigation moves across columns and cards; the board reflects live mp review_state + findings on refresh",
+      "verification": "crates/raul/tests/board_view.rs",
+      "status": "passed",
+      "evidence": "cargo test -p raul --test board_view exit 0"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Board data & categorization",
+      "goal": "Fetch milestones + categorize into review-lifecycle columns from live mp data.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Board rendering",
+      "goal": "Render columns + cards (id/title/executor/open-findings); responsive layout.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Navigation & drill-in",
+      "goal": "Toggle to board view, keyboard navigation, drill into milestone detail + findings.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Live data & refresh",
+      "goal": "Board reflects live mp review_state + findings on entry/refresh.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Board data layer: define BoardColumn (Ready/Executing/Pending-Review/Open-Findings/Remediated/Verified); fetch milestones via mp (list milestones + reviews lifecycle) and categorize each into a column by execution_status + review_state + open findings",
+      "files": [],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "board data module categorizes all milestones into the 6 columns from live mp data",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Render the board: columns side by side; each card shows id, title, executor, open-findings count; empty columns still labeled; responsive (columns collapse/abbreviate on narrow terminals)",
+      "files": [],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "board renders the 6 columns with cards showing id/title/executor/open-findings; empty columns labeled",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Add board view toggle (key 'b' from the lane screen, or raul --board) + keyboard navigation: Left/Right across columns, Up/Down within a column",
+      "files": [],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "toggle enters/exits the board; arrow keys move across columns and cards",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Enter on a card drills into the milestone detail + findings thread; open findings highlighted by severity; back/Esc returns to the board",
+      "files": [],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "Enter opens milestone detail + findings with open findings severity-highlighted; back returns to board",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP4",
+      "order": 5,
+      "action": "Board reflects live mp review_state + findings on entry and on refresh (re-fetch after returning from drill-in)",
+      "files": [],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "board re-fetches mp data on entry/refresh and reflects current review_state + findings",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5.1",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Render findings section in render_milestone_detail with open findings emphasized by severity (F-08 / AC-03)",
+      "files": [
+        "crates/raul/src/tui/render.rs"
+      ],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "detail view shows findings list with severity styling when milestone has open findings",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5.1.1",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Add raul --board CLI flag and b keybinding to jump to board lane from any TUI screen (F-09 / AC-01)",
+      "files": [
+        "crates/raul/src/cli.rs",
+        "crates/raul/src/tui/event.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "raul -i --board starts on board lane; b key switches to board from other lanes",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5.1.1.1",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Add board render and drill-in integration tests beyond classify_card unit tests (F-10)",
+      "files": [
+        "crates/raul/tests/board_view.rs"
+      ],
+      "tests": "crates/raul/tests/board_view.rs",
+      "done_when": "tests cover board entry, card metadata, drill-in to detail with findings, and refresh",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-02",
+    "branch": "",
+    "evidence": "cargo test -p raul --test board_view exit 0"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Board broken against installed mp (v2.0.0-rc.2): list_milestones_with_findings uses --include findings and reviews_lifecycle uses 'reviews lifecycle' — neither exists in installed release. load_board silently swallows lifecycle failure via .ok(), so Pending Review column is always empty on the shipped product. AC-04 only verified against unreleased mp.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Classification drops milestones in spec_status=review (M80/M81/M82 currently) and planned-without-ready via '_ => continue'. For a review board, the awaiting-approval queue vanishes silently. No logging.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Drill-in (Lane::Board Enter handler) permanently switches active_lane to Milestones; go_back() only walks ContentState and never restores the lane. AC-03 'back/Esc returns to the board' is not met.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "No tests exercise load_board classification state machine (the core logic). All 7 board_view tests cover pure App state. Extract classify_card() -> usize and table-test it.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "Card render builds a single Line with an embedded \\n inside one Span for the executor row; ratatui Line is one display row so the \\n doesn't create a second row. card_height=3 layout reserves 3 rows but only 1 renders. Build Text from multiple Lines instead.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Board refresh (r key / load_board) resets board_selected_col and board_selected_card to 0, losing cursor position on a 80+ milestone board. Clamp to new bounds instead of resetting.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "render_board scroll-offset math is opaque: 'max_visible = inner.height.saturating_sub(1) / card_height' then 'selected.saturating_sub(max_visible.min(selected))'. Convoluted; grows scroll linearly with selection rather than keeping card in view. Add a comment or simplify.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "da9dea9",
+      "created": "2026-07-01",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-08",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-03: milestone detail drill-in does not render findings thread or severity highlighting; render_milestone_detail only shows steps/ACs.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "62f373f",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-09",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "AC-01: spec promises raul --board CLI flag and b key toggle; board is sidebar-lane only today.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "62f373f",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    },
+    {
+      "id": "F-10",
+      "severity": "medium",
+      "category": "testing",
+      "description": "board_view.rs tests classify_card/navigation only; no render or drill-in integration tests for board ACs.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "62f373f",
+      "created": "2026-07-02",
+      "resolved": "2026-07-02"
+    }
+  ]
+}

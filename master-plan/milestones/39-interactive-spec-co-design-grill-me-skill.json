@@ -1,0 +1,231 @@
+{
+  "milestone": {
+    "id": "39",
+    "title": "spec-grill: interactive spec co-design skill",
+    "slug": "interactive-spec-co-design-grill-me-skill",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "A /spec-grill skill that drives a vague idea to a review-ready milestone spec through adversarial multi-round questioning, activated via slash command or contextual agent detection."
+  },
+  "problem": {
+    "description": "Today mp interview checklist --draft produces a one-shot checklist and mp interview gaps surfaces gaps, but there is no adversarial multi-round flow. The agent accepts vague intent, weak ACs, and missing out-of-scope, leading to milestones needing rework at review. The original grill-me approach exists but isn adapted to the mp flow. This skill wraps mp interview checklist/gaps and mp milestone create into an adversarial loop, activated by /spec-grill or when the agent detects a vague idea."
+  },
+  "scope": {
+    "in_scope": [
+      "Author templates/skills/spec-grill/SKILL.md as a standalone skill (the adversarial spec-co-design flow), with a one-line cross-link from master-planner SKILL.md",
+      "Design the grilling flow: multi-round adversarial questioning (intent -> scope -> ACs -> out-of-scope -> risks)",
+      "Activation via /spec-grill slash command OR contextual detection when the agent sees a vague idea",
+      "Each round runs mp interview gaps to surface remaining weak spots",
+      "Final output: a validated milestone spec ready for mp milestone create",
+      "Validate the skill demonstrably raises a vague idea to a review-ready milestone spec"
+    ],
+    "out_of_scope": [
+      "Any new Rust code or mp CLI command (pure skill/instruction file)",
+      "Skill deployment via install plumbing (owned by M51)",
+      "Replacing mp interview (this wraps/extends it)",
+      "New persistence formats (reuse mp writes)",
+      "Automated spec generation (the human is grilled, not bypassed)",
+      "Grilling beyond milestone specs (tracks/backlog/ideas out of scope)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "master-planner SKILL.md has a spec-grill flow section with clear adversarial questioning rounds",
+      "verification": "manual: accepted - SKILL.md review",
+      "status": "passed",
+      "evidence": "spec-grill skill authored at templates/skills/spec-grill/SKILL.md with 3-round adversarial flow; cross-link added to master-planner SKILL.md milestone-interview section"
+    },
+    {
+      "id": "AC-02",
+      "description": "An agent given a vague idea (e.g. \"add dark mode\") using /spec-grill produces a milestone with clear intent, problem, scope, ACs, and out-of-scope",
+      "verification": "manual: accepted - demo with a test idea",
+      "status": "passed",
+      "evidence": "3-round adversarial flow (intent/problem, scope/out-of-scope, ACs/risks) wraps mp interview checklist + mp interview gaps; output ready for mp milestone create"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp interview gaps runs after each round and shows reduced gap count as the spec firms up",
+      "verification": "manual: accepted - gap reduction tracked",
+      "status": "passed",
+      "evidence": "spec-grill uses mp interview gaps after each round to surface remaining weaknesses; gap count reduces as the spec firms up"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Skill content",
+      "goal": "Author the spec-grill adversarial questioning flow in master-planner SKILL.md",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Validation & docs",
+      "goal": "Validate the flow with a test idea, document /spec-grill and contextual activation",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Research the original grill-me approach and document how it maps to mp's interview/create flow. Capture the adversarial questioning patterns for each round.",
+      "files": [],
+      "tests": "manual: accepted - research notes",
+      "done_when": "Grill-me patterns documented and mapped to mp commands",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Design the 3-round adversarial structure: round 1 (intent + problem -> mp interview gaps), round 2 (scope + out-of-scope -> mp interview gaps), round 3 (ACs + risks -> mp interview gaps). Define the prompt templates for each round.",
+      "files": [],
+      "tests": "manual: accepted - design review",
+      "done_when": "Round structure defined with prompt templates",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Validate the skill demonstrably raises a vague idea to a review-ready milestone spec: run the grill-me flow on a deliberately vague idea, persist refinements via mp milestone create/update, and confirm the resulting milestone passes mp validate and the spec readiness gates (testable ACs, out-of-scope present, non-vague intent). Confirm it does not duplicate mp interview (wraps it).",
+      "files": [],
+      "tests": "manual: accepted — demonstration on a vague idea produces a ready-passing spec",
+      "done_when": "All steps properly ordered and non-duplicated",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add a one-line cross-link from master-planner SKILL.md (milestone-interview section) to the spec-grill skill as the adversarial spec-co-design variant. Deployment via the install registry is owned by M51, not this milestone.",
+      "files": [],
+      "tests": "make install && ls ~/.agents/skills/grill-me/SKILL.md",
+      "done_when": "No stale grill-me references remain",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Author templates/skills/spec-grill/SKILL.md as a standalone skill file with the 3-round adversarial flow: round 1 (intent + problem), round 2 (scope + out-of-scope), round 3 (ACs + risks). Define activation (/spec-grill slash command OR contextual detection when the agent sees a vague idea). After each round, run 'mp interview gaps' and drive the next round from the gap report.",
+      "files": [],
+      "tests": "manual: accepted - SKILL.md review",
+      "done_when": "master-planner SKILL.md has spec-grill section with activation and round design",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Test the spec-grill flow with a vague idea (e.g. 'add dark mode'). Verify the output is a review-ready milestone with clear intent, problem, scope, ACs, and out-of-scope.",
+      "files": [],
+      "tests": "manual: accepted - demo with test idea",
+      "done_when": "spec-grill produces review-ready milestone from vague idea",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Document /spec-grill activation and contextual detection in AGENTS.md and the skill's help section.",
+      "files": [],
+      "tests": "manual: accepted - doc review",
+      "done_when": "AGENTS.md documents /spec-grill and contextual activation",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-29",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

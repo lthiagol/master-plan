@@ -4,8 +4,11 @@
 # OS files
 **/.DS_Store
 
-# mp CLI runtime state (not part of the repo)
-.mp-scratch/
+# mp CLI runtime state (not part of the repo).
+# The Codeberg .gitignore had 'master-plan/.mp/' (wrong path) — the actual
+# runtime state lives at top-level .mp/, which the new GitHub repo excludes.
+/.mp/
+/.mp-scratch/
 master-plan/.mp/
 master-plan/.mp-write.lock
 .mp-project-write.lock
@@ -13,8 +16,7 @@ master-plan/.mp-write.lock
 # Session tooling state (not part of the repo)
 .pi-subagents/
 .zcode/
-docs-old/code-review/
 .scratch/
 
-# Empty install stub dir (rsync artifact)
+# Empty install stub dir (rsync artifact, not user content)
 _install_stub/

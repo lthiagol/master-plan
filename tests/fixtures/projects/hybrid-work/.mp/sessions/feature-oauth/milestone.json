@@ -1,0 +1,105 @@
+{
+  "milestone": {
+    "id": "03",
+    "title": "OAuth login (session)",
+    "slug": "oauth-login-session",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "depends_on": [],
+    "priority": "high",
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "greenfield",
+    "scope": "session",
+    "session_id": "feature-oauth",
+    "created": "2026-06-17",
+    "updated": "2026-06-17",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Internal users can sign in with Google OAuth on the login page."
+  },
+  "problem": {
+    "description": "Password-only auth blocks SSO rollout for internal tools."
+  },
+  "scope": {
+    "in_scope": [
+      "Google OAuth redirect",
+      "Callback route",
+      "Link to existing user"
+    ],
+    "out_of_scope": [
+      "GitHub OAuth",
+      "Customer-facing SSO"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "OAuth callback creates valid session",
+      "verification": "cargo test oauth_callback",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Invalid state parameter rejected",
+      "verification": "cargo test oauth_csrf",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [],
+  "open_questions": [],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "OAuth flow",
+      "goal": "Google OAuth on login page",
+      "rollback": "Revert feature/oauth-login branch",
+      "steps": []
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add OAuth config and Google client",
+      "files": ["src/auth/oauth.rs"],
+      "tests": "cargo test oauth_config",
+      "done_when": "Config loads in test",
+      "status": "pending",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement callback and session linking",
+      "files": ["src/api/login.rs"],
+      "tests": "cargo test oauth_callback",
+      "done_when": "Callback test passes",
+      "status": "pending",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "evidence": "",
+    "branch": ""
+  },
+  "findings": []
+}

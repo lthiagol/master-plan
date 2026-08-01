@@ -1,0 +1,16 @@
+[package]
+name = "mp-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared domain types for the Master Plan toolkit — pure data, no I/O"
+
+[lib]
+name = "mp_model"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

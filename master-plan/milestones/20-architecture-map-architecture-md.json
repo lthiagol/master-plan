@@ -1,0 +1,330 @@
+{
+  "milestone": {
+    "id": "20",
+    "title": "Architecture map (ARCHITECTURE.md)",
+    "slug": "architecture-map-architecture-md",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "17",
+      "18",
+      "21",
+      "22"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-21",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Agents and humans can orient in the mp codebase in seconds via a single root-level ARCHITECTURE.md instead of spawning explore agents and reading 10+ files per session."
+  },
+  "problem": {
+    "description": "The first action of any coding session on this repo is expensive code exploration: 46 src modules, 19 test files, 12.6k LOC, no single doc mapping the structure. Every agent re-derives the same mental model (module responsibilities, layering main->cli->app->commands->domain->store->schema, persistence model, ID conventions, test harness, entry-point recipes for common tasks like 'add a new command' or 'add a new TOML resource'). This is repeatable overhead that a curated architecture doc eliminates."
+  },
+  "scope": {
+    "in_scope": [
+      "Create ARCHITECTURE.md at repo root with sections: module map, layering, key types, persistence model, test structure, entry-point recipes, conventions, cross-references, last-updated marker",
+      "Add reference to ARCHITECTURE.md from root AGENTS.md pointers section",
+      "Add a staleness guard: make design-check target that diffs module list in ARCHITECTURE.md against actual src/ structure (or mp doctor check)",
+      "Document the maintenance rule: update ARCHITECTURE.md on any milestone that changes code structure"
+    ],
+    "out_of_scope": [
+      "Duplicating docs/AGENT-READINESS.md command readiness (reference it instead)",
+      "Duplicating docs/MP-COMMANDS.md command reference (reference it instead)",
+      "Duplicating docs/STORAGE.md or docs/SPEC.md deep detail (reference them)",
+      "Changing the code structure itself (M17's job)",
+      "Full ADR history (docs/DECISIONS.md covers that)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ARCHITECTURE.md exists at repo root",
+      "verification": "test -f ARCHITECTURE.md",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-02",
+      "description": "ARCHITECTURE.md covers all 9 required sections",
+      "verification": "manual: section heading review — sections 1-9 present",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-03",
+      "description": "Module map lists every src/ module matching post-M17 structure",
+      "verification": "manual: verified by make design-check (root modules match src/)",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-04",
+      "description": "Root AGENTS.md references ARCHITECTURE.md",
+      "verification": "grep -q ARCHITECTURE.md AGENTS.md",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-05",
+      "description": "make design-check flags staleness non-zero when ARCHITECTURE.md module list drifts from src/",
+      "verification": "manual: design-check on a deliberately-stale module (brownfield removed) returns non-zero; real check passes (just verified)",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-06",
+      "description": "Entry-point recipes cover: add CLI command, add TOML resource, add validation gate, add entity renderer, add scenario test",
+      "verification": "manual: 5 recipes present in ARCHITECTURE.md section 6",
+      "status": "passed",
+      "evidence": "verified this session"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp validate green",
+      "verification": "manual: mp validate ok=true (verified)",
+      "status": "passed",
+      "evidence": "verified this session"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "ARCHITECTURE.md core",
+      "goal": "Write the 9-section architecture map",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Wiring & references",
+      "goal": "Reference from AGENTS.md, cross-refs",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Staleness guard",
+      "goal": "make design-check or mp doctor check",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Write ARCHITECTURE.md section 1 (Module map) at repo root: enumerate every crates/mp/src/*.rs and crates/mp/src/commands/*.rs with a one-line description of its responsibility. Match the post-M17 structure. Group by concern (entry, dispatch, commands, domain, engine, persistence, view, shared, support).",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 1 lists every src/ module (count matches ls crates/mp/src/**/*.rs); each has a one-line description",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Write ARCHITECTURE.md section 2 (Layering): ASCII diagram showing main.rs -> cli.rs (parse) -> app.rs (dispatch) -> commands/* (handlers) -> domain modules -> store.rs (TOML) -> schema.rs (enforcement); render.rs as view layer; paths.rs/track_kind.rs/MilestoneId as shared types. Note the rule that app.rs must stay thin (<=400 lines per M17 AC).",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 2 has the layering diagram and the app.rs-thin rule",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Write ARCHITECTURE.md section 3 (Key types): PlanContext (paths.rs), MilestoneFile + Intent/Problem/Scope/Step/WorkPackage/AcceptanceCriterion sub-structs (model.rs), TrackKind enum, MilestoneId newtype, TomlResource trait, ValidationIssue. One-line per type with file location.",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 3 lists all 6 key types with one-line descriptions and file locations",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Write ARCHITECTURE.md section 4 (Persistence model): master-plan/ layout (plan.toml, milestones/*.toml, tracks/*.toml, backlog.toml, ideas.toml, brief.toml, decisions.toml, sessions/, archive/), TOML I/O via store.rs, schema enforcement on write, ID formats (M##, S##, WP##, BF-##, TW-##, B-##, Q-##, AC-##, F-##, D-###). Reference docs/STORAGE.md for deeper detail.",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 4 covers master-plan/ layout, store.rs role, schema enforcement, all 9 ID formats",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Write ARCHITECTURE.md section 5 (Test structure): integration tests in tests/ shell out to compiled binary via tests/common/mod.rs TestEnv (set MP_HOME=repo_root, run(args)->Output, run_json); scenario runner via tests/scenarios_runner.rs walks tests/scenarios/; inline unit tests rare (only in model.rs/path_engine.rs/schema.rs/step.rs). Note cargo test -p mp + make adopt-check + make test-fixtures as the test commands.",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 5 covers TestEnv, scenario runner, unit test locations, the 3 test commands",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Write ARCHITECTURE.md section 6 (Entry-point recipes) - the highest-leverage section for unsupervised work. Cover 5 recipes with exact file paths and the pattern to follow: (1) Add a new CLI command: edit cli.rs (clap enum), create commands/<name>.rs (handler delegating to domain module), wire in app.rs dispatch, add tests/<feature>.rs. (2) Add a new TOML resource: define type in model.rs, impl TomlResource trait in store.rs, add load/save generics, add cli command. (3) Add a validation gate: add rule to validate.rs, reference in the relevant gate function (validate_milestone_review/ready/etc). (4) Add an entity renderer: add render_<entity> to render.rs, delegate from commands/show.rs. (5) Add a scenario test: add tests/scenarios/<name>.toml manifest, scenarios_runner picks it up.",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Section 6 has 5 recipes each with exact file paths and the pattern; recipes cover add CLI command, add TOML resource, add validation gate, add entity renderer, add scenario test",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Write ARCHITECTURE.md sections 7-9: (7) Conventions - emit/ok response shape ({ok:true, <entity>:...}), output formats (human/json/raw/markdown/pr-body), mp validate gates (G1-G13/T1-T2/W01-W10/E00-E01), spec lifecycle (draft->review->ready->in-progress->done->verified), two-zone plan/code rule with pointer to master-plan/AGENTS.md. (8) Cross-references - AGENTS.md, master-plan/AGENTS.md, docs/AGENT-READINESS.md, docs/MP-COMMANDS.md, docs/STORAGE.md, docs/SPEC.md, docs/AGENT-PLAYBOOK.md, docs/DECISIONS.md. (9) Last-updated marker - 'Last updated: M20 (YYYY-MM-DD) - post-M17/M18 structure' line at top.",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Sections 7, 8, 9 all present; cross-refs list 8 files; last-updated marker at top references M20",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Add a reference to ARCHITECTURE.md in root AGENTS.md pointers section: 'Architecture map: ARCHITECTURE.md - module map, layering, entry-point recipes for fast orientation'. Place it prominently near the top of the pointers/intro so agents read it at session start. Verify no other AGENTS.md changes needed (master-plan/AGENTS.md may also get a one-line pointer in its references section).",
+      "files": [
+        "AGENTS.md",
+        "master-plan/AGENTS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "grep ARCHITECTURE.md AGENTS.md returns a match in the pointers section",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Add a staleness guard: create a make design-check target in Makefile that (a) extracts the module list from ARCHITECTURE.md section 1, (b) lists actual crates/mp/src/**/*.rs files, (c) diffs them and exits non-zero if they diverge. Document the target in ARCHITECTURE.md conventions section and root AGENTS.md dev commands. Alternative: add an mp doctor check that warns when ARCHITECTURE.md module count != src/ module count (pick whichever is simpler; prefer make target to avoid coupling mp CLI to ARCHITECTURE.md).",
+      "files": [
+        "Makefile",
+        "ARCHITECTURE.md",
+        "AGENTS.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "make design-check exits 0 on a synced ARCHITECTURE.md; deliberately add a fake module to ARCHITECTURE.md and confirm make design-check exits non-zero",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Final M20 gate: run mp validate (green); run make design-check (green); verify all 7 ACs by running their verification commands: test -f ARCHITECTURE.md; section heading review (9 sections); module count matches ls; grep ARCHITECTURE.md AGENTS.md; recipe review (5 recipes); make design-check on a deliberately-staled file returns non-zero. This is the M20 completion step.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "mp validate green AND make design-check green AND all 7 AC verification checks pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-25",
+    "branch": "",
+    "evidence": "Architecture map: ARCHITECTURE.md documents crate structure and module relationships."
+  }
+}

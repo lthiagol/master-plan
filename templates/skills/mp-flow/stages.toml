@@ -1,0 +1,123 @@
+# mp-flow stages manifest
+#
+# Canonical list of stages in the mp-flow lifecycle. The mp-flow SKILL.md
+# must have a `## <name>` section per stage, and each section must list the
+# `mp` commands named here. The `make mp-flow-lint` target parses this
+# manifest and asserts the SKILL.md matches.
+#
+# This file is the source of truth for stage ordering, naming, and
+# per-stage `mp` commands. The role-binding table here is mirrored in the
+# SKILL.md role-binding section; if the two diverge, the SKILL.md is
+# considered out of date (the lint fails).
+#
+# Schema:
+#   [[stages]]
+#   number = 1..12 (the stage number)
+#   name = "<heading>" (the `## <name>` heading in SKILL.md)
+#   role = "coordinator" | "runner"
+#   summary = "<one-line summary>"
+#   commands = ["<mp command>", ...] (the `mp` commands the agent runs)
+
+[[stages]]
+number = 1
+name = "Draft"
+role = "coordinator"
+summary = "Write the milestone spec (intent, problem, scope, AC, design_decisions)."
+commands = ["mp interview checklist", "mp milestone create --json @-"]
+
+[[stages]]
+number = 2
+name = "Groom"
+role = "coordinator"
+summary = "Refine the spec, decompose into work packages and steps."
+commands = ["mp milestone groom", "mp milestone challenge start", "mp milestone decompose"]
+
+[[stages]]
+number = 3
+name = "Specify"
+role = "coordinator"
+summary = "Lock the spec for execution; transition to `spec_status: ready`."
+commands = ["mp milestone set-spec-status <id> ready"]
+
+[[stages]]
+number = 4
+name = "Approve"
+role = "coordinator"
+summary = "Pass the G1-G4 gates; transition to `lifecycle: approved`."
+commands = ["mp milestone approve <id>"]
+
+[[stages]]
+number = 5
+name = "Claim & execute"
+role = "runner"
+summary = "Claim the milestone and execute the steps."
+commands = ["mp milestone set-status <id> in-progress", "mp milestone step done <id> <step-id>"]
+
+[[stages]]
+number = 6
+name = "Self-review"
+role = "runner"
+summary = "Round-1 self-review (per the author-not-only-reviewer discipline + mp-runner executing.md self-review step)."
+commands = ["mp reviews finding add <id> --phase self --description \"...\""]
+
+[[stages]]
+number = 7
+name = "Complete"
+role = "runner"
+summary = "Mark the milestone complete; lifecycle transitions to `complete` (terminal)."
+commands = ["mp milestone complete <id> --evidence \"...\""]
+
+[[stages]]
+number = 8
+name = "External review"
+role = "coordinator"
+summary = "Round-2 external review; file findings for the runner to remediate."
+commands = ["mp reviews finding list <id>", "mp reviews finding add <id> --phase external --description \"...\""]
+
+[[stages]]
+number = 9
+name = "Remediate"
+role = "runner"
+summary = "Patch the code per the coordinator's findings."
+commands = ["mp reviews finding resolve <id> <finding-id>"]
+
+[[stages]]
+number = 10
+name = "Re-review"
+role = "coordinator"
+summary = "Verify the remediation; close with reviews pass (terminal lifecycle); or loop back to stage 9."
+commands = ["mp milestone verify <id>", "mp reviews pass <id> --verdict ok --reviewer <who>"]
+
+[[stages]]
+number = 11
+name = "Document"
+role = "coordinator"
+summary = "Capture the lesson (if any) and write the closing note."
+commands = ["mp note add --title \"...\" --body @-"]
+
+[[stages]]
+number = 12
+name = "Hand off"
+role = "coordinator"
+summary = "Close out the milestone and hand off to the next work (next milestone / archive)."
+commands = ["git commit -m \"...\""]
+
+# Review loop annotation: stages 8 -> 9 -> 10 iterate until stage 10 is
+# clean. The loop is documented here so the SKILL.md reviewer-loop
+# section has a single source of truth.
+
+[review_loop]
+from = 8
+to = 9
+exit = 10
+description = "Stages 8 (External review), 9 (Remediate), and 10 (Re-review) form a loop: if stage 10 finds new findings, the cycle returns to stage 9. A clean stage 10 advances to stage 11 (Document)."
+
+# Role-binding summary. Mirrors the role-binding table in the SKILL.md.
+
+[role_binding.coordinator]
+stages = [1, 2, 3, 4, 8, 10, 11, 12]
+sub_skills = ["mp-flow", "mp-coordinator", "spec-grill"]
+
+[role_binding.runner]
+stages = [5, 6, 7, 9]
+sub_skills = ["mp-flow", "mp-runner"]

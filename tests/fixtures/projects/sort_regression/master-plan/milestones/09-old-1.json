@@ -1,0 +1,52 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "old-1 done",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "manual: fixture"
+    }
+  ],
+  "intent": {
+    "outcome": "Old milestone 09 (below the 100 boundary)."
+  },
+  "milestone": {
+    "created": "2026-07-04",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "09",
+    "risk": "low",
+    "slug": "old-1",
+    "spec_status": "verified",
+    "title": "Old 09",
+    "updated": "2026-07-04"
+  },
+  "problem": {
+    "description": "Pre-100 milestone."
+  },
+  "scope": {
+    "in_scope": ["old-1"],
+    "out_of_scope": []
+  },
+  "steps": [
+    {
+      "action": "Do old-1",
+      "covers_ac": ["AC-01"],
+      "done_when": "done",
+      "id": "S1",
+      "status": "done",
+      "tests": "manual: fixture",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Bootstrap old-1",
+      "id": "WP1",
+      "name": "WP1",
+      "rollback": "n/a"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "m67-step-add",
+  "phase": "implemented",
+  "description": "step add writes a step on ready milestone with work package",
+  "fixture": "projects/minimal-ready",
+  "command": [
+    "milestone",
+    "step",
+    "add",
+    "02",
+    "--wp",
+    "WP1",
+    "--action",
+    "Add golden write step",
+    "--tests",
+    "echo ok",
+    "--format",
+    "json"
+  ],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_contains": "\"id\": \"S1\"",
+    "fs_unchanged": false
+  }
+}

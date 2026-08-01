@@ -1,0 +1,230 @@
+{
+  "milestone": {
+    "id": "112",
+    "title": "Read & inspection surface — backlog list, schema-derived --fields, projection take/select/sort, milestone log",
+    "slug": "read-inspection-surface-backlog-list-schema-derived-fields-projection-take-select-sort-milestone-log",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "111"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.1.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, agents stop reaching for `python3 -c 'import json...'` and `jq` to extract fields from mp JSON output. `mp backlog list` exists with filter flags; `mp show milestone --fields` accepts every field the schema accepts on write (no more 'unknown path: follow_ups'); `mp list milestones` and `mp list steps` support `--take N`, `--select 'a.b'`, and `--sort 'field'`; and `mp milestone log <id>` surfaces created/updated history without requiring `git log`."
+  },
+  "problem": {
+    "description": "Four entries in the 2026-07-03/04/05 dogfood log show agents routinely bypassing mp's read surface because it cannot express the shapes they need. (1) `mp backlog list` doesn't exist — only add/show/resolve/promote do — so M106's S11 test command referencing it was broken in production (entry: 2026-07-05 `mp backlog list subcommand doesn't exist`; M106's S11 test was patched to a jq+grep workaround in commit 0eb01b6, but the underlying UX gap remains). (2) `mp show milestone <id> --fields follow_ups` returns `unknown path: 'follow_ups'` because the --fields allowlist is hardcoded rather than schema-derived (entry: 2026-07-03 `mp show milestone --fields follow_ups returns unknown path`); the array is accepted on write but invisible on read. (3) Agents invoked `python3 -c \"import json,sys; ...\"` 20+ times across M100–M104 sessions to extract slices and leaf projections — `mp list milestones | jq '.milestones[].id'`-style shapes — because `--fields` cannot express array slices, leaf projections over arrays, or sort (entry: 2026-07-04 `python3 -c used 20+ times to extract specific fields`). (4) `git log --oneline` was used to read milestone change history because `mp` exposes no history command (entry: 2026-07-04 `git log --oneline used instead of mp plan/history commands`). Each forces the agent out of mp's contract and into ad-hoc shell."
+  },
+  "scope": {
+    "in_scope": [
+      "Add `mp backlog list [--source=...] [--status=...] [--priority=...] [--limit=N]` to crates/mp/src/commands/backlog.rs. Mirrors the filter semantics already present in `mp show milestone --filter`. Re-enables the original M106 S11 test path (currently worked around with jq+grep). Pinned by a test listing backlog entries with and without filters.",
+      "Make `mp show milestone --fields` and `mp list milestones --fields` allowlist schema-derived rather than hardcoded, so any field accepted on write (follow_ups, change_kind, target_version, etc.) is readable. Pinned by a test asserting `--fields follow_ups` returns the array on a milestone that has follow-ups.",
+      "Add `--take N` (slice first N items), `--select 'a.b'` (leaf projection over arrays), and `--sort 'field'` to `mp list milestones` and `mp list steps`. Subset of jq semantics; covers the 20+ python3 workarounds enumerated in the dogfood log. Pinned by tests covering each flag.",
+      "Add `mp milestone log <id>`: emits created/updated timestamps from the on-disk milestone document plus a read-only `git log --oneline -- <milestone-file-path>` of the file's commit history. No auto-sync, no writes. Pinned by a test asserting the command emits the milestone's created field and at least one git-log line."
+    ],
+    "out_of_scope": [
+      "Auto-sync preview tooling — wontfix per the 2026-07-04 `git checkout plan.json` entry's own resolution (use `mp plan show --plan-json` to preview).",
+      "Git tag management CLI — wontfix per the 2026-07-03 `No mp command for git tag management` entry (git state is intentionally out of mp's scope).",
+      "Fragment-CLI ergonomics (evidence flag, ac-add append, etc.) — M111.",
+      "Plan-IO locking and --dry-run — M113.",
+      "Direct cargo / make-target ergonomics — wontfix agent-discipline per the 2026-07-04 cargo entry.",
+      "find_mp() precedence fix — already tracked in M104 AC-03."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp backlog list` emits all backlog items as JSON. `--source=X`, `--status=X`, `--priority=X`, `--limit=N` each filter/slice correctly. Empty backlog returns `{items: []}`. The M106 S11 test path (jq+grep workaround in commit 0eb01b6) is no longer the only way to list source-filtered entries.",
+      "verification": "cargo test -p mp --test backlog_list",
+      "status": "passed",
+      "evidence": "AC-01 (mp backlog list) verified: cargo test -p mp --test backlog_list. 6/6 cases green: returns_items_object_with_expected_shape, filters_by_source, filters_by_priority_and_status, limit_slices_first_n, combined_filters, plus the empty-backlog case returning {items: []}. Manual probe: mp backlog list --source planning returns 100+ items; --limit 3 returns 3. Re-enables the original M106 S11 test path that was patched to jq+grep in 0eb01b6."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp show milestone <id> --fields follow_ups` returns the follow_ups array on a milestone that has follow-ups (no 'unknown path' error). Schema-derived allowlist covers every top-level field the milestone schema accepts on write. Pinned by a test on a fixture with follow_ups populated.",
+      "verification": "cargo test -p mp --test fields_schema_derived",
+      "status": "passed",
+      "evidence": "AC-02 (schema-derived --fields) verified: cargo test -p mp --test fields_schema_derived. Test pins that mp show milestone <id> --fields follow_ups returns the follow_ups array on a fixture with follow-ups populated (no 'unknown path' error). Manual probe: mp show milestone 112 --fields 'acceptance_criteria[AC-02].verification' returns the verification string for AC-02 — schema-derived allowlist covers all top-level write-accepted fields."
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp list milestones --take 5` returns at most 5 milestones. `--select 'milestone.id'` returns only the id leaf over the array. `--sort 'milestone.id'` orders by the dotted field. Combinations work (`--sort milestone.priority --take 3`).",
+      "verification": "cargo test -p mp --test list_projection_flags",
+      "status": "passed",
+      "evidence": "AC-03 (--take/--select/--sort) verified: cargo test -p mp --test list_projection_flags. Test exercises --take 5, --select milestone.id, --sort milestone.id, and the combination --sort milestone.priority --take 3 on mp list milestones; each returns the expected shape. Manual probe: mp list milestones --select milestone.id --sort milestone.id | jq '.[]' returns 3 items (the 3 execution-lane milestones)."
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp milestone log <id>` emits a JSON object with the milestone's created/updated fields and a `commits` array (>=0 entries) of `git log --oneline -- <path>` lines. The command makes no on-disk changes.",
+      "verification": "cargo test -p mp --test milestone_log",
+      "status": "passed",
+      "evidence": "AC-04 (mp milestone log) verified: cargo test -p mp --test milestone_log. Test asserts created field present, commits is an array (>=0 entries), command exits 0 with no on-disk change. Manual probe: mp milestone log 112 emits {created: '2026-07-05', updated: '2026-07-05', commits: [...]} — the commits array contains the real git log of master-plan/milestones/112-*.json."
+    },
+    {
+      "id": "AC-05",
+      "description": "Closure: `cargo test -p mp && mp validate --summary` exits 0.",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "AC-05 (closure) verified: cargo test -p mp && mp validate --summary exits 0. Pre-close-out validate was 14 G6 errors + 1 W44; post-close-out is 0 errors / 0 warnings. Scope narrowed from cargo test -p mp -p raul (broad, multi-crate) to single-crate per §3.2.1 + L53. M112's affected-crate set is {mp}; verifying only -p mp is correct."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "backlog list",
+      "goal": "Add mp backlog list [--source] [--status] [--priority] [--limit] mirroring mp show filter semantics.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "schema-derived fields",
+      "goal": "Make --fields allowlist schema-derived so any field accepted on write (follow_ups, etc.) is readable.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "projection flags",
+      "goal": "Add --take N, --select 'a.b', --sort 'field' to mp list milestones and mp list steps.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "milestone log",
+      "goal": "Add mp milestone log <id>: emits created/updated + read-only git log of the milestone file. No writes.",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "Closure",
+      "goal": "cargo test -p mp && mp validate --summary green.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add mp backlog list [--source=...] [--status=...] [--priority=...] [--limit=N] to crates/mp/src/commands/backlog.rs. Wire into the BacklogCmd enum in cli.rs. Output is JSON: {items: [...]}. Empty backlog returns {items: []}. Filters are AND-combined; --limit slices the first N.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/backlog.rs"
+      ],
+      "tests": "cargo test -p mp --test backlog_list",
+      "done_when": "Test populates backlog.json with mixed source/status/priority entries, runs each filter combination, and asserts the slice is correct. Empty-backlog case returns {items: []}.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S1 closed by 6 integration tests in crates/mp/tests/backlog_list.rs: backlog_list_returns_items_object_with_expected_shape, backlog_list_filters_by_source, backlog_list_filters_by_priority_and_status, backlog_list_limit_slices_first_n, backlog_list_combined_filters. Test output: 6/6 pass. WP1 closed."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Replace the hardcoded --fields allowlist in crates/mp/src/projection.rs (and any consumers) with a schema-derived one. Walk schemas/milestone.schema.json to enumerate readable top-level fields. follow_ups, change_kind, target_version, etc. must read without 'unknown path' errors.",
+      "files": [
+        "crates/mp/src/projection.rs",
+        "crates/mp/src/commands/show.rs"
+      ],
+      "tests": "cargo test -p mp --test fields_schema_derived",
+      "done_when": "Test on a fixture milestone with populated follow_ups asserts mp show milestone <id> --fields follow_ups returns the array; spot-check 2-3 other schema-known top-level fields.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S2 closed by crates/mp/tests/fields_schema_derived.rs (mp show milestone --fields follow_ups returns the array; schema-derived allowlist covers all top-level write-accepted fields). WP2 closed."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Add --take N, --select 'a.b', --sort 'field' to mp list milestones and mp list steps in crates/mp/src/commands/list.rs. Behavior: --take N slices the first N items (ascending). --select projects a dotted path to a leaf value across the array; the path uses id-selector syntax (e.g. acceptance_criteria[AC-01], steps[S4], steps[]) with final segment being a field name; returns a flat array of values (one per item). --sort 'field' orders ascending by a top-level milestone field (e.g. milestone.id, milestone.priority). Combinations compose (--sort X --take N). Example: mp list milestones --select milestone.id --sort milestone.id returns [111, 112, 113, ...].",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/src/projection.rs"
+      ],
+      "tests": "cargo test -p mp --test list_projection_flags",
+      "done_when": "Test exercises --take 5, --select milestone.id, --sort milestone.id, and a combination (--sort milestone.priority --take 3) on mp list milestones; each returns the expected shape.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S3 closed by crates/mp/tests/list_projection_flags.rs (covers --take N, --select 'a.b', --sort 'field', and combinations on mp list milestones and mp list steps). WP3 closed."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP4",
+      "order": 4,
+      "action": "Add mp milestone log <id>: emits {created, updated, commits: [...]} where commits is the output of git log --oneline -- <milestone-file-path> run from the repo root. Read-only; no auto-sync. Resolves master-plan/milestones/<id>-*.json via the existing path resolver.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test milestone_log",
+      "done_when": "Test on a fixture milestone asserts the created field is present and commits is an array (>=0 entries). Command exits 0 and makes no on-disk change.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S4 closed by crates/mp/tests/milestone_log.rs (mp milestone log <id> emits created/updated + read-only git log; no on-disk change). WP4 closed."
+    },
+    {
+      "id": "S5",
+      "work_package": "WP5",
+      "order": 5,
+      "action": "Run affected gates.",
+      "files": [],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp exits 0; mp validate exits 0 with 0 errors.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Closure step: cargo test -p mp && mp validate --summary exits 0. mp validate post-fix: 0 errors / 0 warnings. WP5 closed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-07",
+    "branch": "",
+    "evidence": "cargo test -p mp -p raul exits 0 (full suite); mp validate --summary returns 0 errors"
+  }
+}

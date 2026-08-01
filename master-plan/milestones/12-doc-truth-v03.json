@@ -1,0 +1,190 @@
+{
+  "milestone": {
+    "id": "12",
+    "title": "Post-v0.2 doc truth sync",
+    "slug": "doc-truth-v03",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "10"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Top-tier docs reflect M07–M10 shipped state; agents stop hitting stale deferrals."
+  },
+  "problem": {
+    "description": "AGENT-READINESS, DESIGN-REVIEW, PLANNING-STATUS, and root AGENTS.md still reference M07–M09 as pending or partial."
+  },
+  "scope": {
+    "in_scope": [
+      "AGENT-READINESS session/path rows",
+      "PLANNING-STATUS v0.3 roadmap section",
+      "DESIGN-REVIEW remediation index",
+      "root AGENTS.md session log",
+      "docs/CI.md contract tests header"
+    ],
+    "out_of_scope": [
+      "Full MP-COMMANDS line rewrite (M15)",
+      "npm/Homebrew install docs (M14)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "No doc claims M07–M09 are unshipped",
+      "verification": "grep audit on docs/",
+      "status": "passed",
+      "evidence": "DESIGN-REVIEW, PM-WORKFLOWS, MP-COMMANDS headers updated; no unshipped M07-M09 claims"
+    },
+    {
+      "id": "AC-02",
+      "description": "AGENT-READINESS session rows show M08 shipped",
+      "verification": "docs review",
+      "status": "passed",
+      "evidence": "AGENT-READINESS session rows: M08 shipped, M13 focus marked planned"
+    },
+    {
+      "id": "AC-03",
+      "description": "PLANNING-STATUS lists v0.3 milestones M11–M15",
+      "verification": "docs review",
+      "status": "passed",
+      "evidence": "PLANNING-STATUS section 14 lists M11-M15 + B-17-B-28"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Agent docs",
+      "goal": "AGENT-READINESS + DESIGN-REVIEW",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Roadmap docs",
+      "goal": "PLANNING-STATUS + AGENTS.md",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Fix AGENT-READINESS session/path rows (M08 shipped)",
+      "files": [
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "No stale M08 partial warnings",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update DESIGN-REVIEW to post-v0.2 truth",
+      "files": [
+        "docs/DESIGN-REVIEW.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "No claims M07–M09 unshipped",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Update docs/CI.md contract tests section",
+      "files": [
+        "docs/CI.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "CI.md matches plan.yml workflow",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add PLANNING-STATUS v0.3 roadmap section (M11–M15)",
+      "files": [
+        "docs/PLANNING-STATUS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "v0.3 table lists M11–M15",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Update root AGENTS.md session log",
+      "files": [
+        "AGENTS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Session log reflects v0.3 planning",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

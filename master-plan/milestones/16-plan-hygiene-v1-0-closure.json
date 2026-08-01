@@ -1,0 +1,195 @@
+{
+  "milestone": {
+    "id": "16",
+    "title": "Plan hygiene & v1.0 closure",
+    "slug": "plan-hygiene-v1-0-closure",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-21",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Plan state reflects v1.0 shipped reality; v1.1 wave ready to plan and execute."
+  },
+  "problem": {
+    "description": "B-16 ('v1.0 git tag + release notes') is still active in backlog but M11 evidence shows v1.0.0 tag and Gitea release are published. plan.toml index is stale (lists M11-M15 as ready/planned while milestone files say verified/done). target_version=0.3 despite v1.0.0 being the shipped semver. root AGENTS.md session log and PLANNING-STATUS do not mark the v1.0 wave closed."
+  },
+  "scope": {
+    "in_scope": [
+      "Resolve B-16 as shipped (point to M11 evidence)",
+      "Run mp sync to rebuild plan.toml milestone index",
+      "Set target_version=1.1 via mp plan set",
+      "Update root AGENTS.md session log + docs/PLANNING-STATUS.md to mark v1.0 closed and v1.1 wave started",
+      "mp validate green after writes"
+    ],
+    "out_of_scope": [
+      "Feature work or refactoring (M17)",
+      "Doc-code drift closure (M18)",
+      "AGENTS.md structural simplification (M19)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "B-16 resolved as shipped with M11 evidence reference",
+      "verification": "manual: mp list backlog --status active (B-16 absent) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "B-16 resolved wont-fix via mp backlog resolve; mp list backlog --status active excludes B-16"
+    },
+    {
+      "id": "AC-02",
+      "description": "plan.toml [[milestones]] index matches milestone files (M11-M15 verified/done)",
+      "verification": "mp validate + mp status",
+      "status": "passed",
+      "evidence": "mp sync rebuilt index (22 milestones indexed, M11-M15 updated, M16-M22 added); mp validate green with no W01 warnings"
+    },
+    {
+      "id": "AC-03",
+      "description": "target_version=1.1 in plan.toml",
+      "verification": "mp plan show --format json",
+      "status": "passed",
+      "evidence": "mp plan set --target-version 1.1; mp plan show --format json shows target_version=1.1"
+    },
+    {
+      "id": "AC-04",
+      "description": "Session log + PLANNING-STATUS mark v1.0 closed and v1.1 wave started",
+      "verification": "docs review",
+      "status": "passed",
+      "evidence": "root AGENTS.md session log has 2026-06-21 v1.1 entry; docs/PLANNING-STATUS.md §14 marks v1.0 shipped, §15 v1.1 in-execution"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Plan state hygiene",
+      "goal": "Resolve B-16, sync index",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Version & docs closure",
+      "goal": "target_version=1.1, session log, PLANNING-STATUS",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Resolve B-16 as shipped via mp backlog resolve B-16 --wont-fix --reason 'shipped: v1.0.0 tag + Gitea release per M11 AC-01/AC-02 evidence'",
+      "files": [
+        "master-plan/backlog.toml"
+      ],
+      "tests": "make adopt-check",
+      "done_when": "B-16 status=resolved; mp list backlog --status active excludes B-16",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Run mp sync to rebuild plan.toml [[milestones]] index so M11-M15 show verified/done",
+      "files": [
+        "master-plan/plan.toml"
+      ],
+      "tests": "cargo build --release -p mp",
+      "done_when": "mp validate has no W01 warnings; mp status shows 19 milestones done",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Set target_version=1.1 via mp plan set --target-version 1.1",
+      "files": [
+        "master-plan/plan.toml"
+      ],
+      "tests": "manual: verify version and release notes correct",
+      "done_when": "mp plan show --format json shows target_version=1.1",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Update root AGENTS.md session log (add 2026-06-21 block: v1.0 closed, v1.1 code-health wave M16-M19 created) and docs/PLANNING-STATUS.md (mark v1.0 wave shipped, v1.1 in planning)",
+      "files": [
+        "AGENTS.md",
+        "docs/PLANNING-STATUS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Session log has v1.1 entry; PLANNING-STATUS marks v1.0 closed",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Run mp validate and confirm green (no errors, no warnings)",
+      "files": [],
+      "tests": "make adopt-check",
+      "done_when": "mp validate --format json returns ok=true with empty errors and warnings",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-21",
+    "branch": "",
+    "evidence": "B-16 resolved; plan.toml index synced (22 milestones); target_version=1.1; AGENTS.md + PLANNING-STATUS.md updated; mp validate green. All 4 ACs passed."
+  }
+}

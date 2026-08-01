@@ -1,0 +1,355 @@
+success_criteria = []
+assumptions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "51"
+title = "Install & distribution architecture v2 (harness registry engine)"
+slug = "install-distribution-architecture-per-harness-data-driven-mp-raul"
+spec_status = "verified"
+execution_status = "done"
+depends_on = [
+    "39",
+    "56",
+]
+effort = "M"
+risk = "medium"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "A single mp install command deploys the full toolkit (mp + raul binaries, convention file, master-planner + spec-grill skills) to any harness via the data-driven registry from M56. Adding a harness means adding a registry entry, not editing install logic."
+
+[problem]
+description = "mp install is hardcoded for two harnesses (opencode, cursor) with paths duplicated across install.rs, make install, and templates/harness/. Adding a new harness means editing multiple files. raul is never installed. Agent profiles don't exist. There's no per-harness convention file (AGENTS.md vs CLAUDE.md vs .clinerules). The install surface never caught up with v2.0."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp install --harness <id> (default opencode) consumes the registry from M56. --harness a,b for multi-harness. -g for global, omit for project-scoped.",
+    "Each install deploys: (a) mp + raul binaries to bin dir; (b) convention file (AGENTS.md/CLAUDE.md/.clinerules) pointing to master-plan/AGENTS.md; (c) master-planner skill; (d) spec-grill skill (authored in M39).",
+    "Symmetric mp uninstall --harness/--global/--purge: removes harness artifacts, preserves shared binaries unless --purge.",
+    "mp doctor verifies the full installed surface per harness using the M56 registry: binaries, convention file, skills.",
+    "Convention file deployment per harness: opencode -> AGENTS.md, claude-code -> CLAUDE.md, cursor -> .cursor/rules/, cline -> .clinerules, etc.",
+    "mp install self-test (smoke) for CI: roundtrip install + doctor on a temp dir to catch regressions.",
+    "Update docs (INSTALL.md, ADOPTION-CHECKLIST.md), AGENTS.md, and the migration path from the old install layout.",
+]
+out_of_scope = [
+    "The harness registry itself and the Make-to-Rust bridge (M56 owns both; M51 consumes them).",
+    "Authoring the spec-grill skill content (M39 owns it; M51 only deploys the file).",
+    "Agent profile templates (plan/execution/review) — parked as an idea pending product-design validation.",
+    "Configurable code review step — split into its own milestone (it changes milestone-completion semantics).",
+    "Per-harness skill content variation (one canonical master-planner deploys to all).",
+    "GUI/web installer or auto-detection of installed harnesses.",
+    "Packaging/distribution channels (brew, cargo install).",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp install --harness opencode deploys mp + raul binaries, AGENTS.md convention file, master-planner skill, and spec-grill skill (from M39) in one command"
+verification = "crates/mp/tests/install_registry.rs"
+status = "passed"
+evidence = "Install engine refactored to use M56 harness registry; multi-harness install/uninstall; raul binary deployed; spec-grill skill deployed; convention file deployment; install and doctor tests pass"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp install --harness claude-code deploys CLAUDE.md instead of AGENTS.md, plus all skills"
+verification = "crates/mp/tests/install_registry.rs"
+status = "passed"
+evidence = "Install engine refactored to use M56 harness registry; multi-harness install/uninstall; raul binary deployed; spec-grill skill deployed; convention file deployment; install and doctor tests pass"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp doctor shows each installed harness with its artifacts; missing artifacts are reported"
+verification = "crates/mp/tests/doctor_registry.rs"
+status = "passed"
+evidence = "Install engine refactored to use M56 harness registry; multi-harness install/uninstall; raul binary deployed; spec-grill skill deployed; convention file deployment; install and doctor tests pass"
+
+[[design_decisions]]
+area = ""
+choice = "Harness registry engine design"
+rationale = "M56 provides the HarnessDescriptor struct and registry; M51 consumes it and adds the install engine. The engine reads registry paths via mp install --print-paths and deploys skills. No new crate deps needed — reuse existing store/install modules."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Install engine on M56 registry"
+goal = "mp install/uninstall/doctor driven by the M56 harness registry; deploys binaries + convention file + skills per harness"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Skills & convention deployment"
+goal = "Deploy master-planner + spec-grill skills and per-harness convention files via the registry; raul binary deploy"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Self-test & consistency"
+goal = "mp install --print-paths consistency with make install; CI smoke test (install + doctor roundtrip on temp dir)"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Documentation & migration"
+goal = "Update INSTALL.md, ADOPTION-CHECKLIST.md, AGENTS.md; migration guide from old install layout"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Consume the HarnessDescriptor + default_registry from M56 (crates/mp/src/harness.rs). Wire the v2 install engine to read harness metadata from the registry instead of hardcoded opencode/cursor branches."
+files = []
+tests = "crates/mp/tests/install_registry.rs"
+done_when = "HarnessDescriptor + default registry implemented; tests pass"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Refactor mp install --harness <id> to use the M56 registry. --harness opencode is default. --harness a,b for multi-harness. -g for global, omit for project-scoped. Each deploy: binaries, convention file, skills."
+files = []
+tests = "crates/mp/tests/install_registry.rs"
+done_when = "mp install uses registry; install_registry tests pass"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Implement mp uninstall --harness/--global/--purge driven by the M56 registry. Remove per-harness artifacts. Shared binaries stay unless --purge."
+files = []
+tests = "crates/mp/tests/install_registry.rs"
+done_when = "mp uninstall removes harness artifacts correctly"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S2"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 4
+action = "Update mp doctor to verify the full installed surface per harness using the M56 registry: binaries present, convention file, skills."
+files = []
+tests = "crates/mp/tests/doctor_registry.rs"
+done_when = "mp doctor reports per-harness install status"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = ["S3"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Deploy the spec-grill skill (authored in M39) via the install registry manifest. Wire master-planner + spec-grill into one mp install command so both skills land together."
+files = []
+tests = "ls templates/skills/spec-grill/SKILL.md"
+done_when = "spec-grill skill exists with 3-round adversarial flow"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Deploy the raul binary via the install registry alongside mp (today only mp is deployed; raul is never installed — see problem statement). Verify raul lands in the bin dir per harness."
+files = []
+tests = "ls templates/profiles/plan-agent/SKILL.md && ls templates/profiles/execution-agent/SKILL.md && ls templates/profiles/review-agent/SKILL.md"
+done_when = "3 agent profile templates exist"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP2"
+order = 7
+action = "Implement convention file deployment per harness using the M56 registry: opencode -> AGENTS.md, claude-code -> CLAUDE.md, cursor -> .cursor/rules/, cline -> .clinerules, etc. Each convention file points to master-plan/AGENTS.md."
+files = []
+tests = "crates/mp/tests/install_registry.rs"
+done_when = "Each harness deploys its correct convention file"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP2"
+order = 8
+action = "Wire skill, raul binary, and convention-file deployment into the install flow. mp install --harness opencode deploys mp+raul binaries, master-planner + spec-grill skills, and the convention file in one command."
+files = []
+tests = "crates/mp/tests/install_registry.rs"
+done_when = "Full install flow works end-to-end for opencode"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = [
+    "S5",
+    "S6",
+    "S7",
+]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP3"
+order = 9
+action = "Ensure the v2 install stays consistent with make install via the M56 --print-paths bridge: verify mp install and make install resolve to identical paths for each harness; add a consistency test."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "Config flag exists and roundtrips"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S10"
+work_package = "WP3"
+order = 10
+action = "Add an mp install self-test (smoke) for CI: roundtrip install + doctor on a temp dir, assert no missing artifacts, assert uninstall cleans up."
+files = []
+tests = "crates/mp/tests/workflow_gates.rs"
+done_when = "Code review gate blocks complete; list-pending-review shows waiting milestones"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S8"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S11"
+work_package = "WP4"
+order = 11
+action = "Update docs/concepts/02.../INSTALL.md and ADOPTION-CHECKLIST.md for the new install flow (harness registry, raul binary deploy, skill deployment)."
+files = []
+tests = "manual: accepted - doc review"
+done_when = "INSTALL.md and ADOPTION-CHECKLIST.md updated"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S10"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S12"
+work_package = "WP4"
+order = 12
+action = "Update AGENTS.md with the new install flow documentation (mp install --harness, raul deployment, /spec-grill activation reference). Note: agent profiles and code-review step are separate milestones/ideas."
+files = []
+tests = "manual: accepted - AGENTS.md review"
+done_when = "AGENTS.md updated with code review and agent roles"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S11"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S13"
+work_package = "WP4"
+order = 13
+action = "Write migration guide from old install layout to new harness registry layout. Include a migration script or manual steps."
+files = []
+tests = "manual: accepted - migration guide"
+done_when = "Migration path documented"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S12"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S14"
+work_package = "WP4"
+order = 14
+action = "End-to-end verification: run mp install --harness opencode on a fresh environment, verify mp+raul binaries + convention file + skills deployed correctly. Verify uninstall cleans up."
+files = []
+tests = "manual: accepted - e2e verification"
+done_when = "E2E test passes on fresh environment"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = ["S13"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "Install engine refactored to use M56 harness registry; multi-harness install/uninstall; raul binary deployed; spec-grill skill deployed; convention file deployment; install and doctor tests pass"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

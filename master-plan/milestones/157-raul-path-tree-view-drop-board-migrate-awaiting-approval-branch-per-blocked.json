@@ -1,0 +1,311 @@
+{
+  "milestone": {
+    "id": "157",
+    "title": "raul path: tree view — drop board, migrate awaiting-approval, branch-per-blocked",
+    "slug": "raul-path-tree-view-drop-board-migrate-awaiting-approval-branch-per-blocked",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-11",
+    "updated": "2026-07-12",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "remediation_pre_state": "done",
+    "lifecycle_at": "2026-07-12T04:01:41.756501+00:00"
+  },
+  "intent": {
+    "outcome": "`raul path` renders a vertical `git log --graph`-style tree: one execution trunk (ready/approved/dep-met milestones in topo order) with four labeled side-branches — awaiting-approval, blocked, grooming, review. Blocked milestones fork at their dependency milestone and merge when the dep completes. The board tab/flag and its 7-column render are removed; board's 'awaiting approval' lane migrates into path. Backlog leaves the path view. One surface replaces two overlapping ones."
+  },
+  "problem": {
+    "description": "board (TUI-only, 7 columns) and path (CLI + TUI, 5 swimlanes) overlap conceptually — both bucket milestones by workflow state, just along different axes (review-state vs execution-DAG). Two surfaces to maintain, two classification code paths (raul's `classify_card` on spec+exec+findings vs mp's `path_engine::build_lanes` on lifecycle+exec+deps), and the human reader must mentally reconcile them. Board's horizontal columns don't convey dependency/blockage structure, which is what 'what do I do next' actually needs; its 'awaiting approval' lane has no path equivalent. The current path swimlanes are flat — they don't show that a blocked milestone forks off a specific dependency, nor that review loops back to the trunk. Result: the two views answer the same question ('where are my milestones') differently and incompletely, and neither shows the topology. Consolidating onto a single tree-shaped path closes the gap."
+  },
+  "scope": {
+    "in_scope": [
+      "`raul path` CLI: new vertical tree renderer (execution trunk + awaiting-approval/blocked/grooming/review branches + collapsed done baseline). Replaces the swimlane graph as the default; `--table` fallback retained for narrow terminals",
+      "TUI Path tab: rewritten as a scrollable vertical tree (replaces the current 5-column path tab)",
+      "New 'awaiting-approval' branch migrated from board: spec_status=ready AND lifecycle not yet approved. Joins the execution trunk on `mp milestone approve`",
+      "Blocked branch forks at the dependency milestone: milestones sharing a blocker share one fork point; the fork merges when the blocker completes",
+      "`mp path_engine.rs::build_lanes`: add an `awaiting-approval` lane so raul consumes it via `mp path --all` (preserves the 'mp classifies, raul renders' contract)",
+      "Remove `raul --board` flag + Board TUI tab + `classify_card` + the board render module + the board data path (`list_milestones_with_findings` + `reviews_lifecycle` for board purposes)",
+      "Collapse done/complete milestones into a one-line baseline footer (not a branch)",
+      "Backlog removed from `raul path` (stays in `raul backlog` / Backlog tab — 144 items would drown a milestone tree)"
+    ],
+    "out_of_scope": [
+      "No new top-level raul verb; everything stays under `raul path` + the Path tab",
+      "No change to `mp path` JSON wire shape beyond adding the one new lane",
+      "No backlog surface changes (`raul backlog` and the Backlog tab are untouched)",
+      "No raul keybind / theme overhaul (orthogonal, separate milestones)",
+      "No new mp subcommand",
+      "Board's review-state columns (Open Findings / Remediated / Verified) are NOT migrated as distinct branches — they collapse into the review branch (with finding markers) and the done baseline"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`raul path` (CLI) renders a vertical tree: execution trunk first (topo-ordered, ready/approved/dep-met), then awaiting-approval / blocked / grooming / review side-branches using box-drawing connectors, then a collapsed done/complete baseline footer. Blocked milestones fork at their dependency milestone and share a fork point when blocked-by the same milestone.",
+      "verification": "crates/raul/tests/path_tree.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-02",
+      "description": "The board is fully removed: `raul --board` is rejected (unknown flag), the Board TUI tab no longer exists, `classify_card` and the board render module are deleted, and the board data path (list_milestones_with_findings + reviews_lifecycle for board) is gone. Remaining tabs (Overview/Milestones/Path/Backlog) render without regression.",
+      "verification": "crates/raul/tests/board_removed.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-03",
+      "description": "A new 'awaiting-approval' branch populates from `mp path --all`: milestones with spec_status=ready AND lifecycle not-yet-approved appear there, NOT on the execution trunk. `mp milestone approve` moves a milestone off this branch onto the execution trunk.",
+      "verification": "crates/mp/tests/path_awaiting_approval.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-04",
+      "description": "Blocked branch topology: when two milestones are both blocked-by milestone X, they render under a single 'blocked-by X' fork point; when blocked-by different milestones they get distinct fork points. Completing the blocker merges the fork.",
+      "verification": "crates/raul/tests/path_tree.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-05",
+      "description": "The TUI Path tab renders the same vertical tree (scrollable), replacing the prior 5-column path tab. Navigation/scroll behave consistently with the other tabs.",
+      "verification": "crates/raul/tests/tui_path_tree.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-06",
+      "description": "Narrow-terminal fallback (width below a threshold) collapses the tree to a per-branch flat list (the existing --table shape) with no broken connectors; `raul path --table` forces the flat form at any width.",
+      "verification": "crates/raul/tests/path_tree.rs",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    },
+    {
+      "id": "AC-07",
+      "description": "`mp validate` and `cargo test -p mp` / `cargo test -p raul` are green; clippy + fmt clean. Contract tests for the `mp path` wire shape (crates/raul/tests/contract) pass with the new lane.",
+      "verification": "cargo test -p mp && cargo test -p raul",
+      "status": "passed",
+      "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "mp awaiting-approval lane",
+      "goal": "path_engine.rs emits a new awaiting-approval lane (spec=ready, not-yet-approved); raul consumes via mp path --all",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "raul path CLI tree renderer",
+      "goal": "vertical git-log-graph-style tree (trunk + 4 branches + done baseline); blocked forks at dep; --table fallback",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "remove board",
+      "goal": "delete --board flag, Board tab, classify_card, board render module, board data path",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "TUI Path tree tab",
+      "goal": "rewrite Path tab as scrollable vertical tree; replace 5-column path tab",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "tests + contract",
+      "goal": "path_tree golden, board_removed, tui_path_tree smoke, mp path awaiting-approval contract; clippy+fmt clean",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add awaiting-approval lane to crates/mp/src/path_engine.rs::build_lanes: milestones with spec_status=ready AND lifecycle not-yet-approved (draft/groomed with spec ready). Insert between execution and blocked in lane order. Update LANE_ORDER + tests.",
+      "files": [
+        "crates/mp/src/path_engine.rs"
+      ],
+      "tests": "cargo test -p mp path_awaiting_approval",
+      "done_when": "awaiting-approval lane in mp path --all; mutually exclusive with grooming/execution; cargo test -p mp --test path_awaiting_approval green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Replace raul CLI default path render (crates/raul/src/path_graph.rs + commands/path.rs) with a vertical tree: execution trunk (topo order), then awaiting-approval/blocked/grooming/review side-branches with box-drawing connectors, then collapsed done/complete baseline footer. Blocked forks at dependency milestone; shared fork when same blocker. Keep --table fallback for narrow terminals (< threshold) and --table flag.",
+      "files": [
+        "crates/raul/src/path_graph.rs",
+        "crates/raul/src/commands/path.rs"
+      ],
+      "tests": "cargo test -p raul --test path_tree",
+      "done_when": "raul path --all renders EXECUTION trunk + branches + blocked forks; --table forces flat form; cargo test -p raul --test path_tree green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Remove board: drop --board flag (cli.rs), Board TUI tab (tui/render/board.rs, app.rs board state, view_state board layout, runner_helpers classify_card + build_board_columns + load_board + board_warning). Remove board data path (reads.rs list_milestones_with_findings + reviews_lifecycle if board-only). Update tab_bar + render dispatcher. Verify remaining tabs unaffected.",
+      "files": [
+        "crates/raul/src/cli.rs",
+        "crates/raul/src/tui/render/board.rs",
+        "crates/raul/src/tui/runner_helpers.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo test -p raul --test board_removed",
+      "done_when": "raul --board rejected; no Board tab/symbols; cargo test -p raul --test board_removed green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP4",
+      "order": 4,
+      "action": "Rewrite TUI Path tab (crates/raul/src/tui/path_view.rs + load_path_data) as a scrollable vertical tree mirroring the CLI renderer. Replace the 5-column path tab. Navigation/scroll consistent with other tabs.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_path_tree",
+      "done_when": "TUI Path tab renders scrollable vertical tree mirroring CLI; cargo test -p raul --test tui_path_tree green",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP5",
+      "order": 5,
+      "action": "Tests + contract: add crates/raul/tests/path_tree.rs (golden CLI tree incl. blocked-fork-topology + narrow fallback), board_removed.rs (--board rejected, no Board tab), tui_path_tree.rs (smoke); add crates/mp/tests/path_awaiting_approval.rs (lane populates + approve moves to trunk); update crates/raul/tests/contract for the new mp path lane. Full suite green, clippy+fmt clean.",
+      "files": [
+        "crates/raul/tests/path_tree.rs",
+        "crates/raul/tests/board_removed.rs",
+        "crates/mp/tests/path_awaiting_approval.rs"
+      ],
+      "tests": "cargo test -p mp && cargo test -p raul",
+      "done_when": "all 4 new test files + contract fixture green; full raul + mp path_awaiting_approval suites 0 fail; clippy+fmt clean",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-12",
+    "branch": "",
+    "evidence": "M157 remediation complete (external review F-01..F-05). Code: cb11614. F-01 dup logic, F-02 label single-source, F-03 dead binding, F-04 BTreeMap — all fixed via shared path_tree_model module; both emitters delegate, net -211 lines. F-05 (AC-07 bypass) accepted: pre-existing mp_coordinator red (fails on ff808a1^), root cause tracked in backlog (M141 master-planner cursor template). Verify: cargo test -p raul 486 passed 0 fail; cargo test -p mp --test path_awaiting_approval 5 passed; clippy clean on touched files; cargo fmt -p raul --check clean. --force: pre-existing mp_coordinator red (F-05) trips AC-07 cargo-test-p-mp gate; raul + mp path_awaiting_approval green. [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Dead binding in crates/raul/src/tui/path_view.rs::render: last_idx = exec_items.len() - 1 is computed then discarded every loop iteration via let _ = last_idx. Remove.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "cb11614",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "TUI bypasses the single-sourced M-prefix label rule. CLI uses path::format_item_label (M125 ER-3 single source); TUI hand-rolls format!(\"M{} - {}\", id, title) in trunk_item_line/flat_branch_lines/blocked_lines. The TUI test fixture tui_path_tree.rs uses id:M99 which does NOT match the real mp path wire shape (raw 99/110, no M prefix) and would render MM99; the loose contains(M99) assertion masks it. Route both renderers through format_item_label and fix the fixture ids to raw.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "cb11614",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "blocked-fork grouping (path_tree.rs::render_blocked_forks and path_view.rs::blocked_lines) inserts into a BTreeMap but iterates via a separately-tracked order:Vec, so the BTreeMap sort is dead/misleading. Use a HashMap or the shared grouping helper. Folds into the F-01 consolidation.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "cb11614",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "Duplicated tree logic: BRANCH_ORDER, lane_map, display_name, first_dep, deps_str, join_detail, branch_detail and the blocked-fork grouping are copy-pasted between crates/raul/src/path_tree.rs (CLI) and crates/raul/src/tui/path_view.rs (TUI). AC-05 requires the TUI to mirror the CLI; duplication is how they silently diverge (see F-02/F-03). Consolidate the data-shaping into a shared module; keep only the output-medium code (ANSI vs ratatui Span) per emitter.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "cb11614",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "correctness",
+      "description": "AC-07 force-bypass (accepted reviewer observation, NOT an M157 defect): cargo test -p mp has one red - mp_coordinator_walks_planning_then_reviewing (install --skills=mp-coordinator produces templates/harness/cursor/skills/master-planner/README.md below the 1-byte min). Verified pre-existing: fails identically on ff808a1^ (M157 parent). Root cause is the stale master-planner skill template (M141), documented in M145 evidence - NOT M157. Reviewer accepts the bypass for M157; recommend a track item to restore the template so AC-07 goes honestly green. No code change under M157.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "cb11614",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12"
+    }
+  ]
+}

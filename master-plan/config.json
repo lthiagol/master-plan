@@ -1,0 +1,83 @@
+{
+  "workflow": {
+    "profile": "full",
+    "artifacts": {
+      "brief": true,
+      "backlog": true,
+      "milestones": true,
+      "tracks": true,
+      "ideas": true,
+      "decisions": true
+    },
+    "plan": {
+      "in_repo": true,
+      "location": "master-plan"
+    },
+    "gates": {
+      "strictness": "full"
+    },
+    "session": {
+      "auto_bind_branch": null,
+      "archive_on_merge": null,
+      "focus": null
+    },
+    "steps": {
+      "code_review": null
+    }
+  },
+  "output": {},
+  "display": {
+    "milestone_prefix": null
+  },
+  "ui": {
+    "color": null,
+    "icons": null,
+    "theme": null,
+    "hide_done": false
+  },
+  "archive": {
+    "auto_purge_days": 0,
+    "archive_on_milestone_delete": true,
+    "archive_on_track_cancel": true
+  },
+  "next": {
+    "prefer": "milestone"
+  },
+  "git": {
+    "auto_commit": false,
+    "auto_push": null,
+    "commit_on_milestone_complete": false,
+    "commit_message_template": null
+  },
+  "planning": {
+    "require_min_out_of_scope": 2,
+    "require_min_acceptance_criteria": 1
+  },
+  "agent": {
+    "runner": {
+      "harness": "opencode",
+      "command": null,
+      "model": "minimax-coding-plan/MiniMax-M3",
+      "thinking_level": null
+    },
+    "coordinator": {
+      "harness": "opencode",
+      "command": null,
+      "model": "minimax-coding-plan/MiniMax-M3",
+      "thinking_level": null
+    },
+    "automation": {
+      "commit_after_execute": null,
+      "push_after_review": null,
+      "branch_strategy": null,
+      "auto_remediate": null
+    }
+  },
+  "review": {
+    "hunk": false,
+    "hunk_author": "mp"
+  },
+  "sort": {
+    "milestones": "lifecycle"
+  }
+}

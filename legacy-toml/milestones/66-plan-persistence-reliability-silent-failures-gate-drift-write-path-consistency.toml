@@ -1,0 +1,255 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "66"
+title = "Plan persistence reliability: silent failures, gate drift, write-path consistency"
+slug = "plan-persistence-reliability-silent-failures-gate-drift-write-path-consistency"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Plan reads fail loudly on corruption; gate checks use a single source of truth for thresholds; every milestone mutation path syncs the index and validates schema; completion guardrail has bounded runtime; concurrency hazard is either enforced in code or covered by a real regression test."
+
+[problem]
+description = "Code review found several reliability gaps in the persistence and validation layer that can produce false-green states or silent data loss. (1) store::load_config silently returns ProjectConfig::default() on parse/read failure — gates and strictness can change without error. (2) validate_milestone_review() hardcodes G4 out-of-scope minimum at 2 while validate_plan() respects config.min_out_of_scope() — approve can pass while mp validate fails. (3) step/wp/delta writers call store::write_milestone directly without sync_plan, causing plan.toml index drift (W03) until manual mp sync. (4) enforce_milestone_file schema validation runs on milestone create/update but NOT on step/wp mutations — invalid shapes can be persisted via the most common write paths. (5) validate_plan uses unwrap_or_default() on load_all_milestones and swallows annotation load errors — disk failures look like empty plan. (6) ac_verify subprocess runs with no timeout — hung step tests block completion indefinitely. (7) concurrency.rs is a compile-only stub despite documented parallel step-add clobber risk (AGENTS.md warns agents not to parallelize plan writes)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "load_config: return/ propagate parse errors or at minimum log+surface a doctor/validate warning when config.toml is unreadable or invalid",
+    "Unify G4 (and any similar) between validate_plan and validate_milestone_review/ready — pass PlanContext config into review gates",
+    "Centralize milestone write path: step.rs, wp.rs, delta.rs, plan_gaps.rs route through with_milestone_mut or a write_milestone_and_sync helper that always calls sync_plan",
+    "Call enforce_milestone_file on all milestone file writes (step/wp/status mutations)",
+    "validate_plan: propagate load_all_milestones and load_annotations errors instead of unwrap_or_default / empty vec",
+    "ac_verify: add configurable timeout (env or constant) for subprocess execution; fail with clear message on timeout",
+    "Replace concurrency.rs stub with a test demonstrating parallel step add clobber OR document + enforce single-writer in store (minimal: test that sequential writes preserve all steps; stretch: file lock or --if-updated on step add)",
+]
+out_of_scope = [
+    "Full multi-file transactional archive (archive_milestone rename + index append) — separate follow-up if needed",
+    "Rewriting validate.rs monolith structure (organizational only)",
+    "Optimistic concurrency on every write (M09 shipped --if-updated on milestone update; extend only if test proves need)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Corrupt config.toml surfaces as error or validate/doctor warning — not silent default config"
+verification = "crates/mp/tests/config_load_reliability.rs"
+status = "passed"
+evidence = "cargo test -p mp --test config_load_reliability: W50 validate + doctor config_parse + write-block + E02/E03"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "G4 threshold in approve/review path matches config.min_out_of_scope() — no hardcoded 2"
+verification = "crates/mp/tests/gate_matrix.rs"
+status = "passed"
+evidence = "cargo test -p mp --test gate_matrix g4_approve_respects_config_min_out_of_scope"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "step add/update triggers plan index sync — no W03 drift after step mutation without manual mp sync"
+verification = "crates/mp/tests/index_auto_sync.rs"
+status = "passed"
+evidence = "cargo test -p mp --test index_auto_sync auto_sync_on_step_auto_close"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Invalid milestone shape written via step add is rejected by schema enforcement"
+verification = "crates/mp/tests/schema_on_step_write.rs"
+status = "passed"
+evidence = "cargo test -p mp --test schema_on_step_write"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "ac_verify times out hung subprocess within bounded wall clock"
+verification = "crates/mp/tests/ac_verify_timeout.rs"
+status = "passed"
+evidence = "cargo test -p mp --test ac_verify_timeout hung_verification_times_out"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "concurrency.rs tests real write behavior (not empty stub)"
+verification = "crates/mp/tests/concurrency.rs"
+status = "passed"
+evidence = "cargo test -p mp --test concurrency sequential_step_chain_preserved"
+
+[[open_questions]]
+id = "Q-01"
+question = "Should corrupt config.toml block all writes (strict) or warn-and-continue with defaults (lenient)?"
+status = "resolved"
+answer = "Strict on write paths (bail with context); doctor/validate warn on read — fail loud, no silent defaults"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Config and gate consistency"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Write path centralization"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Validation and guardrail bounds"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Fix load_config: propagate or surface corrupt config.toml — no silent ProjectConfig::default() on parse failure"
+files = []
+tests = "crates/mp/tests/config_load_reliability.rs"
+done_when = "Corrupt config surfaces error or doctor/validate warning"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Unify G4 threshold: validate_milestone_review/ready use cfg.min_out_of_scope() not hardcoded 2"
+files = []
+tests = "crates/mp/tests/gate_matrix.rs"
+done_when = "Approve and validate agree on G4"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Introduce write_milestone_synced helper; route step.rs, wp.rs, delta.rs, plan_gaps.rs through it (always sync_plan)"
+files = []
+tests = "crates/mp/tests/index_auto_sync.rs"
+done_when = "Step mutation does not cause W03 drift"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Call enforce_milestone_file on all milestone file writes including step/wp mutations"
+files = []
+tests = "crates/mp/tests/schema_on_step_write.rs"
+done_when = "Invalid shape via step add is rejected"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "validate_plan: propagate load_all_milestones and load_annotations errors instead of unwrap_or_default"
+files = []
+tests = "crates/mp/tests/config_load_reliability.rs"
+done_when = "Disk failures do not produce false-green validate"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP3"
+order = 6
+action = "ac_verify: add subprocess timeout with clear failure message"
+files = []
+tests = "crates/mp/tests/ac_verify_timeout.rs"
+done_when = "Hung test fails within bounded wall clock"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP3"
+order = 7
+action = "Replace concurrency.rs stub with real test (sequential step chain preserved; document parallel clobber if lock not implemented)"
+files = []
+tests = "crates/mp/tests/concurrency.rs"
+done_when = "concurrency.rs asserts write behavior"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "cargo test -p mp --test config_load_reliability --test gate_matrix --test index_auto_sync --test schema_on_step_write --test ac_verify_timeout --test concurrency: all pass; cargo test -p mp: all pass"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

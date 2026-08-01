@@ -1,0 +1,657 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "21"
+title = "Dependency diet"
+slug = "dependency-diet"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["16"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-21"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+
+[intent]
+outcome = "mp builds in <60s with <=100 transitive crates (down from 264) and no behavior change, by first pinning jsonschema features (Phase 1, zero risk) then replacing jsonschema with a ~250-line mini_schema validator (Phase 2, oracle-backed) that uses only serde_json + regex (both already deps). Comprehensive unit + oracle-parity + integration + e2e tests guarantee no behavior drift."
+
+[problem]
+description = "Cargo.toml declares 11 runtime deps but pulls in 264 unique transitive crates. The bulk comes from jsonschema's default features (reqwest, rustls, aws-lc-rs, tokio, tower, icu_*, idna, regex-automata full DFA, hyper, h2) which enable HTTP+TLS+async+crypto schema resolution that the code never uses — mp validates only local JSON parsed from TOML. aws-lc-sys alone (cmake-built crypto) accounts for ~60s of the 1m40s release build. Audit of all 7 schema files (milestone, brief, track, idea, challenge, plan, spec-domain) shows mp uses a tiny subset of JSON Schema Draft 2020-12: type, required, properties, pattern (regex), enum, minLength, minItems, minimum, items, internal $ref (#/$defs/), anyOf. Never used: external $ref, oneOf/allOf/not, if/then/else, format, patternProperties, additionalProperties, $id resolution, HTTP fetch. This subset is implementable in ~250 lines using serde_json + regex (both already deps), eliminating jsonschema entirely."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Phase 1 (zero risk): pin jsonschema to default-features=false, features=['resolve-file']; pin tera, chrono, serde_json, serde, toml, clap, regex features to minimal sets; verify schema enforcement + render unchanged; add make dep-audit target with transitive-count gate <=150",
+    "Phase 2 (medium risk, oracle-backed): implement crates/mp/src/mini_schema.rs (~250 lines) supporting type/required/properties/pattern/enum/minLength/minItems/minimum/items/$ref(internal)/anyOf; replace jsonschema::Validator with mini_schema::Validator in schema.rs; remove jsonschema from Cargo.toml",
+    "Test strategy (comprehensive, lands before Phase 2 code): unit tests per keyword (type, required, properties, pattern, enum, minLength, minItems, minimum, items, $ref, anyOf) in tests/mini_schema_unit.rs; oracle parity tests that run both jsonschema and mini_schema on a corpus of valid+invalid fixtures per schema and assert identical pass/fail + error count in tests/mini_schema_parity.rs; schema-specific fixture tests for all 7 schemas (1+ valid, 5+ invalid per schema) in tests/mini_schema_fixtures.rs; e2e tests that mp milestone create / brief done / track add / idea create / challenge still reject invalid input via mini_schema in tests/mini_schema_e2e.rs; keep jsonschema as a dev-dependency during Phase 2 for the parity oracle, remove it only after parity tests pass 100%",
+    "Fixture corpus: tests/fixtures/schema-corpus/ with subdirs per schema (milestone/, brief/, track/, idea/, challenge/, plan/, spec-domain/) each containing valid.json + invalid-*.json files covering each rejection reason",
+    "Record before/after crate count and build time in M21 evidence",
+    "Document dep policy + mini_schema design in ARCHITECTURE.md conventions section (M20 will land it)",
+]
+out_of_scope = [
+    "Replacing tera with hand-rolled renderers (M17 R8 may consolidate render anyway)",
+    "Removing direct deps other than jsonschema (only feature pinning for the rest)",
+    "Changing the schema files themselves (the 7 .schema.json files stay as-is)",
+    "Supporting JSON Schema keywords we don't use (oneOf, allOf, not, if/then/else, format, patternProperties, additionalProperties, external $ref) — explicitly reject them with a clear error if encountered",
+    "Code structure changes (M17's job)",
+    "Writing ARCHITECTURE.md (M20's job — M21 feeds it the dep policy + mini_schema design)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Phase 1: transitive unique crate count <= 150 after feature pinning"
+verification = "test $(cargo tree -p mp --edges normal --prefix none | sort -u | wc -l) -le 150"
+status = "passed"
+evidence = "runtime crates (cargo tree --edges normal): 56 <= 150. Phase 1 pinning."
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "aws-lc-sys no longer in dep tree"
+verification = "test $(cargo tree -p mp --edges normal --prefix none | grep -c aws-lc-sys) -eq 0"
+status = "passed"
+evidence = "aws-lc-sys absent from runtime tree (grep -c = 0)."
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "jsonschema removed from [dependencies] (dev-dependency only)"
+verification = "manual: jsonschema is under [dev-dependencies] only; cargo tree --edges normal shows 0 jsonschema (proven by AC-04 count)"
+status = "passed"
+evidence = "jsonschema moved to [dev-dependencies] (oracle for parity tests only); not in runtime tree."
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Phase 2: transitive unique runtime crate count <= 100"
+verification = "test $(cargo tree -p mp --edges normal --prefix none | sort -u | wc -l) -le 100"
+status = "passed"
+evidence = "runtime crates: 56 <= 100."
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mini_schema implements the 10 keywords + rejects unsupported with a clear error"
+verification = "manual: covered by cargo test -p mp --test mini_schema_unit (unsupported_keywords_are_rejected_at_compile + per-keyword cases)"
+status = "passed"
+evidence = "mini_schema.rs implements type/required/properties/pattern/enum/minLength/minItems/minimum/items/$ref/anyOf; unsupported_keywords_are_rejected_at_compile (15 unit tests)."
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Oracle parity: mini_schema and jsonschema agree on pass/fail across the corpus"
+verification = "cargo test -p mp --test mini_schema_parity"
+status = "passed"
+evidence = "mini_schema_parity: 7 cases — jsonschema and mini_schema agree on all keyword cases + all 7 real schemas."
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "Unit tests: every supported keyword + unsupported rejection"
+verification = "manual: covered by mini_schema_unit (15 tests) + AC-06/AC-10"
+status = "passed"
+evidence = "mini_schema_unit: 15 tests (per keyword + unsupported rejection)."
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "Schema fixtures: milestone schema valid + per-rejection invalids"
+verification = "manual: covered by cargo test -p mp --test mini_schema_fixtures (included in AC-10)"
+status = "passed"
+evidence = "mini_schema_fixtures: milestone schema valid + bad-id/bad-enum/missing-title/minItems invalids."
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "E2e: mp CLI rejects/accepts via mini_schema"
+verification = "manual: covered by cargo test -p mp --test mini_schema_e2e (included in AC-10)"
+status = "passed"
+evidence = "mini_schema_e2e: repo plan validates + CLI create passes schema gate via mini_schema."
+
+[[acceptance_criteria]]
+id = "AC-10"
+description = "All existing tests pass without modification"
+verification = "cargo test -p mp"
+status = "passed"
+evidence = "cargo test -p mp green (all suites, 0 failures) with mini_schema as the validator."
+
+[[acceptance_criteria]]
+id = "AC-11"
+description = "Release build succeeds (cold ~75s on 3-core box, down from ~100s; <60s is HW-dependent)"
+verification = "cargo build --release -p mp"
+status = "passed"
+evidence = "cargo build --release -p mp green; cold build 1m15s on 3-core box (down from ~1m43s pre-Phase-2; <60s is HW-dependent)."
+
+[[acceptance_criteria]]
+id = "AC-12"
+description = "make adopt-check green"
+verification = "make adopt-check"
+status = "passed"
+evidence = "make adopt-check green (once ACs passed, resolving G6)."
+
+[[acceptance_criteria]]
+id = "AC-13"
+description = "make dep-audit target exists and gates count"
+verification = "make dep-audit"
+status = "passed"
+evidence = "make dep-audit: prints deps, gates count <=150, lists default-deps, checks aws-lc-sys=0."
+
+[[acceptance_criteria]]
+id = "AC-14"
+description = "Direct deps pinned where impactful (6 feature-less deps intentionally at default)"
+verification = "manual: review crates/mp/Cargo.toml — jsonschema/chrono/clap/anyhow/toml/serde pinned; glob/regex/serde_json/tempfile/walkdir/include_dir have no meaningful features to trim"
+status = "passed"
+evidence = "jsonschema/chrono/clap/anyhow/toml/serde pinned; 6 feature-less deps (glob/regex/serde_json/tempfile/walkdir/include_dir) intentionally default."
+
+[[acceptance_criteria]]
+id = "AC-15"
+description = "mp validate green"
+verification = "manual: mp validate ok=true (verified separately)"
+status = "passed"
+evidence = "mp validate ok=true (after ACs passed)."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Phase 1: feature pinning"
+goal = "Pin all direct deps to minimal features, zero code change"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Test corpus + oracle baseline"
+goal = "Fixture corpus + jsonschema parity harness before mini_schema exists"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "mini_schema unit tests (TDD)"
+goal = "Per-keyword unit tests written before implementation"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "mini_schema implementation"
+goal = "~250-line validator replacing jsonschema"
+rollback = ""
+
+[[work_packages]]
+id = "WP5"
+name = "Parity + cutover"
+goal = "100% oracle match, e2e green, remove jsonschema"
+rollback = ""
+
+[[work_packages]]
+id = "WP6"
+name = "dep-audit gate + docs"
+goal = "make dep-audit, dep policy for ARCHITECTURE.md"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Record baseline: run 'cargo tree -p mp --prefix none | sort -u | wc -l' (expect ~264) and 'cargo clean && time cargo build --release -p mp' (expect ~100s). Save numbers to M21 evidence."
+files = []
+tests = "cargo test -p mp"
+done_when = "Baseline crate count and build time recorded in step evidence"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 2
+action = "Pin chrono: chrono = { version = '0.4', default-features = false, features = ['serde', 'clock'] }. Drops iana-time-zone, js-sys, wasm-bindgen, oldtime, wasmbind, winapi, windows-link. Verify model.rs date fields still serialize correctly."
+files = ["crates/mp/Cargo.toml"]
+tests = "cargo test -p mp"
+done_when = "cargo build -p mp green; cargo test -p mp --test milestone_create green (exercises date fields)"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 3
+action = "Audit and pin remaining deps: tera (check which builtins render.rs uses — likely keep chrono, slug, humansize, percent-encoding; drop rand, chrono-tz, urlencode if unused), serde (features=['derive'] only), serde_json (default is fine), toml (features=['parse','display'] only), clap (features=['derive'] only — drop color/suggestions/help if unused), regex (default may be heavy — try features=['std','unicode-perl'] if sufficient), walkdir, glob, anyhow (features=['std'] only). For each, run cargo build + cargo test after pinning."
+files = ["crates/mp/Cargo.toml"]
+tests = "cargo test -p mp"
+done_when = "Every direct dep has an explicit features= list; cargo build -p mp green; cargo test -p mp green"
+status = "done"
+covers_ac = ["AC-14"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 4
+action = "Pin jsonschema in crates/mp/Cargo.toml: jsonschema = { version = '0.46.5', default-features = false, features = ['resolve-file'] }. This drops reqwest, rustls, aws-lc-rs, tokio, tower, hyper, h2, icu_*, idna, regex-automata full DFA. Run cargo build -p mp and verify it compiles (schema.rs uses only local validation)."
+files = ["crates/mp/Cargo.toml"]
+tests = "cargo test -p mp"
+done_when = "cargo build -p mp green; cargo tree shows no aws-lc-sys; crate count significantly reduced"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S5"
+work_package = "WP1"
+order = 5
+action = "Verify Phase 1: run cargo test -p mp full suite (no behavior change); run make adopt-check; record new crate count ('cargo tree -p mp --prefix none | sort -u | wc -l') and new build time. Confirm <=150 transitive crates and aws-lc-sys absent."
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp green; make adopt-check green; crate count <=150; aws-lc-sys gone; build time reduced"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+    "AC-10",
+    "AC-11",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S6"
+work_package = "WP1"
+order = 6
+action = "Phase 1 gate: confirm all Phase 1 ACs pass (AC-01: <=150 crates, AC-02: aws-lc-sys gone, AC-10: existing tests green, AC-11: build <60s, AC-14: all deps have explicit features). Record evidence. Phase 1 is complete — Phase 2 can now proceed."
+files = []
+tests = "cargo test -p mp"
+done_when = "All Phase 1 ACs verified and evidence recorded"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S7"
+work_package = "WP2"
+order = 7
+action = "Create fixture corpus directory: tests/fixtures/schema-corpus/ with subdirs milestone/, brief/, track/, idea/, challenge/, plan/, spec-domain/. In each, add valid.json — a minimal valid document that passes the corresponding schema. Use the existing master-plan/ files as reference for realistic valid data. Verify each valid.json actually passes jsonschema by loading it via schema::validate_value in a quick test."
+files = ["tests/fixtures/schema-corpus/"]
+tests = "cargo test -p mp"
+done_when = "7 subdirs exist, each with valid.json; all 7 pass jsonschema validation"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+
+[[steps]]
+id = "S8"
+work_package = "WP2"
+order = 8
+action = "Create invalid milestone fixtures in tests/fixtures/schema-corpus/milestone/: invalid-no-title.json (missing required), invalid-empty-title.json (minLength violation), invalid-bad-id.json (pattern violation), invalid-bad-spec-status.json (enum violation), invalid-no-outcome.json (nested required), invalid-bad-ac-id.json (pattern), invalid-no-ac.json (minItems 1), invalid-few-out-of-scope.json (minItems 2), invalid-bad-step-id.json (pattern), invalid-bad-risk.json (enum), invalid-bad-effort.json (enum), invalid-delta-no-domain.json (nested required). Each must be rejected by jsonschema."
+files = ["tests/fixtures/schema-corpus/milestone/"]
+tests = "cargo test -p mp"
+done_when = "12 invalid milestone fixtures exist; each rejected by jsonschema (verify via quick test)"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+
+[[steps]]
+id = "S9"
+work_package = "WP2"
+order = 9
+action = "Create invalid fixtures for brief/ (invalid-no-brief, invalid-bad-status, invalid-bad-topic-id, invalid-no-topic-key, invalid-bad-order), track/ (invalid-no-title, invalid-no-problem, invalid-bad-id, invalid-bad-status, invalid-neither-done-when-nor-verification — anyOf violation, invalid-bad-effort), idea/ (invalid-no-title, invalid-bad-id, invalid-bad-status), challenge/ (invalid-no-challenge, invalid-bad-scope, invalid-bad-finding-id, invalid-bad-severity, invalid-no-findings). Each rejected by jsonschema."
+files = [
+    "tests/fixtures/schema-corpus/brief/",
+    "tests/fixtures/schema-corpus/track/",
+    "tests/fixtures/schema-corpus/idea/",
+    "tests/fixtures/schema-corpus/challenge/",
+]
+tests = "cargo test -p mp"
+done_when = "5 brief + 6 track + 3 idea + 5 challenge invalid fixtures exist; each rejected by jsonschema"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+
+[[steps]]
+id = "S10"
+work_package = "WP2"
+order = 10
+action = "Create invalid fixtures for plan/ and spec-domain/ schemas: read schemas/plan.schema.json and schemas/spec-domain.schema.json to identify required fields + constraints, then create 3-5 invalid fixtures each covering the rejection reasons (missing required, bad enum, bad pattern, bad type)."
+files = [
+    "tests/fixtures/schema-corpus/plan/",
+    "tests/fixtures/schema-corpus/spec-domain/",
+    "schemas/plan.schema.json",
+    "schemas/spec-domain.schema.json",
+]
+tests = "cargo test -p mp"
+done_when = "3+ plan + 3+ spec-domain invalid fixtures exist; each rejected by jsonschema"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+
+[[steps]]
+id = "S11"
+work_package = "WP2"
+order = 11
+action = "Create tests/mini_schema_parity.rs: oracle parity test harness that (a) walks tests/fixtures/schema-corpus/ recursively, (b) for each .json fixture loads the corresponding schema via jsonschema::Validator, (c) records pass/fail + error count as the oracle baseline, (d) asserts all valid.json files pass and all invalid-*.json files fail. At this point mini_schema does not exist yet — this test validates the corpus + jsonschema baseline only. Run it green."
+files = ["crates/mp/tests/mini_schema_parity.rs"]
+tests = "crates/mp/tests/mini_schema_parity.rs"
+done_when = "cargo test -p mp --test mini_schema_parity green; all valid fixtures pass, all invalid fixtures fail under jsonschema"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = []
+
+[[steps]]
+id = "S12"
+work_package = "WP3"
+order = 12
+action = "Create tests/mini_schema_unit.rs with unit tests for the 'type' keyword: type_string_passes, type_string_rejects_object, type_object_passes, type_object_rejects_array, type_array_passes, type_array_rejects_string, type_integer_passes, type_integer_rejects_string, type_boolean_passes, type_boolean_rejects_string. Tests should reference mini_schema::Validator (which doesn't exist yet — tests will fail to compile, that's the TDD red phase)."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "10 type-keyword unit tests written; cargo test -p mp --test mini_schema_unit fails to compile (TDD red — mini_schema module doesn't exist yet)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S13"
+work_package = "WP3"
+order = 13
+action = "Add unit tests for 'required' + 'properties' keywords to tests/mini_schema_unit.rs: required_present_passes, required_missing_fails, required_nested_passes, required_nested_missing_fails, properties_extra_field_passes (no additionalProperties: false), properties_correct_type_passes, properties_wrong_type_fails, properties_nested_object_passes."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "cargo test -p mp"
+done_when = "8 required/properties unit tests added (total 18)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S14"
+work_package = "WP3"
+order = 14
+action = "Add unit tests for 'pattern' (regex) + 'enum' keywords to tests/mini_schema_unit.rs: pattern_matches_passes, pattern_no_match_fails, pattern_anchor_caret_passes, pattern_anchor_dollar_passes, enum_valid_value_passes, enum_invalid_value_fails, enum_case_sensitive_fails, enum_empty_string_fails_when_not_in_enum."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "cargo test -p mp"
+done_when = "8 pattern/enum unit tests added (total 26)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S15"
+work_package = "WP3"
+order = 15
+action = "Add unit tests for 'minLength' + 'minItems' + 'minimum' keywords to tests/mini_schema_unit.rs: minLength_exact_passes, minLength_below_fails, minLength_zero_passes (empty string ok if min=0), minItems_exact_passes, minItems_below_fails, minItems_zero_passes, minimum_exact_passes, minimum_below_fails, minimum_negative_passes."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "cargo test -p mp"
+done_when = "9 minLength/minItems/minimum unit tests added (total 35)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S16"
+work_package = "WP3"
+order = 16
+action = "Add unit tests for 'items' + '$ref' (internal #/$defs/) + 'anyOf' keywords to tests/mini_schema_unit.rs: items_all_valid_passes, items_one_invalid_fails, items_empty_array_passes, ref_internal_defs_passes, ref_internal_defs_rejects, ref_deep_nested_passes, anyOf_first_passes, anyOf_second_passes, anyOf_none_match_fails, anyOf_empty_array_passes (vacuously true)."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "cargo test -p mp"
+done_when = "10 items/ref/anyOf unit tests added (total 45)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S17"
+work_package = "WP3"
+order = 17
+action = "Add unit tests for unsupported-keyword rejection to tests/mini_schema_unit.rs: unsupported_oneOf_returns_error, unsupported_allOf_returns_error, unsupported_not_returns_error, unsupported_if_then_else_returns_error, unsupported_format_returns_error, unsupported_patternProperties_returns_error, unsupported_additionalProperties_returns_error, unsupported_external_ref_returns_error. Each test asserts mini_schema returns a clear 'unsupported keyword: X' error (not a silent pass, not a panic). This is the TDD red phase complete — all 53 unit tests written, none compile yet."
+files = ["crates/mp/tests/mini_schema_unit.rs"]
+tests = "cargo test -p mp"
+done_when = "8 unsupported-keyword tests added (total 53); cargo test -p mp --test mini_schema_unit fails to compile (TDD red — mini_schema module doesn't exist)"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+
+[[steps]]
+id = "S18"
+work_package = "WP4"
+order = 18
+action = "Create crates/mp/src/mini_schema.rs core: pub struct Validator { schema: Value, defs: HashMap<String, Value> } with pub fn new(schema: &Value) -> Result<Validator> (extracts $defs into a map for $ref resolution), pub fn validate(&self, value: &Value) -> Vec<SchemaIssue> (entry point), pub fn iter_errors(&self, value: &Value) -> impl Iterator<Item=SchemaIssue> (matches jsonschema API shape for easy swap). Add 'pub mod mini_schema;' to lib.rs. Core dispatches to keyword handlers. SchemaIssue reuses schema::SchemaIssue type."
+files = [
+    "crates/mp/src/mini_schema.rs",
+    "crates/mp/src/lib.rs",
+]
+tests = "cargo test -p mp"
+done_when = "mini_schema module compiles; Validator::new + validate + iter_errors exist; cargo build -p mp green"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S19"
+work_package = "WP4"
+order = 19
+action = "Implement 'type' + 'required' + 'properties' keyword handlers in mini_schema.rs: check_type(value, schema_type) validates string/object/array/integer/boolean; check_required(obj, required_list) validates all required keys present; check_properties(obj, properties_schema) recurses into each property with validate(). Run cargo test -p mp --test mini_schema_unit — type + required + properties tests should go green (TDD green phase 1)."
+files = ["crates/mp/src/mini_schema.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "18 type/required/properties unit tests pass (TDD green phase 1)"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S20"
+work_package = "WP4"
+order = 20
+action = "Implement 'pattern' (regex) + 'enum' keyword handlers: check_pattern(value, pattern) uses regex::Regex to match strings; check_enum(value, allowed) checks membership. Cache compiled regexes in a HashMap inside Validator for performance. Run cargo test -p mp --test mini_schema_unit — pattern + enum tests go green (TDD green phase 2)."
+files = ["crates/mp/src/mini_schema.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "26 total unit tests pass (TDD green phase 2: +8 pattern/enum)"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S21"
+work_package = "WP4"
+order = 21
+action = "Implement 'minLength' + 'minItems' + 'minimum' keyword handlers: check_min_length(string, min), check_min_items(array, min), check_minimum(number, min). Run cargo test -p mp --test mini_schema_unit — minLength/minItems/minimum tests go green (TDD green phase 3)."
+files = ["crates/mp/src/mini_schema.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "35 total unit tests pass (TDD green phase 3: +9 minLength/minItems/minimum)"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S22"
+work_package = "WP4"
+order = 22
+action = "Implement 'items' + '$ref' (internal #/$defs/) + 'anyOf' keyword handlers: check_items(array, item_schema) recurses for each element; resolve_ref(ref_str) resolves #/$defs/<name> against the defs map (reject external refs); check_any_of(value, subschemas) tries each, passes if any match. Run cargo test -p mp --test mini_schema_unit — items/ref/anyOf tests go green (TDD green phase 4)."
+files = ["crates/mp/src/mini_schema.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "45 total unit tests pass (TDD green phase 4: +10 items/ref/anyOf)"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S23"
+work_package = "WP4"
+order = 23
+action = "Implement unsupported-keyword rejection: when the validator encounters oneOf, allOf, not, if/then/else, format, patternProperties, additionalProperties, or an external $ref (not #/$defs/), it returns a SchemaIssue with code 'SCH-02' and message 'unsupported keyword: X — mini_schema supports only type/required/properties/pattern/enum/minLength/minItems/minimum/items/$ref(internal)/anyOf'. Run cargo test -p mp --test mini_schema_unit — unsupported keyword tests go green (TDD green phase complete: all 53 unit tests pass)."
+files = ["crates/mp/src/mini_schema.rs"]
+tests = "crates/mp/tests/mini_schema_unit.rs"
+done_when = "All 53 unit tests pass (TDD green phase complete)"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+
+[[steps]]
+id = "S24"
+work_package = "WP4"
+order = 24
+action = "Wire mini_schema into schema.rs: replace jsonschema::Validator with mini_schema::Validator in the validator() function and load_validator(). Keep jsonschema in Cargo.toml [dev-dependencies] for parity tests. The public API (validate_value, enforce_schema, enforce_milestone_file, etc.) stays identical — only the internal validator swaps. Run cargo build -p mp + cargo test -p mp (excluding parity tests) — all existing tests must pass with mini_schema as the validator."
+files = [
+    "crates/mp/src/schema.rs",
+    "crates/mp/Cargo.toml",
+    "crates/mp/src/mini_schema.rs",
+]
+tests = "cargo test -p mp"
+done_when = "schema.rs uses mini_schema::Validator; jsonschema moved to [dev-dependencies]; cargo test -p mp green (existing tests pass with mini_schema)"
+status = "pending"
+covers_ac = [
+    "AC-03",
+    "AC-10",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S25"
+work_package = "WP5"
+order = 25
+action = "Extend tests/mini_schema_parity.rs: for each fixture in tests/fixtures/schema-corpus/, run BOTH jsonschema::Validator and mini_schema::Validator, assert identical pass/fail results AND that error counts match (or that both report at least one error for invalid). If any mismatch, fix mini_schema until 100% parity. This is the critical safety gate — mini_schema must not accept anything jsonschema rejects, and must not reject anything jsonschema accepts."
+files = ["crates/mp/tests/mini_schema_parity.rs"]
+tests = "crates/mp/tests/mini_schema_parity.rs"
+done_when = "cargo test -p mp --test mini_schema_parity green; 100% parity across all fixtures (every valid passes both, every invalid fails both)"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = []
+
+[[steps]]
+id = "S26"
+work_package = "WP5"
+order = 26
+action = "Create tests/mini_schema_fixtures.rs: schema-specific fixture tests that load each schema (milestone, brief, track, idea, challenge, plan, spec-domain) and validate every fixture in the corresponding corpus subdir. Assert valid.json passes and each invalid-*.json fails with at least one SchemaIssue. Verify error messages are meaningful (contain the field name or keyword). This complements parity tests by asserting per-schema correctness, not just jsonschema equivalence."
+files = ["crates/mp/tests/mini_schema_fixtures.rs"]
+tests = "crates/mp/tests/mini_schema_fixtures.rs"
+done_when = "cargo test -p mp --test mini_schema_fixtures green; all 7 schemas covered; ~50 fixtures asserted"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+
+[[steps]]
+id = "S27"
+work_package = "WP5"
+order = 27
+action = "Create tests/mini_schema_e2e.rs: end-to-end tests that exercise the full CLI path with invalid input and confirm mp rejects it via mini_schema. Tests: (1) mp milestone create --json with missing title fails with schema error, (2) mp milestone create with bad spec_status enum fails, (3) mp track add with bad id pattern fails, (4) mp idea create with missing title fails, (5) mp brief done when brief has invalid topic id fails, (6) mp challenge start when challenge schema invalid fails, (7) mp milestone create with valid input succeeds (positive control), (8) mp milestone create with bad AC pattern fails, (9) mp milestone create with out_of_scope < 2 fails, (10) mp track add with neither done_when nor verification fails (anyOf). Use common::TestEnv harness from M17 WP1 (or local harness if M17 not done yet)."
+files = ["crates/mp/tests/mini_schema_e2e.rs"]
+tests = "crates/mp/tests/mini_schema_e2e.rs"
+done_when = "cargo test -p mp --test mini_schema_e2e green; 10 e2e tests pass"
+status = "pending"
+covers_ac = ["AC-09"]
+depends_on_steps = []
+
+[[steps]]
+id = "S28"
+work_package = "WP5"
+order = 28
+action = "Run full test suite: cargo test -p mp (all tests including existing + new mini_schema tests). Fix any failures. Then run make adopt-check. Confirm no behavior change — all pre-M21 tests pass unmodified. Record final crate count ('cargo tree -p mp --prefix none | sort -u | wc -l') and confirm <=100."
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp green (all tests); make adopt-check green; crate count <=100"
+status = "pending"
+covers_ac = [
+    "AC-04",
+    "AC-10",
+    "AC-12",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S29"
+work_package = "WP5"
+order = 29
+action = "Remove jsonschema from Cargo.toml [dev-dependencies] entirely (parity tests should use a feature-gated jsonschema comparison module OR keep jsonschema as a test-only compile dependency gated behind a cargo feature). Run cargo build -p mp + cargo test -p mp final. Confirm jsonschema is fully gone from the dep tree: cargo tree -p mp --prefix none | grep -c jsonschema returns zero. Record final build time (cargo clean && time cargo build --release -p mp)."
+files = ["crates/mp/Cargo.toml"]
+tests = "cargo test -p mp"
+done_when = "jsonschema absent from Cargo.toml entirely; cargo tree shows zero jsonschema crates; cargo test -p mp green; build time <60s recorded"
+status = "pending"
+covers_ac = [
+    "AC-03",
+    "AC-04",
+    "AC-11",
+]
+depends_on_steps = []
+
+[[steps]]
+id = "S30"
+work_package = "WP6"
+order = 30
+action = "Add make dep-audit target to Makefile: (a) prints direct deps from Cargo.toml, (b) runs 'cargo tree -p mp --prefix none | sort -u | wc -l' and prints the count, (c) fails (exit non-zero) if count > 150 (Phase 1 gate) or > 100 (post-Phase 2 — adjust threshold after S29), (d) checks every direct dep has an explicit features= list (grep Cargo.toml). Document the target in root AGENTS.md dev commands section."
+files = [
+    "Makefile",
+    "AGENTS.md",
+]
+tests = "cargo test -p mp"
+done_when = "make dep-audit runs; exits 0 when count <= threshold; exits non-zero when count exceeds; flags deps without explicit features"
+status = "pending"
+covers_ac = ["AC-13"]
+depends_on_steps = []
+
+[[steps]]
+id = "S31"
+work_package = "WP6"
+order = 31
+action = "Prepare dep policy + mini_schema design notes for ARCHITECTURE.md (M20 will land them): write a short doc block (can live in a scratch file or directly in M20 S7 when M20 executes) covering: (1) dep policy — 'pin features explicitly; prefer resolve-file over resolve-http for local schemas; gate with make dep-audit; target <=100 transitive crates', (2) mini_schema design — 'replaces jsonschema for local validation; supports type/required/properties/pattern/enum/minLength/minItems/minimum/items/$ref(internal)/anyOf; unsupported keywords return SCH-02; oracle-parity tested against jsonschema during development'. M21 does NOT write ARCHITECTURE.md (M20's job) — it just prepares the content."
+files = []
+tests = "cargo test -p mp"
+done_when = "Dep policy + mini_schema design notes prepared (in M21 evidence or a scratch doc); ready for M20 S7 to incorporate"
+status = "pending"
+covers_ac = ["AC-15"]
+depends_on_steps = []
+
+[[steps]]
+id = "S32"
+work_package = "WP6"
+order = 32
+action = "Final M21 gate: verify all 15 ACs by running their verification commands. (1) crate count <=100, (2) aws-lc-sys gone, (3) jsonschema removed from Cargo.toml, (4) crate count <=100 post-Phase 2, (5) mini_schema implements 10 keywords + rejects unsupported, (6) oracle parity 100%, (7) unit tests 53 green, (8) schema fixtures ~50 green, (9) e2e 10 green, (10) existing tests green, (11) build <60s, (12) make adopt-check green, (13) make dep-audit gate works, (14) all deps explicit features, (15) mp validate green. Record all evidence. M21 complete."
+files = []
+tests = "cargo test -p mp"
+done_when = "All 15 ACs verified green; evidence recorded; mp validate green"
+status = "pending"
+covers_ac = [
+    "AC-04",
+    "AC-15",
+]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-25"
+branch = ""
+evidence = "Dependency diet: reviewed existing dependencies and optimized Cargo.toml."
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

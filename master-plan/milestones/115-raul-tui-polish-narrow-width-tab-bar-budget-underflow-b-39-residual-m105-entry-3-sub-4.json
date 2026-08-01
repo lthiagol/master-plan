@@ -1,0 +1,149 @@
+{
+  "milestone": {
+    "id": "115",
+    "title": "raul TUI polish — narrow-width tab bar render budget underflow (M105 code review entry 3 sub-4)",
+    "slug": "raul-tui-polish-narrow-width-tab-bar-budget-underflow-b-39-residual-m105-entry-3-sub-4",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "114"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.1.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, the raul TUI tab bar renders cleanly at terminal widths below 6 columns — no overflow, no indicator spans spilling outside the area. The `compute_tab_bar_layout` budget underflow surfaced during M105 code review (entry 3 sub-4) is resolved with an explicit design choice."
+  },
+  "problem": {
+    "description": "M105's code review (mp-dogfood-log.md entry 3, sub-item 4) surfaced a pre-existing budget underflow in `crates/raul/src/tui/render.rs::compute_tab_bar_layout`. At `area.width < 6`, `budget.saturating_sub(3+3)` returns 0 and the active lane itself doesn't fit, but the renderer still emits indicator spans (3+4+3 = 10 cols into a 4-col area). M105's refactor preserved this logic intentionally to stay M-shaped; the finding was deferred to a post-rc polish follow-up (verdict: backlog). This is the post-rc polish follow-up. The underflow is not a crash but it produces visually broken output at very narrow widths and silently violates the layout contract."
+  },
+  "scope": {
+    "in_scope": [
+      "Resolve the width<6 budget underflow in `crates/raul/src/tui/render.rs::compute_tab_bar_layout`. Pick one explicit design: (a) drop left/right indicator spans entirely when `area.width < 6` and render an active-only bar, or (b) render nothing (empty bar) when the active lane itself cannot fit. Choice documented in a code comment. Pinned by a unit test asserting the rendered output width never exceeds `area.width` at widths 1..10."
+    ],
+    "out_of_scope": [
+      "raul TUI larger redesigns (board view, milestone tree, theme audit — ideas ID-13..ID-16, each needs its own spec).",
+      "Non-tab-bar raul rendering issues.",
+      "mp-side work (covered by M111..M114).",
+      "The historical B-39 hit-test divergence at the same narrow widths — that was the M105 AC-01 fix; this milestone addresses only the render-side budget underflow."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "At `area.width` from 1 to 5 inclusive, `compute_tab_bar_layout` produces a layout whose total rendered width never exceeds `area.width`. Indicator spans are dropped (or the bar is empty) at narrow widths per the chosen design. The active lane fits or the bar renders nothing — never overflow.",
+      "verification": "cargo test -p raul --test tab_bar_narrow_width",
+      "status": "passed",
+      "evidence": "AC-01 (narrow-width tab bar budget) verified: cargo test -p raul --test tab_bar_narrow_width. Test asserts that for area.width in 1..=5, the rendered output width never exceeds area.width; for width >= 6, the M105 layout is preserved. The width<6 budget underflow in crates/raul/src/tui/render.rs::compute_tab_bar_layout is resolved (entry 3 sub-4 from M105 code review)."
+    },
+    {
+      "id": "AC-02",
+      "description": "At `area.width >= 6`, behavior is unchanged from M105 — full indicator + active + trailing layout. No regression.",
+      "verification": "cargo test -p raul --test tui_tab_bar",
+      "status": "passed",
+      "evidence": "AC-02 (no regression at width >= 6) verified: cargo test -p raul --test tui_tab_bar. M105 tab_bar_layout test passes unchanged. The narrow-width fix in compute_tab_bar_layout only kicks in below area.width < 6, so the M105 layout is preserved at all widths >= 6."
+    },
+    {
+      "id": "AC-03",
+      "description": "Closure: `cargo test -p raul && mp validate --summary` exits 0.",
+      "verification": "cargo test -p raul && mp validate --summary",
+      "status": "passed",
+      "evidence": "AC-03 (closure) verified: cargo test -p raul && mp validate --summary exits 0. Pre-close-out validate was 14 G6 errors + 1 W44; post-close-out is 0 errors / 0 warnings. Scope narrowed from cargo test -p mp -p raul (broad, multi-crate) to single-crate per §3.2.1 + L53. M115's affected-crate set is {raul} (S1: crates/raul/src/tui/render.rs + tests/tab_bar_narrow_width.rs; S2: crates/raul/tests/tab_bar_layout.rs); verifying only -p raul is correct."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Narrow-width budget fix",
+      "goal": "Resolve the width<6 budget underflow in compute_tab_bar_layout (render.rs). Pick a design (drop indicators / empty bar) and pin with a unit test covering widths 1..10.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Closure",
+      "goal": "cargo test -p raul && mp validate --summary green.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Resolve the width<6 budget underflow in crates/raul/src/tui/render.rs::compute_tab_bar_layout. Pick one design: (a) when area.width < INDICATOR_BUDGET (6), drop left+right indicator spans and render the active lane only (clamped to area.width); OR (b) render an empty bar when the active lane itself cannot fit. Document the choice in a comment next to the saturation site. Add a unit test covering widths 1..10 asserting total rendered width <= area.width.",
+      "files": [
+        "crates/raul/src/tui/render.rs",
+        "crates/raul/tests/tab_bar_narrow_width.rs"
+      ],
+      "tests": "cargo test -p raul --test tab_bar_narrow_width",
+      "done_when": "Test asserts that for area.width in 1..=5, the rendered output width never exceeds area.width; for width >= 6, the M105 layout is preserved (covered by AC-02).",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S1 closed by crates/raul/tests/tab_bar_narrow_width.rs (asserts compute_tab_bar_layout never exceeds area.width for widths 1..=5; M105 layout preserved at width >= 6). The fix in crates/raul/src/tui/render.rs resolves the width<6 budget underflow (M105 code review entry 3 sub-4). WP1 closed."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Regression guard: assert the existing tab_bar_layout test (M105 behavior) still passes at width >= 6. No indicator dropping at normal widths.",
+      "files": [
+        "crates/raul/tests/tab_bar_layout.rs"
+      ],
+      "tests": "cargo test -p raul --test tui_tab_bar",
+      "done_when": "M105 tab_bar_layout test passes unchanged; no regression at width >= 6.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S2 closed by crates/raul/tests/tab_bar_layout.rs (M105 tab_bar_layout test passes unchanged; no regression at width >= 6). The narrow-width fix only kicks in below area.width < 6. WP1 closed (regression pin)."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Run affected gates.",
+      "files": [],
+      "tests": "cargo test -p raul && mp validate --summary",
+      "done_when": "cargo test -p raul exits 0; mp validate exits 0 with 0 errors.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Closure step: cargo test -p raul && mp validate --summary exits 0. mp validate post-fix: 0 errors / 0 warnings. WP2 closed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-07",
+    "branch": "",
+    "evidence": "All 3 ACs verified; tests green"
+  }
+}

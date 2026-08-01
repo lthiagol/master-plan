@@ -1,0 +1,174 @@
+{
+  "strategy": "resume_then_ready",
+  "lanes": [
+    {
+      "name": "blocked",
+      "item_type": "milestone",
+      "item_count": 0,
+      "head": null,
+      "items": []
+    },
+    {
+      "name": "execution",
+      "item_type": "milestone",
+      "item_count": 2,
+      "head": {
+        "rank": 1,
+        "type": "milestone",
+        "milestone": {
+          "id": "110",
+          "title": "Hygiene sweep v2",
+          "lifecycle": "approved",
+          "priority": "normal"
+        },
+        "step": null,
+        "work_package": null,
+        "reason": "execution lane head"
+      },
+      "items": [
+        {
+          "rank": 1,
+          "type": "milestone",
+          "milestone": {
+            "id": "110",
+            "title": "Hygiene sweep v2",
+            "lifecycle": "approved",
+            "priority": "normal"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "execution lane head"
+        },
+        {
+          "rank": 2,
+          "type": "milestone",
+          "milestone": {
+            "id": "119",
+            "title": "Agent role dispatch",
+            "lifecycle": "approved",
+            "priority": "normal"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "execution lane head"
+        }
+      ]
+    },
+    {
+      "name": "awaiting-approval",
+      "item_type": "milestone",
+      "item_count": 0,
+      "head": null,
+      "items": []
+    },
+    {
+      "name": "review",
+      "item_type": "milestone",
+      "item_count": 1,
+      "head": {
+        "rank": 1,
+        "type": "milestone",
+        "milestone": {
+          "id": "103",
+          "title": "raul path tab + raul path CLI",
+          "lifecycle": "done",
+          "review_phase": "needs-self-check",
+          "priority": "normal"
+        },
+        "step": null,
+        "work_package": null,
+        "reason": "review phase: needs-self-check"
+      },
+      "items": [
+        {
+          "rank": 1,
+          "type": "milestone",
+          "milestone": {
+            "id": "103",
+            "title": "raul path tab + raul path CLI",
+            "lifecycle": "done",
+            "review_phase": "needs-self-check",
+            "priority": "normal"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "review phase: needs-self-check"
+        }
+      ]
+    },
+    {
+      "name": "grooming",
+      "item_type": "milestone",
+      "item_count": 0,
+      "head": null,
+      "items": []
+    },
+    {
+      "name": "backlog",
+      "item_type": "backlog_item",
+      "item_count": 3,
+      "head": {
+        "rank": 1,
+        "type": "backlog-item",
+        "milestone": {
+          "kind": "bugfix",
+          "id": "BF-01",
+          "title": "Reconstruct hybrid-work .mp/ fixture",
+          "priority": "regular"
+        },
+        "step": null,
+        "work_package": null,
+        "reason": "backlog item (priority=regular)"
+      },
+      "items": [
+        {
+          "rank": 1,
+          "type": "backlog-item",
+          "milestone": {
+            "kind": "bugfix",
+            "id": "BF-01",
+            "title": "Reconstruct hybrid-work .mp/ fixture",
+            "priority": "regular"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "backlog item (priority=regular)"
+        },
+        {
+          "rank": 2,
+          "type": "backlog-item",
+          "milestone": {
+            "kind": "tweak",
+            "id": "TW-01",
+            "title": "--version flag on mp CLI",
+            "priority": "regular"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "backlog item (priority=regular)"
+        },
+        {
+          "rank": 3,
+          "type": "backlog-item",
+          "milestone": {
+            "kind": "backlog",
+            "id": "B-04",
+            "title": "[M07] JSON schema validate on CLI write",
+            "priority": "high"
+          },
+          "step": null,
+          "work_package": null,
+          "reason": "backlog item (priority=high)"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "backlog": 3,
+    "blocked": 0,
+    "execution": 2,
+    "awaiting_approval": 0,
+    "grooming": 0,
+    "review": 1
+  }
+}

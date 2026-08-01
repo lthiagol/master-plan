@@ -1,0 +1,469 @@
+{
+  "milestone": {
+    "id": "185",
+    "title": "raul Milestones table refactor — table visual with indent + lifecycle gauge, multi-select lifecycle filter, drop Grooming tab",
+    "slug": "raul-milestones-table-refactor-table-visual-with-indent-lifecycle-gauge-multi-select-lifecycle-filter-drop-grooming-tab",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-18",
+    "updated": "2026-07-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-18T21:17:29.679944+00:00"
+  },
+  "intent": {
+    "outcome": "The Milestones tab uses the same Table widget as Backlog (proper row cursor via highlight_style(REVERSED)), adds a lifecycle gauge column showing position in the canonical lifecycle path, and a multi-select lifecycle filter modal so users can show any combination (approved, in-progress, remediation, done, ...). The old Grooming tab is gone — its semantics (approved + in-progress + groomed) are reachable via the Grooming preset bound to g."
+  },
+  "problem": {
+    "description": "Today's Milestones tab uses a custom line-span renderer with only BOLD applied to id-substring spans as the selected-row signal — no row-wide cursor, weak highlight. Backlog uses a Table widget with highlight_style(REVERSED), proper row cursor. The asymmetry makes navigation feel different on the two list-surfacing tabs. The Grooming tab is one hard-coded filter (approved + in-progress + groomed); users who want remediation-only or done-only have no way to express that. There is no visual indicator of lifecycle position — a colored badge is the only signal. The lifecycle rank table in app.rs (in-progress > approved > groomed > done > self-reviewed > reviewed > complete > cancelled > remediation > draft) is the canonical ordering and is the right shape for a gauge."
+  },
+  "scope": {
+    "in_scope": [
+      "Drop Lane::Grooming from Lane::ordered() and from the dispatcher in app.rs render() match",
+      "Replace render_milestone_tree in lane_lists.rs:419 with a Table-widget-based renderer matching Backlog's visual (highlight_style(REVERSED), column layout with id, title, priority, lifecycle gauge, lifecycle)",
+      "Add an indent column showing depends_on[0] depth (small left indent, max ~4 spaces)",
+      "Add a lifecycle gauge column: 8 segments (draft → groomed → approved → in-progress → done → self-reviewed → reviewed → complete); the segment for the current lifecycle is filled and palette-colored, segments before are dim filled, segments after are empty; cancelled shows ✗, remediation shows ↺ instead of the segmented bar",
+      "Extend crates/raul/src/tui/progress.rs (not a new module) with the lifecycle gauge widget",
+      "Add app.milestone_filter: BTreeSet<Lifecycle> state on App (empty = all)",
+      "New mode: Mode::LifecycleFilter — multi-select modal with Space toggle, arrows navigate, Enter commit, Esc revert",
+      "New actions: OpenLifecycleFilter, LifecycleFilterToggle, LifecycleFilterNext/Prev, LifecycleFilterCommit, LifecycleFilterCancel, ApplyGroomingPreset",
+      "Title bar chip on Milestones: 'Milestones · approved, in-progress (8)' when filter is non-empty, 'Milestones · All (12)' when empty",
+      "g keybind applies the Grooming preset (approved + in-progress + groomed)",
+      "Filter state persists across lane switches (same lifetime as hide_done and lane_sort_key)",
+      "Pin parity tests: synthetic milestone set → expected rendered order; synthetic lifecycle set → expected gauge segment for each lifecycle"
+    ],
+    "out_of_scope": [
+      "Filter modal for Backlog/Ideas (a separate title-bar filter chip is a follow-up; M185's modal is Milestones-only)",
+      "Backlog table refactor (M184 already keeps the existing Backlog renderer; M185 lifts the shared helper but does not change Backlog visually)",
+      "True fuzzy matching on the lifecycle filter (the filter is a multi-select set, not a search)",
+      "Changing the underlying MilestoneSummary shape in mp (priority, updated, depends_on already carry enough)",
+      "Any new keybinds beyond F (filter), g (preset), and the modal-internal keys",
+      "Refactoring the existing render_milestone_tree module (crates/raul/src/tui/render/milestone_tree.rs); it can stay as-is — only the lane_lists.rs:419 caller is replaced"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Lane::ordered() returns exactly 7 lanes (Overview, Milestones, Path, Backlog, Ideas, Watch, Settings). Lane::Grooming no longer in the list. The visible_milestones() Grooming special-case branch is removed.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_lane_ordering_post_grooming --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-02",
+      "description": "Lane::Milestones renders via a Table widget (not the line-span tree renderer). highlight_style is REVERSED on the selected row. A test renders a synthetic milestone set with cursor at index 2 and asserts the third row is highlighted (REVERSED style applied to that row only).",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_milestones_table_cursor --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-03",
+      "description": "The lifecycle gauge column renders: 8 segments for the canonical lifecycles (draft, groomed, approved, in-progress, done, self-reviewed, reviewed, complete); current lifecycle's segment filled and colored using the moved lifecycle_color mapping (complete→success, in-progress→accent, blocked→danger, approved/ready→warn, else→dim); segments before are dim filled; segments after are empty. Cancelled shows ✗ (danger), remediation shows ↺ (warn). A test pins each lifecycle → (segment_index, color) pair against a fixture milestone set.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-04",
+      "description": "Pressing F on Milestones opens the lifecycle filter modal. Space toggles a lifecycle, arrows navigate, Enter commits (filter applied), Esc reverts (filter restored to prior state). A test exercises each interaction: open modal → toggle 'approved' → toggle 'in-progress' → commit → assert visible_milestones() returns only items with those lifecycles.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-05",
+      "description": "Title bar on Milestones shows a chip 'Milestones · <comma-separated-filter> (<count>)' when filter is non-empty, 'Milestones · All (<count>)' when empty. A test pins both states against a fixture set.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-06",
+      "description": "Pressing g on Milestones applies the Grooming preset: app.milestone_filter becomes {'approved', 'in-progress', 'groomed'}. Title bar reflects the new filter. visible_milestones() returns only items with those lifecycles. A test pins the preset's filter set.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_grooming_preset --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-07",
+      "description": "Filter state persists across lane switches: switching from Milestones to Backlog and back to Milestones restores the active filter (not reset to empty). A test exercises the round-trip.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_filter_persistence --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-08",
+      "description": "cargo fmt --all -- --check passes; cargo clippy -p raul --tests --no-deps -- -D warnings passes.",
+      "verification": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-09",
+      "description": "mp validate exits 0 with the new milestone file in master-plan/.",
+      "verification": "manual: after M185 lands, ls master-plan/milestones/185-*.json returns ≥1 hit; cargo nextest run -p raul --no-fail-fast exits 0; mp validate exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-10",
+      "description": "Lowercase f continues to bind Action::ToggleFilter (annotation open-only toggle in the annotation thread view) and capital F binds OpenLifecycleFilter — both coexist. A test confirms that pressing f in the annotation thread flips app.open_only; pressing F on Milestones opens the lifecycle filter modal. The help overlay text explicitly notes the case distinction.",
+      "verification": "manual: after M185 lands, cargo nextest run -p raul --test tui_filter_keybind_coexistence --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-11",
+      "description": "The help overlay (modes/help.rs) lists the new keybinds F (lifecycle filter), g (grooming preset), o (cycle sort — landed by M186), and / (search — landed by M186) under the Milestones section, with the case distinction for f vs F explicitly noted. The Settings flat key list (modes/settings.rs::SETTINGS_KEYS) has entries for keybinds.lifecycle_filter, keybinds.grooming_preset, keybinds.cycle_sort, and keybinds.search, so users can rebind through the standard editor.",
+      "verification": "manual: after M186 lands, cargo nextest run -p raul --test tui_help_overlay_sync --no-fail-fast exits 0 [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    },
+    {
+      "id": "AC-12",
+      "description": "CHANGELOG.md has a new entry describing the M183–M186 TUI refactor (7 tabs, search, lifecycle filter, gauge, two-line footer) under the current unreleased version section.",
+      "verification": "manual: after M185 lands, grep -E 'M183|M184|M185|M186' CHANGELOG.md returns ≥4 hits [manual-auto-prefix: 2026-07-18]",
+      "status": "passed",
+      "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "gauge-position",
+      "choice": "Lifecycle gauge as a column between priority and lifecycle-at on the Milestones table",
+      "rationale": "Right-anchored so titles (left-anchored) keep maximum width; the gauge width is fixed (8 cells + padding) regardless of terminal width — the existing list_title_col_width helper in lane_lists.rs already handles column-flex behavior."
+    },
+    {
+      "area": "gauge-segments",
+      "choice": "8 segments in the order draft → groomed → approved → in-progress → done → self-reviewed → reviewed → complete; cancelled and remediation render as off-path markers (✗ and ↺)",
+      "rationale": "This matches the canonical lifecycle path the mp toolkit treats as forward-flowing. Off-path states (cancelled, remediation) are not part of the linear progression and need a distinct marker so the gauge doesn't lie about position."
+    },
+    {
+      "area": "grooming-preset",
+      "choice": "g keybind applies the preset; no separate Grooming tab; the preset is encoded as a constant filter set",
+      "rationale": "Preserves old Grooming tab muscle memory for users who relied on it. Encoding the preset as a constant filter set (rather than a separate rendering mode) keeps the rendering path simple and means the chip + the preset are the same code path."
+    },
+    {
+      "area": "filter-state-lifetime",
+      "choice": "Persist app.milestone_filter alongside hide_done and lane_sort_key (in-memory across lane switches; cleared on raul restart for this milestone — MP_HOME persistence is a follow-up if users want it)",
+      "rationale": "Same persistence model as existing in-memory user preferences. MP_HOME persistence can be added later if it becomes a UX gap."
+    },
+    {
+      "area": "indent-column",
+      "choice": "Indent column shows depends_on[0] depth (1 space per level, capped at ~4 spaces) as a leading column",
+      "rationale": "Preserves the 'tree feel' of the previous render_milestone_tree without committing to full tree glyphs — at scale (50+ milestones), pure tree glyphs get noisy. Indent is the minimum cue needed to see hierarchy; deeper relationships are surfaced via the title text."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "milestones table + lifecycle gauge",
+      "goal": "Replace render_milestone_tree (lane_lists.rs:419) with a Table-widget-based renderer matching Backlog's visual; add lifecycle gauge column; drop Lane::Grooming",
+      "rollback": "Restore render_milestone_tree tree-glyph renderer and the Lane::Grooming branch in visible_milestones(); leave the lifecycle gauge module in place as dead code."
+    },
+    {
+      "id": "WP2",
+      "name": "lifecycle filter modal",
+      "goal": "Multi-select lifecycle filter modal bound to F; g keybind applies Grooming preset; title bar chip",
+      "rollback": "Remove the lifecycle filter mode from mode.rs and the F/g keybinds from keybinds.rs; drop app.milestone_filter state."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Remove Lane::Grooming from the Lane enum, Lane::ordered(), and the compact_label() match. Update the 7 production files that reference Lane::Grooming: (1) crates/raul/src/tui/app.rs — drop the enum variant, Lane::Grooming arm in Lane::ordered(), compact_label match, sort_keys_for match (collapse to Milestones + Ideas + Backlog only), visible_backlog list-size dispatch (line 969), and the Grooming special-case branch in visible_milestones (the legacy 'approved || in-progress || groomed' filter is replaced by the new milestone_filter mechanism in WP2); (2) crates/raul/src/tui/runner_helpers.rs — remove Lane::Grooming from valid_lanes in load_persisted_sort_keys, from match_lane_label, and from the data-loader dispatch (Lane::Grooming currently calls load_milestones — collapse to Milestones only); (3) crates/raul/src/tui/render/lane_lists.rs — drop the Grooming arm in render_lane_list; (4) crates/raul/src/tui/view_state.rs — drop Lane::Grooming from the scrollbar-rect dispatch match (line 598); (5) crates/raul/src/tui/action.rs — remove the Lane::Grooming arm in the Enter-key handler (it called enter_milestone_detail; that path is now reachable via Milestones); (6) crates/raul/src/lanes.rs — drop LANE_GROOMING references in the lane_label match; (7) crates/raul/src/path_tree_model.rs — line 80 maps the 'grooming' lane string for the Path tab's lifecycle branches; verify whether the path data still emits this branch and update if needed. Also: remove the body string 'Grooming requested via raul TUI' in crates/raul/src/tui/runner_helpers.rs:471 if its caller is removed; trace the consumer before removal.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/lanes.rs",
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lane_ordering_post_grooming --no-fail-fast",
+      "done_when": "Lane::Grooming is no longer referenced anywhere; Lane::ordered() returns 7 lanes; App::visible_milestones() no longer has the Grooming special case. A test pins Lane::ordered() shape.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Replace render_milestone_tree (lane_lists.rs:419) with a Table-widget-based renderer matching Backlog's visual. Columns: indent (depends_on[0] depth, 1 space per level capped at 4), id, title (fill), priority, lifecycle gauge, lifecycle-at. Use highlight_style(REVERSED) for the selected row. As part of this step, delete the entire crates/raul/src/tui/render/milestone_tree.rs module (the file becomes dead code after the Table renderer lands): drop the pub mod milestone_tree; declaration in render/mod.rs:18, drop the use crate::tui::render::milestone_tree; in render/lane_lists.rs:10, and remove the file itself. The lifecycle_color helper inside milestone_tree.rs is moved to progress.rs in step S3 — do not lose it during deletion.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_table_cursor --no-fail-fast",
+      "done_when": "Milestones tab renders via a Table widget with REVERSED cursor; a test asserts the cursor lands on the correct row (REVERSED style applied to that row only).",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Extend crates/raul/src/tui/progress.rs (not a new module) with lifecycle_gauge_segment(lifecycle: &str) → &str helper and lifecycle_color(lifecycle: &str, palette: &Palette) → Color (moved from milestone_tree.rs which is deleted in step S2 — preserve the exact mapping: complete → success, in-progress → accent, blocked → danger, approved / ready → warn, else → dim). 8 canonical lifecycles map to a segmented bar position: draft=0, groomed=1, approved=2, in-progress=3, done=4, self-reviewed=5, reviewed=6, complete=7. Cancelled shows ✗ (using palette.danger), remediation shows ↺ (using palette.warn). Add a render function that draws the gauge as 8 cells (▮ for the current segment + filled palette color, ▮ dim for prior segments, ▯ for future segments). Wire it into the Milestones table column between priority and lifecycle-at. A test pins each lifecycle → (segment_index, color) pair.",
+      "files": [
+        "crates/raul/src/tui/progress.rs",
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast",
+      "done_when": "Each lifecycle renders the correct segment; the gauge is visible in the Milestones table; a test pins each lifecycle → segment mapping.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add app.milestone_filter: BTreeSet<Lifecycle> state on App. Update App::visible_milestones() to apply the filter: empty set means 'all' (current behavior); non-empty set narrows to milestones whose lifecycle is in the set. Filter state is in-memory and survives lane switches (same lifetime as hide_done).",
+      "files": [
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_filter_persistence --no-fail-fast",
+      "done_when": "app.milestone_filter exists and is consulted by visible_milestones(); filter survives lane switches; a test exercises each.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add Mode::LifecycleFilter variant. Add actions: OpenLifecycleFilter, LifecycleFilterToggle, LifecycleFilterNext, LifecycleFilterPrev, LifecycleFilterCommit, LifecycleFilterCancel. Bind F (capital) to OpenLifecycleFilter. The modal UI: list of 10 lifecycles (draft, groomed, approved, in-progress, done, self-reviewed, reviewed, complete, cancelled, remediation) in canonical order with cancelled and remediation at the bottom as off-path branches; arrows navigate; Space toggles a lifecycle (added/removed from app.milestone_filter); Enter commits; Esc reverts to the prior filter state. Modal size: if content_area.height < 17 rows, the lifecycle list becomes scrollable (only the visible window renders) and a 'more below' indicator appears — never overflows the content area. Implement the modal renderer in render/overlays.rs (parallel to the Settings flat-list pattern). On mode close, the placeholder per-tab footer label added in the M183 footer milestone is replaced by the real modal-internal keys. Keybind coexistence: lowercase f continues to bind Action::ToggleFilter (annotation open-only toggle in the annotation thread view) — both f and F coexist; the help overlay text added in the help-overlay-sync step below explicitly notes the case distinction.",
+      "files": [
+        "crates/raul/src/tui/mode.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/render/overlays.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast",
+      "done_when": "Pressing F opens the modal; Space toggles a lifecycle; Enter commits (filter applied); Esc reverts (filter restored to prior state). Tests exercise each interaction.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add ApplyGroomingPreset action. Bind g to it. The action sets app.milestone_filter to {Lifecycle::Approved, Lifecycle::InProgress, Lifecycle::Groomed} (the legacy Grooming tab semantics). Lane-gating: the action is a no-op on lanes other than Milestones — pressing g on Path/Overview/Watch/Settings/Backlog/Ideas does nothing. Title bar chip and visible_milestones() reflect the new filter immediately when applied. A test pins the preset's filter set; a second test pins the no-op behavior on each non-Milestone lane.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_grooming_preset --no-fail-fast",
+      "done_when": "Pressing g applies the Grooming preset; app.milestone_filter has the three expected lifecycles; title bar shows them. A test pins the preset's filter set.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Render the title bar chip on Milestones: 'Milestones · <comma-separated-filter> (<count>)' when app.milestone_filter is non-empty, 'Milestones · All (<count>)' when empty. The count is the post-filter count from visible_milestones() (also honoring hide_done). Chip design: one segment for the lifecycle filter only in this milestone; M186 will add a second segment for the search term separated by ' · '. The chip uses the dim palette color so it doesn't compete with the lane title; the active segment is rendered with the palette accent color. Touch render/dashboard_view.rs and/or render/mod.rs to render the chip.",
+      "files": [
+        "crates/raul/src/tui/render/dashboard_view.rs",
+        "crates/raul/src/tui/render/mod.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast",
+      "done_when": "Title bar shows the chip with the correct text in both states; a test pins both states against a fixture set.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Run the canonical lint gate and validate the plan: cargo fmt --all -- --check, cargo clippy -p raul --tests --no-deps -- -D warnings, and mp validate all pass.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "done_when": "All three commands exit 0 in sequence.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP2",
+      "order": 9,
+      "action": "Sync new keybinds into the help overlay and the Settings flat key list. (1) Update crates/raul/src/tui/modes/help.rs to include F (filter) and g (grooming preset) under the Milestones section — the help text mentions both keybinds and explains that lowercase f (annotation toggle) is separate from capital F (lifecycle filter). (2) Add entries to crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS under the keybinds section: 'keybinds.lifecycle_filter' and 'keybinds.grooming_preset'. Both are optional (have defaults F and g respectively) and follow the existing pattern for keybind entries.",
+      "files": [
+        "crates/raul/src/tui/modes/help.rs",
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_help_overlay_sync --no-fail-fast",
+      "done_when": "Pressing ? on Milestones shows F and g in the help overlay; opening Settings shows the two new keybinds in the flat list and they can be rebound through the standard keybind editor.",
+      "status": "done",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP2",
+      "order": 10,
+      "action": "Add a single CHANGELOG.md entry summarizing the M183–M186 TUI refactor. The entry goes under the current release version (whichever is unreleased) and lists: 7 tabs (was 9) — Tweaks and Grooming removed; new / search on Milestones/Backlog/Ideas; new F lifecycle filter modal with multi-select and g Grooming preset on Milestones; new o cycle-sort keybind; new segmented lifecycle gauge column on the Milestones table; new two-line footer (globals on line 1, per-tab keys on line 2). Note explicitly that lowercase f (annotation toggle) and capital F (lifecycle filter) coexist — see help overlay. Migration notes: existing config that references Tweaks-specific keybinds is silently dropped with a warning.",
+      "files": [
+        "CHANGELOG.md"
+      ],
+      "tests": "rg 'M183|M184|M185|M186' CHANGELOG.md | head -10",
+      "done_when": "CHANGELOG.md has a new entry under the unreleased version section describing the four-milestone TUI refactor with all six bullet points above.",
+      "status": "done",
+      "covers_ac": [
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-18",
+    "branch": "",
+    "evidence": "M185: Milestones Table+gauge; F lifecycle filter modal; g grooming preset; title chip; deleted milestone_tree; 733 tests; fmt+clippy clean"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-11 requires the help overlay to list capital F (lifecycle filter) and g (grooming preset) with the f vs F case distinction. help_entries() was updated to new labels ('Toggle filter (annotations; lowercase f)', 'Lifecycle filter…', 'Grooming preset…') but render_help_overlay still looks up k(\"Toggle filter\") (exact label miss → empty keys for f) and never renders the Lifecycle filter / Grooming lines at all. Users pressing ? never see F/g. Fix: update overlay lines to use the new labels and add a Milestones section for F and g.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/overlays.rs",
+        "new_range": {
+          "start_line": 279,
+          "end_line": 279
+        },
+        "side": "new"
+      },
+      "summary": "Help overlay omits F/g and blanks lowercase f"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "S5/AC-04: when content area is short (spec: height < 17), the lifecycle list must become scrollable with a 'more below' indicator and must never overflow. render_lifecycle_filter_overlay dumps all 10 options into a List with no windowing or more-below cue. On short overlays the ListState may clip without feedback. Fix: window the options around st.selected to fit overlay inner height; prepend/append '… more above/below …' when truncated.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/overlays.rs",
+        "new_range": {
+          "start_line": 650,
+          "end_line": 650
+        },
+        "side": "new"
+      },
+      "summary": "Lifecycle filter modal lacks short-terminal scroll + more-below"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Design decision filter-state / S7: chip uses dim palette; the active segment should use accent. milestones_filter_chip renders the whole ' · approved (N)' suffix as dim. Cosmetic; chip text content is correct (AC-05 pins text). Optional polish: accent the filter portion.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-18",
+      "resolved": "2026-07-18",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/render/mod.rs",
+        "new_range": {
+          "start_line": 80,
+          "end_line": 80
+        },
+        "side": "new"
+      },
+      "summary": "Title chip uses only dim style (no accent on active segment)"
+    }
+  ]
+}

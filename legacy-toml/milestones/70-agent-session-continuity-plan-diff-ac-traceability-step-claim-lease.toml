@@ -1,0 +1,232 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "70"
+title = "Agent session continuity: plan diff, AC traceability, step claim/lease"
+slug = "agent-session-continuity-plan-diff-ac-traceability-step-claim-lease"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Agents can see plan deltas since a handoff or timestamp, audit a milestone's AC/step/test linkage before complete, and optionally claim steps so mp next skips in-flight work. Reviewers get machine-readable trace artifacts to pair with M64 execution reports."
+
+[problem]
+description = "Three recurring gaps from review and dogfooding: (1) Context loss between agent sessions — handoff exists but there is no crisp 'what changed in the plan since last time?' artifact. (2) Semantic drift — specs and code diverge while mechanical gates pass; reviewers need a structured AC→verification→step map, not grep. (3) Parallel or overlapping agent runs clobber milestone files — documented in AGENTS.md and backlog B-26 but not enforced; --if-updated does not cover step add chains. These are agent-facing (mp) capabilities that complement M64's review queue without automating review judgment."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp plan diff: read-only diff of plan.toml + milestone files since --since <iso>, --since-handoff, or --git <ref>; JSON + optional markdown summary grouped by milestone",
+    "Extend mp execution handoff or add mp handoff show to surface last diff pointer / changed milestone ids",
+    "mp milestone trace <id>: per-milestone report — each AC with verification + evidence status; each step with tests classify result; gaps (AC uncovered, manual where runnable exists, steps without tests)",
+    "Step claim/lease: fields on step (claimed_by, claimed_at, lease_expires_at) or sidecar; mp milestone step claim|release <M> <S> [--lease <duration>]",
+    "mp next and mp path: skip steps with active non-expired claims; surface claim owner in JSON",
+    "Integration tests for diff, trace, and claim lifecycle",
+]
+out_of_scope = [
+    "LLM-based spec drift detection (advisory heuristics only)",
+    "Hard blocking writes when step claimed by another agent (lease is soft-skip for mp next unless config strict)",
+    "File locks or merge on concurrent writes (B-20 deferred)",
+    "raul surface for these commands (raul can shell out later)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp plan diff --since-handoff lists changed milestones and field-level summary; exits 0 on clean tree"
+verification = "crates/mp/tests/plan_diff.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone trace <id> reports AC coverage gaps and step test classification"
+verification = "crates/mp/tests/milestone_trace.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "step claim + release works; mp next skips actively claimed steps; expired leases ignored"
+verification = "crates/mp/tests/step_claim.rs"
+status = "passed"
+evidence = "milestone complete"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "JSON shapes documented in MP-COMMANDS.md"
+verification = "manual: accepted — docs review"
+status = "passed"
+evidence = "milestone complete"
+
+[[open_questions]]
+id = "Q-01"
+question = "Store claim fields inline on Step struct vs annotations sidecar?"
+status = "resolved"
+answer = "Suggestion: inline on Step in milestone TOML — visible in mp show, no join logic; clears on step complete."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Plan diff and handoff"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "AC traceability"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Step claim and lease"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Docs"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement mp plan diff with --since-handoff, --since <iso>, and --git <ref>; JSON output grouped by milestone with changed fields summary"
+files = []
+tests = "crates/mp/tests/plan_diff.rs"
+done_when = "mp plan diff --since-handoff runs and lists changes"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Surface changed milestone ids on mp execution handoff and add mp handoff show read command pointing at last diff context"
+files = []
+tests = "crates/mp/tests/plan_diff.rs"
+done_when = "handoff records changes; handoff show returns them"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Implement mp milestone trace <id>: AC list with verification/evidence, step tests with ac_verify classify, gap rows for uncovered ACs and missing tests"
+files = []
+tests = "crates/mp/tests/milestone_trace.rs"
+done_when = "trace report matches fixture milestone gaps"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Add step claim fields to model (claimed_by, claimed_at, lease_expires_at); mp milestone step claim and step release commands"
+files = []
+tests = "crates/mp/tests/step_claim.rs"
+done_when = "claim and release persist on step"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Update mp next and mp path to skip non-expired claimed steps; include claim metadata in JSON"
+files = []
+tests = "crates/mp/tests/step_claim.rs"
+done_when = "mp next skips claimed step; expired lease ignored"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP4"
+order = 6
+action = "Document plan diff, handoff show, milestone trace, and step claim in MP-COMMANDS.md"
+files = []
+tests = "manual: accepted — docs review"
+done_when = "MP-COMMANDS.md sections present"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

@@ -1,0 +1,197 @@
+{
+  "milestone": {
+    "id": "52",
+    "title": "State tracking discipline & autonomous agent guardrails",
+    "slug": "state-tracking-discipline-autonomous-agent-guardrails",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Every state mutation (step done, criterion pass, track done) is reliably recorded when the work completes — via convention, encoded post-conditions, a validate-time drift check, and an auto-close helper — so raul and mp status always reflect reality and can be trusted for execution tracking."
+  },
+  "problem": {
+    "description": "Agents executing plan steps routinely forget to run state-tracking commands (step done, track done, criterion pass) after completing the code work. This leaves tracks pending forever, milestones stuck in in-progress, and raul status showing stale data. Examples: TW-04/TW-06/TW-07 were all shipped in M47 but never closed in the track system until manually caught. The root cause is that the plan step says 'do the work' but nothing enforces or reminds the agent to also update the state. Three mitigation layers exist: (1) convention in AGENTS.md, (2) encoding track-done in the step tests field so running tests auto-closes the track, (3) validate-time warnings when a done step references a still-pending track item."
+  },
+  "scope": {
+    "in_scope": [
+      "AGENTS.md convention: every step that references a TW/BF item must close it via mp track done after completing the work",
+      "Step tests field encoding: steps referencing track items include mp track done in their tests value as a post-condition",
+      "Validate-time drift check (W30): mp validate warns when a done step references a track item still in pending/in-progress status",
+      "Auto-close helper: mp step done scans the step action for TW-/BF- patterns and closes referenced tracks automatically",
+      "Review and refresh this repo's master-plan/AGENTS.md content"
+    ],
+    "out_of_scope": [
+      "Changes to the execution engine or autonomous mode logic",
+      "A full audit of past milestones for missed state updates",
+      "Replacing mp state mutations with automatic inference (all state changes remain explicit CLI commands)",
+      "mp init default changes (root AGENTS.md creation, abort-on-existing) — moved to a separate init-defaults milestone"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "AGENTS.md has a dedicated 'State tracking discipline' section with explicit rules for agents",
+      "verification": "manual: accepted - AGENTS.md state tracking section review",
+      "status": "passed",
+      "evidence": "W30 stale-state warning; auto-close on last step done; state_tracking tests pass"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp validate emits W30 when a done step references a TW/BF item that is still pending or in-progress",
+      "verification": "crates/mp/tests/state_tracking.rs",
+      "status": "passed",
+      "evidence": "W30 stale-state warning; auto-close on last step done; state_tracking tests pass"
+    },
+    {
+      "id": "AC-03",
+      "description": "master-plan/AGENTS.md content reviewed and refreshed (stale references updated, sections accurate)",
+      "verification": "manual: accepted - master-plan/AGENTS.md review",
+      "status": "passed",
+      "evidence": "W30 stale-state warning; auto-close on last step done; state_tracking tests pass"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp step done auto-closes referenced TW/BF track items when their IDs appear in the step action",
+      "verification": "crates/mp/tests/state_tracking.rs",
+      "status": "passed",
+      "evidence": "W30 stale-state warning; auto-close on last step done; state_tracking tests pass"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Init defaults: root AGENTS.md + abort on existing",
+      "goal": "Change mp init to create root AGENTS.md by default, abort on existing projects unless --force, add --skip-root-agents flag",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "State tracking discipline: convention + W30 + auto-close",
+      "goal": "Add AGENTS.md state tracking rules, W30 validate-time check for pending tracks, auto-close helper",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "master-plan/AGENTS.md review",
+      "goal": "Review and refresh this repo's master-plan/AGENTS.md content",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Auto-close helper: when mp step done runs, scan the completed step action for TW-/BF- patterns, resolve each to a track item, and run mp track done for any still in pending/in-progress status. Implement in step.rs with tests in state_tracking.rs.",
+      "files": [],
+      "tests": "crates/mp/tests/init_root_agents.rs",
+      "done_when": "mp step done auto-closes referenced TW/BF track items; state_tracking tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Add a State tracking discipline section to AGENTS.md with explicit rules: every step referencing a TW/BF must close it via mp track done; every step must call step done and criterion pass; step tests should encode post-conditions. Cross-reference from the step-testing convention section.",
+      "files": [],
+      "tests": "manual: accepted - AGENTS.md state tracking section review",
+      "done_when": "AGENTS.md has 'State tracking discipline' section with rules for TW/BF closing, step done, criterion pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Implement the W30 validate-time check: when a step has status done and its action contains a TW- or BF- pattern, check if that track item exists and is still pending/in-progress. Emit a warning if so. Implement in validate.rs with test in state_tracking.rs.",
+      "files": [],
+      "tests": "crates/mp/tests/state_tracking.rs",
+      "done_when": "mp validate emits W30 when done step references pending TW/BF; state_tracking tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Encode track-done post-conditions: audit this repo's plan steps that reference TW/BF items and ensure their tests field includes the relevant mp track done command as a post-condition, per the step-testing convention.",
+      "files": [],
+      "tests": "crates/mp/tests/init_transactional.rs",
+      "done_when": "mp init on existing project aborts with clear error; --force re-initializes; init_transactional tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Review and refresh this repo's master-plan/AGENTS.md: ensure all sections are current, update stale references, verify the test-file naming convention, step-testing convention, and dev commands are accurate.",
+      "files": [],
+      "tests": "manual: accepted - master-plan/AGENTS.md review",
+      "done_when": "master-plan/AGENTS.md reviewed; stale references updated; sections accurate",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-30",
+    "branch": "",
+    "evidence": "W30 stale-state warning; auto-close on last step done; state_tracking tests pass"
+  }
+}

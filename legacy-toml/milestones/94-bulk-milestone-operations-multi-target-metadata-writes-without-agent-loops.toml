@@ -1,0 +1,272 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "94"
+title = "Bulk milestone operations — multi-target metadata writes without agent loops"
+slug = "bulk-milestone-operations-multi-target-metadata-writes-without-agent-loops"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = ["82"]
+effort = "M"
+risk = "med"
+change_kind = ""
+priority = "high"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Agents change milestone metadata (priority, depends_on, spec_status, execution block/defer) across many milestones in one mp command — using --ids or the same --where filters as list milestones — instead of shell for-loops over mp milestone set-priority / update. mp runs writes sequentially, returns per-id results { succeeded, failed, results[] }, and supports --dry-run. Complements M79/M88 bulk review ops and M93 single-milestone fragment ops; closes the remaining agent loop pattern for plan metadata."
+
+[problem]
+description = "M79 and M88 eliminated jq loops and bulk review/finding writes, but milestone-level metadata still requires one subprocess per id. Observed agent pattern: for id in 82 92 93; do mp milestone set-priority $id high; done — and similar loops to add the same depends_on entry or set spec_status=review on every milestone matching a filter. Each iteration re-pays CLI startup, loses atomic reporting (which id failed?), and pushes orchestration to the shell. list milestones already supports --where and --include for bulk reads; reviews pass supports --all. Milestone writes have no symmetric bulk API. M93 deliberately scopes to single-milestone fragment ops (ac/step/wp). Cross-milestone scalar metadata updates need a first-class bulk layer."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp milestone bulk set-priority --ids … | --where … --priority <low|normal|high|urgent> [--dry-run]",
+    "mp milestone bulk set-spec-status --ids … | --where … --status <draft|review|ready|verified> [--dry-run]",
+    "mp milestone bulk depends-on add --ids … | --where … --depends-on <id> [--dry-run]",
+    "mp milestone bulk depends-on remove --ids … | --where … --depends-on <id> [--dry-run]",
+    "Target resolution: --ids and --where are unioned (dedupe); error if both empty",
+    "Response shape: { ok, dry_run, target_count, succeeded, failed, results: [{ id, ok, error? }] }",
+    "Sequential execution; continue on per-id failure; exit non-zero if any failed (unless --keep-going documents otherwise)",
+    "Integration tests: ids list, where filter, dry-run, partial failure, depends_on add/remove",
+    "Document in AGENTS.md, AGENT-READINESS, MP-COMMANDS — anti-pattern: shell for-loop over set-priority/update",
+]
+out_of_scope = [
+    "Bulk fragment ops (ac/step/wp) — M93 single-milestone only",
+    "Bulk milestone complete, bulk reviews pass — reviews pass --all exists",
+    "Bulk track/backlog/idea metadata",
+    "Parallel/concurrent plan writes",
+    "Bulk array replacement on milestone update — M93 --replace-arrays migration escape hatch only",
+    "Transactional all-or-nothing batch (partial success is a feature)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp milestone bulk set-priority --ids 82,92,93 --priority high updates all three in one command; stdout reports succeeded=3 and per-id results"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone bulk set-priority --where 'spec_status==review' --priority high resolves targets via same filter as list milestones and updates only matches"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp milestone bulk depends-on add --ids 91,92 --depends-on 87 appends dependency when missing; remove drops it; validate rejects cyclic depends_on with per-id error in results"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "--dry-run resolves targets and returns planned mutations in JSON without writing; subsequent run without --dry-run applies them"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "When one id fails mid-batch, later ids still process; stdout lists failed ids with error messages; exit code non-zero if failed > 0"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Bulk commands reject empty target set (--ids and --where both absent) with clear error"
+verification = "crates/mp/tests/milestone_bulk.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "AGENTS.md and AGENT-READINESS document bulk milestone ops and forbid shell for-loops over set-priority/update for multi-id changes"
+verification = "manual: accepted — doc review at completion"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "cargo test -p mp exit 0"
+verification = "cargo test -p mp"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Bulk metadata commands"
+goal = "bulk set-priority, set-spec-status with --ids and --where"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Bulk depends-on & resilience"
+goal = "depends-on add/remove, dry-run, partial failure, empty target guard"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Docs"
+goal = "AGENTS, AGENT-READINESS, MP-COMMANDS anti-loop guidance"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement mp milestone bulk set-priority with --ids and --where target resolution"
+files = ["crates/mp/src/commands/milestone.rs"]
+tests = "crates/mp/tests/milestone_bulk.rs"
+done_when = "bulk set-priority updates multiple milestones in one command with per-id results"
+status = "pending"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Implement mp milestone bulk set-spec-status with same target resolution and response shape"
+files = ["crates/mp/src/commands/milestone.rs"]
+tests = "crates/mp/tests/milestone_bulk.rs"
+done_when = "bulk set-spec-status works for ids and where filters"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Implement bulk depends-on add/remove with cycle detection per-id errors"
+files = ["crates/mp/src/milestone.rs"]
+tests = "crates/mp/tests/milestone_bulk.rs"
+done_when = "depends-on bulk ops append/remove safely and reject cycles"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add --dry-run, partial failure continue, empty target rejection"
+files = ["crates/mp/src/commands/milestone.rs"]
+tests = "crates/mp/tests/milestone_bulk.rs"
+done_when = "Dry-run previews mutations; failures reported per-id; empty targets error"
+status = "pending"
+covers_ac = [
+    "AC-04",
+    "AC-05",
+    "AC-06",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Document bulk ops in AGENTS.md, AGENT-READINESS, MP-COMMANDS; forbid shell for-loops"
+files = [
+    "AGENTS.md",
+    "docs",
+]
+tests = "manual: accepted — doc review at completion"
+done_when = "Docs show bulk patterns"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = ["S4"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP-close"
+order = 6
+action = "cargo test -p mp exit 0"
+files = []
+tests = "cargo test -p mp"
+done_when = "All bulk integration tests pass"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = ["S5"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

@@ -1,0 +1,130 @@
+name: stable-ci
+
+on:
+  push:
+    branches: [stable]
+    # Tag convention: git tag = v<semver>, package version = <semver>.
+    # Pre-releases use bare rcN (not rc.N): v1.0.0-rc1 / 1.0.0-rc1.
+    # Filter is 'v*' — a tag without the v prefix will not fire this workflow.
+    tags: ['v*']
+  pull_request:
+    branches: [stable]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+          shared-key: master-plan
+
+      - name: Install nextest
+        run: cargo install cargo-nextest --locked --version '^0.9'
+
+      - name: Install ripgrep
+        # Required by scripts/check-consumer-surface.sh (part of `make lint`).
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep
+
+      # raul tests shell out to `mp` via find_mp (PATH / MP_HOME).
+      # Provide the just-built release binaries — same contract as `make dev-env`.
+      - name: Build release binaries
+        run: make build
+
+      - name: Put mp + raul on PATH
+        run: echo "$GITHUB_WORKSPACE/target/release" >> "$GITHUB_PATH"
+
+      - name: make ci
+        env:
+          NEXTTEST: 1
+        run: make ci
+
+  tap-update:
+    name: open homebrew-tap bump PR
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Resolve tag + commit SHA + SHA256
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          COMMIT=$(git rev-list -n 1 "${GITHUB_REF_NAME}")
+          SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" | sha256sum | cut -d' ' -f1)
+          DATE=$(date -u +%Y%m%d)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}"    >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}"          >> "$GITHUB_OUTPUT"
+          echo "date=${DATE}"        >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: lthiagol/homebrew-tap
+          ref: stable
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update both formulas on a new branch
+        working-directory: homebrew-tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          COMMIT:  ${{ steps.meta.outputs.commit }}
+          SHA:     ${{ steps.meta.outputs.sha }}
+          DATE:    ${{ steps.meta.outputs.date }}
+        run: |
+          BRANCH="bump-master-plan-v${VERSION}"
+          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+
+          sed -i.bak -E \
+            -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
+            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
+            Formula/master-plan.rb
+
+          sed -i.bak -E \
+            -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
+            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
+            -e "s|^  version \".*\"|  version \"${VERSION}-dev.${DATE}\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
+            Formula/master-plan-dev.rb
+
+          rm -f Formula/*.bak
+          git add Formula/master-plan.rb Formula/master-plan-dev.rb
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "master-plan: bump to v${VERSION} (and master-plan-dev to ${VERSION}-dev.${DATE})"
+          git push -u origin "$BRANCH" --force
+
+      - name: Open PR against homebrew-tap:stable
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          BRANCH="bump-master-plan-v${{ steps.meta.outputs.version }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          DATE="${{ steps.meta.outputs.date }}"
+          SHA="${{ steps.meta.outputs.sha }}"
+          COMMIT="${{ steps.meta.outputs.commit }}"
+          cat > /tmp/pr_body.md <<PRBODY
+          Auto-bump from ${{ github.repository }} tag v${VERSION}.
+
+          * master-plan.rb -> v${VERSION} tarball
+          * master-plan-dev.rb -> v${VERSION}-dev.${DATE} (tracks the tagged commit ${COMMIT:0:7})
+          * SHA256: ${SHA}
+
+          This PR targets stable. CI runs brew audit + style on the formulas.
+          PRBODY
+          gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan: bump to v${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"

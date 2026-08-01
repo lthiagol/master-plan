@@ -1,0 +1,84 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+work_packages = []
+steps = []
+follow_ups = []
+
+[milestone]
+id = "06"
+title = "Remaining polish"
+slug = "remaining-polish"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["05"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-18"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "brief reopen, git.auto_push, path suggest."
+
+[problem]
+description = "Last documented-only CLI gaps."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = []
+out_of_scope = [
+    "JSON schema CI",
+    "session vs tagged milestone design",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "AGENT-READINESS accurate"
+verification = "docs review"
+status = "passed"
+evidence = "AGENT-READINESS.md + p13_m06_polish.rs; adoption checklist refreshed"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "p13_m06_polish.rs + docs"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

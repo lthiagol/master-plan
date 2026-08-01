@@ -1,0 +1,208 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "49"
+title = "Native dependency & impact queries (reverse deps + blast radius)"
+slug = "native-dependency-impact-queries-reverse-deps-blast-radius"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "Agents and humans can answer dependency questions natively via mp: 'what depends on M39?' (dependents), 'what does M39 depend on?' (deps), and 'what is the blast radius if I block/delete/reorder M39?' (impact) - all as stable --format json, plus a raul explain view - so planning decisions are self-service instead of ad-hoc scripts over mp show JSON."
+
+[problem]
+description = "mp has a forward dependency graph (crates/mp/src/graph.rs, mp graph, path_engine.rs) but no native REVERSE or TRANSITIVE query dimension. During M39 planning, answering 'does anything depend on M39?' required looping mp show milestone over every planned milestone and inspecting depends_on by hand; 'do any path pins reference M39?' needed mp path list-pins plus a manual filter; 'what is affected if I block/delete/reorder this?' was not answerable at all without hand-parsing JSON. This forced external scripts (the same anti-pattern as ID-04: agent reshaping mp JSON externally) and made block/delete/reorder decisions guesswork. A silent depends_on drop was also observed during mp milestone create on M45/M46 - there is no warning when a depends_on entry references a non-existent milestone."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp milestone dependents <id> --format json: returns every milestone whose depends_on includes <id> (reverse deps).",
+    "mp milestone deps <id> --format json: returns what <id> depends on (forward, for symmetry/completeness).",
+    "mp milestone impact <id> --format json: transitive blast radius = recursive reverse deps + any path pins involving <id> + path implications (what falls after/before <id> in the current path).",
+    "mp path list-pins --milestone <id> filter: scope pin listing to a single milestone.",
+    "Warn (not block) on mp milestone create / mp milestone update when a depends_on entry references a non-existent milestone id - catches the silent M45/M46 depends_on drop class of bug.",
+    "raul explain impact <id>: human-readable blast-radius view over the mp impact json, wired through the shared reads layer.",
+    "Golden scenario + integration tests covering reverse deps, transitive impact, pin scoping, and the dangling-depends_on warning.",
+]
+out_of_scope = [
+    "Changing the dependency model or the path engine itself (this milestone adds a query/reading dimension over the existing graph).",
+    "Auto-repair of broken depends_on entries (warn only; repair is a human/agent action).",
+    "A TUI view (CLI first; TUI is a later pass).",
+    "Impact analysis across archived milestones (operates on the active plan only).",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp milestone dependents <id> and mp milestone deps <id> return correct --format json results against a fixture with a known dependency chain"
+verification = "crates/mp/tests/dependency_query.rs"
+status = "passed"
+evidence = "dependents/deps implemented in milestone.rs commands/milestone.rs"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp milestone impact <id> returns the transitive blast radius: recursive reverse deps + path pins involving <id> + path ordering implications"
+verification = "crates/mp/tests/dependency_query.rs + golden scenario m-impact-query"
+status = "passed"
+evidence = "impact command implemented with transitive dependents, path pins, position in path"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp path list-pins --milestone <id> scopes the pin listing to one milestone"
+verification = "crates/mp/tests/path_flags.rs (extend)"
+status = "passed"
+evidence = "path list-pins --milestone filter added"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp milestone create/update emits a clear warning when a depends_on entry references a non-existent milestone (catches silent drops like M45/M46)"
+verification = "crates/mp/tests/dependency_query.rs (dangling-depends_on warning)"
+status = "passed"
+evidence = "warn_dangling_deps function in milestone.rs"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "raul explain impact <id> renders a human-readable blast-radius view via the shared reads layer"
+verification = "crates/raul/tests/ + rg 'runner.run' crates/raul/src/commands/explain.rs (uses reads.rs)"
+status = "passed"
+evidence = "raul explain impact via reads layer"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "mp dependency queries"
+goal = "Native forward/reverse/transitive dependency queries over the existing graph: mp milestone dependents, deps, and impact; plus path list-pins --milestone filter; plus a dangling-depends_on warning on create/update."
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "raul view + tests"
+goal = "raul explain impact human-readable view over the mp impact json via the shared reads layer, plus golden scenario and docs."
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "mp milestone dependents <id> and mp milestone deps <id>: reverse and forward dependency queries over the existing graph (crates/mp/src/graph.rs), both --format json. dependents scans all milestones depends_on for <id>; deps lists what <id> depends on."
+files = []
+tests = "crates/mp/tests/dependency_query.rs"
+done_when = "Implemented and verified"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "mp milestone impact <id> --format json: transitive blast radius = recursive reverse dependents + any path pins involving <id> + path ordering implications (what falls before/after <id>)."
+files = []
+tests = "crates/mp/tests/dependency_query.rs"
+done_when = "Implemented and verified"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "mp path list-pins --milestone <id> filter: scope the pin listing to a single milestone."
+files = []
+tests = "crates/mp/tests/path_flags.rs"
+done_when = "Implemented and verified"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 4
+action = "Warn (not block) on mp milestone create / update when a depends_on entry references a non-existent milestone id - catches the silent M45/M46 depends_on drop class."
+files = []
+tests = "crates/mp/tests/dependency_query.rs"
+done_when = "Implemented and verified"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "raul explain impact <id>: human-readable blast-radius view over the mp impact json, wired through the shared reads layer (not direct MpRunner). Add a golden scenario and MP-COMMANDS note."
+files = []
+tests = "crates/raul/tests/explain_impact.rs"
+done_when = "Implemented and verified"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-29"
+branch = ""
+evidence = "Completed all 5 steps: deps/dependents/impact commands, path list-pins --milestone, dangling dep warning, raul explain impact"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

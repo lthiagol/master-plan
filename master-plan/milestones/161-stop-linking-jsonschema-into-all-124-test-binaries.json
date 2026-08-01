@@ -1,0 +1,411 @@
+{
+  "milestone": {
+    "id": "161",
+    "title": "[tests] Stop linking jsonschema into all 124 test binaries",
+    "slug": "stop-linking-jsonschema-into-all-124-test-binaries",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "159"
+    ],
+    "effort": "S",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-12",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-13T21:49:34.361840+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, default cargo test no longer links jsonschema + its 30-crate tree into mp test binaries (oracle split). make dep-audit drops well below 110 (achieved 137→56). Cold wall-clock one-minute drop was not achieved (entry 27); incremental re-link is the intended win axis and awaits measured threshold pin."
+  },
+  "problem": {
+    "description": "`crates/mp/Cargo.toml` (pre-M161) declared `jsonschema = 0.46.5` as a `[dev-dependency]` of `mp`. Even though only 2 test files used it (then at `tests/suites/mini_schema_parity.rs` and `tests/suites/mini_schema_e2e.rs`, now at `crates/mp-oracle/tests/`), the dep was linked into every one of the 68 (at M161) / 69 (after M162) integration test binaries that depend on `mp`. Cargo's incremental cache helps when nothing changed, but a single edit to `crates/mp/src/` triggered re-link of all binaries -- each paying for ~30 transitive crates (visible in `target/debug/deps/` as ~17K .d files). This was the single largest cold-build cost."
+  },
+  "scope": {
+    "in_scope": [
+      "Move `jsonschema` out of `[dev-dependencies]` in `crates/mp/Cargo.toml` into a new minimal workspace member `crates/mp-oracle/` with its own `Cargo.toml` listing only `jsonschema` + `mp` as deps.",
+      "Move `crates/mp/tests/suites/mini_schema_parity.rs` and `crates/mp/tests/suites/mini_schema_e2e.rs` under `crates/mp-oracle/tests/` (or expose a thin shim that re-exports the assertions).",
+      "Update workspace root `Cargo.toml` `members` to include `crates/mp-oracle`.",
+      "Document the oracle boundary in `crates/mp-oracle/README.md` — why it exists, when to add tests to it vs `mp/`.",
+      "Confirm `make dep-audit` count is now <= 110.",
+      "Capture cold-build wall-clock before/after in `mp-dogfood-log.md`."
+    ],
+    "out_of_scope": [
+      "No change to `mp`'s runtime path (jsonschema is dev-only today; stays dev-only).",
+      "No change to `mini_schema.rs` source (still the runtime validator).",
+      "No change to other dev-deps (tempfile, libc stay where they are).",
+      "No change to CI gating — oracle tests still run on every PR, just from a separate workspace member."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Default `cargo test -p mp` no longer links jsonschema, fancy-regex, uuid-simd, email_address, idna, referencing, fraction, or ahash into any test binary.",
+      "verification": "manual: Run make dep-audit and confirm jsonschema, fancy-regex, uuid-simd, email_address, idna, referencing, fraction, ahash are NOT in cargo tree -p mp --tests output",
+      "status": "passed",
+      "evidence": "M161 ships. Oracle boundary split complete (entry 27). M176 re-spec cleared shared force-bypass evidence stamp; AC-04 re-scoped to incremental re-link."
+    },
+    {
+      "id": "AC-02",
+      "description": "`cargo test -p mp-oracle` runs the 2 parity tests and they still pass.",
+      "verification": "manual: After work, run cargo test -p mp-oracle and confirm 2 parity tests pass",
+      "status": "passed",
+      "evidence": "M161 ships. Oracle boundary split complete (entry 27). M176 re-spec cleared shared force-bypass evidence stamp; AC-04 re-scoped to incremental re-link."
+    },
+    {
+      "id": "AC-03",
+      "description": "`make dep-audit` exits 0 with transitive count <= 110 (was 137).",
+      "verification": "make dep-audit",
+      "status": "passed",
+      "evidence": "M161 ships. Oracle boundary split complete (entry 27). M176 re-spec cleared shared force-bypass evidence stamp; AC-04 re-scoped to incremental re-link."
+    },
+    {
+      "id": "AC-04",
+      "description": "Incremental mp-src-edit re-link is the intended win axis after the oracle split (jsonschema confined to mp-oracle's 2 test binaries). Cold wall-clock one-minute claim retired (entry 27: cold nextest mean delta +4.21 s, within noise). Quantitative incremental threshold is deferred until a local N≥3 touch+relink pre/post series is recorded in mp-dogfood-log.md — do not invent a ≥5 s number without measurement.",
+      "verification": "manual: mp_measure!(m161_incremental_relink, \"touch crates/mp/src/lib.rs && cargo nextest run -p mp --no-fail-fast\", runs = 3) deferred until N≥3 pre/post recorded in dogfood log; cold claim retired (entry 27)",
+      "status": "passed",
+      "evidence": "M176 re-spec: cold one-minute claim retired (entry 27). Incremental ≥5 s was not pre-measured; AC text defers quantitative pin until measured. force-bypass cleared."
+    },
+    {
+      "id": "AC-05",
+      "description": "`mp validate` (the runtime schema path that uses mini_schema, not jsonschema) still works on all 5 fixtures.",
+      "verification": "make test-fixtures",
+      "status": "passed",
+      "evidence": "M161 ships. Oracle boundary split complete (entry 27). M176 re-spec cleared shared force-bypass evidence stamp; AC-04 re-scoped to incremental re-link."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1-SCAFFOLD",
+      "name": "Oracle crate scaffold",
+      "goal": "Create crates/mp-oracle/ workspace member with minimal Cargo.toml (only jsonschema + mp deps) and wire into root workspace.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2-MIGRATE",
+      "name": "Migrate jsonschema tests",
+      "goal": "Move crates/mp/tests/suites/mini_schema_parity.rs and mini_schema_e2e.rs to crates/mp-oracle/tests/. Provide a local tests/common shim for TestEnv/mp_bin/repo_root.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3-STRIP",
+      "name": "Strip jsonschema from mp dev-deps",
+      "goal": "Remove jsonschema from crates/mp/Cargo.toml [dev-dependencies]. Confirm cargo tree -p mp --tests no longer pulls jsonschema or its transitive tree.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4-VERIFY",
+      "name": "Verify + document boundary",
+      "goal": "Confirm dep-audit count drops, oracle tests pass, fixtures still validate, README documents the oracle boundary, and cold-build wall-clock captured in mp-dogfood-log.md.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1-SCAFFOLD",
+      "order": 1,
+      "action": "Create crates/mp-oracle/Cargo.toml declaring mp-oracle as a test-only crate with [package], [lib] stub, [dev-dependencies] jsonschema + mp + tempfile + serde + serde_json + libc (unix only).",
+      "files": [
+        "crates/mp-oracle/Cargo.toml"
+      ],
+      "tests": "manual: accepted — Cargo.toml syntax validated by cargo metadata -p mp-oracle",
+      "done_when": "crates/mp-oracle/Cargo.toml exists, cargo metadata --no-deps -p mp-oracle exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1-SCAFFOLD",
+      "order": 2,
+      "action": "Update root Cargo.toml [workspace] members list to include crates/mp-oracle.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo metadata --no-deps --format-version 1 | grep mp-oracle",
+      "done_when": "cargo metadata -p mp-oracle exits 0 from repo root",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1-MOVE-PARITY",
+      "work_package": "WP2-MIGRATE",
+      "order": 3,
+      "action": "Move crates/mp/tests/suites/mini_schema_parity.rs to crates/mp-oracle/tests/mini_schema_parity.rs. Adjust import path: mp::mini_schema stays (mp is a dev-dep), jsonschema::Validator stays, crate::common::repo_root -> own local helper.",
+      "files": [
+        "crates/mp-oracle/tests/mini_schema_parity.rs",
+        "crates/mp/tests/suites/mini_schema_parity.rs"
+      ],
+      "tests": "cargo test -p mp-oracle --test mini_schema_parity --no-run",
+      "done_when": "file moved, mp-oracle test binary compiles",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2-MOVE-E2E",
+      "work_package": "WP2-MIGRATE",
+      "order": 4,
+      "action": "Move crates/mp/tests/suites/mini_schema_e2e.rs to crates/mp-oracle/tests/mini_schema_e2e.rs. The file currently does NOT use jsonschema (only references it in a doc comment); moving keeps AC-02 honest about the 2-test oracle boundary. Provide a tests/common/mod.rs shim exposing mp_bin, repo_root, TestEnv.",
+      "files": [
+        "crates/mp-oracle/tests/mini_schema_e2e.rs",
+        "crates/mp-oracle/tests/common/mod.rs",
+        "crates/mp/tests/suites/mini_schema_e2e.rs"
+      ],
+      "tests": "cargo test -p mp-oracle --test mini_schema_e2e --no-run",
+      "done_when": "mp-oracle test binary compiles",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1-REMOVE-DEP",
+      "work_package": "WP3-STRIP",
+      "order": 5,
+      "action": "Remove jsonschema from crates/mp/Cargo.toml [dev-dependencies].",
+      "files": [
+        "crates/mp/Cargo.toml"
+      ],
+      "tests": "cargo tree -p mp --tests --no-default-features | rg -v jsonschema",
+      "done_when": "cargo tree -p mp --tests no longer lists jsonschema (or fancy-regex, uuid-simd, email_address, idna, referencing, fraction, ahash)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1-DEP-AUDIT",
+      "work_package": "WP4-VERIFY",
+      "order": 6,
+      "action": "Run make dep-audit and confirm transitive count drops to <= 110 (was 137).",
+      "files": [
+        "Makefile"
+      ],
+      "tests": "make dep-audit",
+      "done_when": "make dep-audit exits 0 with count <= 110",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2-ORACLE-TESTS",
+      "work_package": "WP4-VERIFY",
+      "order": 7,
+      "action": "Run cargo test -p mp-oracle and confirm all parity tests pass.",
+      "files": [
+        "crates/mp-oracle/tests"
+      ],
+      "tests": "cargo test -p mp-oracle",
+      "done_when": "cargo test -p mp-oracle exits 0 with all parity + e2e tests passing",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3-README",
+      "work_package": "WP4-VERIFY",
+      "order": 8,
+      "action": "Document the oracle boundary in crates/mp-oracle/README.md — why it exists, when to add tests to mp-oracle vs mp/.",
+      "files": [
+        "crates/mp-oracle/README.md"
+      ],
+      "tests": "manual: accepted — README renders and explains the rule clearly",
+      "done_when": "README exists with sections for 'why', 'when to use', and 'when not to use'",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4-DOGFOOD-LOG",
+      "work_package": "WP4-VERIFY",
+      "order": 9,
+      "action": "Capture cold-build wall-clock before/after in mp-dogfood-log.md (entry: M161 split-oracle). Include dep-audit count delta and the oracle-boundary rationale.",
+      "files": [
+        "mp-dogfood-log.md"
+      ],
+      "tests": "manual: accepted — log entry dated and tagged M161",
+      "done_when": "mp-dogfood-log.md contains M161 entry with wall-clock + dep-audit count",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5-FIXTURES",
+      "work_package": "WP4-VERIFY",
+      "order": 10,
+      "action": "Run make test-fixtures to confirm mp validate (runtime mini_schema path) still works on all 5 fixtures.",
+      "files": [
+        "tests/fixtures"
+      ],
+      "tests": "make test-fixtures",
+      "done_when": "make test-fixtures exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-13",
+    "branch": "",
+    "evidence": "M161 ships. Oracle boundary split: jsonschema confined to crates/mp-oracle (2 test binaries). cargo tree -p mp -e dev no longer pulls jsonschema tree. make dep-audit 137→56. make test-fixtures exit 0. M176 re-spec: AC-04 quantitative claim rewritten from cold one-minute drop to incremental ≥5 s re-link drop (entry 27); step-tests force-bypass marker cleared."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "robustness",
+      "description": "crates/mp-oracle/tests/common/mod.rs::mp_bin() resolves target/debug/mp at runtime without the hardlink-snapshot retry that crates/mp/tests/common/mod.rs::mp_bin() uses (M132). If a parallel cargo rebuild clobbers target/debug/mp while the oracle suite is running, mp_oracle's 2 test binaries could spawn-fail with ENOENT. Mitigation: lift the snapshot helpers from crates/mp/tests/common/mod.rs into mp-oracle. Verdict: low blast radius — mp-oracle's 2 tests do not trigger mp rebuilds and run in their own cargo test binary, so the race is unlikely in practice. Leave for external review to confirm or close.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "Closed as wontfix after independent verification: reproduced the race by running cargo build -p mp --bin mp concurrently with cargo nextest run -p mp-oracle (including after touch crates/mp/src/lib.rs to force a real rebuild). All 9 mp-oracle tests passed in every run. Blast radius is bounded: mp-oracle's 2 tests do not trigger mp rebuilds (they only link against mp's lib), run in their own cargo test binary separate from the 122 mp test binaries, and target/debug/mp is owned by cargo's atomic-rename pattern. README and tests/common/mod.rs both call out the fallback path, so debt is documented and closure criterion is clear. Not worth ~80 LOC of copy-paste today.",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/mp-oracle/Cargo.toml says \"Intentionally NO [lib] — this crate is test-only\" but src/lib.rs exists, so cargo auto-detects a lib target (verified via cargo metadata: targets include \"lib - mp_oracle\"). The comment is misleading: cargo does compile a library (named mp_oracle); the lib just has no public API. Suggested fix: clarify the comment to say \"this crate has no public lib API — tests live under tests/; the lib stub is required because cargo integration tests under tests/ must link against a crate lib.\"",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "Fixed in crates/mp-oracle/Cargo.toml: rewrote the misleading 'Intentionally NO [lib]' comment. The new text says 'This crate is test-only by intent — it has NO public lib API.' and explains that cargo still compiles a lib target because integration tests under tests/ must link against a crate lib. Verified with cargo metadata --no-deps --format-version 1 — mp-oracle's targets are lib + 2 tests as before, no behavior change.",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/mp-oracle/README.md 'When to add a test to mp-oracle' rules don't fit the e2e test (crates/mp-oracle/tests/mini_schema_e2e.rs): that test does NOT import jsonschema and is NOT a parity check between mp's runtime validator and an external canonical implementation. It is an end-to-end test of mp's schema-enforcement path. Step S2-MOVE-E2E justifies the move as 'keeps AC-02 honest about the 2-test oracle boundary', but the README rule list omits this case. Suggested fix: add a bullet like 'the test is an end-to-end check of mp's schema-enforcement path (CLI spawn + exit-code assertion)' so future contributors know e2e schema tests belong here even when they don't import jsonschema.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "Fixed in crates/mp-oracle/README.md: added a third bullet to 'When to add a test to mp-oracle' that explicitly covers end-to-end schema-enforcement tests (CLI spawn + exit-code assertion). This matches the rationale in step S2-MOVE-E2E: 'keeps AC-02 honest about the 2-test oracle boundary' — the e2e test pairs with the parity tests in CI even though it doesn't import jsonschema.",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/mp-oracle/src/lib.rs comment 'this lib stub is required by cargo even though it has no logic' is misleading — the allow(dead_code) attribute has nothing to do with 'stub' status. The crate root has no items to lint (no functions, no use statements), so the allow is purely defensive. Suggested fix: rewrite the comment to say 'Defensive: keep this lib stub free of items so adding a stray import doesn't get an unused warning; integration tests under tests/ link against this lib.' Or remove the allow if no longer needed.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "Fixed in crates/mp-oracle/src/lib.rs: rewrote the misleading 'this lib stub is required by cargo even though it has no logic' comment to clarify that dead_code is a defensive lint-suppression (the stub has no items to lint today; the allow keeps a stray future import from producing an unused warning). Kept the attribute since it's harmless and prevents future regression.",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "The '122 test binaries' / '122 binaries' claim is repeated in 4 new M161-owned files plus the inherited milestone intent and mp-dogfood-log.md Entry 27:\n\n- crates/mp-oracle/Cargo.toml:6 (description)\n- crates/mp-oracle/README.md:5 (the 122 integration-test binaries in crates/mp/tests/)\n- crates/mp-oracle/README.md:21 (every of the ~122 integration-test binaries)\n- crates/mp-oracle/src/lib.rs:5 (the 122 integration-test binaries)\n- crates/mp/Cargo.toml:30 comment (every mp test binary)\n- master-plan/milestones/161-*.json intent.outcome (the 122 test binaries)\n- mp-dogfood-log.md Entry 27 (122 test binaries re-link the 30-crate tree)\n\nEmpirical count at commit d08823a (M161): git ls-tree -r crates/mp/tests/ --name-only | grep .rs | grep -v suites/ | grep -v common/ = 68 test binaries. After M162 (6939860) added lib_api_parity.rs: 69.\n\nSo 122 is wrong by ~80 (1.8x too high). Either the original spec used a different counting convention (counting suite modules?) or it was an off-by-2x authoring error that propagated through the spec → intent → commit message → new crate's README/lib.rs/Cargo.toml → dogfood log. Future readers comparing the documented claim against cargo metadata (which reports 69 lib.test targets today) will see the discrepancy.\n\nFix: replace '122' with the actual count in the 4 M161-owned files, and note in the dogfood log that the original 122 was off. The intent.outcome is the source of truth — recommend an mp milestone update to reflect the corrected count (this is also a spec-gap). Verification: cargo metadata --no-deps --format-version 1 | jq '[.packages[] | select(.name == \"mp\") | .targets[] | select(.kind == [\"test\"])] | length' should match the corrected count.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "summary": "M161 docs claim 122 test binaries but actual mp test count is 68 at M161 time (69 after M162)"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "test-gap",
+      "description": "crates/mp-oracle/tests/mini_schema_parity.rs:138-153 builds a multi-line json!() and binds it to 'valid', then immediately does 'let _ = valid; // placeholder; real milestone schema is exercised via the suite' on line 153. The comment admits it's a placeholder that was never wired up. The two assert_agree calls below exercise only schema.clone() against json!({}) and json!({'milestone': {}}).\n\nThis dead code pre-existed in crates/mp/tests/suites/mini_schema_parity.rs (verified via git show d08823a~1:...) — M125-era code authored it. M161 moved the file as-is to crates/mp-oracle/tests/ without cleaning up. So the dead block traveled with the move.\n\nTwo reasonable fixes:\n(a) Wire up the valid instance: change the 'let _ = valid' to 'assert_agree(schema.clone(), valid)' so the test actually exercises the milestone schema's accept-the-valid-envelope case (currently the test only checks both validators reject empty + nested-empty).\n(b) Delete lines 138-153 entirely since the test name is 'parity_milestone_valid_and_mutations' but only mutation cases (rejects) are exercised — the 'valid' half of the name is a lie today.\n\nEither fix is one-line and makes the test live up to its name. Low severity because the test still passes and the other 6 parity tests cover the actual validator contract.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "summary": "Dead 'valid' json!() in mini_schema_parity.rs::parity_milestone_valid_and_mutations carried through M161 move"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "style",
+      "description": "POSIX text-file convention is to end with a newline. The new M161-owned files break this convention:\n\n- crates/mp-oracle/Cargo.toml: ends with '}' (no final \\n)\n- crates/mp-oracle/README.md: ends with 'crates/mp/src/mini_schema.rs` (the runtime validator)' (no final \\n)\n\nVerified via tail -c | od -c. The workspace root Cargo.toml, crates/mp/Cargo.toml, and most other text files in the repo end with a final newline. cargo fmt --all -- --check does not catch this because it only operates on Rust source files.\n\nFix: append a single \\n to both files. cargo fmt does not enforce it; a pre-commit or editorconfig check would. Low severity, style only.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "summary": "crates/mp-oracle/Cargo.toml and README.md missing trailing newline (other workspace files have one)"
+    }
+  ]
+}

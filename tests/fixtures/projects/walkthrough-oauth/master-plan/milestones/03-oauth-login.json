@@ -1,0 +1,134 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "OAuth redirect returns valid session",
+      "evidence": "",
+      "id": "AC-01",
+      "status": "pending",
+      "verification": "cargo test oauth_callback"
+    },
+    {
+      "description": "Unknown email creates linked account",
+      "evidence": "",
+      "id": "AC-02",
+      "status": "pending",
+      "verification": "cargo test oauth_link"
+    },
+    {
+      "description": "Invalid OAuth state rejected",
+      "evidence": "",
+      "id": "AC-03",
+      "status": "pending",
+      "verification": "cargo test oauth_csrf"
+    }
+  ],
+  "behavior": {
+    "scenarios": [
+      {
+        "given": "User has Google account",
+        "id": "SC-01",
+        "independent_test": "cargo test oauth_callback",
+        "priority": "P1",
+        "then": "User has active session",
+        "title": "Happy path Google login",
+        "when": "User completes OAuth redirect"
+      }
+    ]
+  },
+  "context": {
+    "references": [
+      "src/auth/session.rs",
+      "src/api/routes.rs"
+    ],
+    "related": [
+      "02"
+    ]
+  },
+  "design_decisions": [
+    {
+      "area": "Provider",
+      "choice": "Google only in M03",
+      "rationale": "Largest user base; GitHub deferred"
+    }
+  ],
+  "intent": {
+    "outcome": "Users sign in with Google OAuth and receive a valid session."
+  },
+  "milestone": {
+    "change_kind": "greenfield",
+    "created": "2026-06-15",
+    "depends_on": [
+      "02"
+    ],
+    "effort": "M",
+    "execution_status": "planned",
+    "id": "03",
+    "priority": "high",
+    "risk": "med",
+    "slug": "oauth-login",
+    "spec_status": "ready",
+    "title": "OAuth Login",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Password-only auth blocks low-friction signup."
+  },
+  "scope": {
+    "in_scope": [
+      "Google OAuth",
+      "Callback route",
+      "Session linking"
+    ],
+    "out_of_scope": [
+      "GitHub OAuth",
+      "Mobile SDK",
+      "Password removal"
+    ]
+  },
+  "verification": {
+    "branch": "",
+    "date": "",
+    "evidence": ""
+  },
+  "work_packages": [
+    {
+      "goal": "Google OAuth end-to-end",
+      "id": "WP1",
+      "name": "OAuth flow",
+      "rollback": "git revert oauth branch",
+      "steps": [
+        {
+          "action": "Add OAuth config keys and Google client setup",
+          "done_when": "Config loads in test",
+          "files": [
+            "src/auth/oauth.rs",
+            "config/oauth.example.toml"
+          ],
+          "id": "S1",
+          "status": "pending",
+          "tests": "cargo test oauth_config"
+        },
+        {
+          "action": "Implement /auth/google/callback handler",
+          "done_when": "Callback tests pass",
+          "files": [
+            "src/api/auth_callback.rs"
+          ],
+          "id": "S2",
+          "status": "pending",
+          "tests": "cargo test oauth_callback"
+        },
+        {
+          "action": "Link OAuth identity to user on first login",
+          "done_when": "Link tests pass",
+          "files": [
+            "src/auth/link.rs"
+          ],
+          "id": "S3",
+          "status": "pending",
+          "tests": "cargo test oauth_link"
+        }
+      ]
+    }
+  ]
+}

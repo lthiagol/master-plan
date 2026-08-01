@@ -1,0 +1,15 @@
+{
+  "id": "p0-status-minimal",
+  "phase": "implemented",
+  "description": "Status aggregates milestones and track pending count",
+  "fixture": "projects/minimal-ready",
+  "command": ["status", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/status.json",
+    "fs_unchanged": true
+  }
+}

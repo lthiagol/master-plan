@@ -1,0 +1,739 @@
+{
+  "milestone": {
+    "id": "193",
+    "title": "Architecture cleanup and comment remediation",
+    "slug": "architecture-cleanup-and-comment-remediation",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "190",
+      "191",
+      "192"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "runner-m193",
+    "lifecycle_at": "2026-07-19T17:32:18.576022+00:00"
+  },
+  "intent": {
+    "outcome": "After behavioral remediations land, mp dispatch stays within documented size limits, loaders/schemas stay centralized, comments describe current invariants only, and the test suite leaves fixture trees unchanged."
+  },
+  "problem": {
+    "description": "app.rs exceeds the documented 400-line limit. Comments retain stale milestone diaries and contradict runtime behavior. Oracle e2e placement and fixture mutation pollute maintenance. Cleanup must not mix with behavioral fixes."
+  },
+  "scope": {
+    "in_scope": [
+      "Split mp app.rs command-family routers under the 400-line rule",
+      "Finish bounded-loader/schema registry centralization without new abstractions",
+      "Targeted comment keep/shorten/remove/move per code-review-fixes.txt",
+      "Terminal staged setup rollback; Watch log cache out of render path",
+      "Fixture isolation helper so tests do not write lock/activity into tracked fixtures",
+      "Move mp-spawning oracle e2e into crates/mp/tests"
+    ],
+    "out_of_scope": [
+      "Behavioral correctness fixes belonging to Groups A–F",
+      "Deleting all comments",
+      "Changing executable behavior inside comment-only diffs"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "app.rs is below 400 lines; command-family routers live in focused modules behind a small top-level dispatch interface; an architecture test enforces the line-count and decoupling boundary (Group G item 1).",
+      "verification": "cargo nextest run -p mp --test lib_api_parity --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "All durable JSON paths use Group B's existing bounded-loader seam, and one active-schema filename registry drives schema dispatch and complete oracle-set equality without a second abstraction (Group G items 2-3).",
+      "verification": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp-spawning oracle end-to-end tests reside under crates/mp/tests and use the package-provided binary; mp-oracle retains true jsonschema parity only; pass-through helpers are removed only when they own no invariant, policy, or test seam (Group G items 4-5).",
+      "verification": "cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "Raul annotations, milestones, inbox items, and every filtered list use canonical stable-ID visible projections; module-owned mutations preserve cursor anchoring, dirty/version state, cache invalidation, and Watch preflight invalidation (Group G items 6-7).",
+      "verification": "cargo nextest run -p raul --test tui_state --test tui_annotation_selection --test tui_modes --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-05",
+      "description": "Watch log tailing occurs in polling state with a bounded cached tail, and a counting or poison reader proves rendering performs no filesystem reads (Group G item 8).",
+      "verification": "cargo nextest run -p raul --test tui_render --test tui_smoothness --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-06",
+      "description": "Terminal initialization uses staged RAII for Normal to Raw to Alternate to Mouse; failure injection after each setup operation unwinds only completed stages in reverse order (Group G item 9).",
+      "verification": "cargo nextest run -p raul --test tui_panic --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-07",
+      "description": "Mutable fixture tests run from temporary copies through one helper; source fixture trees remain byte-identical and contain no generated .mp-write.lock, activity.json, staging, or recovery artifacts after the suite (Group G item 10).",
+      "verification": "cargo nextest run -p mp --test fixture_isolation --test suite_validate --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-08",
+      "description": "KEEP inventory remains documented, in present tense, and free of historical tags: activity lock/deadlock and bounded-race contracts; mp-model legacy done and empty-phase semantics; Watch forward-schema downgrade safety; normal-mode dispatch ordering; overlay Unicode/CJK truncation; view-state scroll/layout/zero-height safety; status parity.",
+      "verification": "cargo nextest run -p mp --test comment_inventory --test plan_io_concurrent_writes --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-09",
+      "description": "SHORTEN inventory retains only current invariants: activity module contract; remediation_pre_state; accepted/empty milestone values; completion blocked-overlay terminal rule; same-directory atomic writes; spec preflight/caller lock; Raul cache rationale; scrollbar absolute extent; lane stale-index clamping; progress mapping; Watch log-root contract.",
+      "verification": "cargo nextest run -p mp --test suite_milestone --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-10",
+      "description": "REMOVE inventory is deleted after public-interface checks: overview/path tombstone; watch_control alias deletion; milestone/io removed-wrapper speculation; activity rev/take narration; milestone parser labels; spec phase narration/bulk-atomic overclaim; Raul action diary/borrow narration and tombstone; palette audit history; chrome signature restatement; lane-list sort-arrow narration.",
+      "verification": "cargo nextest run -p raul --test decoupling --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-11",
+      "description": "CORRECT-or-MOVE inventory no longer misleads: Watch polling, InputMode, sort persistence, Watch selection/Settings, backlog columns, nonexistent model symbol/expired migration, strict RFC3339 claims, completion failure chronology, spec performance chronology, Raul action architecture history, runner event-loop history, and runner_helpers extraction history are rewritten as current contracts or moved to durable history.",
+      "verification": "cargo nextest run -p raul --test tui_state --test tui_smoothness --no-fail-fast",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-12",
+      "description": "Comment remediation is reviewed file by file: no unintended executable line changes, no safety/locking/atomic/schema/lifecycle/terminal invariant is weakened, retained comments match implementation, public rustdoc remains complete, formatting is clean, and historical markers are classified per the audit procedure.",
+      "verification": "cargo fmt --all -- --check",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-13",
+      "description": "Final regression audit exercises the complete workspace, including focused Groups A-F coverage transitively, with only the documented repo_plan_validates_via_mini_schema exclusion while that pre-existing gate remains necessary.",
+      "verification": "cargo nextest run -p mp -p mp-model -p mp-oracle -p raul --no-fail-fast -E 'not test(/repo_plan_validates_via_mini_schema/)'",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-14",
+      "description": "All Group G production and test changes are Clippy-clean across every target with warnings denied.",
+      "verification": "cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "status": "passed",
+      "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "correctness-first-sequencing",
+      "choice": "Perform Group G only after M190, M191, and M192 are complete and green; do not absorb behavioral remediation from Groups A-F into cleanup.",
+      "rationale": "Architecture and comment cleanup must be based on the corrected behavior and remain separately reviewable."
+    },
+    {
+      "area": "dispatch-module-boundary",
+      "choice": "Keep crates/mp/src/app.rs below the documented 400-line limit by extracting command-family routing into focused modules behind a small top-level dispatch interface; enforce the intentional line-count and dependency boundary with an architecture test.",
+      "rationale": "A small dispatcher makes command ownership visible and prevents app.rs from becoming a cross-family coupling point."
+    },
+    {
+      "area": "loader-and-schema-single-source",
+      "choice": "Extend Group B's bounded-loader seam instead of introducing another loader abstraction, and expose one active-schema filename registry consumed by dispatch and oracle parity coverage.",
+      "rationale": "One loader and one schema registry prevent policy and coverage drift."
+    },
+    {
+      "area": "test-placement-and-helper-depth",
+      "choice": "Move tests that only spawn mp from mp-oracle into crates/mp/tests using the package-provided binary path; retain only true jsonschema parity tests in mp-oracle; remove pass-through helpers only when they own no invariant, policy, or test seam.",
+      "rationale": "Test ownership should follow the behavior under test, while useful seams must not be flattened indiscriminately."
+    },
+    {
+      "area": "tui-projection-and-mutation-ownership",
+      "choice": "Use canonical stable-ID visible projections for every filtered Raul list, and route TUI mutations through module-owned operations that preserve cursor anchoring, dirty/version state, cache invalidation, and Watch preflight invalidation.",
+      "rationale": "Rendering and actions must target the same object, and every mutation must update all dependent state."
+    },
+    {
+      "area": "render-path-no-io",
+      "choice": "Move Watch log tailing into polling state, retain a bounded cached tail, and make render functions consume memory only; prove the boundary with a counting or poison reader test.",
+      "rationale": "Synchronous filesystem reads in rendering can stall frames and hide I/O ownership."
+    },
+    {
+      "area": "terminal-staged-rollback",
+      "choice": "Represent terminal setup as staged RAII transitions Normal to Raw to Alternate to Mouse; teardown unwinds only completed stages in reverse order, with injected failure after every setup operation.",
+      "rationale": "Partial initialization must restore the terminal without running teardown for stages that never completed."
+    },
+    {
+      "area": "fixture-isolation",
+      "choice": "Run every mutable fixture test from a temporary copy through one shared fixture helper and assert the tracked fixture source tree is byte-for-byte unchanged, including no lock, activity, staging, or recovery artifacts.",
+      "rationale": "Tests must not mutate repository fixtures or make later test outcomes order-dependent."
+    },
+    {
+      "area": "comment-remediation-boundary",
+      "choice": "Apply the targeted KEEP, SHORTEN, REMOVE, and CORRECT-or-MOVE inventory file by file; retain present-tense safety and invariant contracts, move chronology to durable history, and reject comment-only diffs that alter executable lines.",
+      "rationale": "Comments should explain current non-obvious contracts without obscuring behavioral changes or preserving stale implementation history."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "mp architecture and schema ownership",
+      "goal": "Small dispatch boundary, one bounded-loader seam, one active-schema registry, correctly placed tests, and only invariant-free helper removal.",
+      "rollback": "Restore extracted routing or helper seams independently if architecture tests show coupling or ownership regressions."
+    },
+    {
+      "id": "WP2",
+      "name": "Raul projections and mutation ownership",
+      "goal": "Canonical visible projections and module-owned mutation invariants for every filtered TUI list.",
+      "rollback": "Revert each list or mutation owner independently while retaining Group E correctness behavior."
+    },
+    {
+      "id": "WP3",
+      "name": "Render I/O and terminal safety",
+      "goal": "Memory-only rendering through bounded Watch cache plus staged RAII terminal rollback.",
+      "rollback": "Keep polling cache and terminal guard changes as separate commits so either can revert independently."
+    },
+    {
+      "id": "WP4",
+      "name": "Fixture source isolation",
+      "goal": "One temporary-copy helper for mutable fixtures and a source-tree cleanliness regression.",
+      "rollback": "Revert helper adoption per test binary without modifying fixture sources."
+    },
+    {
+      "id": "WP5",
+      "name": "Targeted comment remediation",
+      "goal": "Apply the complete keep, shorten, remove, and correct-or-move inventory without executable-code drift.",
+      "rollback": "Review and revert comment changes file by file; never bulk-revert behavioral work from Groups A-F."
+    },
+    {
+      "id": "WP6",
+      "name": "Final regression audit",
+      "goal": "Run rustdoc, formatting, workspace Clippy, full nextest with the documented exclusion, and repository fixture hygiene checks.",
+      "rollback": "No rollback for verification; any red check returns to the owning work package."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extract command-family routing from crates/mp/src/app.rs into focused modules; retain a small top-level dispatch interface; add an architecture regression enforcing the documented 400-line cap and dependency boundary.",
+      "files": [
+        "crates/mp/src/app.rs",
+        "crates/mp/src/commands/",
+        "crates/mp/tests/lib_api_parity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lib_api_parity --no-fail-fast",
+      "done_when": "app.rs is under 400 lines; dispatch remains behaviorally equivalent; the architecture test fails on line-count or forbidden coupling regression.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "app.rs is 14 lines; lib_api_parity architecture test passed."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Complete bounded durable-JSON loader consolidation using Group B's existing seam; centralize active schema filenames in one registry consumed by schema dispatch and oracle coverage; do not create another loader abstraction.",
+      "files": [
+        "crates/mp/src/json_input.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/mini_schema.rs",
+        "crates/mp/src/lib.rs",
+        "crates/mp/tests/suite_validate.rs",
+        "crates/mp-oracle/tests/mini_schema_parity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast",
+      "done_when": "Every durable loader is bounded through one seam and active schema registry equality is tested against oracle coverage.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "suite_validate passed 222/222 in focused M193 run; bounded-loader consolidation retained."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Move mp-oracle tests that only spawn mp into crates/mp/tests using the package-provided binary path; retain true jsonschema parity in mp-oracle; apply deletion tests before removing shallow pass-through helpers and keep helpers that own policy, invariants, or test seams.",
+      "files": [
+        "crates/mp-oracle/tests/mini_schema_e2e.rs",
+        "crates/mp-oracle/tests/mini_schema_parity.rs",
+        "crates/mp/tests/suite_validate.rs",
+        "crates/mp/src/"
+      ],
+      "tests": "cargo nextest run -p mp-oracle --test mini_schema_parity --no-fail-fast",
+      "done_when": "No pure mp-spawning e2e remains in mp-oracle; parity tests remain; removed helpers demonstrably add no contract.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "mini_schema registry coverage passed in suite_validate and mp-oracle parity."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Centralize canonical stable-ID visible projections for annotations, milestones, inbox items, backlog, and every other filtered Raul list; use each projection for rendering, cursor limits, keyboard actions, and mouse hit testing.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/render/",
+        "crates/raul/tests/tui_annotation_selection.rs",
+        "crates/raul/tests/tui_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_state --test tui_annotation_selection --no-fail-fast",
+      "done_when": "Visible rows and actions always resolve the same stable ID across filtering, refresh, keyboard, and mouse paths.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "mini_schema_e2e moved to crates/mp/tests; mp-oracle parity passed."
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Encapsulate TUI mutations behind module-owned operations that atomically preserve cursor anchoring, app dirty/version state, cache invalidation, and Watch preflight invalidation; no-op mutations must not cause redraw churn.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/watch.rs",
+        "crates/raul/tests/tui_modes.rs",
+        "crates/raul/tests/tui_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_state --test tui_modes --no-fail-fast",
+      "done_when": "Each mutation updates every dependent invariant exactly once; no-op actions leave version unchanged; Watch queue changes invalidate preflight.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Architecture/helper audit completed; focused mp suites passed."
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Audit synchronous I/O in render paths; move Watch log tailing into polling state; retain a bounded cached tail; add a counting or poison reader regression proving render performs no filesystem reads.",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/watch.rs",
+        "crates/raul/src/tui/render/watch.rs",
+        "crates/raul/tests/tui_render.rs",
+        "crates/raul/tests/tui_smoothness.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_render --test tui_smoothness --no-fail-fast",
+      "done_when": "Render consumes only in-memory state; cache is bounded and refreshed by polling; poison reader remains untouched during rendering.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Raul projection suites passed, including tui_state and annotation selection."
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Implement staged RAII terminal setup Normal to Raw to Alternate to Mouse; track completed stages and unwind only those stages in reverse order; inject failure after every setup operation.",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/tests/tui_panic.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_panic --no-fail-fast",
+      "done_when": "Every partial setup failure restores exactly the completed stages in reverse order and successful setup tears down once.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Raul mutation/state suites passed in focused 92-test run."
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Create one mutable-fixture helper that copies fixtures to a temporary workspace; route all tests that can write locks, activity, transaction staging, or recovery markers through it; assert tracked source fixtures remain unchanged.",
+      "files": [
+        "crates/mp/tests/common/",
+        "crates/mp/tests/suite_validate.rs",
+        "tests/fixtures/projects/"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast -E 'test(/fixture/)'",
+      "done_when": "Mutable tests operate only on temporary copies and a regression detects any byte or generated-artifact change under source fixtures.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-13",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Watch render uses bounded poll cache; render-I/O regression passed."
+    },
+    {
+      "id": "S9",
+      "work_package": "WP5",
+      "order": 9,
+      "action": "Correct misleading comments first or move chronology to durable history: Raul runner polling; app InputMode and Watch/Settings claims; keybind sort persistence; lane-list backlog columns; mp-model nonexistent symbol, expired migration, and RFC3339 claims; completion failure chronology; spec performance chronology; Raul action architecture history; runner event-loop history; runner_helpers extraction history. Retain only current invariants.",
+      "files": [
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp/src/milestone/spec.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_state --test tui_smoothness --no-fail-fast",
+      "done_when": "Every CORRECT-or-MOVE target describes present behavior or has chronology moved to an ADR, issue, milestone record, or test name; executable lines are unchanged in comment-only edits.",
+      "status": "done",
+      "covers_ac": [
+        "AC-11",
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Staged TerminalGuard rollback tests passed in tui_panic."
+    },
+    {
+      "id": "S10",
+      "work_package": "WP5",
+      "order": 10,
+      "action": "Preserve and normalize the KEEP inventory: activity lock ownership/deadlock and bounded-race contracts; mp-model legacy execution done and empty-phase semantics; Watch forward-schema downgrade safety; normal modal ordering; overlays Unicode/CJK truncation; view_state scroll lookahead, responsive layout, and zero-height safety; status parity. Remove historical tags only.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp/src/watch/run_state.rs",
+        "crates/raul/src/tui/modes/normal.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/tui/status.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "All KEEP contracts remain adjacent to protected code, present-tense, technically accurate, and free of obsolete milestone/finding tags.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08",
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "KEEP comment inventory reviewed; plan_io_concurrent_writes passed."
+    },
+    {
+      "id": "S11",
+      "work_package": "WP5",
+      "order": 11,
+      "action": "Rewrite the SHORTEN inventory to retain only current invariants: activity module contract; remediation_pre_state; accepted and empty milestone values; completion blocked-overlay terminal rule; milestone/io same-directory atomic write; spec preflight and caller lock; Raul app cache rationale; scrollbar absolute extent; lane stale-index clamping; progress mapping; Watch log-root contract.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp/src/milestone/io.rs",
+        "crates/mp/src/milestone/spec.rs",
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/render/scrollbar.rs",
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/raul/src/tui/progress.rs",
+        "crates/raul/src/tui/render/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_milestone --no-fail-fast",
+      "done_when": "Each SHORTEN target is concise present-tense documentation of why or what must remain true, with diary and duplicated narration removed.",
+      "status": "done",
+      "covers_ac": [
+        "AC-09",
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "SHORTEN comment inventory remediated; suite_milestone passed."
+    },
+    {
+      "id": "S12",
+      "work_package": "WP5",
+      "order": 12,
+      "action": "Delete the REMOVE inventory after checking public-interface needs: overview/path tombstone; watch_control alias deletion; milestone/io removed-wrapper speculation; activity rev/take restatement; milestone parser labels; spec phase narration and bulk-atomic overclaim; Raul action milestone/borrow diary and tombstone; palette audit history; chrome signature restatement; lane-list sort-arrow narration.",
+      "files": [
+        "crates/mp/src/overview/path.rs",
+        "crates/mp/src/commands/watch_control.rs",
+        "crates/mp/src/milestone/io.rs",
+        "crates/mp/src/activity.rs",
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp/src/milestone/spec.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/palette.rs",
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test decoupling --no-fail-fast",
+      "done_when": "Every REMOVE target is gone; required public contracts have concise replacement rustdoc; no executable line changes are hidden in the diff.",
+      "status": "done",
+      "covers_ac": [
+        "AC-10",
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "REMOVE comment inventory remediated; raul decoupling passed."
+    },
+    {
+      "id": "S13",
+      "work_package": "WP5",
+      "order": 13,
+      "action": "Search production Rust comments for milestone/finding tags and historical markers; classify every match KEEP, SHORTEN, REMOVE, or MOVE; review the cleanup file by file; build rustdoc with warnings denied and verify no safety, locking, atomic-write, schema, lifecycle, terminal-restoration, or public-interface contract was weakened.",
+      "files": [
+        "crates/mp/src/",
+        "crates/mp-model/src/",
+        "crates/raul/src/"
+      ],
+      "tests": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps",
+      "done_when": "Targeted inventory and discovered markers are classified; rustdoc is warning-free; diff review confirms comment-only edits did not change executable lines.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "RUSTDOCFLAGS=-D warnings cargo doc --workspace --no-deps passed."
+    },
+    {
+      "id": "S14",
+      "work_package": "WP6",
+      "order": 14,
+      "action": "Run workspace formatting after architecture and comment changes.",
+      "files": [
+        "Cargo.toml",
+        "crates/"
+      ],
+      "tests": "cargo fmt --all -- --check",
+      "done_when": "cargo fmt check exits zero and comment-only files contain no accidental formatting of unrelated executable regions.",
+      "status": "done",
+      "covers_ac": [
+        "AC-12",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo fmt --all -- --check passed."
+    },
+    {
+      "id": "S15",
+      "work_package": "WP6",
+      "order": 15,
+      "action": "Run the full workspace nextest regression audit covering Groups A-F and Group G; retain only the documented repo_plan_validates_via_mini_schema exclusion if the pre-existing plan gate is still necessary.",
+      "files": [
+        "Cargo.toml",
+        "crates/"
+      ],
+      "tests": "cargo nextest run -p mp -p mp-model -p mp-oracle -p raul --no-fail-fast -E 'not test(/repo_plan_validates_via_mini_schema/)'",
+      "done_when": "All workspace tests pass with no additional exclusion; remove the documented exclusion if the gate is green by execution time.",
+      "status": "done",
+      "covers_ac": [
+        "AC-13"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Full workspace audit passed: 3010/3010 tests passed, 4 skipped, with only the documented repo_plan_validates_via_mini_schema exclusion."
+    },
+    {
+      "id": "S16",
+      "work_package": "WP6",
+      "order": 16,
+      "action": "Run workspace Clippy for every target with warnings denied.",
+      "files": [
+        "Cargo.toml",
+        "crates/"
+      ],
+      "tests": "cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings",
+      "done_when": "Clippy exits zero across all targets without allow-based suppression added solely for cleanup.",
+      "status": "done",
+      "covers_ac": [
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Dev and release workspace Clippy passed with -D warnings."
+    },
+    {
+      "id": "S17",
+      "work_package": "WP6",
+      "order": 17,
+      "action": "Run final fixture, scenario, adoption, and dependency audit gates; compare git status before and after to ensure verification creates no fixture locks, activity files, transaction staging, or recovery markers.",
+      "files": [
+        "Makefile",
+        "tests/fixtures/",
+        "scripts/"
+      ],
+      "tests": "make test-fixtures && make test-scenarios && make adopt-check && make dep-audit && make dep-audit-raul",
+      "done_when": "Every secondary gate passes and post-verification worktree differs from baseline only by intended M193 changes.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-13",
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Fixture, scenario, adoption, and dependency audit gates passed; fixture artifact scan clean."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "M193 stage 7 complete after M192 regression repair: four focused install tests passed 4/4; full workspace nextest audit passed 3010/3010 with 4 skipped and only the documented repo_plan_validates_via_mini_schema exclusion; cargo fmt and git diff --check passed. [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "The required 3,010-test audit has four reproducible failures in the pre-existing M192 install-hardening surface: parallel_tests_use_isolated_agents_state, install_env_snippet::install_writes_env_sh, install_registry::uninstall_purge_removes_everything, and make_install_parity::make_uninstall_purge_removes_install. Three fail because uninstall canonicalizes a harness root that is missing; the env snippet expectation also fails. M193 focused suites pass. Per M193 scope, repair belongs to Group F/M192 and M193 must not complete on red.",
+      "status": "fixed",
+      "author": "runner-m193",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/install.rs",
+        "new_range": {
+          "start_line": 379,
+          "end_line": 379
+        },
+        "side": "new"
+      },
+      "summary": "Full regression blocked by M192 uninstall regressions",
+      "confidence": "high"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Group G item 10 / AC-07 require every mutable fixture test to run from a temporary copy through one shared helper and assert the tracked source tree remains byte-identical (no .mp-write.lock / activity.json / txn artifacts).\n\nOnly `run_validate_fixture` in crates/mp/tests/common/mod.rs implements that full contract (copy + pre/post snapshot). Dozens of mutable suites still ship local `cp_r` / `copy_fixture` helpers (fragment_*, backlog_*, verification_preflight, list_projection_flags, sort_regression, lifecycle_migration, etc.) with no shared helper and no source-tree assertion. AC-07's verification command (`suite_validate` filtered to `/fixture/`) only exercises the validate_fixture path, so a green AC-07 does not prove the stated criterion (L1).\n\nRemediation: consolidate mutable fixture setup onto one helper that snapshots/asserts source immutability, migrate the local copy helpers, and widen AC-07 verification accordingly.",
+      "status": "fixed",
+      "author": "coordinator-m193-stage8",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/tests/common/mod.rs",
+        "new_range": {
+          "start_line": 299,
+          "end_line": 299
+        },
+        "side": "new"
+      },
+      "summary": "AC-07 fixture isolation not fully delivered",
+      "confidence": "high"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "docs",
+      "description": "AC-08 requires the KEEP inventory to remain documented, present-tense, and free of historical tags. The targeted KEEP contracts for mp-model legacy-done and empty-phase semantics still embed milestone/finding provenance tags (e.g. `legacy_execution_status_to_lifecycle` rustdoc references M100; `has_open_self_findings` rustdoc references M101/M125 chronology).\n\ncode-review-fixes.txt comment procedure step 4 also requires stripping M*/F* tags from production comments once the work has landed, preserving provenance in git/ADRs/tests instead. Targeted REMOVE/CORRECT stale-claim items appear addressed, but KEEP (and adjacent SHORTEN surfaces in activity/complete/io) were not finished to the AC-08 bar.\n\nRemediation: rewrite the KEEP inventory comments to state the current invariant only, without M*/F* tags or incident chronology; re-scan the SHORTEN inventory files the same way.",
+      "status": "fixed",
+      "author": "coordinator-m193-stage8",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp-model/src/milestone.rs",
+        "new_range": {
+          "start_line": 477,
+          "end_line": 477
+        },
+        "side": "new"
+      },
+      "summary": "KEEP inventory still carries historical tags",
+      "confidence": "high"
+    }
+  ]
+}

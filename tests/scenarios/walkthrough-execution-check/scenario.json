@@ -1,0 +1,16 @@
+{
+  "id": "walkthrough-execution-check",
+  "phase": "implemented",
+  "description": "execution check reports can_handoff on walkthrough fixture",
+  "fixture": "projects/walkthrough-oauth",
+  "command": ["execution", "check", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/execution-check.json",
+    "fs_unchanged": true
+  },
+  "notes": "P1.9 — golden is target shape from docs/WALKTHROUGH.md."
+}

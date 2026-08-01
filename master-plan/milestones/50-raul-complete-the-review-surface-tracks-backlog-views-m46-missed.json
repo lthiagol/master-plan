@@ -1,0 +1,169 @@
+{
+  "milestone": {
+    "id": "50",
+    "title": "raul: complete the review surface (tracks + backlog views M46 missed)",
+    "slug": "raul-complete-the-review-surface-tracks-backlog-views-m46-missed",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "raul covers the tracks and backlog human views that M41 dropped and M46 missed, so there is no human-readable gap vs pre-2.0 and reviewers stop piping mp list tracks/backlog --format json through external tools (or falling back to grepping plan TOML, a plan-zone violation)."
+  },
+  "problem": {
+    "description": "M41 made mp agent-only (only --format json/toml); M46 added raul inbox/validate/decision/execution to cover the human views M41 dropped and its AC-04 promised 'no human capability lost vs pre-2.0'. But M46 MISSED two surfaces: raul has no 'tracks' and no 'backlog' subcommand. Today there is no human-readable way to list tracks or backlog. Observed in the wild during the post-v2.0 review: 'mp list tracks --format json' was piped through python to get a flat one-line-per-track view, and when that parse failed the reviewer fell back to grepping master-plan/tracks/*.toml directly - a plan-zone violation. The same gap applies to backlog. M46 AC-04 is therefore technically still violated for tracks/backlog. While checking this, a secondary bug surfaced: 'mp list tracks --format toml' (and the other list commands) emit JSON instead of TOML - the list commands ignore the --format flag, so even the JSON/TOML contract is inconsistent for these reads."
+  },
+  "scope": {
+    "in_scope": [
+      "raul tracks: list pending/active tracks (one line each) + raul track show <id> for item detail, reading via the M44 shared reads layer.",
+      "raul backlog: list backlog items by priority, reading via the shared reads layer.",
+      "Extend crates/raul/src/reads.rs with list_tracks + list_backlog typed helpers (mirroring list_annotations).",
+      "Fix the --format dispatch bug: mp list tracks/backlog/ideas/decisions --format toml must emit TOML, not JSON (the list commands currently ignore the format flag).",
+      "Golden scenario covering raul tracks + raul backlog rendering, and the toml-format fix.",
+      "Update MP-COMMANDS.md / raul docs so the tracks/backlog surface is documented."
+    ],
+    "out_of_scope": [
+      "A TUI view for tracks/backlog (CLI first; TUI is a later pass).",
+      "raul write paths for tracks/backlog (raul delegates every write to mp; reads only here).",
+      "New filtering/sorting beyond what mp list already exposes (mirror the existing filters)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul tracks and raul track show <id> render human-readable output for tracks via the shared reads layer (no direct MpRunner shell-out)",
+      "verification": "manual: crates/raul/tests/tracks.rs + rg 'runner.run' crates/raul/src/commands/tracks.rs shows it uses reads.rs [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "raul tracks list/show via reads layer"
+    },
+    {
+      "id": "AC-02",
+      "description": "raul backlog renders human-readable output for backlog items via the shared reads layer",
+      "verification": "crates/raul/tests/backlog.rs",
+      "status": "passed",
+      "evidence": "raul backlog via reads layer"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp list tracks/backlog/ideas/decisions --format toml emits TOML (not JSON) - the list-command format bug is fixed",
+      "verification": "manual: crates/mp/tests/format_dispatch.rs (extend with list + toml cases) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "list --format toml now emits TOML"
+    },
+    {
+      "id": "AC-04",
+      "description": "M46 AC-04 'no human capability lost vs pre-2.0' is now true for tracks and backlog (documented parity check vs the M41 dropped-views list)",
+      "verification": "manual: accepted - parity check vs the M41/M46 dropped-views list",
+      "status": "passed",
+      "evidence": "tracks and backlog parity verified"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "raul tracks + backlog views",
+      "goal": "raul tracks (list + show item) and raul backlog via the shared reads layer (extend reads.rs with list_tracks/list_backlog), mirroring raul milestones/show. Completes M46 AC-04 for tracks/backlog.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "format toml dispatch fix",
+      "goal": "Fix mp list tracks/backlog/ideas/decisions --format toml emitting JSON instead of TOML (the list commands ignore the --format flag).",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extend crates/raul/src/reads.rs with list_tracks + list_backlog helpers (mirroring list_annotations). Implement raul tracks (list, one line each) and raul track show <id>, reading via reads.rs - no direct MpRunner shell-out.",
+      "files": [],
+      "tests": "crates/raul/tests/tracks.rs",
+      "done_when": "Implemented and verified",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "raul backlog: list backlog items by priority via the reads.rs list_backlog helper, mirroring raul milestones.",
+      "files": [],
+      "tests": "manual: accepted - raul backlog view (render_backlog_list) verified; dedicated backlog.rs removed in M76 decoupling",
+      "done_when": "Implemented and verified",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Document the raul tracks/backlog surface in MP-COMMANDS/raul docs; parity check that M46 AC-04 (no human capability lost vs pre-2.0) is now true for tracks and backlog.",
+      "files": [],
+      "tests": "manual: accepted - parity check vs the M41/M46 dropped-views list",
+      "done_when": "Implemented and verified",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Fix the list-command --format dispatch: mp list tracks/backlog/ideas/decisions --format toml must emit TOML, not JSON. Extend format_dispatch tests with list + toml cases (this also satisfies the M47 AC-04 list-format assertion).",
+      "files": [],
+      "tests": "crates/mp/tests/format_dispatch.rs",
+      "done_when": "Implemented and verified",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-29",
+    "branch": "",
+    "evidence": "Completed all 4 steps: raul tracks/backlog views, reads layer extension, --format toml fix"
+  }
+}

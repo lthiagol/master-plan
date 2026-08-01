@@ -1,0 +1,354 @@
+{
+  "milestone": {
+    "id": "147",
+    "title": "Agent automation config: commit/push/branch/auto-remediate knobs in project config",
+    "slug": "agent-automation-config-commit-push-branch-auto-remediate-knobs-in-project-config",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "140"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-10",
+    "updated": "2026-07-14",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-14T05:25:43.427570+00:00"
+  },
+  "intent": {
+    "outcome": "Project config gains an [agent.automation] section with four knobs: commit_after_execute (bool), push_after_review (bool), branch_strategy (per-milestone | current | none), and auto_remediate (none | low | medium | high | all — threshold semantics: remediate findings at or above the level). Agents read these knobs at handoff boundaries (after execute, after self-review, after external review) and branch their behavior: commit the work, push on review handoff, cut a per-milestone branch, and auto-remediate findings at/above the configured threshold or merely record them. raul surfaces the knobs via the M140 config TUI."
+  },
+  "problem": {
+    "description": "Today every agent handoff is ad-hoc: the runner commits (or doesn't) based on session judgment, the coordinator pushes (or doesn't) at the review boundary, branch strategy is implicit, and finding remediation is all-or-nothing. There is no shared, project-level policy — so the same project behaves differently across sessions and agents, and the human cannot declare 'always push at review handoff' or 'auto-fix only high-severity findings' once and have every agent honor it."
+  },
+  "scope": {
+    "in_scope": [
+      "Config model: new [agent.automation] section in config.toml (mp-model config.rs) with fields: commit_after_execute: bool (default false), push_after_review: bool (default false), branch_strategy: enum { per-milestone, current, none } (default current), auto_remediate: enum { none, low, medium, high, all } (default none).",
+      "auto_remediate threshold semantics: the value names the MINIMUM severity to remediate. none = record only; low = all severities; medium = medium+high; high = high only; all = alias for low (every severity). Document the ordering none < low < medium < high so 'all' is redundant-with-low but kept for clarity.",
+      "mp config set/show: read/write the new section. mp config validate accepts the new fields and their enum values.",
+      "raul: the new section appears in the M140 Settings TUI as an [agent.automation] group, editable like other sections.",
+      "Agent contract (skills): mp-runner and mp-coordinator updated to read config at handoff boundaries and branch on the knobs — commit after execute if commit_after_execute, push at review handoff if push_after_review, honor branch_strategy, and auto-remediate findings at/above the auto_remediate threshold (else just record them via mp reviews finding).",
+      "mp reviews finding: when auto_remediate is set and findings are below threshold, they are recorded but not acted on; at/above threshold, the runner remediation loop engages. The threshold filter is applied by the agent reading config, not by mp gating the command."
+    ],
+    "out_of_scope": [
+      "No new mp subcommand for git automation. The agent runs git directly per the config knobs; mp does not wrap git commit/push/branch into its own command surface (mp git status/commit/push exist separately and are unaffected).",
+      "No CI/CD pipeline integration. Branch and push are local git operations; continuous integration is downstream and out of scope.",
+      "No per-milestone override of the automation config. The knobs are project-level policy. Per-milestone overrides are a later candidate if the need surfaces.",
+      "No automatic PR creation. push_after_review pushes to the configured remote; opening a PR remains a manual/harness step.",
+      "Does not change the lifecycle state machine or review model — only adds config that agents consult at existing transitions."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "config.toml accepts an [agent.automation] section with the four knobs and sensible defaults",
+      "verification": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp config validate rejects invalid enum values for branch_strategy and auto_remediate",
+      "verification": "cargo nextest run -p mp --test config_agent_automation config_set_rejects_invalid_branch_strategy config_set_rejects_invalid_auto_remediate config_validate_rejects_invalid_automation_enum --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    },
+    {
+      "id": "AC-03",
+      "description": "auto_remediate threshold is interpreted as 'remediate at or above this severity' — none < low < medium < high",
+      "verification": "cargo nextest run -p mp --test auto_remediate_threshold auto_remediate_threshold_severity_rank_ordering_is_locked auto_remediate_threshold_should_remediate_truth_table --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    },
+    {
+      "id": "AC-04",
+      "description": "raul Settings TUI (M140) shows the [agent.automation] section and lets the user edit each knob",
+      "verification": "cargo nextest run -p raul --test tui_settings_automation settings_sections_register_agent_automation_block settings_modal_surfaces_agent_section_via_navigation settings_edit_persists_commit_after_execute_to_disk --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    },
+    {
+      "id": "AC-05",
+      "description": "mp-runner skill instructs the agent to commit after execute when commit_after_execute=true, and to honor branch_strategy",
+      "verification": "cargo nextest run -p mp --test skill_contract_automation skill_runner_skill_md_documents_automation_handoffs skill_runner_executing_md_documents_branch_and_commit_consult --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    },
+    {
+      "id": "AC-06",
+      "description": "mp-coordinator skill instructs the agent to push at the review handoff when push_after_review=true, and to apply the auto_remediate threshold",
+      "verification": "cargo nextest run -p mp --test skill_contract_automation skill_coordinator_skill_md_documents_automation_handoffs skill_coordinator_reviewing_md_documents_threshold_and_push_consult --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "threshold-semantics",
+      "choice": "auto_remediate names a minimum severity (threshold from the top), not an exclusive set",
+      "rationale": "A threshold reads naturally ('medium' = med+high) and avoids combinatorial list values. 'all' aliases 'low' (everything) for clarity, accepting the redundancy."
+    },
+    {
+      "area": "config-location",
+      "choice": "Knobs live in project config.toml under [agent.automation], not in plan.toml or per-user settings",
+      "rationale": "This is project-level workflow policy a team should share via the repo. config.toml is already mp-managed and sits in the plan-adjacent zone — keeps it out of the hand-edit plan zone while remaining version-controlled."
+    },
+    {
+      "area": "enforcement-point",
+      "choice": "The agent reads config and branches on it; mp does not gate commands on the knobs",
+      "rationale": "The knobs describe desired agent behavior at handoff boundaries, not hard CLI gates. mp provides the source of truth; the skills encode the consult-and-act discipline. This avoids coupling git/review commands to config-checking logic."
+    },
+    {
+      "area": "sequencing",
+      "choice": "depends_on M140 (config management TUI)",
+      "rationale": "M140 provides the raul editor surface for the new fields. Adding the fields before the TUI exists means raul cannot manage them; adding after lets the new section get a first-class editing home immediately."
+    },
+    {
+      "area": "config-location",
+      "choice": "[agent.automation] lives in ProjectConfig at crates/mp/src/config.rs, NOT mp-model config.rs as the original spec body stated",
+      "rationale": "mp-model/src/config.rs holds only domain types (Decisions/Brief/Ideas). ProjectConfig — the on-disk config.toml schema with Option<T> + unwrap_or accessors — lives in crates/mp/src/config.rs. Same correction applied to M149 S1. Keeps agent.* sections together (M149 agent.runner/coordinator, M147 agent.automation)."
+    },
+    {
+      "area": "threshold-semantics",
+      "choice": "auto_remediate names the MINIMUM severity to remediate (at-or-above); none<low<medium<high; all is an alias for low",
+      "rationale": "An at-or-above threshold matches operator intuition ('fix everything medium and up'). low vs all overlap is deliberate clarity, not redundancy — 'all' reads better in configs that want every severity."
+    },
+    {
+      "area": "agent-enforced",
+      "choice": "the threshold filter is applied by the agent reading config, not by mp gating mp reviews finding",
+      "rationale": "mp reviews finding records any severity unconditionally (audit trail must be complete). The decision to ACT is policy, read by the agent at the handoff boundary. Keeps mp a recorder, not a gate, over review severity."
+    },
+    {
+      "area": "no-per-milestone-override",
+      "choice": "knobs are project-level only; no per-milestone override",
+      "rationale": "Policy consistency across sessions/agents is the whole point. Per-milestone overrides fragment behavior and defeat the 'declare once' value; defer unless a concrete need surfaces."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-CONFIG",
+      "name": "Config section + validation",
+      "goal": "[agent.automation] in crates/mp/src/config.rs (NOT mp-model) with 4 knobs + enum validation",
+      "rollback": ""
+    },
+    {
+      "id": "WP-THRESHOLD",
+      "name": "auto_remediate semantics",
+      "goal": "Document + enforce none<low<medium<high at-or-above ordering",
+      "rollback": ""
+    },
+    {
+      "id": "WP-SKILLS",
+      "name": "Skill contract updates",
+      "goal": "mp-runner + mp-coordinator read knobs at handoff boundaries and branch behavior",
+      "rollback": ""
+    },
+    {
+      "id": "WP-RAUL",
+      "name": "raul Settings surface",
+      "goal": "Surface [agent.automation] in M140 Settings TUI (gated on M140)",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-CONFIG",
+      "order": 1,
+      "action": "Add AgentAutomationConfig to ProjectConfig in crates/mp/src/config.rs (NOT mp-model). Fields: commit_after_execute, push_after_review, branch_strategy, auto_remediate with defaults. Wire mp config set/show. mp config validate rejects invalid enum values for branch_strategy and auto_remediate (AC-02).",
+      "files": [
+        "crates/mp/src/config.rs",
+        "templates/defaults/config.full.json",
+        "templates/defaults/config.hybrid.json"
+      ],
+      "tests": "cargo test -p mp config_agent_automation",
+      "done_when": "mp config set agent.automation.commit_after_execute true round-trips; invalid branch_strategy/auto_remediate values are rejected",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed, 0 failed. config_set/config_validate/agent_* untouched (re-run confirmed green)"
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-THRESHOLD",
+      "order": 2,
+      "action": "Codify auto_remediate threshold semantics: the value names the MINIMUM severity to remediate (none=record only; low=all; medium=medium+high; high=high only; all=alias for low). Add a SeverityRank helper (none<low<medium<high) and a should_remediate(sev) accessor used by the skill contract.",
+      "files": [
+        "crates/mp/src/config.rs"
+      ],
+      "tests": "cargo test -p mp auto_remediate_threshold",
+      "done_when": "SeverityRank ordering test passes; should_remediate returns correct bool for each config value x severity pair",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-SKILLS",
+      "order": 3,
+      "action": "Update mp-runner AND mp-coordinator skills: runner commits after execute when commit_after_execute=true and honors branch_strategy; coordinator pushes at review handoff when push_after_review=true and applies auto_remediate threshold (else record-only via mp reviews finding).",
+      "files": [
+        "templates/skills/mp-runner/SKILL.md",
+        "templates/skills/mp-coordinator/SKILL.md"
+      ],
+      "tests": "cargo test -p mp skill_contract_automation",
+      "done_when": "both skills carry a numbered, mandatory handoff step reading the config knobs; a fixture project with the knobs set drives the documented git/remediation behavior",
+      "status": "done",
+      "covers_ac": [
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed, 0 failed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. Skills updated: templates/skills/mp-runner/{SKILL.md,executing.md}, templates/skills/mp-coordinator/{SKILL.md,reviewing.md}"
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-RAUL",
+      "order": 4,
+      "action": "Surface [agent.automation] as an editable group in the raul Settings TUI (M140). Gated on M140 landing first; if M140 is not done, this step blocks.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo test -p raul settings_automation",
+      "done_when": "Settings TUI shows the 4 knobs and persists edits via mp config set",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed, 0 failed. cargo nextest run -p raul -E test(/settings/): 15 passed, 0 failed (untouched tui_settings tests still pass after section-index shift). cargo clippy -p raul --tests --no-deps -- -D warnings: clean."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-14",
+    "branch": "",
+    "evidence": "cargo nextest run -p mp --test config_agent_automation --no-fail-fast: 15 passed. cargo nextest run -p mp --test auto_remediate_threshold --no-fail-fast: 9 passed. cargo nextest run -p mp --test skill_contract_automation --no-fail-fast: 8 passed. cargo nextest run -p raul --test tui_settings_automation --no-fail-fast: 5 passed. cargo nextest run -p raul -E test(/settings/): 15 passed. cargo clippy -p mp --tests --no-deps -- -D warnings: clean. cargo clippy -p raul --tests --no-deps -- -D warnings: clean. mp milestone verify: 6/6 ACs runnable-pass."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "config-consistency",
+      "description": "templates/defaults/config.session.json missing agent.automation block (independent code review finding M147-MEDIUM-1). Fixed by adding the same four-key block to config.session.json",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "7e55dca1cc4d8cb6c9e90364996c675de6245213",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Session profile users saw null for the four knobs while full/hybrid users saw explicit defaults — UX consistency across profiles. Verified after fix: mp init --profile session now writes agent.automation block."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "test-coverage",
+      "description": "LOW-1 from code review: only 'high' severity was exercised for the explicit 'none' threshold and unset threshold. Extended auto_remediate_threshold_unknown_threshold_treated_as_record_only to cover all three severities (low, medium, high) for both 'bogus' and explicit-'none' paths plus the rank-equality assertion.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "7e55dca1cc4d8cb6c9e90364996c675de6245213",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "rationale": "Defensive coverage for the auto_remediate=\"none\" vs unset parity claim. Headline test passed with 9/9 green after fix; rank-equality assertion added to catch a future regression where the sentinel and the string diverge."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "correctness",
+      "description": "templates/skills/mp-coordinator/reviewing.md:55 instructs external reviewers to file blocker|major|minor|nit severities, and templates/skills/mp-flow/SKILL.md:145 orders blocker/major first, but crates/mp/src/config.rs:119-130 SeverityRank recognizes only low|medium|high (plus config alias all) and maps every other value to None. An agent following the installed review skill will therefore mark all of its findings record-only even when auto_remediate=low|medium|high, defeating M147 AC-06. Align the review/flow skill vocabulary to low|medium|high and add a contract test that pins the exact accepted labels and forbids the stale blocker/major/minor/nit vocabulary.",
+      "status": "fixed",
+      "author": "pi-external-reviewer",
+      "fixed_in": "238415a3da86f13e1928c317cab538e08011dabd",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "auto_remediate cannot classify the severities the review skill tells agents to file",
+      "rationale": "The feature is agent-enforced, so contradictory skill text is executable behavior, not a documentation nit. Green threshold tests only exercise low/medium/high and miss the actual reviewer instructions.",
+      "confidence": "high",
+      "tags": [
+        "m147",
+        "automation",
+        "severity",
+        "skill-contract"
+      ]
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "templates/skills/mp-runner/executing.md:24-27 claims the milestone with mp milestone set-status before consulting branch_strategy, contradicting templates/skills/mp-runner/SKILL.md:107-110, which says to branch before claiming. For per-milestone this makes the first plan write occur on the old branch before the switch. The SKILL.md table also says to cut from hard-coded main, which fails in repositories whose default branch is master (including this repository) or another name. Consult and honor branch_strategy before the claim write, create from the current approved base/HEAD unless a repository default is discovered, and pin ordering/portable-base wording in skill_contract_automation tests.",
+      "status": "fixed",
+      "author": "pi-external-reviewer",
+      "fixed_in": "238415a3da86f13e1928c317cab538e08011dabd",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "per-milestone branch guidance runs after claim and hard-codes main",
+      "rationale": "M147 enforcement lives entirely in the skill. Wrong ordering and a non-portable base branch can make the declared branch policy fail or strand the claim mutation on the wrong branch.",
+      "confidence": "high",
+      "tags": [
+        "m147",
+        "automation",
+        "branch-strategy",
+        "ordering",
+        "portability"
+      ]
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "templates/skills/mp-runner/SKILL.md:89-97 and 124-132 plus templates/skills/mp-runner/executing.md:88-99 instruct git add/commit before mp milestone complete. This contradicts crates/mp/src/config.rs:60-61 and 424-426, which define commit_after_execute as committing after complete, and means the lifecycle/evidence mutations written by complete are left dirty outside the automated commit. It can also create a commit for work that complete subsequently rejects on red AC verification. Run mp milestone complete first; only after it succeeds and lifecycle is confirmed terminal should commit_after_execute=true stage and commit the resulting code plus plan evidence. Add contract tests that assert complete precedes git commit in both runner documents.",
+      "status": "fixed",
+      "author": "pi-external-reviewer",
+      "fixed_in": "238415a3da86f13e1928c317cab538e08011dabd",
+      "created": "2026-07-14",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "commit_after_execute commits before completion instead of after it",
+      "rationale": "The current sequence violates the knob name and documented hand-off boundary, leaves the audit trail uncommitted, and can commit failed work.",
+      "confidence": "high",
+      "tags": [
+        "m147",
+        "automation",
+        "commit-order",
+        "evidence"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,711 @@
+[[reviews]]
+milestone_id = "63"
+verdict = "changes-needed"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "Core guardrail (classify, bare .rs translate, cwd=project_root, regression tests) verified green. raul tracks isolation fix verified (3x full suite). AGENTS.md guardrail docs OK. Gaps: (1) completed with --force — 3 ACs + S1 step-test bypassed; evidence records this honestly. (2) M63 AC-03/AC-04 verification strings have invalid prose suffixes '(prints nothing)'/'(empty)' — plan spec bug, not shell. (3) AC-05 cargo test -p mp fails on pre-existing init_from_repo_markdown::from_repo_no_markdown_no_candidates (temp dir collision). (4) bare_rs_fail hardcoded in ac_verify.rs — works but brittle. (5) S1 stale — M62 already committed f0797e9. (6) plan completion TOMLs uncommitted."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "64"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "reviews pending/pass/list/show + pending_review_count verified via tests. execution report compiles steps/ACs/evidence. AGENTS.md execution contract + review cadence + verify-dont-trust present. master-planner skill updated. Clean complete without --force. Minor: execution_notes heuristically match ideas by milestone id in title/body/tags (matches spec reuse of mp note add). Plan completion TOMLs still uncommitted."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "63"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "Remediation verified: clean complete without --force; generalized ignored-only bare.rs guardrail; AC strings fixed; cargo test -p mp green."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "72"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "regex/serde_json/tempfile pinned; dep-audit clean; 137 transitive; ARCHITECTURE.md updated."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "65"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "install_deploy + doctor_discoverability tests pass; raul required on install; make install-global copies raul."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "69"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "env.sh on install/uninstall; doctor points at env.sh; skill+INSTALL docs."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "63"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "Evidence remediation verified: no force-bypass text; verification+AC evidence refreshed via re-complete; complete_milestone fix in 6d3d457."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "67"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "Remediation: raul status migrated to isolated TempDir; per-AC evidence refreshed; m67-validate-after-write scenario; AGENTS.md CI/stub docs; audit-stub-tests wired."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "63"
+verdict = "ok"
+reviewer = "agent-review"
+reviewed_at = "2026-06-30"
+notes = "Post-M68 re-verification: complete_guardrail 11/11; classify()+bare.rs translate unchanged in behavior via run_test(); cargo test -p mp green; raul 3x full suite green. M68 ac_verify refactor preserved M63 guardrail semantics."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "74"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-06-30"
+notes = "Verified remediation: doctor_install runtime check, Pi doctor test, INSTALL Pi section, README links. make_install_parity + doctor_discoverability green."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "76"
+verdict = "ok"
+reviewer = "independent-review"
+reviewed_at = "2026-06-30"
+notes = "Human format removed; emit() simplified; config output section dropped; raul mp_runner no longer appends --format json. format_dispatch 13/13 green; make doctor OK. Docs/templates/skills remediated post-review (Makefile, AGENTS-TEMPLATE, MP-COMMANDS search, doc sweep). Shipped df2bac3; clean complete without --force."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "01"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "02"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "03"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "04"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "05"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "06"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "07"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "08"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "09"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "10"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "11"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "12"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "13"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "14"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "15"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-18"
+
+[[reviews]]
+milestone_id = "16"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-21"
+
+[[reviews]]
+milestone_id = "17"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-22"
+
+[[reviews]]
+milestone_id = "18"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "19"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "20"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "21"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "22"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-22"
+
+[[reviews]]
+milestone_id = "23"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "24"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "25"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "26"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "27"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "28"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "29"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "30"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-25"
+
+[[reviews]]
+milestone_id = "31"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "32"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "33"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "34"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "35"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "36"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "37"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-27"
+
+[[reviews]]
+milestone_id = "38"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "39"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "40"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "41"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "42"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "43"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "44"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "45"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "46"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-28"
+
+[[reviews]]
+milestone_id = "47"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "48"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "49"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "50"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "51"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "52"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "53"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "56"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "57"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "58"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "59"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "60"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "61"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-29"
+
+[[reviews]]
+milestone_id = "62"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "66"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "68"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "70"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "71"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "73"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "75"
+verdict = "ok"
+reviewer = "baseline-audit-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Baseline-attested clear during 2026-07-01 review-backlog sweep. Shipped across v1.0/v1.1/2.0-rc.2; spec_status=verified; cargo test -p mp and cargo test -p raul green on 2026-07-01. mp validate non-green only due to legitimate M54 depends_on M77 forward dep (G8) + 14 W20 hygiene warnings, both tracked in M78. Force-bypass flags (where present) sampled (M62, M48): imprecise evidence, not concealed breakage. Per-AC deep re-review not performed."
+milestone_completed_at = "2026-06-30"
+
+[[reviews]]
+milestone_id = "77"
+verdict = "ok"
+reviewer = "independent-code-review-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Independent code review. M77 core deliverables (sidebar/mouse/drill-in/responsive/review-menu/path-inbox) verified green - all tui_* tests pass. The force-bypassed test failure was a REAL production panic, not a flake: raul milestones crashed on any title containing a multibyte char (em-dash) via byte-slicing at commands/milestones.rs:23 (pre-existing, M40). M77 re-introduced the same antipattern in tui/render.rs:551. Both fixed via a shared char-safe text::truncate helper + regression tests (crates/raul/src/text.rs). cargo test -p raul now fully green incl. raul_milestones_lists. Non-blocking follow-ups noted: dead spec_color/exec_color in render_milestone_list, unbounded detail_scroll, duplicated lane-label mapping."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "78"
+verdict = "ok"
+reviewer = "independent-code-review-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Independent code review. Found 3 issues, all remediated in this pass. (1) W20 fix was cosmetic comma->semicolon (gamed the validator, mangled prose e.g. M27 'AGENTS.md. without flag'); reverted the mangling and fixed W20 at the validator to skip manual: fields, then honestly categorized the 11 genuinely-multi-value fields (9 manual: prefix, 2 real commands cleaned). (2) AC-02 option-A reconciliation was recorded but never implemented; now implemented - mini_schema_e2e tolerates G8 forward-dep errors (the only legitimate in-flight error). (3) AC-03 audit-step-tests.sh was env-fragile (MP_HOME/target/release/mp) and surfaced drift; hardened mp resolution (target/bin/PATH), skip not-yet-done milestones (M79 future tests no longer fail), and resolved done-milestone stale refs (M18 p13_m06_polish, M22 track_render_parity, M50 backlog, M59 step_archive -> manual:). mp validate W20=0/0 warnings; mini_schema_e2e green; audit rc=0; mp 112 + raul 36 suites green."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "79"
+verdict = "ok"
+reviewer = "independent-code-review-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Independent code review. Implementation solid: clean completion (no force-bypass), 6 AC test files green (36 tests), 118 mp + 36 raul suites green, projection.rs correct (hard-errors on bad paths per design decision), scratch.rs has path-traversal sanitization. One HIGH finding, fixed in this pass: milestone_matches_filter (groom.rs) had default arm _ => true, so any unknown --filter value silently returned ALL milestones (dogfooded: --filter force-bypassed returned 81/82). Made the fn strict (Result + bail on unknown) so it can never silently match-all; --filter force-bypassed now errors with a pointer to --preset/--where; added a regression test (filter_unknown_preset_errors_not_silently_matches_all). Also noted: --filter/--preset/--where split deviated from the spec's single --filter but is cleaner now that --filter is strict. Process note: M79 had been left entirely uncommitted by the executor; committed here."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "83"
+verdict = "ok"
+reviewer = "independent-code-review-2026-07-01"
+reviewed_at = "2026-07-01"
+notes = "Independent code review. Solid implementation: clean completion (no force-bypass), 18 review_lifecycle tests pass, features work end-to-end (dogfooded: finding add with severity validation, resolve with fixed_in, list, lifecycle rollup, W44 gate). review_state derivation correct, clean mp-model split (Finding struct, executed_by). Three issues found and remediated in this pass: (1) HIGH: golden scenario p0-validate-ok (and walkthrough-validate-ok, m67-validate-after-write) broke because W44 now fires on done-but-unreviewed fixture milestones — added reviews to the 3 affected fixtures (minimal-ready, walkthrough-oauth, write-post-step-add) so the happy-path validate scenarios stay clean (W44 covered by review_lifecycle tests); (2) LOW: review_state 'remediated' included wontfix findings — fixed to require all findings 'fixed', wontfix now lands in reviewed-clean; (3) process: M83 was uncommitted by the executor. Also dogfooded the feature by recording M79's real finding (F-01 -> fixed 75bb3b2)."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "88"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Shipped. Minor follow-ups tracked as tweaks TW-10 and TW-11."
+milestone_completed_at = "2026-07-02"
+
+[[reviews]]
+milestone_id = "54"
+verdict = "changes-needed"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Visual overhaul and review-workflow CLI shipped. Shallow AC tests, missing TUI set-dependency in review menu, and behavioral review-action tests deferred to M86/M87. Tracked as tweaks TW-12..TW-14."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "84"
+verdict = "changes-needed"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Findings F-08..F-10 opened. Reopen for remediation: findings detail, --board/b toggle, integration tests."
+milestone_completed_at = "2026-07-01"
+
+[[reviews]]
+milestone_id = "85"
+verdict = "changes-needed"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Findings F-12..F-14 opened. Reopen for remediation: TUI color honor, review error surfacing, annotation behavioral test."
+milestone_completed_at = "2026-07-02"
+
+[[reviews]]
+milestone_id = "84"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Remediation verified in 7b86b57: findings detail, --board/b, board_view tests green."
+milestone_completed_at = "2026-07-02"
+
+[[reviews]]
+milestone_id = "85"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Remediation verified in 7b86b57: effective_palette monochrome, review error surfacing, annotation parse tests green."
+milestone_completed_at = "2026-07-02"
+
+[[reviews]]
+milestone_id = "86"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Remediation 0c88190: scope markdown, debug parse counter, render cache test, help text"
+milestone_completed_at = "2026-07-02"
+
+[[reviews]]
+milestone_id = "89"
+verdict = "ok"
+reviewer = "cursor-agent"
+reviewed_at = "2026-07-02"
+notes = "Remediation 0c88190: inbox_nav module, real navigation tests, removed Inbox lane, inbox count sync"
+milestone_completed_at = "2026-07-02"

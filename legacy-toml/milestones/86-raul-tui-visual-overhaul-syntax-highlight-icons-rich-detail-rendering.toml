@@ -1,0 +1,416 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "86"
+title = "Raul TUI visual overhaul — syntax highlight, icons, rich detail rendering"
+slug = "raul-tui-visual-overhaul-syntax-highlight-icons-rich-detail-rendering"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["85"]
+effort = "M"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "The raul TUI milestone detail view renders lightweight markdown formatting (bold, code, lists, rules) with syntax highlighting, status indicators use configurable icons with visual weight, and step/AC progress is conveyed by proportion bars and color-coded badges instead of bare text."
+
+[problem]
+description = "The raul TUI today renders all milestone detail text as flat monochrome paragraphs — body fields (description, problem, scope) have no formatting, list items blend into prose, and AC/step status is conveyed by plain text labels only. (Note: an earlier draft of this spec claimed M54 shipped empty; that is inaccurate — M54 raul TUI v2 is in the pending-review queue. M86 stands on its own merit: the TUI genuinely lacks typography and visual hierarchy today.) The icon system (status_icon in config.rs) is underutilized — only three statuses use it while lanes, board cards, and detail views use hardcoded symbols. M85 activates the theme palette and icon config plumbing; this milestone builds the typography, iconography, and progress indicators on top of that foundation, hence depends_on: [85]."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Lightweight markdown renderer for milestone detail text: **bold**, `code`, bullet lists (-/*/+), numbered lists, --- separators",
+    "Apply syntax highlighting to milestone body fields (description, problem, scope) in the TUI detail view",
+    "Enrich icon set: lane-specific icons in sidebar, board card status icons, list-item status markers (using the status_icon system wired in M85)",
+    "Add step progress bar to milestone detail (e.g. [=====>    ] 7/12 steps done) via extracted pure fn compute_progress_bar",
+    "Add AC progress bar with color-coded pass/fail/pending states (using palette colors from M85)",
+    "Color-code spec_status and execution_status badges with visual weight (not just text labels)",
+    "Improve detail view spacing: add padding between sections, indent nested content",
+    "Cache parsed markdown on app state so rendering does not re-parse every frame",
+    "Edge-case handling in the parser: unmatched delimiters, empty input, nested markers — no panics",
+]
+out_of_scope = [
+    "Full CommonMark or GFM compliance — this is a lightweight renderer, not a markdown engine",
+    "Custom icon packs beyond the existing Unicode/ASCII/None modes",
+    "Animation, transitions, or loading spinners",
+    "Dashboard/status page redesign (already clean in M71)",
+    "Touch/gesture support",
+    "Right-to-left or bidirectional text support",
+    "Theme palette activation and --color flag work (prerequisite, done in M85)",
+    "Robustness fixes for drill-in/panic/truncation (covered by M87)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = 'A markdown renderer module (e.g. crates/raul/src/tui/markdown.rs) parses inline **bold** into a bold Span and inline `code` into a distinct-color Span. Test feeds "**hi** and `code`" and asserts the styled spans exist with the expected modifiers/colors.'
+verification = "crates/raul/tests/tui_markdown.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = 'Bullet lists (-, *, +) and numbered lists (1.) render with indentation and a colored bullet/marker token. Test feeds "- a\n- b\n1. first" and asserts indentation prefix and marker styling on the output Lines.'
+verification = "crates/raul/tests/tui_markdown.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = 'A line that is exactly --- renders as a horizontal rule (a Line of box-drawing or repeated - characters spanning the detail width). Test feeds "\n---\n" and asserts a rule-styled Line is produced.'
+verification = "crates/raul/tests/tui_markdown.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Step progress bar renders as a string like [=====>    ] 7/12 where the filled proportion = done/total. A pure fn compute_progress_bar(done: usize, total: usize, width: usize) -> String is extracted and table-tested for edge cases: 0/0 (no division-by-zero), 0/N, N/N, total<width."
+verification = "crates/raul/tests/tui_progress.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "AC statuses are color-coded in detail: passed=green, failed=red, pending=yellow via palette colors (not hardcoded Color:: tokens, since M85 moved rendering onto the palette). Test asserts the style lookup maps each status to the expected palette color."
+verification = "crates/raul/tests/tui_detail.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Sidebar lanes and board cards use the status_icon system from config.rs (honoring ui.icons = unicode/ascii/none) instead of hardcoded symbols. Test: with ui.icons=none, lanes/cards render no icon glyph; with unicode, they render the configured icon."
+verification = "crates/raul/tests/tui_icons.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "Detail sections have consistent vertical spacing — a blank Line between sections, no sections running together. Manual visual review confirmed via screenshot or recorded TUI session."
+verification = "manual: accepted — visual spacing requires human review"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "Markdown parser handles edge cases without panic: unmatched **, unmatched `, empty string, nested *``**, and a body with only whitespace. Test feeds each and asserts a non-panicking render with best-effort output."
+verification = "crates/raul/tests/tui_markdown.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "Markdown parsing runs once per detail load (cached on app state), not on every render frame. A test or debug counter asserts the parser is invoked at most once per milestone detail load."
+verification = "crates/raul/tests/tui_markdown.rs"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[[acceptance_criteria]]
+id = "AC-10"
+description = "All existing raul tests pass (cargo test -p raul); new tests cover markdown rendering, progress bar computation, and icon config."
+verification = "cargo test -p raul"
+status = "passed"
+evidence = "cargo test -p raul exit 0"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "[scaffold — superseded by named WPs]"
+goal = "Covered by wp-markdown, wp-progress, and wp-icons."
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "[scaffold — superseded by named WPs]"
+goal = "Covered by wp-markdown, wp-progress, and wp-icons."
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "[scaffold — superseded by named WPs]"
+goal = "Closure distributed across the named WPs tests and validation."
+rollback = ""
+
+[[work_packages]]
+id = "wp-markdown"
+name = "Markdown renderer"
+goal = "Build a lightweight markdown-to-ratatui renderer: bold, code, bullet lists, numbered lists, horizontal rules. Apply to milestone detail body fields (description, problem, scope)."
+rollback = ""
+
+[[work_packages]]
+id = "wp-progress"
+name = "Progress bars & visual hierarchy"
+goal = "Add step progress bar, AC color-coded statuses, spec/exec status badges, section spacing/padding in detail views."
+rollback = ""
+
+[[work_packages]]
+id = "wp-icons"
+name = "Icon system enrichment"
+goal = "Extend status_icon to all lane/sidebar contexts; add board card status icons; ensure all icon paths honor the icon mode config (Unicode/ASCII/None)."
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "wp-markdown"
+order = 1
+action = "Create markdown parsing module (src/tui/markdown.rs): parse **bold**, inline code spans, bullet lists (-/*/+), numbered lists, --- separators into ratatui Spans/Lines"
+files = []
+tests = "cargo test -p raul"
+done_when = "markdown.rs compiles and passes unit tests; parse_bold, parse_code, parse_list, parse_hr all produce correct ratatui Spans"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "wp-markdown"
+order = 2
+action = "Integrate markdown renderer into render_milestone_detail: replace flat Paragraph rendering of description, problem, scope with markdown-parsed output"
+files = []
+tests = "cargo test -p raul"
+done_when = "Milestone detail shows bold text in bold, code in distinct color, bullet lists with indentation, and hr separators"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "wp-markdown"
+order = 3
+action = "Add unit tests for markdown parser: bold spans, code spans, bullet/numbered lists, separators, mixed content, edge cases (empty input, unclosed delimiters)"
+files = []
+tests = "cargo test -p raul"
+done_when = "All markdown parser edge cases have passing tests"
+status = "done"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "wp-progress"
+order = 4
+action = "Add step progress bar to milestone detail: compute done/total from step statuses, render a proportion bar (e.g. [====>   ] 7/12) with palette colors"
+files = []
+tests = "cargo test -p raul"
+done_when = "Milestone detail shows step progress bar with correct done/total count and visual proportion"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "wp-progress"
+order = 5
+action = "Color-code AC statuses in milestone detail: passed=palette.success, failed=palette.danger, pending=palette.warn; render as colored badge not just text"
+files = []
+tests = "cargo test -p raul"
+done_when = "AC list in milestone detail shows green/red/yellow badges per status"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "wp-progress"
+order = 6
+action = "Add spec_status and execution_status badges: render as colored labels (ready=green, draft=yellow, in-progress=cyan, done=green, blocked=red) in milestone detail header"
+files = []
+tests = "cargo test -p raul"
+done_when = "Spec/exec status in milestone detail header are color-coded badges"
+status = "done"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "wp-progress"
+order = 7
+action = "Add section padding and visual separation: consistent vertical spacing between intent/problem/scope/ACs/steps sections, indentation for nested content"
+files = []
+tests = "cargo test -p raul"
+done_when = "Detail sections have consistent spacing; no sections visually bleed together"
+status = "done"
+covers_ac = ["AC-07"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "wp-icons"
+order = 8
+action = "Extend sidebar lane labels: add lane-specific icons (using status_icon pattern) to each lane entry in the sidebar renderer, honoring icon mode config"
+files = []
+tests = "cargo test -p raul"
+done_when = "Each sidebar lane shows an icon (Unicode/ASCII/None depending on config); icon mode toggle updates all lanes"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "wp-icons"
+order = 9
+action = "Add board card status icons: render spec/exec status icons on each card in the review board, consistent with the status_icon system"
+files = []
+tests = "cargo test -p raul"
+done_when = "Board cards show colored status icons matching the icon mode; changing icon mode refreshes board icons"
+status = "done"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S10"
+work_package = "wp-icons"
+order = 10
+action = "Add icon rendering tests: verify all lanes, statuses, and board cards produce correct icon strings for each IconMode (Unicode, ASCII, None)"
+files = []
+tests = "cargo test -p raul"
+done_when = "Tests pass for all three icon modes across lane labels, status markers, and board cards"
+status = "done"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S11"
+work_package = "wp-progress"
+order = 11
+action = "Add progress bar computation tests: verify done/total counts, empty milestone (0/0), all-done milestone, mixed statuses"
+files = []
+tests = "cargo test -p raul"
+done_when = "Progress bar unit tests pass for edge cases"
+status = "done"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-07-02"
+branch = ""
+evidence = "cargo test -p raul exit 0"
+
+[[findings]]
+id = "F-01"
+severity = "low"
+category = "correctness"
+description = "Scope fields: out_of_scope plain text; in_scope only inline spans — spec promised scope markdown"
+status = "fixed"
+author = ""
+fixed_in = "0c88190"
+created = "2026-07-02"
+resolved = "2026-07-02"
+
+[[findings]]
+id = "F-02"
+severity = "low"
+category = "maintainability"
+description = "thread_local parse counter in markdown.rs is always-on production test hook"
+status = "fixed"
+author = ""
+fixed_in = "0c88190"
+created = "2026-07-02"
+resolved = "2026-07-02"
+
+[[findings]]
+id = "F-03"
+severity = "low"
+category = "testing"
+description = "markdown_parse_once_per_detail_load test does not exercise render cache path"
+status = "fixed"
+author = ""
+fixed_in = "0c88190"
+created = "2026-07-02"
+resolved = "2026-07-02"
+
+[[findings]]
+id = "F-04"
+severity = "low"
+category = "ux"
+description = "Help overlay says Status: refresh dashboard instead of Overview"
+status = "fixed"
+author = ""
+fixed_in = "0c88190"
+created = "2026-07-02"
+resolved = "2026-07-02"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

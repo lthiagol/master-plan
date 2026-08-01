@@ -1,0 +1,202 @@
+{
+  "milestone": {
+    "id": "37",
+    "title": "Changelog management (mp changelog)",
+    "slug": "changelog-management-mp-changelog",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "36"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-06-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "mp manages CHANGELOG.md via CLI commands - show, add, edit, init, and auto-generate a version section from milestones completed since the last release - keeping it consistent with the release map."
+  },
+  "problem": {
+    "description": "CHANGELOG.md is hand-maintained. There is no mp command to view, add, edit, or scaffold it, and no way to auto-generate a version section from completed milestones. Each release requires a human to transcribe milestone/WP summaries into the changelog by hand, duplicating data already in the plan and risking drift between what shipped and what the changelog says."
+  },
+  "scope": {
+    "in_scope": [
+      "`mp changelog show` (optionally --version / --section) - print CHANGELOG.md or a slice",
+      "`mp changelog add <entry> --version <ver> --section <section> [--milestone <id>]` - insert an entry under the right version/section, creating the version header if absent",
+      "`mp changelog edit` - structured edit / open the file",
+      "`mp changelog init` - scaffold a Keep a Changelog-style CHANGELOG.md if absent",
+      "`mp changelog generate --version <ver>` - assemble a version section from milestones completed since the last shipped release, grouped by milestone/WP, reading target_version from the release map (M36); matches existing CHANGELOG.md conventions",
+      "Integration tests: add creates/positions entries idempotently; generate matches a fixture; show slices by version"
+    ],
+    "out_of_scope": [
+      "Publishing changelog entries to GitHub/Gitea releases (distribution, not editing)",
+      "Retroactive rewriting of historical entries (generate is forward-looking)",
+      "AI-prose generation - entries derived from milestone titles/intents, not generated prose"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp changelog show` prints CHANGELOG.md; `--version <ver>` slices one version section",
+      "verification": "show + slice test on a fixture changelog",
+      "status": "passed",
+      "evidence": "changelog_show tests pass"
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp changelog add` inserts an entry under the correct version+section, creating the version header if missing, without duplicating existing entries",
+      "verification": "add idempotency + positioning test",
+      "status": "passed",
+      "evidence": "changelog_add tests pass"
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp changelog init` scaffolds a Keep-a-Changelog-style file when none exists",
+      "verification": "init test in a temp dir asserting the scaffold",
+      "status": "passed",
+      "evidence": "changelog_init tests pass"
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp changelog generate --version <ver>` builds a section from milestones completed since the last shipped release, grouped by milestone/WP, matching the existing CHANGELOG.md style",
+      "verification": "generate test against a fixture plan with completed milestones + release map",
+      "status": "passed",
+      "evidence": "changelog_generate tests pass"
+    },
+    {
+      "id": "AC-05",
+      "description": "MP-COMMANDS.md documents the changelog commands",
+      "verification": "manual: accepted - doc review",
+      "status": "passed",
+      "evidence": "changelog commands documented in MP-COMMANDS.md"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Changelog CRUD",
+      "goal": "mp changelog show/add/init manage CHANGELOG.md entries reliably",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Generate from milestones",
+      "goal": "mp changelog generate assembles a version section from completed milestones since the last shipped release",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Documentation",
+      "goal": "Document the changelog commands in MP-COMMANDS.md",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement mp changelog show to print CHANGELOG.md, with --version <ver> slicing one version section",
+      "files": [],
+      "tests": "cargo test -p mp --test changelog_show",
+      "done_when": "mp changelog show prints the file and --version slices one section",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement mp changelog add <entry> --version <ver> --section <section> [--milestone <id>] to insert under the correct version+section, creating the version header if missing, without duplicating existing entries",
+      "files": [],
+      "tests": "cargo test -p mp --test changelog_add",
+      "done_when": "changelog add positions entries correctly and is idempotent",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement mp changelog init to scaffold a Keep-a-Changelog-style CHANGELOG.md when none exists",
+      "files": [],
+      "tests": "cargo test -p mp --test changelog_init",
+      "done_when": "changelog init in a temp dir produces the expected scaffold",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement mp changelog generate --version <ver> to build a section from milestones completed since the last shipped release, grouped by milestone/WP, reading target_version from the release map (M36) and matching existing CHANGELOG.md style",
+      "files": [],
+      "tests": "cargo test -p mp --test changelog_generate",
+      "done_when": "changelog generate produces a version section matching a fixture plan with completed milestones and release map",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Document the mp changelog commands (show/add/edit/init/generate) in MP-COMMANDS.md",
+      "files": [],
+      "tests": "manual: accepted — doc review",
+      "done_when": "MP-COMMANDS.md documents the changelog commands",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-27",
+    "branch": "",
+    "evidence": "All 5 steps done, all ACs passed, validate clean"
+  }
+}

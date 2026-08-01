@@ -1,0 +1,108 @@
+{
+  "milestone": {
+    "id": "194",
+    "title": "mp init AGENTS.md gaps — stale templates, missing cross-links, and unresolvable doc refs in consumer projects",
+    "slug": "mp-init-agents-md-gaps-stale-templates-missing-cross-links-and-unresolvable-doc-refs-in-consumer-projects",
+    "lifecycle": "groomed",
+    "spec_status": "review",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-23",
+    "updated": "2026-07-23",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-23T20:45:47.889604+00:00"
+  },
+  "intent": {
+    "outcome": "mp init produces correct, self-contained agent instructions that an agent can follow without missing doc references or stale paths, regardless of whether the project already has a root AGENTS.md."
+  },
+  "problem": {
+    "description": ""
+  },
+  "scope": {
+    "in_scope": [
+      "Fix ROOT-AGENTS-SNIPPET.md doc references to match the installed toolkit layout",
+      "Decide what docs AGENTS-TEMPLATE.md should reference (toolkit-absolute paths vs project-relative) and fix them",
+      "Make mp init handle existing root AGENTS.md: warn, offer --force / --merge, or append the snippet",
+      "Add mp init --refresh to re-write master-plan/AGENTS.md from the current binary's template (or add a doctor check)"
+    ],
+    "out_of_scope": [
+      "Restructuring the installed toolkit docs tree (that's a separate documentation project)",
+      "Auto-updating root AGENTS.md on every mp command (too invasive)",
+      "Generating AGENTS.md for non-mp projects"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ROOT-AGENTS-SNIPPET.md references resolve correctly against the installed toolkit docs tree",
+      "verification": "grep -n 'docs/' templates/ROOT-AGENTS-SNIPPET.md; for each path: test -f ~/.agents/master-plan/<path>",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "AGENTS-TEMPLATE.md doc references use toolkit-absolute paths (~/.agents/master-plan/docs/...) or a clear convention documented in the template so agents resolve them correctly",
+      "verification": "grep -rn '../docs/' templates/AGENTS-TEMPLATE.md returns no hits; every doc reference is resolvable from the installed toolkit at ~/.agents/master-plan/docs/",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "mp init on a project with existing root AGENTS.md warns that the snippet was not inserted and tells the user what to add manually (or offers --force to overwrite / --merge to append)",
+      "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "mp init --refresh rewrites master-plan/AGENTS.md from the current binary's embedded template, with a dry-run or confirmation prompt",
+      "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast -E 'test(/refresh/)'",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Doc reference strategy",
+      "choice": "Use toolkit-absolute paths (~/.agents/master-plan/docs/...) in templates, not project-relative ../docs/...",
+      "rationale": "The installed toolkit is the canonical location for mp docs. Consumer projects don't have a docs/ directory with mp content. Toolkit-absolute paths survive regardless of where the project is checked out."
+    },
+    {
+      "area": "Existing AGENTS.md handling",
+      "choice": "Warn + print the snippet to stdout with instructions, offer --force flag to overwrite",
+      "rationale": "Silently skipping is the worst behavior — the user thinks init worked but the agent is missing critical instructions. Overwriting without asking is destructive. Printing the snippet lets the user manually merge."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should we also vendor a minimal subset of toolkit docs into the project's master-plan/ so that doc references work even offline? Or rely entirely on the toolkit installation path?",
+      "status": "open",
+      "answer": ""
+    },
+    {
+      "id": "Q-02",
+      "question": "For mp init --refresh: should it also refresh config.json / plan.json if the template defaults changed, or just AGENTS.md?",
+      "status": "open",
+      "answer": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

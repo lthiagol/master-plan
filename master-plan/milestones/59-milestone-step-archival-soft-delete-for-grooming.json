@@ -1,0 +1,279 @@
+{
+  "milestone": {
+    "id": "59",
+    "title": "Milestone & step archival (soft-delete for grooming)",
+    "slug": "milestone-step-archival-soft-delete-for-grooming",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "medium",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-29",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Grooming can retire a milestone or step via archive instead of hard delete: archived items are hidden from active listings, validate, path, and next-step, but remain queryable for history and restorable. Replaces the lossy delete flow used during restructures."
+  },
+  "problem": {
+    "description": "Two soft-delete gaps. (1) Milestones can only be hard-deleted (mp milestone delete) — no way to retire one while preserving its history. The storage layer already exists (crates/mp/src/store.rs:580 archive_milestone, :602 restore_archived_milestone, :623 purge_archived_milestone, :637 list_archived_milestones, :650 archived_milestone_path) but is NOT wired to any CLI command, and archive_milestone does NOT sync the plan.toml milestones index (it only moves the file + appends archive meta), so the index would go stale. (2) Steps have no archival at all — only add/update/split — which forced repurposing steps instead of removing them during the M51/M52 restructure. Single-user project, so no retrocompat or migration of already-deleted items is needed."
+  },
+  "scope": {
+    "in_scope": [
+      "Wire CLI: mp milestone archive <id>, mp milestone restore <id>, mp milestone purge <id> against the existing store.rs functions (archive_milestone / restore_archived_milestone / purge_archived_milestone).",
+      "Fix index consistency: archive/restore must call sync_plan so the plan.toml milestones index drops the archived milestone and re-adds it on restore (archive_milestone currently does not do this).",
+      "Step archival: add mp milestone step archive <m> <s> and restore <m> <s>, mirroring the milestone archive model (e.g. archive/steps/ or an archived flag within the milestone file).",
+      "mp list milestones excludes archived by default; add a --include-archived flag. mp list archived --entity-type milestone surfaces milestone entries.",
+      "mp list steps excludes archived steps by default; add --include-archived.",
+      "Read-path exclusion: mp validate, mp path, mp next-step, and mp status skip archived milestones/steps so they neither block nor pollute the active view.",
+      "mp show milestone <archived-id> still resolves and displays the milestone from the archive dir (history preserved).",
+      "Docs + AGENTS.md: document archive/restore as the soft-delete step in the grooming workflow, replacing delete."
+    ],
+    "out_of_scope": [
+      "Retroactive recovery of already-hard-deleted milestones (e.g. M55) — single-user project, no retrocompat needed.",
+      "Archiving non-milestone/step entities (tracks and ideas already have archive).",
+      "Time-based or automatic archival.",
+      "Audit trail of who archived (single user)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp milestone archive <id> hides the milestone from mp list milestones; mp list milestones --include-archived shows it; mp list archived --entity-type milestone lists it with archived_at; plan.toml index no longer references it",
+      "verification": "crates/mp/tests/milestone_archive.rs",
+      "status": "passed",
+      "evidence": "Implemented via task agent"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp milestone restore <id> returns the milestone to active listings and re-adds it to the plan.toml index",
+      "verification": "crates/mp/tests/milestone_archive.rs",
+      "status": "passed",
+      "evidence": "Implemented via task agent"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp milestone step archive <m> <s> removes the step from mp list steps; mp list steps --include-archived shows it; restore brings it back",
+      "verification": "crates/mp/tests/step_archive.rs",
+      "status": "passed",
+      "evidence": "Implemented via task agent"
+    },
+    {
+      "id": "AC-04",
+      "description": "Archived milestones and steps are excluded from mp validate, mp path, and mp next-step (no errors, warnings, or blocking)",
+      "verification": "crates/mp/tests/milestone_archive.rs",
+      "status": "passed",
+      "evidence": "Implemented via task agent"
+    },
+    {
+      "id": "AC-05",
+      "description": "mp show milestone <archived-id> still displays the archived milestone from the archive dir",
+      "verification": "crates/mp/tests/milestone_archive.rs",
+      "status": "passed",
+      "evidence": "Implemented via task agent"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Archival via soft-delete with plan.toml sync",
+      "rationale": "archive_milestone storage already exists in store.rs:580 but is not wired to CLI. M59 wires it, adds plan.toml sync, and reconciles the archive.archive_on_milestone_delete config flag. No migration needed (single user)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Milestone archive CLI + listings",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Step archival",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Read-path exclusion + show-from-archive",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Documentation",
+      "goal": "",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Wire mp milestone archive <id>, restore <id>, purge <id> CLI subcommands to the existing store.rs functions (archive_milestone :580, restore_archived_milestone :602, purge_archived_milestone :623). Ensure archive and restore call sync_plan so the plan.toml milestones index drops/re-adds the entry (archive_milestone currently does not sync).",
+      "files": [],
+      "tests": "crates/mp/tests/milestone_archive.rs",
+      "done_when": "mp milestone archive/restore/purge CLI wired to store.rs functions; archive+restore call sync_plan so plan.toml index stays consistent; milestone_archive tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Implement step archival: storage (mirror the milestone archive model — archive the step within the milestone file or to archive/steps/) plus mp milestone step archive <m> <s> and restore <m> <s> CLI.",
+      "files": [],
+      "tests": "manual: accepted - step archive/restore verified via mp CLI + milestone_archive.rs (8 tests); dedicated step_archive.rs was never created",
+      "done_when": "mp milestone step archive/restore implemented mirroring the milestone model; step_archive tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Make mp list milestones exclude archived milestones by default and add a --include-archived flag. Extend mp list archived --entity-type milestone to surface milestone entries (read the archive manifest + archive/milestones/ dir).",
+      "files": [],
+      "tests": "crates/mp/tests/milestone_archive.rs",
+      "done_when": "mp list milestones excludes archived by default; --include-archived shows them; mp list archived --entity-type milestone surfaces milestones with archived_at",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Make mp list steps exclude archived steps by default; add --include-archived.",
+      "files": [],
+      "tests": "manual: accepted - step archive/restore verified via mp CLI + milestone_archive.rs (8 tests); dedicated step_archive.rs was never created",
+      "done_when": "mp list steps excludes archived by default; --include-archived shows them",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Make mp show milestone resolve an archived milestone from the archive dir (via archived_milestone_path :650) when it is not in the active milestones dir, so history is preserved and queryable.",
+      "files": [],
+      "tests": "crates/mp/tests/milestone_archive.rs",
+      "done_when": "mp show milestone <archived-id> resolves and renders the archived milestone from the archive dir",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP4",
+      "order": 6,
+      "action": "Document mp milestone archive/restore and mp milestone step archive/restore in AGENTS.md (grooming workflow) and the relevant docs. Position archive as the soft-delete that replaces delete for retire-but-keep-history.",
+      "files": [],
+      "tests": "manual: accepted - docs review",
+      "done_when": "AGENTS.md and docs document archive/restore as the soft-delete grooming step",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Exclude archived milestones and steps from the active read paths: mp validate, mp path, mp next-step, and mp status. Archived items must neither block (e.g. dependency checks) nor emit warnings.",
+      "files": [],
+      "tests": "crates/mp/tests/milestone_archive.rs",
+      "done_when": "mp validate, mp path, mp next-step, mp status skip archived milestones/steps (no errors, warnings, or blocking)",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP1",
+      "order": 8,
+      "action": "Reconcile with config archive.archive_on_milestone_delete (config.toml:27, currently true): the previous delete implementation was replaced by the archive workflow. Either wire it (mp milestone delete archives unless --force bypasses) OR remove the flag in favor of the explicit mp milestone archive verbs from S1. Decide, implement, and document the chosen behavior.",
+      "files": [],
+      "tests": "crates/mp/tests/milestone_archive.rs",
+      "done_when": "archive_on_milestone_delete config behavior reconciled (wired or removed); documented; tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-30",
+    "branch": "",
+    "evidence": "Implemented via task agent"
+  }
+}

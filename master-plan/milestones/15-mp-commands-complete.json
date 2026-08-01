@@ -1,0 +1,138 @@
+{
+  "milestone": {
+    "id": "15",
+    "title": "MP-COMMANDS completeness pass",
+    "slug": "mp-commands-complete",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "12"
+    ],
+    "effort": "L",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "MP-COMMANDS every command block marked shipped/partial with accurate examples."
+  },
+  "problem": {
+    "description": "M10 fixed headers and phase table but deferred full line-by-line command doc sync."
+  },
+  "scope": {
+    "in_scope": [
+      "Per-command status badges in MP-COMMANDS",
+      "Example invocations match CLI --help",
+      "Cross-links to AGENT-READINESS",
+      "Remove duplicate legacy sections"
+    ],
+    "out_of_scope": [
+      "Auto-generated docs from clap",
+      "User-facing website"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Every mp subcommand has status + example or explicit deferred tag",
+      "verification": "section audit checklist",
+      "status": "passed",
+      "evidence": "MP-COMMANDS updated: session focus/unfocus docs, M08 caveat removed, phase table includes M13/M14"
+    },
+    {
+      "id": "AC-02",
+      "description": "No contradiction with AGENT-READINESS matrix",
+      "verification": "diff audit",
+      "status": "passed",
+      "evidence": "Zero mismatches: session focus mark from 📋→✅, AGENT-READINESS date synced"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Command audit",
+      "goal": "Per-command doc sync",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Build command inventory from clap + AGENT-READINESS",
+      "files": [
+        "crates/mp/src/app.rs",
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "Checklist of all subcommands with status",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update MP-COMMANDS: status badge + example per command",
+      "files": [
+        "docs/MP-COMMANDS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Every section has status and example",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Cross-audit MP-COMMANDS vs AGENT-READINESS",
+      "files": [
+        "docs/MP-COMMANDS.md",
+        "docs/AGENT-READINESS.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Zero status mismatches",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

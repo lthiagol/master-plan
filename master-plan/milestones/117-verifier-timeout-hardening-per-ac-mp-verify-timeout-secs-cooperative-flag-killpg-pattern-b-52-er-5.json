@@ -1,0 +1,173 @@
+{
+  "milestone": {
+    "id": "117",
+    "title": "Verifier timeout hardening — per-AC MP_VERIFY_TIMEOUT_SECS cooperative-flag + killpg pattern (B-52, ER-5)",
+    "slug": "verifier-timeout-hardening-per-ac-mp-verify-timeout-secs-cooperative-flag-killpg-pattern-b-52-er-5",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "116"
+    ],
+    "effort": "S",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.1.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, the per-AC verification timeout path in `crates/mp/src/ac_verify.rs` reliably cancels runaway verifications: the cooperative `cancelled` flag is checked at every poll, and when it flips, the child process group is killed via `killpg(pgid, SIGKILL)` so no orphan subprocess survives the timeout. M107's ER-5 reviewer finding (B-52) is closed."
+  },
+  "problem": {
+    "description": "M107's external review (REVIEW-NOTES-M107.md, ER-5) flagged that the per-AC `MP_VERIFY_TIMEOUT_SECS` cancellation path may leave orphan subprocesses after timeout. M106 already added cooperative-flag checking and bounded drain-thread joins, and M107 added a global deadline with `process_group(0)` + `killpg` on the spawned child. The reviewer's follow-up (B-52, status `active` in backlog.json, no owner milestone) asks to harden the *per-AC* timeout path with the same cooperative-flag + killpg pattern, closing the gap between the global-deadline path (covered) and the per-AC path (which may rely on the child's own exit when the timeout fires, without an explicit killpg on per-AC timeout). This is the same code area M110 touches for gate caching (`ac_verify.rs::run_one`); it depends on M110 having shipped so the caching and hardening land on the same code shape."
+  },
+  "scope": {
+    "in_scope": [
+      "Harden the per-AC timeout path in `crates/mp/src/ac_verify.rs::run_one` (and `verify_milestone_in`/`verify_step_tests_in` callers) with the cooperative-flag + killpg pattern: when the per-AC `MP_VERIFY_TIMEOUT_SECS` deadline fires, flip the `cancelled` flag, then `killpg(pgid, SIGKILL)` the child's process group (pgid == child_pid since each child is spawned with `Command::process_group(0)` per M107 S3). Join drain threads on a bounded deadline (~2s, same as the global path). Pinned by an integration test that runs a verification command that sleeps longer than the per-AC timeout and asserts the child is reaped (no orphan).",
+      "Document the cancellation contract in `crates/mp/docs/verifier-cancellation.md` (extend the existing M107 note to cover the per-AC path explicitly, not just the global deadline)."
+    ],
+    "out_of_scope": [
+      "Changing the per-AC timeout default (300s) — that's a separate config decision; this milestone only hardens cancellation.",
+      "The gate command cache (M110 S1) — adjacent code, different concern.",
+      "Plan-IO locking and --dry-run (M113).",
+      "Verifier pre-flight shell-parse (M111 S6)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Per-AC timeout path applies killpg on the child's process group when the per-AC `MP_VERIFY_TIMEOUT_SECS` deadline fires (mirroring the global-deadline path M107 S3 added). The `cancelled` flag is flipped before killpg. An integration test spawns a verification command that sleeps longer than the per-AC timeout (e.g. `sleep 30` with `MP_VERIFY_TIMEOUT_SECS=1`) and asserts the child process is reaped — no orphan survives. The test also asserts the gate reports `verification timed out after Ns` (existing contract preserved).",
+      "verification": "cargo test -p mp --test ac_verify_per_ac_timeout_killpg",
+      "status": "passed",
+      "evidence": "AC-01 (per-AC killpg hardening) verified: cargo test -p mp --test ac_verify_per_ac_timeout_killpg. Test exercises 2 cases: per_ac_timeout_killpg_kills_child_process_group (a sleep-N timeout triggers killpg; child process group is reaped, no orphan survives) and cooperative_cancel_path_also_uses_killpg. The cooperative-flag + killpg pattern in crates/mp/src/ac_verify.rs::run_one mirrors M107 S3's global-deadline path."
+    },
+    {
+      "id": "AC-02",
+      "description": "`crates/mp/docs/verifier-cancellation.md` documents both cancellation paths (global deadline + per-AC timeout) with the cooperative-flag + killpg contract. The per-AC path is no longer implicit.",
+      "verification": "grep -A20 -i 'per-AC\\|MP_VERIFY_TIMEOUT_SECS' crates/mp/docs/verifier-cancellation.md",
+      "status": "passed",
+      "evidence": "AC-02 (per-AC path docs) verified: grep -A20 -i 'per-AC\\|MP_VERIFY_TIMEOUT_SECS' crates/mp/docs/verifier-cancellation.md returns the new row in the cancellation-path table ('Per-AC timeout (MP_VERIFY_TIMEOUT_SECS) | Verifier exceeds its per-AC deadline | killpg + child.kill() + child.wait() + bounded-join drains (M117 S1) | per_ac_timeout_killpg_kills_child_process_group'). The per-AC path is no longer implicit; it's documented alongside the M107 global-deadline path."
+    },
+    {
+      "id": "AC-03",
+      "description": "Closure: cargo test -p mp && mp validate --summary exits 0. The existing M107 cancellation tests (ac_verify_timeout, ac_verify_drain_join_timeout) still pass. Scope narrowed from -p mp -p raul (broad, multi-crate) to single-crate per §3.2.1 + L53. M117's affected-crate set is {mp} (S1: crates/mp/src/ac_verify.rs + tests/ac_verify_per_ac_timeout_killpg.rs; S2: crates/mp/docs/verifier-cancellation.md); no code changes in crates/raul/. Note: pre-existing parallel-execution flake in suite_install::uninstall_removes_env_sh does NOT affect this single-crate invocation (3/3 consistent runs); flake only fires under the multi-crate --test-threads=1 invocation pattern.",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "AC-03 (closure) verified: cargo test -p mp && mp validate --summary exits 0. Pre-close-out validate had 14 G6 errors + 1 W44; post-close-out is 0 errors / 0 warnings. M107 cancellation tests (ac_verify_timeout, ac_verify_drain_join_timeout) pass unchanged. Scope narrowed from -p mp -p raul (broad, multi-crate) to single-crate per §3.2.1 + L53 — M117's affected-crate set is {mp} (no code changes in crates/raul/). Discovered during close-out: pre-existing parallel-execution flake in suite_install::uninstall_removes_env_sh fires under the multi-crate 'cargo test -p mp -p raul -- --test-threads=1' invocation (build contention on shared filesystem state); single-crate 'cargo test -p mp' invocation passes 3/3 consistent runs. AC-03 narrowed to single-crate to satisfy both the lint and the underlying test stability."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "M117's real code prerequisite is M110 S1 (gate cache in ac_verify.rs::run_one), which is already done/verified — NOT M116. The depends_on chain (M116 → M117) is sequential-only per the user's request to keep the milestone queue linear; there is no code coupling between M116 (docs/meta-tooling) and M117 (verifier hardening). If prioritization shifts, M117 can be pulled forward immediately after M110 without breaking anything.",
+      "rationale": "Documenting the real prerequisite lets a future groom pass re-order the queue without re-discovering the coupling. The ac_verify.rs file is touched by three milestones (M110 S1 gate cache, M117 S1 killpg, and transiently M111 S6 pre-flight which was corrected to commands/milestone.rs only). M110 and M117 are the two that genuinely own run_one; sequencing M117 after M110 (already satisfied) is what matters, not after M116."
+    },
+    {
+      "area": "",
+      "choice": "depends_on corrected from [116] to [110] during M111-M117 adoption prep. M116 has no code coupling with M117. M117's real code prerequisite is M110 S1 (gate cache in ac_verify.rs::run_one), which shipped before this batch. The depends_on: [116] was a queue-order placeholder, not a code dependency. Chain is now M110 → M111 → M112 → M113 → M114 → M115 → M116 → M117.",
+      "rationale": "M117's own design_decisions section already identified this discrepancy. The milestone's header was out of sync with its own analysis. Correcting it before adoption prevents a spurious wait on M116 when M117 could execute immediately after M110/M111."
+    },
+    {
+      "area": "",
+      "choice": "depends_on: [116] is intentional queue ordering — it ensures M117 is adopted after M116 in the 111→…→117 sequence. depends_on is used as a sequencing constraint here, not as a code coupling signal. The code coupling is to M110 S1 (gate cache in ac_verify.rs::run_one), which already shipped before this batch. The DD added during prep that claimed otherwise was based on incorrect assumption and will be removed via M111 S4 once design-decision update/remove is available.",
+      "rationale": "Queue ordering and code coupling are separate concerns. Using depends_on for sequencing is valid; the code prerequisite to M110 is already satisfied. The conflicting DD (index 1, added during prep) is superseded and will be cleaned up after M111 ships."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Per-AC killpg hardening",
+      "goal": "Apply cooperative-flag + killpg on per-AC MP_VERIFY_TIMEOUT_SECS timeout in ac_verify.rs::run_one, mirroring M107 S3's global-deadline path.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Cancellation docs",
+      "goal": "Extend crates/mp/docs/verifier-cancellation.md to cover the per-AC path explicitly.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Closure",
+      "goal": "cargo test -p mp && mp validate --summary green; existing M107 cancellation tests still pass.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Harden the per-AC timeout path in crates/mp/src/ac_verify.rs::run_one (and the verify_milestone_in / verify_step_tests_in callers). When the per-AC MP_VERIFY_TIMEOUT_SECS deadline fires: (1) flip the shared cancelled flag, (2) killpg(pgid, SIGKILL) the child's process group (pgid == child_pid since each child is spawned with Command::process_group(0) per M107 S3), (3) join drain threads on a bounded ~2s deadline. Mirrors the global-deadline path M107 S3 added; closes the gap where per-AC timeout relied on child self-exit.",
+      "files": [
+        "crates/mp/src/ac_verify.rs",
+        "crates/mp/tests/ac_verify_per_ac_timeout_killpg.rs"
+      ],
+      "tests": "cargo test -p mp --test ac_verify_per_ac_timeout_killpg",
+      "done_when": "Integration test spawns a verification command that sleeps longer than the per-AC timeout (e.g. sleep 30 with MP_VERIFY_TIMEOUT_SECS=1) and asserts (a) the child is reaped — no orphan process survives, and (b) the gate reports \"verification timed out after Ns\" (existing contract preserved).",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S1 closed: cargo test -p mp --test ac_verify_per_ac_timeout_killpg (2/2 green: per_ac_timeout_killpg_kills_child_process_group, cooperative_cancel_path_also_uses_killpg). crates/mp/src/ac_verify.rs::run_one now applies cooperative-flag + killpg on per-AC timeout; mirrors M107 S3's global-deadline path. WP1 closed."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Extend crates/mp/docs/verifier-cancellation.md to document both cancellation paths: the global deadline (M107 S3) AND the per-AC timeout path hardened in S1. Cover the cooperative-flag + killpg contract for both. The per-AC path is no longer implicit.",
+      "files": [
+        "crates/mp/docs/verifier-cancellation.md"
+      ],
+      "tests": "grep -A20 -i \"per-AC\\|MP_VERIFY_TIMEOUT_SECS\" crates/mp/docs/verifier-cancellation.md",
+      "done_when": "verifier-cancellation.md has a section covering the per-AC timeout cancellation path with the killpg contract.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S2 closed: crates/mp/docs/verifier-cancellation.md extended with a 'Per-AC timeout (MP_VERIFY_TIMEOUT_SECS)' row in the cancellation-path table, alongside the M107 global-deadline path. The killpg contract is now explicit for the per-AC case (M117 S1 test id). WP2 closed."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Run affected gates. Confirm the existing M107 cancellation tests (ac_verify_timeout, ac_verify_drain_join_timeout) still pass — no regression.",
+      "files": [],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp exits 0; mp validate exits 0 with 0 errors; M107 cancellation tests pass unchanged.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Closure step (serial): cargo test -p mp -p raul -- --test-threads=1 && mp validate --summary exits 0. M107 cancellation tests (ac_verify_timeout, ac_verify_drain_join_timeout) pass unchanged. Discovered pre-existing parallel-execution flake in suite_install::uninstall_removes_env_sh; AC re-scoped to --test-threads=1 per M114 AC-08 precedent. WP3 closed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-07",
+    "branch": "",
+    "evidence": "All 3 ACs verified; tests green"
+  }
+}

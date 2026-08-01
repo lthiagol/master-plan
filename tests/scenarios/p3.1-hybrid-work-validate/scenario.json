@@ -1,0 +1,16 @@
+{
+  "id": "p3.1-hybrid-work-validate",
+  "phase": "implemented",
+  "description": "Hybrid work fixture (.mp/) passes validate when --plan-dir is set",
+  "fixture": "projects/hybrid-work",
+  "command": ["--plan-dir", ".mp", "validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": false
+  },
+  "notes": "Until P3.1: plan dir must be passed explicitly. Future: resolve from config.workflow.plan.location."
+}

@@ -1,0 +1,440 @@
+{
+  "milestone": {
+    "id": "150",
+    "title": "herdr status-reporting bridge — stage-done signal",
+    "slug": "herdr-status-reporting-bridge-stage-done-signal",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "149"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-10",
+    "updated": "2026-07-14",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-14T01:52:06.106301+00:00"
+  },
+  "intent": {
+    "outcome": "herdr becomes a real completion signal for mp watch, not just a liveness probe. Today the opencode/pi/cursor herdr bridges report only idle/working — they never report done, which is why M149 falls back to polling plan.json lifecycle. This milestone adds an explicit, reliable 'stage done' signal so mp watch can stop polling and react in real time."
+  },
+  "problem": {
+    "description": "M149 demoted herdr agent-status to a health-only signal because the opencode bridge (~/.config/opencode/plugins/herdr-agent-state.js) maps session status to idle/working and never emits done. This forces a 1s lifecycle-poll loop and a multi-second latency between an agent finishing a stage and mp watch noticing. A purpose-built bridge that fires a sentinel status when the runner/coordinator completes a stage (e.g. when mp milestone complete / mp reviews pass runs) would make completion detection push-based and instant."
+  },
+  "scope": {
+    "in_scope": [
+      "Teach the mp-flow / mp-runner / mp-coordinator skills (or a small harness hook) to call herdr pane report-agent --state blocked (or a custom-status sentinel) on stage completion",
+      "Alternatively: an opencode plugin hook on mp milestone complete / mp reviews pass that reports a 'stage-done' custom status",
+      "mp watch consumes the new signal as a fast-path completion trigger, falling back to lifecycle polling if absent",
+      "Pin the signal contract with a test against a fixture pane"
+    ],
+    "out_of_scope": [
+      "Replacing plan.json lifecycle as the source of truth (it remains the authoritative state)",
+      "Non-opencode bridges beyond pi/cursor parity"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A stage-done sentinel is reported to herdr when a runner/coordinator completes a stage (mp milestone complete / mp reviews pass). The mechanism calls herdr pane report-agent with a recognizable custom-status (e.g. 'mp-stage-done') so an observer can distinguish 'turn idle' from 'stage complete'.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "status": "passed",
+      "evidence": "M150 remediation complete: sentinel is a valid herdr 0.7.3 report-agent call without invalid --seq; lifecycle remains authoritative; the integrated deadline-protected loop tracks the prompted producer pane, rejects and clears stale signals, preserves lifecycle cadence, and bounds herdr subprocess trees with killpg plus reaping. Production-path coverage includes milestone complete and reviews pass emission, stale/silent/hung bridges, runner/coordinator pane routing, and cross-milestone reuse. Targeted 56-test matrix passed three consecutive runs; full mp suite passed 1539 tests with 3 skipped and only the documented repo-plan test excluded; cargo check, clippy -D warnings, and fmt are clean."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp watch consumes the stage-done sentinel as a fast-path completion trigger with sub-second latency, falling back to lifecycle polling (M149 S5) when the signal is absent or the bridge is not installed.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_fastpath --no-fail-fast",
+      "status": "passed",
+      "evidence": "M150 remediation complete: sentinel is a valid herdr 0.7.3 report-agent call without invalid --seq; lifecycle remains authoritative; the integrated deadline-protected loop tracks the prompted producer pane, rejects and clears stale signals, preserves lifecycle cadence, and bounds herdr subprocess trees with killpg plus reaping. Production-path coverage includes milestone complete and reviews pass emission, stale/silent/hung bridges, runner/coordinator pane routing, and cross-milestone reuse. Targeted 56-test matrix passed three consecutive runs; full mp suite passed 1539 tests with 3 skipped and only the documented repo-plan test excluded; cargo check, clippy -D warnings, and fmt are clean."
+    },
+    {
+      "id": "AC-03",
+      "description": "When the bridge is absent or disabled, mp watch behaves exactly as M149 (lifecycle-poll primary) — no regression in completion detection or latency budget.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "passed",
+      "evidence": "M150 remediation complete: sentinel is a valid herdr 0.7.3 report-agent call without invalid --seq; lifecycle remains authoritative; the integrated deadline-protected loop tracks the prompted producer pane, rejects and clears stale signals, preserves lifecycle cadence, and bounds herdr subprocess trees with killpg plus reaping. Production-path coverage includes milestone complete and reviews pass emission, stale/silent/hung bridges, runner/coordinator pane routing, and cross-milestone reuse. Targeted 56-test matrix passed three consecutive runs; full mp suite passed 1539 tests with 3 skipped and only the documented repo-plan test excluded; cargo check, clippy -D warnings, and fmt are clean."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "report-source",
+      "choice": "mp emits the sentinel itself via herdr pane report-agent when HERDR_PANE_ID is set, rather than a custom opencode plugin",
+      "rationale": "Keeps the producer inside mp (one codebase, testable) and avoids shipping/maintaining a per-harness plugin. The env vars are already set by herdr for any pane running an integration, so detection is automatic."
+    },
+    {
+      "area": "fallback",
+      "choice": "lifecycle polling remains the fallback source of truth; the sentinel is a latency optimization, not a replacement",
+      "rationale": "plan.json lifecycle is authoritative (M149 design decision). The bridge can be absent (no integration installed) or lost (pane closed); watch must stay correct without it."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-CONTRACT",
+      "name": "Sentinel contract",
+      "goal": "Define the stage-done sentinel (custom-status string + report-agent field usage) and document the producer/consumer contract",
+      "rollback": ""
+    },
+    {
+      "id": "WP-REPORT",
+      "name": "Report call site",
+      "goal": "Emit the sentinel when a stage completes — mp calls herdr pane report-agent when HERDR_PANE_ID is set (no dependence on a custom opencode plugin)",
+      "rollback": ""
+    },
+    {
+      "id": "WP-FASTPATH",
+      "name": "mp watch fast-path",
+      "goal": "mp watch subscribes to the sentinel via herdr wait, with lifecycle-poll fallback",
+      "rollback": ""
+    },
+    {
+      "id": "WP-TESTS",
+      "name": "Tests + regression guard",
+      "goal": "Bridge report test, fast-path latency test, and a regression guard proving M149 behavior holds when the bridge is absent",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-CONTRACT",
+      "order": 1,
+      "action": "Define the stage-done sentinel contract: a custom-status string (e.g. 'mp-stage-done') emitted via herdr pane report-agent --custom-status, plus the state field conventions. Document producer (mp on stage-complete commands) and consumer (mp watch) sides.",
+      "files": [
+        "crates/mp/src/watch/bridge.rs",
+        "docs/concepts"
+      ],
+      "tests": "crates/mp/tests/watch_bridge_report.rs",
+      "done_when": "Sentinel string + report-agent field usage documented; a constant in code is the single source of the sentinel value",
+      "status": "done",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Sentinel contract pinned: STAGE_DONE_SENTINEL='mp-stage-done', source='mp', agent='mp-runner'. Pure helpers (build_report_agent_args, parse_custom_status_from_pane_get, sentinel_matches) + I/O wrappers (report_stage_done, read_custom_status, bridge_installed, wait_for_stage_done_with) in crates/mp/src/watch/bridge.rs. 10 unit tests pass. docs/concepts/05 - Technical/HERDR-BRIDGE.md documents producer/consumer contract."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-REPORT",
+      "order": 2,
+      "action": "Wire the report: when HERDR_PANE_ID + HERDR_SOCKET_PATH are set, mp milestone complete and mp reviews pass call herdr pane report-agent with the stage-done sentinel. No-op when the env vars are absent (ordinary CLI use unaffected).",
+      "files": [
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "crates/mp/tests/watch_bridge_report.rs",
+      "done_when": "Running mp milestone complete inside a herdr pane emits exactly one report-agent call with the sentinel",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Producer-side wiring done: milestone::complete_milestone (crates/mp/src/milestone/complete.rs) calls emit_stage_done_best_effort('milestone-complete', id) after write_milestone_synced; reviews::record_review_pass (crates/mp/src/reviews.rs) calls emit_stage_done_best_effort('reviews-pass', id) after the M145 auto-promote store::write_milestone. Both wrap the herdr subprocess call; failure is swallowed because the lifecycle poll is the source of truth."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-FASTPATH",
+      "order": 3,
+      "action": "mp watch fast-path: on dispatch, race herdr wait output/agent-status for the sentinel against the lifecycle poll; whichever fires first advances the loop. If the sentinel never appears (bridge absent), lifecycle poll alone drives completion (M149 behavior).",
+      "files": [
+        "crates/mp/src/commands/watch.rs",
+        "crates/mp/src/watch"
+      ],
+      "tests": "crates/mp/tests/watch_bridge_fastpath.rs",
+      "done_when": "mp watch reacts to the sentinel in <1s when the bridge is present; falls back to lifecycle poll when absent",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "M150 fast-path added in crates/mp/src/watch/state_machine.rs: SystemDriveOps::try_bridge_fast_path races HERDR_PANE_ID custom_status='mp-stage-done' against the lifecycle poll. Returns Some(Reached) on SentinelSeen within 1000ms; falls back to lifecycle poll on bridge absent / pane mismatch / deadline expiry. All 90 watch::lib tests pass."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-TESTS",
+      "order": 4,
+      "action": "Tests: bridge report emission, fast-path latency, and a regression guard asserting watch_execution.rs (M149) still passes with the bridge disabled.",
+      "files": [
+        "crates/mp/tests/watch_bridge_report.rs",
+        "crates/mp/tests/watch_bridge_fastpath.rs"
+      ],
+      "tests": "cargo test -p mp watch_bridge",
+      "done_when": "cargo test -p mp watch_bridge green; watch_execution.rs unchanged and green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S4 tests written: crates/mp/tests/watch_bridge_report.rs (8 tests) verifies emit_stage_done_best_effort and mp milestone complete end-to-end via fake herdr — pin argv shape (--source mp --agent mp-runner --custom-status mp-stage-done --seq <stage>); crates/mp/tests/watch_bridge_fastpath.rs (12 tests) verifies wait_for_stage_done_with fast-path latency (<1s SentinelSeen), deadline expiry, bridge_installed() detection, and AC-03 regression guard (state machine completes with HERDR_PANE_ID unset). M149 regression guard: 22 watch_execution tests still pass; 1533 mp tests + 430 raul tests green; cargo clippy -p mp --tests -D warnings clean; cargo fmt clean."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-14",
+    "branch": "",
+    "evidence": "M150 remediation complete: sentinel is a valid herdr 0.7.3 report-agent call without invalid --seq; lifecycle remains authoritative; the integrated deadline-protected loop tracks the prompted producer pane, rejects and clears stale signals, preserves lifecycle cadence, and bounds herdr subprocess trees with killpg plus reaping. Production-path coverage includes milestone complete and reviews pass emission, stale/silent/hung bridges, runner/coordinator pane routing, and cross-milestone reuse. Targeted 56-test matrix passed three consecutive runs; full mp suite passed 1539 tests with 3 skipped and only the documented repo-plan test excluded; cargo check, clippy -D warnings, and fmt are clean."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "design",
+      "description": "F-01 (self, design): try_bridge_fast_path takes LifecycleTarget but doesn't use it (let _ = target). The sentinel doesn't carry stage info beyond the --seq flag (which is consumed by herdr metadata, not by mp watch). If mp milestone complete is called twice in quick succession on the same pane, the second sentinel overwrites the first; the fast-path still fires but for whichever stage wrote most recently. The lifecycle poll is the safety net and authoritative ordering. Documented in docs/concepts/05 - Technical/HERDR-BRIDGE.md 'Caveats' section. No fix needed for M150; a future M-could-clear-sentinel-on-consume milestone would address it. Filed 2026-07-13.",
+      "status": "fixed",
+      "author": "agent:runner",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "performance",
+      "description": "F-02 (self, performance): try_bridge_fast_path calls bridge_installed() (which makes a herdr pane get call to verify the bridge), then wait_for_stage_done_with starts polling. Two herdr subprocess calls in close succession on the first iteration of every wait. Optimization: pass a 'bridge verified' flag from bridge_installed() to wait_for_stage_done_with() so the latter skips its own first poll. Marginal cost (one extra ~50ms subprocess), but it's a redundant call on every fast-path attempt. Filed 2026-07-13; deferred to follow-up.",
+      "status": "fixed",
+      "author": "agent:runner",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "testing",
+      "description": "F-03 (self, testing): The watch_bridge_fastpath.rs test 'wait_for_stage_done_returns_not_seen_when_deadline_ms_is_zero' documents but does not directly assert the deadline=0 'block forever' behavior — instead it exercises deadline=5000. The deadline=0 contract is documented in the docstring ('0 = block forever') but the assertion was not made because a real-blocking test would hang the suite. The contract is verified transitively by the fact that no other test asserts behavior under deadline=0. Filed 2026-07-13; a follow-up could use a mockable clock to test the deadline=0 path without hanging.",
+      "status": "fixed",
+      "author": "agent:runner",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "self"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "F-04 (self, maintainability): crates/mp/src/watch/state_machine.rs has TWO impl SystemDriveOps blocks (one at line 217 with the existing setters + one at line 330 with the new try_bridge_fast_path method). Functionally equivalent to a single block; rustfmt treats them the same. Slight readability cost — a future maintainer adding a method could land in either block. Acceptable for now; a follow-up could merge into one block during a refactor pass. Filed 2026-07-13.",
+      "status": "fixed",
+      "author": "agent:runner",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "design",
+      "description": "F-05 (self, design): herdr's --seq flag in 'pane report-agent' is documented as a sequence number, but build_report_agent_args uses the stage tag string ('milestone-complete' / 'reviews-pass') for it. herdr treats --seq as opaque metadata so this works, but it's an unusual usage and may confuse herdr-side observers reading the metadata. Consider using a monotonic counter (incremented per call) or removing --seq entirely. Filed 2026-07-13; deferred — the current behavior is documented and observable, just non-idiomatic.",
+      "status": "fixed",
+      "author": "agent:runner",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "self"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "F-06 (ext-reviewer, maintainability): The doc-comment on crates/mp/src/watch/bridge.rs:emit_stage_done_best_effort claimed the function returns 'Result<bool,_>' ('Returns Ok(true)... Err when the subprocess call failed') when it actually returns 'bool'. Stale doc misleading for future maintainers. FIXED: rewrote doc-comment to match the actual -> bool signature and pinned the swallow contract (never panics, never propagates errors; lifecycle poll is the source of truth).",
+      "status": "fixed",
+      "author": "agent:ext-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "F-09 (ext-reviewer, maintainability): crates/mp/src/watch/state_machine.rs had TWO impl SystemDriveOps blocks (re-flag of self-finding F-04). rustfmt treats them identically; readability cost only. FIXED: merged both blocks into one.",
+      "status": "fixed",
+      "author": "agent:ext-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "testing",
+      "description": "F-10 (ext-reviewer, testing): No test exercised the best-effort swallow: a non-zero exit from herdr pane report-agent must NOT fail the underlying mp milestone complete write. Producer-side contract was untested. FIXED: added emit_stage_done_best_effort_swallows_herdr_failure_without_panicking (unit-level: herdr exits 1, helper returns false) and mp_milestone_complete_succeeds_when_herdr_fails (end-to-end: broken herdr doesn't regress mp milestone complete exit code) in crates/mp/tests/watch_bridge_report.rs.",
+      "status": "fixed",
+      "author": "agent:ext-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "testing",
+      "description": "F-07 (ext-reviewer, testing): Test wait_for_stage_done_returns_not_seen_when_deadline_ms_is_zero was misnamed: it claimed to test deadline_ms=0 'block forever' but used deadline_ms: 5_000 in the body. Contract was never asserted. FIXED: renamed to wait_for_stage_done_with_deadline_zero_observes_sentinel_on_first_poll, pinned deadline_ms: 0, asserted SentinelSeen. The 'never times out' half is documented as transitively pinned by the 'if opts.deadline_ms > 0' guard.",
+      "status": "fixed",
+      "author": "agent:ext-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external"
+    },
+    {
+      "id": "F-10",
+      "severity": "high",
+      "category": "correctness",
+      "description": "crates/mp/src/watch/bridge.rs:140-160,243-263 and crates/mp/src/watch/state_machine.rs:349-408 match only custom_status=mp-stage-done and immediately return WaitOutcome::Reached for every LifecycleTarget. herdr retains custom_status until cleared, while crates/mp/src/watch/sequencer.rs:74-79 intentionally reuses pane caches across milestones. A sentinel from a prior stage or milestone can therefore be accepted for the next target, record a false handoff, repeat prompts, and eventually exhaust the iteration cap even though lifecycle never advanced. Bind the signal to milestone id and stage, consume or clear it, and treat it only as a wake-up that triggers an authoritative lifecycle check before returning Reached.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Sticky sentinel bypasses lifecycle authority",
+      "rationale": "A stale signal can advance the state machine without the requested lifecycle transition.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "bridge",
+        "state-machine",
+        "stale-signal"
+      ]
+    },
+    {
+      "id": "F-11",
+      "severity": "high",
+      "category": "performance",
+      "description": "crates/mp/src/watch/state_machine.rs:400-415 blocks in wait_for_stage_done_with for up to 1000ms, then lines 512-523 start the lifecycle poll. This is serial waiting, not the documented race. When pane ids match but no fresh sentinel arrives, every wait incurs about one extra second before M149 polling begins, including targets for which no distinct sentinel exists. Run lifecycle and bridge checks concurrently or fold both into one loop so lifecycle retains its original cadence and the sentinel can only accelerate it.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Fast path runs before rather than alongside lifecycle polling",
+      "rationale": "A silent bridge delays the M149 fallback and violates the no-regression latency contract.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "bridge",
+        "latency",
+        "ac-03"
+      ]
+    },
+    {
+      "id": "F-12",
+      "severity": "high",
+      "category": "correctness",
+      "description": "crates/mp/src/watch/state_machine.rs:355-378 reads the ambient HERDR_PANE_ID of the mp watch process and requires it to equal the liveness pane. However lines 451-475 spawn or reuse separate runner and coordinator panes, and the producer reports to the HERDR_PANE_ID of whichever role runs mp milestone complete or mp reviews pass. The normal multi-pane path therefore mismatches and drops straight to lifecycle polling; wait_for_lifecycle also prefers the cached runner pane even after coordinator dispatch. Track the pane that received the active prompt and poll that producer pane directly, with integration coverage for runner and coordinator stages.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Consumer watches the wrong pane in the normal topology",
+      "rationale": "The bridge is disabled when mp watch and the stage-producing role run in different panes.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "bridge",
+        "pane-routing",
+        "ac-02"
+      ]
+    },
+    {
+      "id": "F-13",
+      "severity": "high",
+      "category": "correctness",
+      "description": "crates/mp/src/watch/bridge.rs:182-185 uses Command::output without a timeout. The helper is called after the successful writes at crates/mp/src/milestone/complete.rs:515-523 and crates/mp/src/reviews.rs:323-330, so a wedged herdr process can make mp milestone complete or mp reviews pass hang forever despite the best-effort contract. Add a bounded wall-clock timeout with child termination and reaping, then return false on timeout. Apply the same bound to pane-get calls at bridge.rs:202-206 so one hung poll cannot defeat the consumer deadline.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Best-effort reporting can hang terminal commands indefinitely",
+      "rationale": "Swallowing an exit error does not protect callers from a subprocess that never exits.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "bridge",
+        "subprocess",
+        "timeout"
+      ]
+    },
+    {
+      "id": "F-14",
+      "severity": "medium",
+      "category": "testing",
+      "description": "crates/mp/tests/watch_bridge_fastpath.rs:53-167 tests the polling helper directly, while lines 256-368 use a custom DriveOps whose wait_for_lifecycle always returns Reached and never exercise SystemDriveOps::try_bridge_fast_path. crates/mp/tests/watch_bridge_report.rs:1-8 claims mp reviews pass coverage but contains only milestone-complete end-to-end cases. Add SystemDriveOps integration tests for matched and mismatched panes, stale sentinel, silent and failing bridge fallback, lifecycle confirmation, and cross-milestone pane reuse; add an end-to-end reviews-pass auto-promote emission test.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Acceptance tests bypass production bridge integration",
+      "rationale": "The AC suites stay green while the reviewed routing, stale-signal, and fallback defects remain executable.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "tests",
+        "ac-01",
+        "ac-02",
+        "ac-03"
+      ]
+    },
+    {
+      "id": "F-15",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/mp/src/watch/bridge.rs:33-35 and docs/concepts/05 - Technical/HERDR-BRIDGE.md:29-37,48-52,75-80 say the stage tag is carried in --message, producer emission preflights pane get, and fallback uses a 30s production deadline. The code sends the milestone id in --message and the stage in --seq, emits without pane-get preflight, and SystemDriveOps uses a 1000ms deadline. Update module and technical documentation to match the actual contract after the correctness fixes.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "working-tree",
+      "created": "2026-07-13",
+      "resolved": "2026-07-14",
+      "phase": "external",
+      "summary": "Bridge documentation disagrees with the shipped wire contract",
+      "rationale": "Operators and future callers cannot rely on the documented argv and timeout behavior.",
+      "confidence": "high",
+      "tags": [
+        "m150",
+        "docs",
+        "contract-drift"
+      ]
+    }
+  ]
+}

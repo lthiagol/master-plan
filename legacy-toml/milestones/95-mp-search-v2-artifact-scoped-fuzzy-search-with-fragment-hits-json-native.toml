@@ -1,0 +1,330 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "95"
+title = "mp search v2 — artifact-scoped fuzzy search with fragment hits (JSON-native)"
+slug = "mp-search-v2-artifact-scoped-fuzzy-search-with-fragment-hits-json-native"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = ["93"]
+effort = "M"
+risk = "low"
+change_kind = ""
+priority = "high"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Agents and humans find plan content with mp search instead of grepping master-plan/ or looping mp show. Search is reworked for M92 JSON-on-disk: source paths point at .json files, artifact types match how agents think (ac, step, wp, title, idea, backlog, track, decision, all), and results can include the full matched fragment (whole AC, step, or WP object) — not only a snippet. Skills and AGENTS.md treat mp search as the default discovery path."
+
+[problem]
+description = "M53 shipped mp search with DIY fuzzy scoring over milestones, steps (partial), ideas, backlog, tracks, and decisions. It did not get lost — but agents still grep or fan out mp show because: (1) --type lacks first-class ac and wp scopes (AC hits appear as milestone with matched_field ac.AC-NN); (2) work_packages are not indexed; (3) results return snippets only, forcing a second mp show to get the full fragment; (4) source paths hardcode .toml slugs, which breaks mental model once M92 moves plan artifacts to JSON; (5) mp search is under-documented in skills vs grep. M93 fragment reads (ac show, --fields by id) pair naturally with search that returns enough context to jump straight to the right mp command without document assembly."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Rework crates/mp/src/search.rs for JSON-era store paths and artifact coverage",
+    "--type ac: search acceptance_criteria description and verification only; artifact_type acceptance_criterion; id AC-NN with parent milestone id in hit",
+    "--type wp: search work_packages name and goal fields",
+    "--type title: search milestone titles only (narrow filter)",
+    "--type step: step action, done_when, tests (extend M53 step coverage)",
+    "Existing types retained: milestone (intent, problem, scope lines), idea, backlog, track, decision",
+    "--include object: attach full matched struct under hit.object (AC, step, WP, idea item, etc.)",
+    "Hit schema v2: score, artifact_type, id, parent_milestone_id (when nested), title, matched_field, snippet, source (.json path), suggested_action, object (optional)",
+    "--group-by milestone: optional JSON grouping of hits under parent milestone",
+    "Update crates/mp/tests/fuzzy_search.rs and add fragment/object coverage tests",
+    "Update MP-COMMANDS.md, AGENTS.md, master-planner skill, AGENT-READINESS — mp search replaces grep for plan discovery",
+    "mp doctor or mp search --help mentions artifact types and --include object",
+]
+out_of_scope = [
+    "Persistent search index or external engine (Elasticsearch, etc.)",
+    "Frecency/history ranking",
+    "raul TUI search UI (raul shells to mp JSON)",
+    "Searching application source code (code zone — harness ripgrep)",
+    "Full-text regex mode (fuzzy/substring only, as M53)",
+    "Replacing mp list --where filters (structured query vs fuzzy)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp search 'install' returns ranked hits; source paths reference .json plan files (post-M92 layout), not .toml"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp search 'OAuth' --type ac returns only acceptance_criteria matches with artifact_type acceptance_criterion, parent_milestone_id, and matched_field ac.<id>"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp search 'markdown' --type wp returns work_package name/goal matches with parent milestone context"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "mp search with --type step returns step hits with milestone-qualified id and matched_field action, done_when, or tests"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp search 'robustness' --type title returns milestone title matches only (not intent/problem body)"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "mp search with --type ac --include object embeds full acceptance_criterion JSON under hit.object; default without --include returns snippet only"
+verification = "crates/mp/tests/search_fragment.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "Each hit includes suggested_action when mappable (e.g. mp milestone ac show on parent+AC id, mp milestone step show on parent+step id, mp show milestone --fields projection)"
+verification = "crates/mp/tests/search_fragment.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "mp search 'zzz-nonexistent' returns { results: [] } with exit 0; empty query returns empty results"
+verification = "crates/mp/tests/fuzzy_search.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "AGENTS.md and master-planner skill document mp search artifact types, --include object, and anti-pattern: do not grep master-plan/"
+verification = "manual: accepted — doc review at completion"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-10"
+description = "cargo test -p mp exit 0 including fuzzy_search and search_fragment tests"
+verification = "cargo test -p mp"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Search engine rework"
+goal = "JSON paths, artifact types ac/wp/title/step, core fuzzy scoring"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Fragment hits & navigation"
+goal = "include object payload, suggested_action, optional group-by milestone"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Docs"
+goal = "AGENTS, master-planner, MP-COMMANDS, doctor/help"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Rework crates/mp/src/search.rs for JSON store paths and extended --type filters"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "mp search returns .json source paths and ranked hits"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Implement --type ac with acceptance_criterion artifact_type and parent_milestone_id"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "AC hits use acceptance_criterion type with parent context"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Implement --type wp and --type title filters"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "wp and title scopes return correct artifact types only"
+status = "pending"
+covers_ac = [
+    "AC-03",
+    "AC-05",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 4
+action = "Extend --type step with milestone-qualified ids and action/done_when/tests fields"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "Step hits include qualified id and matched_field"
+status = "pending"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP1"
+order = 5
+action = "Empty and nonexistent query behavior: exit 0 with empty results"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/fuzzy_search.rs"
+done_when = "Nonexistent query returns empty results array"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Add --include object embedding full matched fragment; hit schema v2 fields"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/search_fragment.rs"
+done_when = "Optional object payload embeds full AC/step/WP JSON"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP2"
+order = 7
+action = "Add suggested_action per hit mapping to M93 fragment commands"
+files = ["crates/mp/src/search.rs"]
+tests = "crates/mp/tests/search_fragment.rs"
+done_when = "Hits include mappable suggested_action strings"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP3"
+order = 8
+action = "Update AGENTS.md and master-planner skill: mp search replaces grep; document types and include object"
+files = [
+    "AGENTS.md",
+    "templates/skills",
+]
+tests = "manual: accepted — doc review at completion"
+done_when = "Skills document search-first discovery"
+status = "pending"
+covers_ac = ["AC-09"]
+depends_on_steps = ["S7"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP-close"
+order = 9
+action = "cargo test -p mp including fuzzy_search and search_fragment"
+files = []
+tests = "cargo test -p mp"
+done_when = "cargo test -p mp exit 0"
+status = "pending"
+covers_ac = ["AC-10"]
+depends_on_steps = ["S8"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

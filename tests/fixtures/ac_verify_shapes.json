@@ -1,0 +1,105 @@
+{
+  "ac_report": {
+    "display": "M01",
+    "empty": 1,
+    "manual": 1,
+    "milestone": "01",
+    "ok": false,
+    "results": [
+      {
+        "ac_id": "AC-PASS",
+        "description": "passes",
+        "exit_code": 0,
+        "kind": "runnable",
+        "note": "verification command succeeded",
+        "output": "ac-pass\n",
+        "passed": true,
+        "verification": "echo ac-pass"
+      },
+      {
+        "ac_id": "AC-FAIL",
+        "description": "exits non-zero",
+        "exit_code": 7,
+        "kind": "runnable",
+        "note": "verification command failed (exit 7)",
+        "output": "",
+        "passed": false,
+        "verification": "exit 7"
+      },
+      {
+        "ac_id": "AC-EMPTY",
+        "description": "no verification",
+        "exit_code": null,
+        "kind": "empty",
+        "note": "empty verification — not checked (flagged)",
+        "output": "",
+        "passed": true,
+        "verification": ""
+      },
+      {
+        "ac_id": "AC-MANUAL",
+        "description": "prose only",
+        "exit_code": null,
+        "kind": "manual",
+        "note": "manual verification — not executed",
+        "output": "",
+        "passed": true,
+        "verification": "manual: kept manual"
+      }
+    ],
+    "runnable_failed": 1,
+    "runnable_passed": 1,
+    "runnable_total": 2,
+    "title": "Snapshot fixture"
+  },
+  "schema_note": "Envelope shapes are byte-identical to pre-WP2 refactor. If this snapshot changes, ANY field rename or ordering change in AcResult / StepTestsResult / VerifyReport / StepTestsReport is a breaking wire-format change for downstream JSON consumers (rauls review-tests payload, mp milestone complete payload). Update the golden deliberately and review callers.",
+  "step_report": {
+    "display": "M01",
+    "empty": 1,
+    "manual": 1,
+    "milestone": "01",
+    "ok": false,
+    "results": [
+      {
+        "exit_code": 0,
+        "kind": "runnable",
+        "note": "step tests command succeeded",
+        "output": "step-pass\n",
+        "passed": true,
+        "step_id": "S-PASS",
+        "tests": "echo step-pass"
+      },
+      {
+        "exit_code": 9,
+        "kind": "runnable",
+        "note": "step tests command failed (exit 9)",
+        "output": "",
+        "passed": false,
+        "step_id": "S-FAIL",
+        "tests": "exit 9"
+      },
+      {
+        "exit_code": null,
+        "kind": "empty",
+        "note": "empty tests — not checked",
+        "output": "",
+        "passed": true,
+        "step_id": "S-EMPTY",
+        "tests": ""
+      },
+      {
+        "exit_code": null,
+        "kind": "manual",
+        "note": "manual tests — not executed",
+        "output": "",
+        "passed": true,
+        "step_id": "S-MANUAL",
+        "tests": "manual: kept manual"
+      }
+    ],
+    "runnable_failed": 1,
+    "runnable_passed": 1,
+    "runnable_total": 2,
+    "title": "Snapshot fixture"
+  }
+}

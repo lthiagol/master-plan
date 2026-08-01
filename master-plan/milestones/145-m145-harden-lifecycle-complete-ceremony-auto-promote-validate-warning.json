@@ -1,0 +1,177 @@
+{
+  "milestone": {
+    "id": "145",
+    "title": "lifecycle=complete ceremony — auto-promote on reviews pass + W-LC-TERMINAL validate warning",
+    "slug": "m145-harden-lifecycle-complete-ceremony-auto-promote-validate-warning",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-10",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-11T16:48:52.665082+00:00"
+  },
+  "intent": {
+    "outcome": "mp reviews pass --verdict ok auto-promotes lifecycle=done → complete when the legacy-shape triple is present; mp validate surfaces W-LC-TERMINAL for stuck non-terminal lifecycles that look finished. Agents and humans stop leaking the done/complete gap."
+  },
+  "problem": {
+    "description": "M143 and M144 shipped with `lifecycle=done + spec_status=verified + execution_status=done`. Only `complete` is in `LIFECYCLE_TERMINAL` (crates/mp-model/src/milestone.rs:58) — `done` is non-terminal. The triple reflects the executor's 'I'm done' write but skipped the ceremonial `mp milestone complete` write. Two reinforcing factors: (a) `mp reviews finding resolve` only auto-exits `remediation → done`/`self-reviewed`; on a non-remediation milestone it no-ops on lifecycle promotion (crates/mp/src/reviews.rs:875-902). (b) `mp reviews pass` validates only `execution_status == done` (crates/mp/src/reviews.rs:287-290), so a `lifecycle=done + execution_status=done + spec_status=verified` milestone can pass review without ever being promoted to the canonical terminal. `mp validate` doesn't gate the inconsistency either. Result: human readers of `raul status` and downstream tooling that keys on `LIFECYCLE_TERMINAL` see different things depending on who shipped the milestone and which ceremony was followed. The fix is symmetrical — close the ceremony gap with one auto-promote hook + one machine-checkable warning, mirroring how resolve_finding already auto-exits remediation when its precondition is met."
+  },
+  "scope": {
+    "in_scope": [
+      "Auto-promote lifecycle=done → complete inside mp reviews pass on verdict=ok (preserve lifecycle_at if set)",
+      "Idempotent pass on lifecycle=complete; verdict=changes-needed does NOT promote",
+      "W-LC-TERMINAL warning in mp validate when execution+spec look terminal but lifecycle is non-terminal",
+      "Unit/integration tests for promote + warning paths"
+    ],
+    "out_of_scope": [
+      "Changing LIFECYCLE_TERMINAL (still [complete] only)",
+      "One-shot dogfood promote of current master-plan legacy-shape milestones — run as a post-ship ops note after M145 lands, not an AC of the product change",
+      "New mp milestone promote subcommand",
+      "Migration-layer rewrites",
+      "M148 stuck self-reviewed transitions (separate investigation)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp reviews pass --verdict ok --reviewer <who>` on a milestone with `lifecycle=done` + `spec_status=verified` + `execution_status=done` auto-promotes the lifecycle to `complete` and sets `lifecycle_at = Some(now_rfc3339())` only when the existing value is missing. Idempotent: re-running on a lifecycle=complete milestone leaves lifecycle=complete and lifecycle_at unchanged.",
+      "verification": "crates/mp/tests/lifecycle_complete_ceremony.rs",
+      "status": "passed",
+      "evidence": "M145 lifecycle=complete ceremony complete. S1: reviews pass auto-promote done->complete on verdict=ok, idempotent, preserves lifecycle_at. S2: W-LC-TERMINAL validate warning. Tests: 9/9 pass in lifecycle_complete_ceremony.rs. mp full suite: 111+5+11+4+4+10+7+8 passed; 1 pre-existing red (coordinator_role_skill referencing dropped master-planner). clippy+fmt clean. --force used (verification field prose trip, see M138 Entry 22 in dogfood log)."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp reviews pass --verdict changes-needed` does NOT promote the lifecycle. The verdict 'changes-needed' is a remediation signal; the milestone stays at its current lifecycle (typically `done` or `self-reviewed`) so the next finding add / resolve cycle exits to the correct pre-remediation state.",
+      "verification": "crates/mp/tests/lifecycle_complete_ceremony.rs",
+      "status": "passed",
+      "evidence": "M145 lifecycle=complete ceremony complete. S1: reviews pass auto-promote done->complete on verdict=ok, idempotent, preserves lifecycle_at. S2: W-LC-TERMINAL validate warning. Tests: 9/9 pass in lifecycle_complete_ceremony.rs. mp full suite: 111+5+11+4+4+10+7+8 passed; 1 pre-existing red (coordinator_role_skill referencing dropped master-planner). clippy+fmt clean. --force used (verification field prose trip, see M138 Entry 22 in dogfood log)."
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp validate --summary` surfaces a `W-LC-TERMINAL` warning when any milestone in the plan has lifecycle=done (or any non-terminal value) AND spec_status=verified AND execution_status=done. The warning names the milestone id and points at `mp milestone complete` as the fix. No warning fires for milestones that already read lifecycle=complete.",
+      "verification": "crates/mp/tests/lifecycle_complete_ceremony.rs",
+      "status": "passed",
+      "evidence": "M145 lifecycle=complete ceremony complete. S1: reviews pass auto-promote done->complete on verdict=ok, idempotent, preserves lifecycle_at. S2: W-LC-TERMINAL validate warning. Tests: 9/9 pass in lifecycle_complete_ceremony.rs. mp full suite: 111+5+11+4+4+10+7+8 passed; 1 pre-existing red (coordinator_role_skill referencing dropped master-planner). clippy+fmt clean. --force used (verification field prose trip, see M138 Entry 22 in dogfood log)."
+    },
+    {
+      "id": "AC-04",
+      "description": "Unit/integration tests cover: (1) reviews pass on lifecycle=done + verdict=ok promotes to complete; (2) lifecycle=complete pass is idempotent; (3) verdict=changes-needed does not promote; (4) mp validate emits W-LC-TERMINAL on the legacy-shape triple and is silent for healthy complete milestones.",
+      "verification": "crates/mp/tests/lifecycle_complete_ceremony.rs",
+      "status": "passed",
+      "evidence": "M145 lifecycle=complete ceremony complete. S1: reviews pass auto-promote done->complete on verdict=ok, idempotent, preserves lifecycle_at. S2: W-LC-TERMINAL validate warning. Tests: 9/9 pass in lifecycle_complete_ceremony.rs. mp full suite: 111+5+11+4+4+10+7+8 passed; 1 pre-existing red (coordinator_role_skill referencing dropped master-planner). clippy+fmt clean. --force used (verification field prose trip, see M138 Entry 22 in dogfood log)."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "scope",
+      "choice": "Auto-promote lives inside mp reviews pass; dogfood cleanup of current plan files is post-ship ops, not an AC",
+      "rationale": "Challenge pass: bundling product behavior with a one-shot master-plan promote made AC-04 a plan-mutation gate and AC-05 a whole-workspace cargo-test. Product ACs must be fixture-testable."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-PROMOTE",
+      "name": "reviews pass auto-promote",
+      "goal": "done→complete on verdict=ok; changes-needed does not promote",
+      "rollback": ""
+    },
+    {
+      "id": "WP-WARN",
+      "name": "W-LC-TERMINAL validate",
+      "goal": "validate warning for stuck non-terminal lifecycle",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-PROMOTE",
+      "order": 1,
+      "action": "In mp reviews pass, when verdict=ok and lifecycle=done (legacy-shape triple), auto-promote lifecycle to complete. Preserve lifecycle_at if already set; else stamp now_rfc3339(). Idempotent when already complete. verdict=changes-needed must not promote.",
+      "files": [
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "cargo test -p mp --test lifecycle_complete_ceremony",
+      "done_when": "pass ok promotes done→complete; changes-needed leaves lifecycle unchanged",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-WARN",
+      "order": 2,
+      "action": "Add W-LC-TERMINAL to mp validate: when execution_status+spec_status look terminal but lifecycle is non-terminal (e.g. done), emit a warning naming the milestone id and pointing at mp milestone complete / reviews pass remediation.",
+      "files": [
+        "crates/mp/src/validate"
+      ],
+      "tests": "cargo test -p mp --test lifecycle_complete_ceremony",
+      "done_when": "validate surfaces W-LC-TERMINAL on legacy-shape fixtures; healthy complete milestones silent",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-11",
+    "branch": "",
+    "evidence": "M145 lifecycle=complete ceremony complete. S1: reviews pass auto-promote done->complete on verdict=ok, idempotent, preserves lifecycle_at. S2: W-LC-TERMINAL validate warning. Tests: 9/9 pass in lifecycle_complete_ceremony.rs. mp full suite: 111+5+11+4+4+10+7+8 passed; 1 pre-existing red (coordinator_role_skill referencing dropped master-planner). clippy+fmt clean. --force used (verification field prose trip, see M138 Entry 22 in dogfood log)."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "F-02: Validate/promote asymmetry. W-LC-TERMINAL in crates/mp/src/validate/plan.rs:562-583 fires for ANY non-complete/non-cancelled lifecycle when exec=done + spec=verified (e.g. lifecycle=self-reviewed after a partial write or migration). But the auto-promote in reviews.rs:310 only fires for lifecycle=done. Result: validate tells the user to run `mp reviews pass --verdict ok` to fix a stuck milestone, but for lc=self-reviewed the pass succeeds without promoting. The warning's advice is unactionable for non-done lifecycles. Fix: narrow W-LC-TERMINAL to lc==done (matching auto-promote scope) OR generalize the auto-promote. Narrowing is safer — does not risk disrupting the active review loop.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "8bd11ad",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "correctness",
+      "description": "F-01: Auto-promote condition in record_review_pass has a redundant clause. crates/mp/src/reviews.rs:310 reads `lc != \"complete\" && lc == \"done\"` — the first clause is implied by the second. Either drop the redundancy or generalize (current form obscures intent). Trivial cleanup.",
+      "status": "fixed",
+      "author": "external-review",
+      "fixed_in": "8bd11ad",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external"
+    }
+  ]
+}

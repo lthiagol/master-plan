@@ -1,0 +1,56 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "build ok",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "cargo build"
+    }
+  ],
+  "intent": {
+    "outcome": "Baseline complete."
+  },
+  "milestone": {
+    "created": "2026-06-17",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "01",
+    "risk": "low",
+    "slug": "foundation",
+    "spec_status": "verified",
+    "title": "Foundation",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Need foundation."
+  },
+  "scope": {
+    "in_scope": [
+      "bootstrap"
+    ],
+    "out_of_scope": [
+      "features",
+      "polish"
+    ]
+  },
+  "steps": [
+    {
+      "action": "Init workspace",
+      "done_when": "",
+      "id": "S1",
+      "status": "done",
+      "tests": "",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Build",
+      "id": "WP1",
+      "name": "Bootstrap",
+      "rollback": "git restore ."
+    }
+  ]
+}

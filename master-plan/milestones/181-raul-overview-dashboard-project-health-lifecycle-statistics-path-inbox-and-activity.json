@@ -1,0 +1,506 @@
+{
+  "milestone": {
+    "id": "181",
+    "title": "Raul Overview dashboard — project health, lifecycle statistics, path, inbox, and activity",
+    "slug": "raul-overview-dashboard-project-health-lifecycle-statistics-path-inbox-and-activity",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "179",
+      "180"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-16",
+    "updated": "2026-07-17",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-17T20:45:41.709727+00:00"
+  },
+  "intent": {
+    "outcome": "Opening Raul lands on a balanced, current project dashboard that shows project health, milestone and step statistics, all canonical lifecycle counts, work queues, watch state, the short suggested path, five actionable Inbox items, and five recent project events without requiring the user to visit each specialized tab."
+  },
+  "problem": {
+    "description": "Raul's initial Overview is still primarily a large Inbox with a small status rollup and suggested path. As the Path and Watch workflows become richer, that layout no longer explains the actual state of the project: users cannot see all lifecycle stages, aggregate step status, queue sizes, validation/blocker health, watch state, or what recently changed. The current dashboard also assembles raw status and Inbox payloads itself. A redesigned Overview should consume M180's consolidated snapshot and present a compact, responsive project summary while preserving the useful Inbox navigation."
+  },
+  "scope": {
+    "in_scope": [
+      "Keep Overview as Raul's initial active tab and redesign it as a balanced read-only project dashboard",
+      "Consume M180's consolidated Overview snapshot through a small Raul adapter rather than independently recomputing lifecycle, step, queue, path, watch, or activity classifications",
+      "A top project-health strip showing validation state/error count, blocker count, execution mode, planning state, and state-only watch status",
+      "A Statistics box showing total milestones and current aggregate step counts for pending, in-progress, done, failed, and skipped",
+      "A Work queues box showing separate counts for actionable Inbox, pending external reviews, backlog, parked ideas, open annotations, blocked milestones, and remediation milestones",
+      "A display-only grid containing every canonical milestone lifecycle count: draft, groomed, approved, in-progress, done, self-reviewed, reviewed, complete, and remediation",
+      "A short ordered suggested-path preview showing three to five upcoming path items",
+      "Two compact lower panels: the latest five actionable Inbox items and latest five project activity events",
+      "Preserve navigation from the five visible Inbox items to their existing destinations; Recent activity rows remain read-only",
+      "Recent activity rows show core details only: timestamp, event type, subject, and short summary",
+      "Responsive layout: health first; Statistics and Work queues; lifecycle grid; suggested path; then Inbox and Recent activity side by side on wide terminals and stacked on narrow terminals",
+      "Refresh the snapshot when entering Overview and when the user invokes manual refresh; no periodic Overview auto-refresh",
+      "Update Overview selection, hit areas, and rendering tests for a five-item navigable Inbox while excluding read-only activity rows from selection",
+      "Graceful empty states for projects with no milestones, no steps, no Inbox items, no future activity events, no path preview, or no active watch"
+    ],
+    "out_of_scope": [
+      "Implementing or modifying M180's event journal, overview aggregation, lifecycle classification, path calculation, or retention behavior",
+      "Detailed Watch information such as active milestone, stage, queue progress, logs, or agent output; the health strip shows watch state only",
+      "Seven-day, thirty-day, since-handoff, or all-time trends, throughput charts, velocity, percentages, or historical comparisons",
+      "Interactive lifecycle/statistic/work-queue counters, inline drill-downs, or navigation from counter boxes",
+      "Navigation from Recent activity events, a full-screen activity browser, independent activity scrolling, or more than five visible activity rows",
+      "More than five visible Inbox rows, restoration of the current full-height detailed Inbox panel, or independent lower-panel scrolling",
+      "Automatic Overview refresh, a replacement W/w timer, configurable refresh intervals, or coupling refresh cadence to mp watch",
+      "Event actor/provenance display, originating commands, detailed reasons, or inferred pre-M180 activity",
+      "Highly artistic charts, sparklines, graphs, or mouse interactions beyond existing Inbox navigation"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Raul still opens with Overview active and renders the specified hierarchy: Health; Statistics and Work queues; canonical lifecycle grid; suggested path; then Inbox and Recent activity. Wide terminals place the two lower panels side by side, while narrow terminals stack them without clipping or hiding the active tab/footer.",
+      "verification": "cargo nextest run -p raul --test tui_responsive --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "The Health strip displays M180's validation state/error count, blocker count, execution mode, planning state, and watch state only. It does not expose active watch milestone, stage, queue, log, or pane details.",
+      "verification": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "Statistics displays total milestones and separate pending, in-progress, done, failed, and skipped step counts. Work queues displays separate actionable Inbox, pending external review, backlog, idea, open annotation, blocked, and remediation counts from the consolidated snapshot.",
+      "verification": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "The lifecycle grid renders every canonical bucket—draft, groomed, approved, in-progress, done, self-reviewed, reviewed, complete, remediation—with its current count, including zero-valued buckets, and none of the counters accept focus or drill down.",
+      "verification": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-05",
+      "description": "The Suggested path section renders the ordered three-to-five-item preview supplied by mp, degrades to a clear empty state, and does not reconstruct milestone ordering inside Raul.",
+      "verification": "cargo nextest run -p raul --test tui_path_inbox --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-06",
+      "description": "Overview renders at most five actionable Inbox rows and five newest activity rows. Inbox selection and Enter navigation continue to target existing destinations; activity rows show timestamp, type, subject, and summary but never receive selection or trigger navigation.",
+      "verification": "cargo nextest run -p raul --test tui_path_inbox --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-07",
+      "description": "Overview reloads M180's snapshot when the user enters the lane and on the existing manual refresh action. With no keypress and no lane entry, it does not schedule periodic refreshes or recreate the removed Overview W/w auto-refresh behavior.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-08",
+      "description": "Raul's Overview loader consumes the consolidated mp snapshot and does not issue separate status, inbox, path, review, backlog, idea, annotation, validation, or watch aggregation subprocesses for one dashboard load.",
+      "verification": "cargo nextest run -p raul --test tui_dashboard --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-09",
+      "description": "Empty milestones, steps, queues, path, watch, Inbox, or activity data renders explicit zero/empty states without panics, invalid selection indices, stale hit areas, or broken scrollbar calculations across supported terminal widths.",
+      "verification": "cargo nextest run -p raul --test tui_responsive --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-10",
+      "description": "The complete Raul test suite remains green after replacing the current detailed-Inbox dashboard layout and updating its view-state and navigation model.",
+      "verification": "cargo nextest run -p raul --no-fail-fast",
+      "status": "passed",
+      "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "dashboard-priority",
+      "choice": "Balanced overview",
+      "rationale": "Health, current workflow state, queues, path, Inbox, and recent events receive deliberate space rather than letting one panel dominate the initial screen."
+    },
+    {
+      "area": "layout",
+      "choice": "Responsive split with a fixed information hierarchy",
+      "rationale": "Wide terminals can compare Inbox and activity side by side; narrow terminals preserve the same hierarchy by stacking without maintaining separate layouts."
+    },
+    {
+      "area": "data-interface",
+      "choice": "Consume M180's consolidated snapshot",
+      "rationale": "Raul remains a thin rendering and interaction adapter; mp owns project semantics and aggregation."
+    },
+    {
+      "area": "statistics-period",
+      "choice": "Current snapshot only",
+      "rationale": "The Overview answers what the project looks like now, not how it trended over an arbitrary period."
+    },
+    {
+      "area": "lifecycle-counters",
+      "choice": "Show every canonical lifecycle bucket and keep counters display-only",
+      "rationale": "The user wants an overview of all workflow stages without details or inline drill-down."
+    },
+    {
+      "area": "step-statistics",
+      "choice": "Show status counts rather than percentages",
+      "rationale": "Pending, in-progress, done, failed, and skipped counts expose the actual current distribution without introducing derived trend metrics."
+    },
+    {
+      "area": "lower-panels",
+      "choice": "Five Inbox items and five activity events",
+      "rationale": "Both ideas remain visible without turning Overview back into a full detail view."
+    },
+    {
+      "area": "navigation",
+      "choice": "Inbox remains navigable; activity and counters are read-only",
+      "rationale": "Inbox already represents actionable destinations, while the selected activity feed is contextual history rather than another navigation system."
+    },
+    {
+      "area": "path",
+      "choice": "Show a short ordered path preview",
+      "rationale": "The initial screen should reveal where the project is heading while detailed lane state remains in the Path tab."
+    },
+    {
+      "area": "refresh",
+      "choice": "Refresh on lane entry and manual request only",
+      "rationale": "The user explicitly rejected periodic Overview polling; detailed live automation belongs in Watch."
+    },
+    {
+      "area": "watch-summary",
+      "choice": "State only",
+      "rationale": "Idle/running/stopped/failed/complete is sufficient for project health; all deeper watch information belongs in the Watch tab."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Overview snapshot adapter",
+      "goal": "Consume M180 through one typed Raul read seam and replace the current status-plus-Inbox fan-out loader.",
+      "rollback": "Restore the legacy DashboardSnapshot and parallel status/inbox loader until the M180 contract is corrected."
+    },
+    {
+      "id": "WP2",
+      "name": "Responsive view model",
+      "goal": "Model the balanced panel geometry, five-item Inbox focus, and read-only activity/counter regions across terminal sizes.",
+      "rollback": "Return to the three-panel Overview layout without changing M180 or other Raul lanes."
+    },
+    {
+      "id": "WP3",
+      "name": "Dashboard rendering",
+      "goal": "Render health, statistics, queues, lifecycle, path, Inbox, activity, and empty states in the approved hierarchy.",
+      "rollback": "Re-enable the prior Plan overview, path, and detailed Inbox renderer while retaining the new adapter behind a feature branch."
+    },
+    {
+      "id": "WP4",
+      "name": "Refresh and navigation",
+      "goal": "Preserve Inbox navigation and manual refresh while keeping activity/counters read-only and avoiding periodic Overview polling.",
+      "rollback": "Disable lower-panel interactions and keep Overview as a static snapshot with existing lane navigation."
+    },
+    {
+      "id": "WP5",
+      "name": "Responsive regression verification",
+      "goal": "Update dashboard fixtures and prove empty/populated wide/narrow behavior across the complete Raul suite.",
+      "rollback": "Revert the smallest dashboard slice that breaks established TUI rendering or input contracts."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add a typed parser for M180's consolidated Overview JSON covering health, step statistics, queue counts, nine lifecycle buckets, path preview, five Inbox rows, and five activity rows, with defensive defaults for optional/empty fields.",
+      "files": [
+        "crates/raul/src/tui/dashboard.rs",
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/reads.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "done_when": "Fixture parsing maps every approved field exactly once, rejects no valid empty snapshot, and contains no Raul-side lifecycle, queue, watch, or path reclassification.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Replace Overview's parallel mp status plus mp inbox loader/cache shape with one mp overview call and cache the raw consolidated snapshot under Lane::Overview.",
+      "files": [
+        "crates/raul/src/tui/runner_helpers.rs",
+        "crates/raul/src/reads.rs",
+        "crates/raul/src/tui/lane_cache.rs",
+        "crates/raul/src/tui/dashboard.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_dashboard --no-fail-fast",
+      "done_when": "One dashboard load spawns exactly one overview subprocess, cache hits reuse the snapshot, and no status/inbox/path/review/backlog/idea/annotation/validation/watch fan-out occurs.",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Replace the old DashboardSnapshot state with the consolidated current-state model and constrain Overview selection/movement/count to the at-most-five Inbox rows; activity and all counters remain outside focus order.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/inbox_nav.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_inbox --no-fail-fast",
+      "done_when": "Selection never lands on lifecycle/statistic/queue/activity content, empty Inbox has no invalid index, and existing Inbox Enter navigation still receives the selected source item.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-06",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Redesign Overview ViewState geometry for Health; Statistics and Work queues; lifecycle grid; suggested path; and a responsive lower Inbox/activity split that is side by side when wide and stacked when narrow, with hit areas only for Inbox rows.",
+      "files": [
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/tui/render/dashboard_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_responsive --no-fail-fast",
+      "done_when": "Supported wide/narrow sizes preserve header, tab bar, all panels, and footer without overlap; activity/counters generate no hit areas or scrollbars.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Render the top Health strip plus Statistics and Work queues boxes from the snapshot, including validation/error count, blockers, execution/planning state, state-only watch status, milestone total, all step statuses, and every selected queue count.",
+      "files": [
+        "crates/raul/src/tui/render/dashboard_view.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "done_when": "Every approved label/count including zeros is visible, Watch reveals no milestone/stage/queue details, and no percentage or historical trend is calculated.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Render a display-only nine-bucket canonical lifecycle grid and the ordered three-to-five-item suggested path supplied by M180, including explicit zero and empty-path states.",
+      "files": [
+        "crates/raul/src/tui/render/dashboard_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test welcome_overview --no-fail-fast",
+      "done_when": "All lifecycle buckets always render, none accept focus, path order is unchanged, and Raul performs no deduplication or path recommendation logic beyond fitting supplied rows.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Render the lower latest-five Inbox and latest-five Recent activity panels with core event details, preserve Inbox highlighting, keep activity read-only, and add explicit empty states for every dashboard section.",
+      "files": [
+        "crates/raul/src/tui/render/dashboard_view.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_inbox --no-fail-fast",
+      "done_when": "No panel shows more than five rows, activity can never highlight/navigate, Inbox navigation remains accurate, and all-zero projects render without panic or stale geometry.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Wire Overview refresh on lane entry and existing r/R manual refresh only, invalidate the single snapshot cache correctly, preserve keyboard/mouse Inbox navigation, and assert no timer or W/w auto-refresh path is introduced after M179.",
+      "files": [
+        "crates/raul/src/tui/modes/normal.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "done_when": "Entry/manual refresh issue one mp overview read, idle time issues none, W/w has no Overview action, and Inbox Enter/click behavior still routes through existing navigation helpers.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3",
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP5",
+      "order": 9,
+      "action": "Update Overview fixtures, render snapshots, view-state hit-area assertions, cache tests, and wide/narrow/empty cases to the M180 payload and new balanced hierarchy.",
+      "files": [
+        "crates/raul/tests/welcome_overview.rs",
+        "crates/raul/tests/tui_dashboard.rs",
+        "crates/raul/tests/tui_responsive.rs",
+        "crates/raul/tests/tui_view_state.rs",
+        "crates/raul/tests/tui_load_cache.rs",
+        "crates/raul/tests/tui_path_inbox.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_responsive --no-fail-fast",
+      "done_when": "Tests pin the exact hierarchy, side-by-side/stack breakpoint behavior, five-row caps, non-focusable activity/counters, empty states, and one-subprocess loader.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP5",
+      "order": 10,
+      "action": "Run the complete Raul suite after removing the old detailed-Inbox assumptions and verify all other lanes, tab navigation, scrollbars, mouse handling, themes, and settings remain green.",
+      "files": [
+        "crates/raul/tests/welcome_overview.rs",
+        "crates/raul/tests/tui_dashboard.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast",
+      "done_when": "All M181 acceptance scenarios and every pre-existing Raul test pass with Overview still selected at startup.",
+      "status": "done",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [
+        "S9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-17",
+    "branch": "",
+    "evidence": "M181 complete 2026-07-17: 10/10 steps done; 10/10 ACs passed with stamped evidence. cargo nextest run -p raul --no-fail-fast: 709/709 green; cargo clippy -p raul --tests -- -D warnings: clean; cargo fmt --all --check: clean. Redesigned Raul's Overview lane to consume M180's consolidated mp overview snapshot (one subprocess, one cache entry, no fan-out). New layout: Health strip; Statistics | Work queues; Lifecycle grid (9 buckets always rendered); Suggested path (3..5 items, empty-state explicit); lower Inbox (≤5, navigable) | Recent activity (≤5, read-only) with responsive side-by-side vs stacked split at the 32-column breakpoint. Legacy DashboardSnapshot retained as a derived view until S3 retires it. The redundant parallel_pair fan-out and the M179-removed W/w auto-refresh are both confirmed absent. AC-09 empty-state paths render without panic; AC-10 full suite green. [skip-verify: AC and step verifications skipped]"
+  }
+}

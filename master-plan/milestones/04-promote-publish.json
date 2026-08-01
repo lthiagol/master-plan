@@ -1,0 +1,61 @@
+{
+  "milestone": {
+    "id": "04",
+    "title": "Promote ladder and publish",
+    "slug": "promote-publish",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "03"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Promote flows, export, git, sync, split, doc alignment."
+  },
+  "problem": {
+    "description": "P5–P12: polish and promotion closure."
+  },
+  "scope": {
+    "in_scope": [
+      "promote",
+      "export",
+      "git",
+      "sync",
+      "split",
+      "brief promote"
+    ],
+    "out_of_scope": [
+      "brief reopen",
+      "auto push"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "52 integration tests",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "shipped; cargo test -p mp green"
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "shipped; cargo test -p mp green"
+  }
+}

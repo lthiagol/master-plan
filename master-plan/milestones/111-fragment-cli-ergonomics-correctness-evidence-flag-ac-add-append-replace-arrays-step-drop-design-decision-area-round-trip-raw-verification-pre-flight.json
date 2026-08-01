@@ -1,0 +1,299 @@
+{
+  "milestone": {
+    "id": "111",
+    "title": "Fragment-CLI ergonomics & correctness — evidence flag, ac-add append, replace-arrays step drop, design-decision area, round-trip raw, verification pre-flight",
+    "slug": "fragment-cli-ergonomics-correctness-evidence-flag-ac-add-append-replace-arrays-step-drop-design-decision-area-round-trip-raw-verification-pre-flight",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "110"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-05",
+    "updated": "2026-07-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.1.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, agents update single ACs/steps via dedicated fragment flags without falling back to `mp milestone update --json --replace-arrays` + jq: `mp milestone ac update` and `mp milestone step update` accept `--evidence`; `mp milestone ac add` appends and auto-increments the AC id (parity with `step add`); `mp milestone update --json --replace-arrays` no longer silently drops the `steps` array; design decisions record a non-empty `area` and can be updated/removed; `mp show milestone --format raw` → `mp milestone update --json` round-trips without manual `jq del(...)` stripping; and verification strings are shell-parse-checked at authoring time (warn, not reject)."
+  },
+  "problem": {
+    "description": "The M93 fragment commands are the documented agent-friendly path, but six recurring gaps in the 2026-07-04/05 dogfood log forced agents back to the `--replace-arrays` + `jq` escape hatch that M93 explicitly warns against. (1) `mp milestone ac update` accepts only `--description`/`--verification`, not `--evidence`, so per-AC evidence annotation requires a 4-step jq+replace-arrays dance (entry: 2026-07-05 `ac update has no --evidence flag`; repeated 5+ times during M107). (2) `mp milestone ac add` overwrites the sole AC instead of appending — two sequential adds leave only the second (entry: 2026-07-04 `ac add replaces the sole AC instead of appending`); `mp validate` did not flag the data loss. (3) `mp milestone update --json --replace-arrays` returns `{ok:true}` but silently drops the `steps` array (entry: 2026-07-04 `--replace-arrays silently drops steps`). (4) `mp milestone design-decision add` records an empty `area` — the schema marks `area` required, but the CLI exposes no `--area` flag and DDs are append-only with no update/remove subcommand (entry: 2026-07-05 `design-decision add records empty area`). (5) `mp milestone update --json` rejects 7 fields that `mp show milestone --format raw` emits, so the round-trip requires `jq del(.design_decisions, .milestone, .verification, .intent, .problem, .scope, .work_packages)` (entry: 2026-07-05 `update --json rejects 7 fields`). (6) Verification strings with mixed prose fail only at `mp milestone complete` time when run through `sh -c`; there is no pre-flight shell-parse check at authoring (entry: 2026-07-05 `M107 spec's 5 AC verification strings had prose`; 5 separate `ac update` calls needed during M107). Each is small in isolation; collectively they make the fragment surface unreliable enough that the escape hatch becomes the default."
+  },
+  "scope": {
+    "in_scope": [
+      "Add `--evidence <TEXT>` to `mp milestone ac update <id> <ac_id>` and `mp milestone step update <id> <step_id>`. Writes the fragment's `evidence` field in place. Pinned by an integration test that sets AC evidence via the fragment command and reads it back.",
+      "Fix `mp milestone ac add <id> --description --verification` to auto-increment the AC id and append (parity with `mp milestone step add`). Currently two sequential adds overwrite the sole AC. Pinned by a regression test that adds two distinct ACs in a row and asserts `mp milestone ac list` returns both.",
+      "Fix `mp milestone update --json --replace-arrays` to persist the `steps` array when present in the input JSON. Currently `{ok:true}` is returned but `steps` is silently ignored. Either persist it (preferred, since the flag is the documented escape hatch for arrays) or reject with a clear error when `steps` is present — implementation picks the former. Pinned by a test that round-trips a milestone with steps via `--replace-arrays` and asserts the steps survive.",
+      "Add `--area <TEXT>` to `mp milestone design-decision add <id>`. Schema marks `area` required; the CLI must expose it. Pinned by a test that adds a DD with `--area` and reads back a non-empty area.",
+      "Add `mp milestone design-decision update <id> <index|area> --area/--decision/--rationale` and `mp milestone design-decision remove <id> <index|area>`. DDs are currently append-only with no correction path short of `--replace-arrays` on the whole milestone. Pinned by tests covering update and remove.",
+      "Round-trip fix for `mp show milestone <id> --format raw` → `mp milestone update --json @file`: add `--accept-extra-fields` to `update` (escape-hatch parity with `--replace-arrays`) OR make `--format raw` emit only the `UPDATE_MILESTONE_KEYS`-accepted fields by default with `--include-all` for the full document. Pick the option consistent with the existing escape-hatch pattern (per AGENTS.md M93).",
+      "Add `sh -n` shell-parse pre-flight check on `--verification` in `mp milestone ac add`, `ac update`, and (where applicable) `step update` tests field. Warn (emit a structured note), do not reject — preserves authoring flexibility. Pinned by a test that adds an AC with a syntactically invalid verification string and asserts the warning fires without blocking the write."
+    ],
+    "out_of_scope": [
+      "The findings/evidence-history model (per-AC evidence stale on re-run) — that's M101's evidence_history work.",
+      "The lifecycle/block overlay reconciliation (stale `block_reason` survives complete) — M100 owns the block-as-overlay refactor; a narrow fix here would be re-worked when M100 lands.",
+      "mp runtime perf, plan-IO locking, `--dry-run`, projection `--take/--select/--sort`, and the history/log CLI — those are M112/M113.",
+      "The verify-lint port and macOS-portability patterns — those are M110.",
+      "Agent-discipline issues (mp scratch rule, /tmp scripts, direct cargo) — wontfix per their dogfood-log verdicts."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp milestone ac update <id> <ac_id> --evidence <TEXT>` writes the AC's evidence field in place; `mp milestone step update <id> <step_id> --evidence <TEXT>` does the same for steps. Read back via `mp milestone ac show <id> <ac_id> --fields evidence` returns the written value. No `--replace-arrays` invocation needed.",
+      "verification": "cargo test -p mp --test fragment_evidence_flag",
+      "status": "passed",
+      "evidence": "AC-01: cargo test -p mp --test fragment_evidence_flag exited 0 (1 passed). Verified --evidence flag on mp milestone ac update and mp milestone step update; integration test fragment_evidence_flag confirms in-place write of the fragment's evidence field. M111 S1 done."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp milestone ac add <id> --description A --verification 'echo a'` followed by `mp milestone ac add <id> --description B --verification 'echo b'` results in TWO acceptance criteria (AC-01 and AC-02) listed by `mp milestone ac list <id>`. The first AC is no longer overwritten by the second. `mp validate` does not flag the milestone.",
+      "verification": "cargo test -p mp --test ac_add_appends",
+      "status": "passed",
+      "evidence": "AC-02: cargo test -p mp --test ac_add_appends exited 0. Verified mp milestone ac add now auto-increments the AC id and appends (parity with mp milestone step add); integration test ac_add_appends asserts that two sequential adds yield both AC-01 and AC-02 in mp milestone ac list. M111 S2 done."
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp milestone update <id> --json @file --replace-arrays`, where `file` contains both `acceptance_criteria` and `steps` arrays, persists BOTH arrays to disk. `mp show milestone <id> --fields 'steps' --format raw` reflects the input steps. No silent drop.",
+      "verification": "cargo test -p mp --test replace_arrays_persists_steps",
+      "status": "passed",
+      "evidence": "AC-03: cargo test -p mp --test replace_arrays_persists_steps exited 0. Verified mp milestone update --json --replace-arrays now persists the steps array when present in input JSON (previously silently dropped); integration test replace_arrays_persists_steps round-trips a milestone with both acceptance_criteria and steps via --replace-arrays and asserts the steps survive. M111 S3 done."
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp milestone design-decision add <id> --area 'Linter port' --decision '...' --rationale '...'` records a non-empty `area` field. `mp milestone design-decision update <id> 0 --area 'New area'` and `mp milestone design-decision remove <id> 0` both succeed. DDs are no longer append-only.",
+      "verification": "cargo test -p mp --test design_decision_area",
+      "status": "passed",
+      "evidence": "AC-04: cargo test -p mp --test design_decision_area exited 0. Verified mp milestone design-decision add now accepts --area (non-empty recorded); mp milestone design-decision update and mp milestone design-decision remove subcommands added so DDs are no longer append-only; integration test design_decision_area covers add/update/remove. M111 S4 done."
+    },
+    {
+      "id": "AC-05",
+      "description": "Round-trip works without manual jq stripping: `mp show milestone <id> --format raw > file.json` followed by `mp milestone update <id> --json @file.json` (with the chosen escape-hatch flag, or by default if --format raw is narrowed) succeeds without the 'unsupported field(s)' error. Pinned by a test on a fixture milestone.",
+      "verification": "cargo test -p mp --test update_raw_round_trip",
+      "status": "passed",
+      "evidence": "AC-05: cargo test -p mp --test update_raw_round_trip exited 0. Verified the round-trip mp show milestone <id> --format raw > file.json then mp milestone update <id> --json @file.json now succeeds without manual jq del(...) stripping; integration test update_raw_round_trip confirms no 'unsupported field(s)' error. M111 S5 done."
+    },
+    {
+      "id": "AC-06",
+      "description": "Adding an AC whose `--verification` string is not shell-parseable (e.g. 'cargo test (new) passes; see lib.rs') emits a structured warning quoting `sh -n`'s parse error, but the AC is still written (warn-not-reject). A clean verification string emits no warning.",
+      "verification": "cargo test -p mp --test verification_preflight",
+      "status": "passed",
+      "evidence": "AC-06: cargo test -p mp --test verification_preflight exited 0. Verified sh -n shell-parse pre-flight on --verification in mp milestone ac add and mp milestone ac update emits a structured warning (JSON: {warning: 'verification shell-parse failed', error: <sh -n stderr>}) on syntactically invalid verification strings but still writes the AC (warn-not-reject); clean strings emit no warning. Integration test verification_preflight covers both paths. M111 S6 done."
+    },
+    {
+      "id": "AC-07",
+      "description": "Closure: `cargo test -p mp && mp validate --summary` exits 0 (single-crate per §3.2.1; workspace-wide `cargo test` belongs in CI).",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "AC-07: cargo test -p mp && mp validate --summary exited 0 (single-crate per §3.2.1; the prior 'cargo test -p mp -p raul' verification was multi-crate on a single-crate milestone and was flagged by mp plan verify-lint — fixed to single-crate as part of M111 close-out). mp validate --summary reports 0 errors / 0 warnings (post-fix; mp plan verify-lint emits 0 hits against M111's own spec). M111 S7 done."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Evidence flag",
+      "goal": "Add --evidence <TEXT> to mp milestone ac update and mp milestone step update so per-fragment evidence updates don't require the bulk --replace-arrays flow.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "ac add append fix",
+      "goal": "Fix mp milestone ac add to auto-increment the AC id and append (parity with step add). Add a regression test that adds two ACs sequentially and lists both.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "replace-arrays steps fix",
+      "goal": "Fix mp milestone update --json --replace-arrays to persist the steps array when present in the input JSON (currently silently dropped).",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "design-decision area + CRUD",
+      "goal": "Add --area to design-decision add; add update and remove subcommands so DDs aren't append-only.",
+      "rollback": ""
+    },
+    {
+      "id": "WP5",
+      "name": "Round-trip raw",
+      "goal": "Fix the --format raw to update --json round-trip so it doesn't require jq del(...) stripping.",
+      "rollback": ""
+    },
+    {
+      "id": "WP6",
+      "name": "Verification pre-flight",
+      "goal": "Add sh -n shell-parse pre-flight (warn-not-reject) on --verification in ac add/ac update.",
+      "rollback": ""
+    },
+    {
+      "id": "WP7",
+      "name": "Closure",
+      "goal": "cargo test -p mp -p raul && mp validate --summary green.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add --evidence <TEXT> flag to mp milestone ac update <id> <ac_id> and mp milestone step update <id> <step_id>. Plumb through commands/milestone.rs fragment dispatch to write the fragment's evidence field in place. Pinned by an integration test that sets AC/step evidence via the fragment and reads it back.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test fragment_evidence_flag",
+      "done_when": "Integration test sets AC evidence via mp milestone ac update --evidence and step evidence via mp milestone step update --evidence, reads both back via fragment show, and confirms the values written.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S1 done: cargo test -p mp --test fragment_evidence_flag exited 0; integration test confirms mp milestone ac update <id> <ac_id> --evidence <TEXT> and mp milestone step update <id> <step_id> --evidence <TEXT> write the fragment's evidence field in place. WP1 complete."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Fix mp milestone ac add to auto-increment the AC id and append, mirroring mp milestone step add (which already appends and auto-increments order). The current path defaults to AC-01 and overwrites; trace the fragment handler in commands/milestone.rs and align with the step-add id-derivation logic.",
+      "files": [
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test ac_add_appends",
+      "done_when": "Regression test on a fresh milestone adds two ACs sequentially and asserts mp milestone ac list returns both AC-01 and AC-02.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S2 done: cargo test -p mp --test ac_add_appends exited 0; regression test adds two ACs sequentially on a fresh milestone and asserts mp milestone ac list returns both AC-01 and AC-02. WP2 complete."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Fix mp milestone update --json --replace-arrays so the steps array persists when present in the input JSON. Currently the flag is documented as the escape hatch for both acceptance_criteria and steps but only acceptance_criteria is honored. Trace the update path in milestone.rs (UPDATE_MILESTONE_KEYS / GUARDED_UPDATE_ARRAYS) and ensure steps round-trips when --replace-arrays is set.",
+      "files": [
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test replace_arrays_persists_steps",
+      "done_when": "Test round-trips a milestone with both acceptance_criteria and steps via --replace-arrays and asserts the steps survive in mp show milestone --fields steps --format raw.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S3 done: cargo test -p mp --test replace_arrays_persists_steps exited 0; round-trip test on a milestone with both acceptance_criteria and steps via mp milestone update --json --replace-arrays confirms steps persist in mp show milestone --fields steps --format raw. WP3 complete."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP4",
+      "order": 4,
+      "action": "Add --area <TEXT> to mp milestone design-decision add (schema already requires area; CLI must expose it). Add mp milestone design-decision update <id> <index|area> and mp milestone design-decision remove <id> <index|area> subcommands so DDs can be corrected without --replace-arrays on the whole milestone. NOTE: update/remove by area operates on the first matching DD when area is non-unique; use index for precision.",
+      "files": [
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test design_decision_area",
+      "done_when": "Test adds a DD with --area, reads back a non-empty area; updates the area via design-decision update; removes the DD via design-decision remove.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S4 done: cargo test -p mp --test design_decision_area exited 0; integration test asserts design-decision add --area records non-empty area; design-decision update 0 --area 'New area' succeeds; design-decision remove 0 succeeds. WP4 complete."
+    },
+    {
+      "id": "S5",
+      "work_package": "WP5",
+      "order": 5,
+      "action": "Fix the --format raw to update --json round-trip. Either (a) add --accept-extra-fields to mp milestone update (escape-hatch parity with --replace-arrays) so the 7 fields design_decisions/milestone/verification/intent/problem/scope/work_packages are ignored rather than rejected, or (b) narrow mp show milestone --format raw to emit only UPDATE_MILESTONE_KEYS-accepted fields by default with --include-all for the full doc. Pick the option consistent with the existing escape-hatch pattern (per AGENTS.md M93).",
+      "files": [
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/commands/show.rs"
+      ],
+      "tests": "cargo test -p mp --test update_raw_round_trip",
+      "done_when": "Test does mp show milestone <id> --format raw > file.json then mp milestone update <id> --json @file.json (with the chosen escape-hatch flag if any) and asserts no unsupported-field error; round-trip succeeds.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S5 done: cargo test -p mp --test update_raw_round_trip exited 0; integration test does mp show milestone <id> --format raw > file.json then mp milestone update <id> --json @file.json and asserts no unsupported-field error. WP5 complete."
+    },
+    {
+      "id": "S6",
+      "work_package": "WP6",
+      "order": 6,
+      "action": "Add sh -n shell-parse pre-flight on --verification in mp milestone ac add and mp milestone ac update (the fragment-command layer where verification strings are authored — NOT in ac_verify.rs, which is the gate runner and is owned by M110/M117). Wrap the verification string as echo \"set -e; $cmd\" | sh -n; if sh -n exits non-zero, emit a structured warning (JSON: {warning: \"verification shell-parse failed\", error: <sh -n stderr>}) but still write the AC. Warn-not-reject preserves authoring flexibility. Apply the same check to step update --tests when set.",
+      "files": [
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo test -p mp --test verification_preflight",
+      "done_when": "Test adds an AC with a deliberately unparseable verification string (mixed prose) and asserts the warning fires in the JSON output AND the AC is still written; a clean string emits no warning.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S6 done: cargo test -p mp --test verification_preflight exited 0; integration test adds an AC with a deliberately unparseable verification string (mixed prose) and asserts the JSON warning fires AND the AC is still written; a clean string emits no warning. WP6 complete."
+    },
+    {
+      "id": "S7",
+      "work_package": "WP7",
+      "order": 7,
+      "action": "Run affected gates.",
+      "files": [],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp && mp validate --summary exits 0; mp validate --summary reports 0 errors (single-crate per §3.2.1).",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "S7 done: cargo test -p mp && mp validate --summary exited 0; mp validate --summary reports 0 errors / 0 warnings; mp plan verify-lint reports 0 hits against M111's own spec (L53 self-lint clean). WP7 complete."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-07",
+    "branch": "",
+    "evidence": ""
+  }
+}

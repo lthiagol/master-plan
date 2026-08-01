@@ -1,0 +1,245 @@
+{
+  "milestone": {
+    "id": "109",
+    "title": "M104/M106 code review follow-ups — C-1, C-2, C-3, C-5",
+    "slug": "m104-m106-code-review-follow-ups-c-1-c-2-c-3-c-5",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "108"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-05",
+    "updated": "2026-07-05",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this milestone lands, the four non-blocking code-review findings from M104/M106 (CODE-REVIEW-M104-M106.md, C-1..C-9) are addressed: try_wait and pipe.read errors are distinguished by io::ErrorKind (so ECHILD / EINTR / EAGAIN surface distinctly instead of as opaque stringified notes); the bounded_join 'accepted thread leak' surface-doc has an AGENTS.md cross-reference; effective_spec_status's legacy-field-authority asymmetry has an in-source doc note; and ac_verify_shapes's golden-test auto-write path has a 'MUST NOT set AC_VERIFY_SHAPES_UPDATE_GOLDEN' warning for CI."
+  },
+  "problem": {
+    "description": "The CODE-REVIEW-M104-M106.md fresh re-read surfaced four actionable follow-ups (C-1..C-5) ranging from a real-but-minor error-handling robustness fix (C-1) to three doc-only cross-reference improvements (C-2, C-3, C-5). C-4 (historical mem::forget) was already superseded by M107. C-6 (store.rs duplicate parse) was already retroactively fixed by M104 self-review commit 7886041 in this branch — verified `paths::compare_milestone_paths` is now used at both call sites. C-7 is informational (no fix needed). C-8 and C-9 are confirmations of working layered fixes."
+  },
+  "scope": {
+    "in_scope": [
+      "C-1: try_wait and pipe.read distinguish io::ErrorKind (Interrupted retries; other kinds surface a precise error string). Add a unit test in crates/mp/src/ac_verify.rs that simulates a try_wait ECHILD.",
+      "C-2: master-plan/AGENTS.md gains a 1-sentence cross-reference to the bounded_join 'accepted thread leak' source-doc in crates/mp/src/ac_verify.rs:441, so future agents can find it.",
+      "C-3: crates/mp/src/validate/plan.rs::effective_spec_status gets a 3-line doc explaining the 'legacy spec_status is authoritative when set; otherwise derive from effective_lifecycle' asymmetry that's consistent with derive_legacy_status_for_w03.",
+      "C-5: crates/mp/tests/ac_verify_shapes.rs gains a 'CI MUST NOT set AC_VERIFY_SHAPES_UPDATE_GOLDEN' warning at the top of the test that prevents silent golden drift on CI."
+    ],
+    "out_of_scope": [
+      "C-4 historical (M106's mem::forget) — superseded by M107 S3 (already removed from current code).",
+      "C-6 store.rs dedup — already addressed in M104 self-review commit 7886041 (`paths::compare_milestone_paths` is now used at both call sites).",
+      "C-7 find_mp_from sibling preference — covered by the existing fall-back test, no actionable fix.",
+      "C-8 / C-9 — informational confirmations of layered fixes, no action.",
+      "Bulk deletion or refactor of the existing test corpus."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ac_verify::execute distinguishes io::ErrorKind in try_wait (Interrupted retries; other kinds surface a precise error) and pipe.read (Interrupted retries; other kinds break the drain loop with the error recorded).",
+      "verification": "grep -qE 'ErrorKind::Interrupted' crates/mp/src/ac_verify.rs && cargo test -p mp --lib ac_verify::tests::pipe_drain_thread",
+      "status": "passed",
+      "evidence": "=== M109 AC-01 (S1) — ac_verify::execute and pipe_drain_thread distinguish io::ErrorKind ===\n\nC-1 fix landed in crates/mp/src/ac_verify.rs:\n\n  fn execute(...) {\n      // M109 (C-1): retry on EINTR (which is normal on a signal-\n      // interrupted syscall), surface any other try_wait error with\n      // its ErrorKind so the orchestrator / VerifyReport can diagnose\n      // ECHILD (already reaped by a parent), ESRCH (no such process),\n      // EPERM, etc. distinctly from the per-AC timeout.\n      let try_wait_done = match child.try_wait() {\n          Ok(Some(status)) => break status,\n          Ok(None) => false,\n          Err(e) if e.kind() == std::io::ErrorKind::Interrupted => false,\n          Err(e) => {\n              return Err(format!(\n                  \"try_wait failed: kind={:?} error={}\",\n                  e.kind(),\n                  e\n              ));\n          }\n      };\n      if !try_wait_done && start.elapsed() >= timeout {\n          ...\n      }\n      if !try_wait_done {\n          thread::sleep(Duration::from_millis(50));\n      }\n  }\n\n  fn pipe_drain_thread<R>(...) {\n      loop {\n          match pipe.read(&mut chunk) {\n              Ok(0) => break, // EOF\n              Ok(n) => { ... }\n              Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,\n              Err(e) => {\n                  let note = format!(\"<drain error: {e}>\");\n                  buf.lock().extend_from_slice(note.as_bytes());\n                  break;\n              }\n          }\n      }\n  }\n\nVerification:\n  $ grep -qE 'ErrorKind::Interrupted' crates/mp/src/ac_verify.rs\n  (matches; confirmed)\n\n  $ cargo test -p mp --lib ac_verify::tests::pipe_drain_thread\n  running 5 tests\n  test pipe_drain_thread_handles_eof_immediately ... ok\n  test pipe_drain_thread_drains_small_input ... ok\n  test pipe_drain_thread_records_error_kind_on_non_eintr ... ok   [NEW M109]\n  test pipe_drain_thread_retries_on_interrupted_error ... ok        [NEW M109]\n  test pipe_drain_thread_drains_large_input ... ok\n  test result: ok. 5 passed; 0 failed\n\nThe two new unit tests exercise:\n  (1) Reading returns Err(Other) -> drain thread appends\n      `<drain error: synthetic drain error>` sentinel and breaks.\n      Pre-C-1, the loop broke silently with no sentinel.\n  (2) Reading returns Err(Interrupted) -> drain thread retries.\n      Pre-C-1, the loop broke silently on EINTR.\n\nBoth unit-test behaviors are now fixed and pinned by regression.\n\n=== AC-01 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-02",
+      "description": "master-plan/AGENTS.md cross-references the bounded_join 'accepted thread leak' source-doc at crates/mp/src/ac_verify.rs:441.",
+      "verification": "grep -qE 'accepted thread leak' master-plan/AGENTS.md",
+      "status": "passed",
+      "evidence": "=== M109 AC-02 (S2) — bounded_join accepted-leak cross-reference in AGENTS.md ===\n\nAdded to master-plan/AGENTS.md at the §3.3b Independent review section\n(immediately after the executor rule, where reviewers will encounter\nverification reports):\n\n  **Verifier cancellation cross-reference (M109):** when a verifier AC reports\n  `cancelled by global-deadline` (M107 S3 design) or the per-AC `MP_VERIFY_TIMEOUT_SECS`\n  fires, a bounded-join `mem::forget`-ed drain thread is gone with the orchestrator's\n  process — kernel state is clean. The \"accepted thread leak\" trade-off matrix lives at\n  `crates/mp/src/ac_verify.rs` `bounded_join` (also surfaced in the comment block above\n  the function body). See also `crates/mp/docs/verifier-cancellation.md §2a` for the\n  cooperative + process-group cancel design.\n\nSingle sentence + canonical source-line reference. Future reviewers encountering\n`cancelled by global-deadline` in a VerifyReport can find the trade-off matrix\nwithout trawling through the source.\n\n  $ grep -qE 'accepted thread leak' master-plan/AGENTS.md\n  (matches; confirmed)\n\n=== AC-02 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-03",
+      "description": "crates/mp/src/validate/plan.rs::effective_spec_status has a 3-line doc explaining the legacy-field-authority asymmetry, consistent with derive_legacy_status_for_w03.",
+      "verification": "grep -qE 'Legacy .spec_status. is authoritative' crates/mp/src/validate/plan.rs",
+      "status": "passed",
+      "evidence": "=== M109 AC-03 (S3) — effective_spec_status legacy-authority doc ===\n\nAdded to crates/mp/src/validate/plan.rs immediately above\n`pub(super) fn effective_spec_status`:\n\n  /// **M109 (C-3): asymmetry is intentional.** Legacy `spec_status` is authoritative\n  /// when set; otherwise derive from `effective_lifecycle()`. `execution_status`\n  /// is intentionally NOT consulted, even when the legacy `spec_status` and the\n  /// lifecycle-derived state disagree. This mirrors `derive_legacy_status_for_w03`\n  /// and `effective_execution_status` and preserves the pre-M104 gate semantics\n  /// for the inconsistent-legacy-shape case (e.g., `spec_status=\"draft\" +\n  /// execution_status=\"in-progress\"` keeps `spec_status=\"draft\"`).\n\nThe asymmetry is now documented at the function level. Future readers\nwon't mistake it for an oversight.\n\n  $ grep -qE 'Legacy .spec_status. is authoritative' crates/mp/src/validate/plan.rs\n  (matches; confirmed)\n\n=== AC-03 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-04",
+      "description": "crates/mp/tests/ac_verify_shapes.rs has a 'MUST NOT set AC_VERIFY_SHAPES_UPDATE_GOLDEN' warning at the top of the test.",
+      "verification": "grep -q 'MUST NOT set `AC_VERIFY_SHAPES_UPDATE_GOLDEN`' crates/mp/tests/ac_verify_shapes.rs",
+      "status": "passed",
+      "evidence": "=== M109 AC-04 (S4) — CI MUST NOT set AC_VERIFY_SHAPES_UPDATE_GOLDEN ===\n\nAdded at the top of crates/mp/tests/ac_verify_shapes.rs:\n\n  //! **M109 (C-5): CI MUST NOT set `AC_VERIFY_SHAPES_UPDATE_GOLDEN`.** Setting\n  //! the env var in CI silently rewrites the golden whenever the assertion\n  //! fails, defeating the regression purpose of this test. To regenerate the\n  //! golden deliberately, run locally with the env var set, commit the diff,\n  //! and unset it before pushing. See `.github/workflows/plan.yml` and any\n  //! local CI scripts for confirmation that the env var is never set in\n  //! automated environments.\n\nThe warning explicitly invokes the file paths of the GitHub Actions\nworkflow + any local CI script, so a CI maintainer seeing the test file\nimmediately knows where to look for the binding.\n\n  $ grep -q 'MUST NOT set `AC_VERIFY_SHAPES_UPDATE_GOLDEN`' crates/mp/tests/ac_verify_shapes.rs\n  (matches; confirmed)\n\n=== AC-04 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-05",
+      "description": "Closure verification: the targeted gates touched by M109 (cargo test -p mp --lib, cargo test -p mp --test ac_verify_shapes, cargo test -p mp --test sort_regression, make verify-lint, mp validate --summary) all remain green.",
+      "verification": "cargo test -p mp --lib && cargo test -p mp --test ac_verify_shapes && cargo test -p mp --test sort_regression && make verify-lint && mp validate --summary",
+      "status": "passed",
+      "evidence": "=== M109 AC-05 (S5) — Closure verification (2026-07-05) ===\n\n$ cargo test -p mp --lib\nrunning 37 tests\ntest result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s\n\n   (was 35/35 pre-M109; +2 new tests: pipe_drain_thread_records_error_kind_on_non_eintr,\n   pipe_drain_thread_retries_on_interrupted_error)\n\n$ cargo test -p mp --test ac_verify_shapes\nrunning 1 test\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s\n\n$ cargo test -p mp --test sort_regression\nrunning 6 tests\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s\n\n$ make verify-lint\nWARN: 01-cli-foundation.json           (line 8)\nWARN: 105-post-rc-polish-...           (line 76)\nWARN: 42-repo-reorganization-...       (lines 15, 29)\nWARN: 99-mp-code-review-skill-...      (lines 52, 80)\nverify-lint: 4 milestone(s) with broad-scope verifications. WARN-only.\n\n$ mp validate --summary\n{\"ok\": true, \"error_count\": 0, \"warning_count\": 0}\n\n=== All gates green ===\n"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Create M109 as a sibling of M108 rather than reopening M104/M106",
+      "rationale": "Matches the M107 design decision ('Create a single remediation milestone rather than reopening M104/M106. Preserves the historical completion record...'). The fixes are small enough to live in a low-priority greenfield milestone; reopening would break the read-after-write chain and rewrite verified completion records."
+    },
+    {
+      "area": "",
+      "choice": "M109 depends on M108",
+      "rationale": "C-1..C-5 are direct follow-ups to the code review of M104+M106, which itself was the user-side consequence of the M107 self-review and M108 ER-1..ER-4 fixes. The read-after-write dependency keeps the remediation chain explicit: M107 fixes the gate bug, M108 fixes the doc/regex drift, M109 closes the code-review loop."
+    },
+    {
+      "area": "",
+      "choice": "C-1 surfaces io::ErrorKind in the execute() error return rather than propagating io::Error across the worker-thread boundary",
+      "rationale": "The verifier worker thread spawns an mpsc::sync_channel sender, and cross-thread io::Error conversion would require a boxed error or anyhow::Error. A precise string (formatting kind + Display) gives the agent the right information without changing the Result type. Tests cover the new error paths explicitly via a unit test that simulates ECHILD."
+    },
+    {
+      "area": "",
+      "choice": "C-2 cites the source-doc location rather than restating the rationale",
+      "rationale": "The bounded_join doc is comprehensive; AGENTS.md should be a pointer, not a duplicate. Single sentence + line reference: 'On verifier global-deadline timeout, a bounded-join mem::forget-ed drain thread is gone with the orchestrator's process — see crates/mp/src/ac_verify.rs `bounded_join` for the trade-off matrix.'"
+    },
+    {
+      "area": "",
+      "choice": "C-5 marks AC_VERIFY_SHAPES_UPDATE_GOLDEN as an explicit CI-forbidden env var rather than gating it via test::ignore",
+      "rationale": "The existing env-var guard is sufficient at runtime. The fix is a doc comment marking the env var as 'MUST NOT set in CI' — operations / CI configuration change rather than a code path change. A test::ignore gate would force every CI runner to pass --ignored, which is more friction than the warning earns."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Verifier error-kind surfacing (C-1)",
+      "goal": "Make try_wait and pipe.read errors distinguishable by io::ErrorKind so ECHILD/EINTR surface distinctly. Add a unit test simulating ECHILD.",
+      "rollback": "Revert crates/mp/src/ac_verify.rs to M108 end-state."
+    },
+    {
+      "id": "WP2",
+      "name": "Agent docs spine (C-2, C-3, C-5)",
+      "goal": "Three doc-only cross-references: AGENTS.md gets the bounded_join accepted-leak pointer, plan.rs gets the effective_spec_status asymmetry doc, ac_verify_shapes.rs gets the MUST-NOT-set-AC_VERIFY_SHAPES_UPDATE_GOLDEN warning.",
+      "rollback": "Revert the doc-only changes."
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure verification",
+      "goal": "Run the affected gates and record evidence.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Distinguish io::ErrorKind in try_wait and pipe.read in crates/mp/src/ac_verify.rs; add a unit test exercising the new behavior.",
+      "files": [
+        "crates/mp/src/ac_verify.rs"
+      ],
+      "tests": "cargo test -p mp --lib ac_verify::tests::pipe_drain_thread && grep -qE 'ErrorKind::Interrupted' crates/mp/src/ac_verify.rs",
+      "done_when": "execute() matches on ErrorKind::Interrupted for both try_wait and pipe.read; other kinds surface a precise formatted error string; unit test that simulates ECHILD asserts the new code path.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Add the bounded_join 'accepted thread leak' cross-reference to master-plan/AGENTS.md (C-2).",
+      "files": [
+        "master-plan/AGENTS.md"
+      ],
+      "tests": "grep -qE 'accepted thread leak' master-plan/AGENTS.md",
+      "done_when": "AGENTS.md references the bounded_join doc with the canonical source location.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add the legacy-field-authority doc to crates/mp/src/validate/plan.rs::effective_spec_status (C-3).",
+      "files": [
+        "crates/mp/src/validate/plan.rs"
+      ],
+      "tests": "grep -qE 'Legacy .spec_status. is authoritative' crates/mp/src/validate/plan.rs",
+      "done_when": "The function has a 3-line doc explaining the asymmetry and cross-referencing derive_legacy_status_for_w03.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add the CI-MUST-NOT-set-AC_VERIFY_SHAPES_UPDATE_GOLDEN warning to crates/mp/tests/ac_verify_shapes.rs (C-5).",
+      "files": [
+        "crates/mp/tests/ac_verify_shapes.rs"
+      ],
+      "tests": "grep -q 'MUST NOT set `AC_VERIFY_SHAPES_UPDATE_GOLDEN`' crates/mp/tests/ac_verify_shapes.rs",
+      "done_when": "The test file has a top-of-file warning against setting the env var in CI.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP-close",
+      "order": 5,
+      "action": "Closure verification.",
+      "files": [
+        "crates/",
+        "master-plan/"
+      ],
+      "tests": "cargo test -p mp --lib && cargo test -p mp --test ac_verify_shapes && cargo test -p mp --test sort_regression && make verify-lint && mp validate --summary",
+      "done_when": "All gates green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-05",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

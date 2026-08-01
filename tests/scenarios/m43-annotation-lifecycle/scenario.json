@@ -1,0 +1,15 @@
+{
+  "id": "m43-annotation-lifecycle",
+  "phase": "implemented",
+  "description": "Annotation list returns expected items from fixture",
+  "fixture": "projects/m43-annotation-fixture",
+  "command": ["annotation", "list", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/list.json",
+    "fs_unchanged": true
+  }
+}

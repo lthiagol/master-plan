@@ -1,0 +1,378 @@
+{
+  "milestone": {
+    "id": "187",
+    "title": "Persistence: PlanWriteTxn and multi-file transactions",
+    "slug": "persistence-planwritetxn-and-multi-file-transactions",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T12:16:16.922723+00:00"
+  },
+  "intent": {
+    "outcome": "Every authoritative plan-resource mutation serializes through PlanWriteTxn; multi-file operations stage, validate, and commit via a recovery manifest so concurrent CLI processes cannot allocate duplicate IDs or leave partially committed promotions/archives."
+  },
+  "problem": {
+    "description": "Most backlog/track/annotation/brief/session/idea writers bypass with_plan_write_lock. Multi-file promotions and archive flows write one resource then another with only per-file atomicity, so crashes and races produce lost updates, duplicate IDs, and inconsistent source/target metadata."
+  },
+  "scope": {
+    "in_scope": [
+      "PlanWriteTxn acquired by each authoritative plan-resource mutation",
+      "Route backlog, idea, brief, annotation, decision, track, session, specs, plan/config, migration, and archive mutations through the txn",
+      "Multi-file stage/validate/commit with versioned recovery manifest and idempotent promotion retries",
+      "Project-root lock for init/relocate; separate short-lived locks/CAS for Watch and agent runtime state",
+      "Post-commit best-effort activity append without re-acquiring the plan lock"
+    ],
+    "out_of_scope": [
+      "Lifecycle transition table and Raul UI fixes (Groups C–E)",
+      "Schema/input hardening and security trust boundaries (Groups B/F)",
+      "Comment cleanup and app.rs decomposition (Group G)",
+      "Holding the global plan lock for an entire Watch run lifetime"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Concurrent backlog add, track add, annotation create, brief update, and session mutation against one plan preserve unique IDs and both writers survive; a held plan write lock times out with a clear error and leaves source files byte-identical.",
+      "verification": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "status": "passed",
+      "evidence": "Stage-10 re-review after F-08: isolated FAIL_AFTER_WRITE=1/2 + success retry converge path+config; plan_relocate_failpoint covers 1+2; focused suites 26 passed; open findings 0; verify AC-01/02/03 ok"
+    },
+    {
+      "id": "AC-02",
+      "description": "Multi-file promotions, archive/restore, brief done/reopen, and session archive/promote either commit all staged resources or recover to one consistent plan state; retry after injected failure never creates a duplicate target; archive metadata always agrees with source status.",
+      "verification": "cargo nextest run -p mp --test mutation_transactions --no-fail-fast",
+      "status": "passed",
+      "evidence": "Stage-10 re-review after F-08: isolated FAIL_AFTER_WRITE=1/2 + success retry converge path+config; plan_relocate_failpoint covers 1+2; focused suites 26 passed; open findings 0; verify AC-01/02/03 ok"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp crate with tests compiles under Clippy with warnings denied after the PlanWriteTxn and transaction changes.",
+      "verification": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "Stage-10 re-review after F-08: isolated FAIL_AFTER_WRITE=1/2 + success retry converge path+config; plan_relocate_failpoint covers 1+2; focused suites 26 passed; open findings 0; verify AC-01/02/03 ok"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "persistence",
+      "choice": "Authoritative plan-resource mutations acquire PlanWriteTxn; Watch and agent runtime state use separate short-lived locks or CAS and never hold the global plan lock for a Watch run lifetime.",
+      "rationale": "A single flock convention was caller-optional and missed most collection writers; Watch must not self-deadlock against activity append or serialize the whole agent run."
+    },
+    {
+      "area": "transactions",
+      "choice": "Multi-file ops compute all documents in memory, validate, stage, fsync, and commit via a versioned recovery manifest; activity append is best-effort after durable commit on a non-relocking path.",
+      "rationale": "Per-file atomic_write cannot express promotion/archive consistency; nested flock on activity under an outer plan lock deadlocks."
+    },
+    {
+      "area": "idempotency",
+      "choice": "Promotion results carry source provenance so retries detect an existing target instead of allocating a duplicate.",
+      "rationale": "Crash between target create and source resolve currently leaves both a new milestone/track item and an unresolved backlog/idea."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "PlanWriteTxn lock discipline",
+      "goal": "All authoritative plan-resource RMW paths acquire PlanWriteTxn; Watch/runtime stay on separate sync.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Multi-file transaction engine",
+      "goal": "Stage/validate/commit with recovery manifest; idempotent promotions; activity post-commit non-relocking.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Introduce PlanWriteTxn (or equivalent token) that acquires the plan/project-root write lock; make unlocked store helpers crate-private and callable only through the token; document nested-lock prohibition for activity.",
+      "files": [
+        "crates/mp/src/plan_io.rs",
+        "crates/mp/src/store.rs",
+        "crates/mp/src/activity.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "Txn API compiles; unit/integration lock tests still pass; activity has non-relocking append path under an outer txn.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Route unlocked collection RMW writers through PlanWriteTxn: backlog, idea, brief, annotation, decision, track, session focus/config, specs init, plan metadata, and config set.",
+      "files": [
+        "crates/mp/src/backlog.rs",
+        "crates/mp/src/idea.rs",
+        "crates/mp/src/brief.rs",
+        "crates/mp/src/annotation.rs",
+        "crates/mp/src/decisions.rs",
+        "crates/mp/src/commands/track.rs",
+        "crates/mp/src/session.rs",
+        "crates/mp/src/config_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "Parallel backlog/track/annotation/brief/session writers allocate unique IDs and both survive; lock timeout leaves files byte-identical.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Use project-root lock for init and plan relocate; keep Watch and agent runtime state on separate short-lived locks or CAS generations (never PlanWriteTxn for Watch lifetime).",
+      "files": [
+        "crates/mp/src/commands/plan.rs",
+        "crates/mp/src/bootstrap.rs",
+        "crates/mp/src/watch/run_state.rs",
+        "crates/mp/src/session.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "Relocate/init do not rely solely on a lock file inside a moving plan dir; Watch state updates do not hold the global plan lock for the run lifetime.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement multi-file mutation module: load sources, compute results in memory, validate, stage, fsync, commit via versioned recovery manifest with rollback/recovery; manifests use bounded relative paths only.",
+      "files": [
+        "crates/mp/src/store.rs",
+        "crates/mp/tests/mutation_transactions.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test mutation_transactions --no-fail-fast",
+      "done_when": "Failpoint suite exists; failure before each stage/rename yields no change or deterministic recovery.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Migrate multi-file command flows onto the transaction module with source provenance for idempotent retries: backlog/idea/track promote, brief done/reopen/promote, track cancel/archive, session archive/promote, milestone archive/restore/purge, review pass where milestone+reviews both write.",
+      "files": [
+        "crates/mp/src/backlog.rs",
+        "crates/mp/src/idea.rs",
+        "crates/mp/src/commands/track.rs",
+        "crates/mp/src/brief.rs",
+        "crates/mp/src/session.rs",
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/store.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test mutation_transactions --no-fail-fast",
+      "done_when": "Injected mid-op failure never leaves source/target disagreeing; retry does not duplicate targets; archive metadata matches source status.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Wire activity append as post-commit best-effort via txn non-relocking path; ensure execution/session/watch callers cannot re-acquire flock under an outer txn.",
+      "files": [
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/execution.rs",
+        "crates/mp/src/session.rs",
+        "crates/mp/src/commands/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test plan_io_concurrent_writes --no-fail-fast",
+      "done_when": "No self-deadlock on activity under plan txn; journal failures warn without rolling back durable plan commits.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "Stage-10 re-review after F-08: isolated FAIL_AFTER_WRITE=1/2 + success retry converge path+config; plan_relocate_failpoint covers 1+2; focused suites 26 passed; open findings 0; verify AC-01/02/03 ok"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "correctness",
+      "description": "PlanWriteTxn::run_recoverable rolled back intentional ExitCode exits (e.g. milestone bulk partial failure exit 2), undoing successful per-id writes. Fix: commit recovery when Err is ExitCode; only unexpected errors roll back.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/plan_io.rs"
+      },
+      "summary": "ExitCode must commit recoverable txn"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Live multi-file edit and plan-path renames (archive/relocate) initially bypassed recoverable PlanWriteTxn / rename_plan_path failpoints. Remediatied by routing edit through recoverable txn and renaming via store::rename_plan_path with archive failpoint coverage.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/commands/edit.rs"
+      },
+      "summary": "Edit/rename must use recoverable txn paths"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "testing",
+      "description": "Legacy promote tests expected hard rejection on re-promote after success; M187 idempotent-retry contract requires success with idempotent:true. Updated p9/p10 suite tests accordingly.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/tests/suites/p9_backlog_promote.rs"
+      },
+      "summary": "Align promote tests with idempotent retries"
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "category": "correctness",
+      "description": "RecoveryTxn treats any surviving .mp-txn directory as incomplete and always restores the before-image on the next PlanWriteTxn::acquire (mutation_txn.rs recover_pending / restore_before_image; plan_io.rs run_recoverable commit only deletes the txn dir after op Ok). There is no durable commit marker, so a process kill after all authoritative writes succeed but before commit() removes .mp-txn leaves the new state on disk with a pending marker. The next unrelated writer silently rolls the completed mutation back.\n\nReproducer (debug mp):\n  init; backlog add; MP_MUTATION_CRASH_AFTER_WRITE=2 mp backlog promote B-01 --to-track bugfix\n  → on-disk: B-01 resolved, track has 1 item, .mp-txn pending\n  → mp backlog add (any writer) recovers\n  → B-01 active again, track items=0 (durable promotion undone)\n\nAC-02 requires commit-all or recover to one consistent intended state; undoing a fully written mutation on an unrelated command is incorrect. Tests only inject mid-mutation crashes (fail_after 1/2 during writes), not post-success/pre-commit-cleanup.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "summary": "Commit crash window undoes durable multi-file mutations"
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "category": "correctness",
+      "description": "mp plan relocate uses PlanWriteTxn::acquire_project_root + txn.run (commands/plan.rs), not run_recoverable, despite being a multi-resource mutation in the Group A inventory. rename_plan_path is called first; on error after a durable rename there is no rollback (rollback only runs if write_config fails later).\n\nReproducer:\n  MP_MUTATION_FAIL_AFTER_WRITE=1 mp plan relocate master-plan relocated-plan\n  → exit 1; master-plan gone; relocated-plan present; config workflow.plan.location still master-plan\n  → subsequent mp commands cannot find the plan at the configured path\n\nThis is a torn multi-file commit outside the recovery manifest path M187 was meant to close.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "summary": "plan relocate tears plan path vs config on rename failure"
+    },
+    {
+      "id": "F-06",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-02 requires archive metadata and source status to agree. TrackCmd::Purge routes to commands/archive.rs cmd_purge which calls store::purge_archived_milestone (file delete only). The milestone path correctly does remove_archive_meta_entry then purge (milestone/io.rs), but the track purge entry point skips meta removal.\n\nReproducer:\n  milestone archive <id>; mp track purge archived milestone <id> --confirm\n  → archive/milestones empty; archive/meta.json still lists the milestone entry\n\nM187 inventory explicitly included track purge as a multi-resource op to migrate onto transactional consistency.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "summary": "track purge deletes archive file but leaves meta entry"
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "commands/archive.rs cmd_restore for track-item sets status=pending and clears archived_at on the track file but never calls remove_archive_meta_entry. After a successful restore, archive/meta.json still lists the track-item as archived while the source item is pending — AC-02 archive metadata disagreement.\n\nReproducer:\n  track archive track-item bugfix BF-01; track restore archived track-item BF-01 --kind bugfix\n  → item status pending; meta.entries still contains entity_id BF-01\n\nMilestone restore correctly removes meta; track-item restore does not. Covered by M187 archive consistency scope / AC-02.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "summary": "track-item restore leaves stale archive meta entry"
+    },
+    {
+      "id": "F-08",
+      "severity": "high",
+      "category": "correctness",
+      "description": "F-05 remediation only rolls back rename_plan_path when the post-rename failpoint fires (FAIL_AFTER_WRITE=1). Relocate still does rename then write_config under PlanWriteTxn::run (not run_recoverable). atomic_write persists config.json before mutation_write_failpoint; on FAIL_AFTER_WRITE=2 the config write fails after the location field is already durable, and commands/plan.rs rolls the directory back to the old path while leaving workflow.plan.location set to the new path inside that directory.\n\nReproducer (isolated temp project, release mp):\n  mp init --force\n  MP_MUTATION_FAIL_AFTER_WRITE=2 mp plan relocate master-plan relocated-plan\n  → exit 1; master-plan present; relocated-plan absent; config workflow.plan.location == \"relocated-plan\"\n  → subsequent mp commands look for the plan at the wrong path\n\nFAIL_AFTER_WRITE=1 remains consistent (path+config both master-plan). Suite test plan_relocate_failpoint_rolls_back_path_and_config only covers fail_after=1 (L1/L2). Violates AC-02 multi-resource consistency for plan relocate.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/plan.rs",
+        "new_range": {
+          "start_line": 157,
+          "end_line": 157
+        },
+        "side": "new"
+      },
+      "summary": "plan relocate tears config vs path when config write fails after durable persist"
+    }
+  ]
+}

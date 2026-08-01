@@ -1,0 +1,210 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "65"
+title = "Install v3: ship raul globally + runtime PATH discoverability"
+slug = "install-v3-ship-raul-globally-runtime-path-discoverability"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-30"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "After make install OR mp install, both mp and raul land in ~/.agents/master-plan/bin/. mp doctor warns when binaries are not discoverable on PATH in the current environment. Install paths (make vs mp) are aligned so contributors and users get the same artifact set."
+
+[problem]
+description = "Independent code review found install/distribution gaps that block human PM workflows and agent adoption. ~/.agents/master-plan/bin/ contains only mp — raul is missing despite M40/M41 shipping it as the human-facing CLI. Root causes: make install-global copies only mp (TARGET_RAUL unused); mp install's resolve_raul_binary() looks at install_dir/bin/raul on non-dev installs (doesn't exist on first install) and silently skips raul via if let Ok; docs layout shows only bin/mp. Separately, agent shells (Cursor) often lack PATH to mp even after make install — doctor checks embedded assets and harness skills but NOT whether mp/raul resolve on PATH or MP_HOME is set. This was observed in a live review session where mp was not found until full path was used."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "make install-global: copy both mp and raul release binaries to ~/.agents/master-plan/bin/",
+    "Fix resolve_raul_binary for non-dev mp install: resolve from current_exe sibling, workspace build artifact, or explicit error — never silent skip",
+    "mp install: fail loudly or build raul when missing; add integration test asserting bin/raul exists after install",
+    "mp doctor: add runtime discoverability checks — mp on PATH (or MP_HOME/bin/mp exists), raul binary present in MP_HOME/bin when install layout expected; surface in JSON as checks[] with remediation hint (path_snippet)",
+    "Align INSTALL.md layout diagram and quick-start to show both binaries; note agent shells may need PATH export",
+    "Uninstall: verify raul removal (already coded; add test if missing)",
+]
+out_of_scope = [
+    "Homebrew formula bundling raul (separate dist track)",
+    "Auto-writing ~/.zshrc or Cursor cli-config.json (document manual setup; optional follow-up for harness env hook)",
+    "cargo install raul as separate package",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "make install-global deploys both mp and raul to ~/.agents/master-plan/bin/"
+verification = "crates/mp/tests/install_deploy.rs"
+status = "passed"
+evidence = "raul+mp install parity, doctor discoverability, INSTALL.md"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp install (non-dev) deploys raul or returns a clear error — never silently omits it"
+verification = "crates/mp/tests/install_deploy.rs"
+status = "passed"
+evidence = "raul+mp install parity, doctor discoverability, INSTALL.md"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "mp doctor reports PATH/discoverability checks with ok:false when mp not on PATH and remediation hint when fixable"
+verification = "crates/mp/tests/doctor_discoverability.rs"
+status = "passed"
+evidence = "raul+mp install parity, doctor discoverability, INSTALL.md"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "INSTALL.md documents both binaries and agent-shell PATH caveat"
+verification = "manual: accepted — docs review"
+status = "passed"
+evidence = "raul+mp install parity, doctor discoverability, INSTALL.md"
+
+[[open_questions]]
+id = "Q-01"
+question = "Should we add a Cursor/OpenCode harness env hook (install writes a snippet agents source) in a follow-up?"
+status = "resolved"
+answer = "Yes — filed as M69 (agent shell env). M65 ships binaries + doctor warnings; M69 ships env.sh + harness docs. Suggestion: run M65 before M69 so doctor checks and env.sh point at a complete bin/."
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Binary deploy parity"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Doctor discoverability"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Docs alignment"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "make install-global: copy TARGET_RAUL alongside TARGET_MP to ~/.agents/master-plan/bin/"
+files = []
+tests = "crates/mp/tests/install_deploy.rs"
+done_when = "make install-global deploys both binaries"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Fix resolve_raul_binary for non-dev: resolve from current_exe sibling dir, then workspace build; mp install must error or deploy raul — remove silent if let Ok skip"
+files = []
+tests = "crates/mp/tests/install_deploy.rs"
+done_when = "mp install always results in bin/raul or clear error"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "Add uninstall test verifying raul is removed from bin/"
+files = []
+tests = "crates/mp/tests/install_deploy.rs"
+done_when = "uninstall removes both mp and raul"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Add doctor checks: mp resolvable on PATH, MP_HOME/bin layout, raul present when install expected; include path_snippet remediation in JSON"
+files = []
+tests = "crates/mp/tests/doctor_discoverability.rs"
+done_when = "doctor discoverability checks pass tests"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP3"
+order = 5
+action = "Update INSTALL.md: both binaries in layout diagram, agent-shell PATH caveat, align with mp install path_snippet"
+files = []
+tests = "manual: accepted — docs review"
+done_when = "INSTALL.md documents mp+raul and PATH"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-30"
+branch = ""
+evidence = "raul+mp install parity, doctor discoverability, INSTALL.md"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

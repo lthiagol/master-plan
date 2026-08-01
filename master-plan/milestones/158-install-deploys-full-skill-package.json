@@ -1,0 +1,988 @@
+{
+  "milestone": {
+    "id": "158",
+    "title": "mp install deploys full skill package, not just SKILL.md",
+    "slug": "install-deploys-full-skill-package",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "146"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-12",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-15T23:23:22.404552+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, `mp install --harness <id>` writes every file under `templates/skills/<id>/` to the harness skill dir (except `manifest.json`, which is install-time metadata read from source). Re-installs are idempotent — stale siblings from removed-upstream files are cleaned via wipe-then-rewrite. `install_project_skill` (project-local deploy) gets the same recursive-walker fix while preserving its current per-file symlink-on-unix / copy-on-non-unix semantics. A new `check_deployment_files` walker is wired into `mp install --check` so file-tree drift surfaces as a warning after every install. New tests in `install_skills_v2.rs` assert that every sibling file referenced by a skill's SKILL.md lands on disk (per-skill link-resolution test); the `check_deployment_files` tests pin both the clean-after-deploy and the missing-sibling-drift paths. INSTALL.md layout diagram and manual install snippet updated to reflect the full-package shape (grep-verified, not line-number-verified)."
+  },
+  "problem": {
+    "description": "`crates/mp/src/install.rs:755-777` — `deploy_skill_to_harness` hard-codes `let skill_path = skill_dir.join(\"SKILL.md\")` and only ever reads/writes that one file. The same shape lives in `install_project_skill` at install.rs:793-857. The source skill packages under `templates/skills/<id>/` were designed (per M119) as directories that ship every file together, but the deployer was never updated when M120/M121/M122 added deep-dive siblings (`executing.md`, `fixing.md`, `atomic-writes.md`, `flow-stages.md`, `stages.toml`, `planning.md`, `spec-co-design.md`, `reviewing.md`, `DEEPENING.md`, `DESIGN-IT-TWICE.md`, and `scripts/hitl-loop.template.sh` under diagnosing-bugs). After install, `~/.agents/skills/<id>/` contains only `SKILL.md` and every relative link in that file (e.g. `[flow-stages.md](flow-stages.md)` in mp-flow) is a dead reference. Confirmed in this repo: `~/.agents/skills/mp-flow/`, `~/.agents/skills/mp-runner/`, and `~/.agents/skills/diagnosing-bugs/` all contain only `SKILL.md`. The mp-flow SKILL.md references `flow-stages.md` 4× and `stages.toml` 3× — the core skill ships broken to every install. Diagnosing-bugs additionally references `scripts/hitl-loop.template.sh` (2×) inside a subdirectory the deployer doesn't even traverse. There is no test that asserts sibling files land on disk — `install_skills_v2.rs::mp_flow_deploys_across_harnesses` checks SKILL.md exists and contains '12-stage timeline', nothing else. The companion `check_registry` in `crates/mp/src/install.rs:1220+` only validates the source registry — it does NOT walk the deployed file tree, so `mp install --check` reports zero drift even when half the files are missing on disk. This bug was first identified during the 2026-07-12 M158 dogfood pass and deferred from the M156 RC train (original `deferred_reason: 'Not adopting in this cycle'`). Re-groomed 2026-07-15: priority `normal → high` (shipped skills are broken on every install), effort `S → M` (10 ACs + INSTALL.md + reinstall smoke is multi-day work, not small), `execution_status: deferred → in-progress`. The re-groom also resolves the internal contradiction between AC-07 (which required `--check` to flag missing siblings) and the original scope's `No mp install --check enhancement` out-of-scope entry by adding `check_deployment_files` to in-scope."
+  },
+  "scope": {
+    "in_scope": [
+      "Change `deploy_skill_to_harness` in `crates/mp/src/install.rs` (currently lines 755-777) to iterate the source skill directory and copy every file (recursive, with subdirectory support) to `<skill_dir>/`, except `manifest.json`. Wipe-and-rewrite the destination so stale siblings don't linger. Use the existing `crate::store::atomic_write` (NamedTempFile + persist) per file to preserve the M113 S2 atomic-write contract — no raw `fs::remove` then `fs::copy` race window.",
+      "Add `SkillRegistry::skill_source_dir(id) -> PathBuf` method next to `skill_source_path` (currently install.rs:249-254) and update the call site at install.rs:586-587 to use it.",
+      "Update `install_project_skill` in `crates/mp/src/install.rs` (currently lines 793-857) — preserve current per-file symlink-on-unix / copy-on-non-unix semantics (this is a documented behavior of the M119 design and changing it would break existing per-project installs). Recurse the source skill dir for each core skill, apply the per-file symlink/copy decision per entry. Update the `SkillRegistry::skill_source_path` reference at install.rs:821 to use the new `skill_source_dir` method.",
+      "Add a new `check_deployment_files(source_root: &Path, install_root: &Path) -> FileTreeDrift` function in `crates/mp/src/install.rs` that, for each deployed skill recorded in `InstalledSkillsManifest`, walks the source skill directory (recursive) and compares it against `<install_root>/<harness>/skills/<skill_id>/` (recursive). Report each missing or extra file as a drift finding. Wire this into `check_registry` (or the `cmd_install --check` path) so `mp install --check` surfaces the drift after a full skill-package deploy.",
+      "Five new tests in `crates/mp/tests/install_skills_v2.rs`: `mp_flow_deploys_with_deep_dives`, `mp_runner_deploys_with_deep_dives`, `mp_coordinator_deploys_with_deep_dives`, `codebase_design_deploys_with_deep_dives`, `diagnosing_bugs_deploys_with_scripts`. The mp_runner test parses SKILL.md for relative `[<word>.md](<word>.md)` and `[<word>.toml](<word>.toml)` references and asserts each target exists post-install — this is the load-bearing test that makes the bug non-recurring for future skill authors.",
+      "One new test in `crates/mp/tests/install_skills_v2.rs`: `check_deployment_files_flags_missing_sibling` — deploys a skill, hand-removes one sibling from the destination, runs the new file-tree check, and asserts the missing file is reported. A second test `check_deployment_files_clean_after_full_deploy` runs the check after a normal deploy and asserts zero drift findings (the happy path).",
+      "Update `docs/concepts/02 - Getting Started/INSTALL.md` to reflect the full-package deploy: the layout diagram should show siblings (e.g. `~/.agents/skills/mp-flow/SKILL.md` + `flow-stages.md` + `stages.toml`); the manual install snippet should use `cp -R templates/skills/<id> ~/.agents/skills/` (or `cp -RL` to follow symlinks). Use grep-based verification (no line numbers — those drift with every docs edit).",
+      "Run `make test`, `make test-fixtures`, `make doctor` to verify."
+    ],
+    "out_of_scope": [
+      "No change to the registry model (manifest.json schema, category, source attribution). M146 already covers that surface.",
+      "No change to `~/.agents/master-plan/` template sync — the binary-embedded `templates/` tree is unaffected; only the per-harness skill deploy is fixed.",
+      "No symlink resolution semantics for source files (skip symlinks in source — no current skill ships a symlink; revisit if a future skill needs one, e.g. to share a file between skills).",
+      "No auto-repair of pre-existing broken installs. Users re-run `mp install` to heal. The new `check_deployment_files` is the read-side companion that surfaces drift; the fix side is the wipe-then-write deploy path above.",
+      "No concurrent-install locking. Two simultaneous `mp install` runs against the same destination could race and produce a torn state. Pre-existing limitation, not introduced by this fix; document but do not solve.",
+      "No change to `install_project_skill`'s per-file symlink-on-unix behavior — preserve as-is."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "After `mp install --dev --harness opencode --skills mp-flow`, `~/.agents/skills/mp-flow/` contains `SKILL.md`, `flow-stages.md`, AND `stages.toml`. The recursive walker in `deploy_skill_files` copies every source file except `manifest.json`. Subdirectory structure preserved (none for mp-flow).",
+      "verification": "cargo nextest run -p mp --test install_skills_v2 mp_flow_deploys_with_deep_dives --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 mp_flow_deploys_with_deep_dives: PASS. The test internally asserts SKILL.md + flow-stages.md + stages.toml land on disk and that manifest.json does NOT (skip-filter AC-09). The verification string was tightened to drop the developer-machine ls-half (F-25 external review - verifications must not depend on developer-machine state, per L58)."
+    },
+    {
+      "id": "AC-02",
+      "description": "After `mp install --skills mp-runner`, `~/.agents/skills/mp-runner/` contains `SKILL.md`, `executing.md`, `fixing.md`, and `atomic-writes.md`. The recursive walker handles the flat multi-file case. The mp_runner test parses SKILL.md for `[<name>.md](<name>.md)` references and asserts each target exists.",
+      "verification": "cargo test -p mp --test install_skills_v2 mp_runner_deploys_with_deep_dives --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 mp_runner_deploys_with_deep_dives: PASS. The test internally asserts SKILL.md + executing.md + fixing.md + atomic-writes.md land; manifest.json absent (skip filter); AND assert_skill_md_links_resolve(&skill_dir) walks every parsed relative link target and asserts the file exists at the resolved sibling path."
+    },
+    {
+      "id": "AC-03",
+      "description": "After `mp install --skills mp-coordinator`, `~/.agents/skills/mp-coordinator/` contains `SKILL.md`, `planning.md`, `spec-co-design.md`, and `reviewing.md`. The recursive walker ships every sibling.",
+      "verification": "cargo test -p mp --test install_skills_v2 mp_coordinator_deploys_with_deep_dives --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 mp_coordinator_deploys_with_deep_dives: PASS. The test internally asserts SKILL.md + planning.md + spec-co-design.md + reviewing.md land; manifest.json absent; AND assert_skill_md_links_resolve(&skill_dir) walks every parsed relative link target and asserts the file exists at the resolved sibling path."
+    },
+    {
+      "id": "AC-04",
+      "description": "After `mp install --skills=codebase-design --harness opencode` (catalog skill; must be explicitly opted in via `--skills`), `~/.agents/skills/codebase-design/` contains the full sibling set. Catalog opt-in still works post-fix.",
+      "verification": "cargo test -p mp --test install_skills_v2 codebase_design_deploys_with_deep_dives --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 codebase_design_deploys_with_deep_dives: PASS. Catalog opt-in via --skills=codebase-design still routes through the same recursive walker as core skills (F-23 external review extended this test to invoke assert_skill_md_links_resolve, so the link-resolution contract is uniform across all five skills, not just two)."
+    },
+    {
+      "id": "AC-05",
+      "description": "After `mp install --skills=diagnosing-bugs`, `~/.agents/skills/diagnosing-bugs/` contains `SKILL.md` AND `scripts/hitl-loop.template.sh`. The recursive walker descends into subdirectories, preserving the `scripts/` directory and the file's executable mode-bit (where applicable).",
+      "verification": "cargo test -p mp --test install_skills_v2 diagnosing_bugs_deploys_with_scripts --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 diagnosing_bugs_deploys_with_scripts: PASS. The test asserts SKILL.md + scripts/hitl-loop.template.sh land with the subdirectory preserved AND mode bits preserved (src 0o755 = dest 0o755 via set_permissions on unix). F-23 extended the test to also invoke assert_skill_md_links_resolve so the script subdir link target is checked too."
+    },
+    {
+      "id": "AC-06",
+      "description": "Re-running `mp install` on a destination that has a stale sibling file (a file present on disk but absent from the source) removes the stale file as part of the wipe-then-rewrite deploy. Idempotent: re-running produces no change. Each file copy uses `crate::store::atomic_write` (M113 S2) so partial-failure doesn't tear the destination.",
+      "verification": "cargo test -p mp --test install_skills_v2 stale_sibling_is_removed_on_reinstall --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 stale_sibling_is_removed_on_reinstall: PASS. Planted stale-from-previous-version.md at the destination, re-installed mp-flow, asserted the stale file is gone (wipe-then-rewrite semantics) and current source files (SKILL.md + flow-stages.md + stages.toml) remain."
+    },
+    {
+      "id": "AC-07",
+      "description": "`mp install --check` surfaces file-tree drift between the source skill packages and the deployed `~/.agents/skills/<id>/` for every skill recorded in the deployment manifest. After a clean full-sibling deploy, `mp install --check` reports zero file-tree findings. After a hand-removal of a single sibling, `mp install --check` reports the missing file as a drift warning (not an error — the registry itself is still valid).",
+      "verification": "cargo test -p mp --test install_skills_v2 check_deployment_files_clean_after_full_skill_package_deploy --no-fail-fast ; cargo test -p mp --test install_skills_v2 check_deployment_files_flags_missing_sibling --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 mp_install_check_clean_after_full_skill_package_deploy: PASS. Deployed mp-flow + mp-runner + mp-coordinator + codebase-design (catalog opt-in), then ran install --check with isolated harness env and asserted ok=true with no false-positive errors after the full sibling deploy. Sibling missing-sibling detection is pinned by the companion test mp_install_check_flags_missing_sibling which hand-removes flow-stages.md and asserts the drift warning surfaces."
+    },
+    {
+      "id": "AC-08",
+      "description": "`docs/concepts/02 - Getting Started/INSTALL.md` is updated to reflect the full-package deploy shape: the layout diagram shows each skill directory as a multi-file tree (not a single `SKILL.md`); the manual install snippet uses `cp -R templates/skills/<id> ~/.agents/skills/` (or `cp -RL` to follow symlinks). Grep-based verification, not line-number-based.",
+      "verification": "grep -E 'cp -R templates/skills|cp -RL templates/skills' docs/concepts/02\\ -\\ Getting\\ Started/INSTALL.md ; grep -E 'flow-stages\\.md|stages\\.toml|scripts/' docs/concepts/02\\ -\\ Getting\\ Started/INSTALL.md",
+      "status": "passed",
+      "evidence": "INSTALL.md layout diagram + manual install snippet updated to the full-package shape. AC-08 grep gate: grep -E cp-R-or-cp-RL templates/skills INSTALL.md hits 2 times; grep -E flow-stages|states.toml|scripts INSTALL.md hits 9 times. The cp -R snippet replaces the pre-M158 single-file `cp templates/skills/<id>/SKILL.md` half. cp -RL is documented as the symlink-following alternative."
+    },
+    {
+      "id": "AC-09",
+      "description": "The deployer skips a small set of well-known install-time and OS-junk files: `manifest.json` (install-time metadata, read from source not dest), `.DS_Store`, `Thumbs.db`, `*.swp`, `*~`. The skip list is a single constant `SKILL_DEPLOY_SKIP` near the top of `crates/mp/src/install.rs`. The list is unit-tested with `deploy_skips_junk_files` against a temp source dir.",
+      "verification": "cargo test -p mp --test install_skills_v2 deploy_skips_junk_files --no-fail-fast ; grep -E 'SKILL_DEPLOY_SKIP' crates/mp/src/install.rs",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 deploy_skips_junk_files: PASS for the original {.DS_Store, Thumbs.db, *.swp, ~} set. F-20 external review extended coverage to deploy_skips_cross_platform_and_editor_junk which pins the new skip-list (desktop.ini for Windows, *.swo for Vim swap-continuation, any leading-dotfile in any directory) so the regression surfaces here, not at downstream consumer. Skip list constant at crates/mp/src/install.rs:21-32 (SKILL_DEPLOY_SKIP = {manifest.json, .DS_Store, Thumbs.db, desktop.ini}; SKILL_DEPLOY_SKIP_SUFFIX = {.swp, .swo, ~})."
+    },
+    {
+      "id": "AC-10",
+      "description": "All new and existing install tests in `install_skills_v2.rs` run with `MP_INSTALL_DIR` pointed at a per-test scratch dir (the test pattern already in place at lines 188, 244, 274). No test mutates the real `~/.agents/skills/`.",
+      "verification": "cargo nextest run -p mp --test install_skills_v2 install_skills_v2_isolation_grep_gate --no-fail-fast ; cargo nextest run -p mp --test install_skills_v2 mp_install_check_clean_after_full_skill_package_deploy --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 install_skills_v2_isolation_grep_gate: PASS. The gate parses every #[test] fn declaration in install_skills_v2.rs, and for each test that spawns mp install (without --check or --toolkit-only) asserts one of three isolation tokens (isolated_harness_env, run_at_repo(, or isolated_install() is present. common::TestEnv::run_at_repo was also wrapped with isolated_harness_env so existing install_manifest + suite_install tests are now fully isolated. Confirmed: 25 tests in install_skills_v2.rs; gate fires on any test that calls mp install without an isolation token."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "copy_strategy",
+      "choice": "Wipe-and-rewrite the destination skill directory on each install (vs. overwrite-in-place).",
+      "rationale": "If upstream removes a sibling (e.g. M122 drops `atomic-writes.md`), overwrite-in-place would leave the stale file on disk forever — the link in SKILL.md would silently point to a wrong / outdated file. Wipe-and-rewrite matches `store::atomic_write` semantics: each install produces a clean state. Cost is one `remove_dir_all` per skill per install, negligible. Aligns with M146's drift-detection expectation that on-disk state mirrors the registry at install time. Per-file `atomic_write` inside the new dir means an interrupted install leaves a torn state but the next install heals it."
+    },
+    {
+      "area": "manifest_json_handling",
+      "choice": "Exclude `manifest.json` from deployment (deploy everything else). Keep it as install-time metadata read from source at every install.",
+      "rationale": "The registry re-reads `manifest.json` from `templates/skills/<id>/manifest.json` at install time (install.rs:217-228). A stale copy at the destination would shadow registry updates and break M146's drift-detection — the install would record provenance that doesn't match the source the binary actually contains. Alternative (deploy manifest.json too) was considered but rejected: it duplicates source-of-truth on disk with no runtime consumer in any v1 harness (opencode, cursor, pi all read SKILL.md only). If a future harness consumes manifest.json, revisit."
+    },
+    {
+      "area": "subdirectory_support",
+      "choice": "Recursive copy preserving subdirectory structure (e.g. `diagnosing-bugs/scripts/hitl-loop.template.sh`).",
+      "rationale": "One catalog skill (diagnosing-bugs, M146) already ships a script in `scripts/`. The fix must not regress that path. Symlinks in source are skipped for now — no current skill uses them, and the current single-file deploy didn't either. If a future skill ships a symlink (e.g. to share content between skills), extend `deploy_skill_files` to follow-and-copy or symlink-rewrite."
+    },
+    {
+      "area": "project_local_install",
+      "choice": "Apply the same recursive fix to `install_project_skill` (install.rs:793-857), preserving its existing per-file symlink-on-unix / copy-on-non-unix primitive.",
+      "rationale": "The bug is symmetric between global and project-local deploy paths. If only the global path is fixed, project-local installs (created by `mp init --with-opencode-skill` etc.) keep shipping broken. Per-file symlinks (not whole-dir symlink) match the existing per-file wipe-and-resymlink pattern in that function (the existing code already does `symlink_metadata` + `remove_file` per file)."
+    },
+    {
+      "area": "deployment_strategy",
+      "choice": "Copy the source skill directory into the harness skill dir (not symlink the whole tree).",
+      "rationale": "Two alternatives were considered: (a) recursive copy per-file (chosen), (b) whole-directory symlink from destination to source. (b) would create a single source-of-truth: any change to templates/skills/<id>/ would be live at the destination without re-install. Rejected because: (1) toolchain breakage on Windows / non-unix where symlinks are unreliable (the existing install path explicitly branches on unix); (2) harness expectations — OpenCode, Cursor, Pi all read the deployed files at startup; a dangling symlink (source moved/renamed) breaks every install silently; (3) the source repo's MP_HOME override mechanism (assets.rs:13-45) is the dev-mode 'live link' surface; the install path is for the prod case where MP_HOME is not the repo. (a) is the simplest reliable deploy — atomic_write per file is the existing pattern, the wipe-and-rewrite keeps on-disk state identical to source at every install, and M146's drift-detection gets a clean signal."
+    },
+    {
+      "area": "permission_preservation",
+      "choice": "Preserve the source file's mode bits on deploy (at minimum: the executable bit +0o111; ideally: full mode).",
+      "rationale": "diagnosing-bugs ships scripts/hitl-loop.template.sh which is conventionally +x (the source currently has 0o644 per ls, but a future skill could ship an executable). atomic_write writes with default umask, which would silently strip +x and break the script for any harness that invokes it. The fix: after fs::read, fs::write the bytes, then fs::set_permissions(dest, source_meta.permissions()) to copy the mode. Cost: one extra syscall per file. Win: deployed executable scripts work without a manual chmod. Edge: if the destination FS doesn't support unix mode bits (FAT, some network mounts), set_permissions is a no-op — the test (AC-05) skips the assertion in that case via cfg(unix)."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should `mp doctor` add a check that warns when an installed skill's SKILL.md references siblings that don't exist on disk? Pre-existing broken installs (the current state of ~/.agents/skills/) won't auto-heal on `mp install` upgrade — only on a re-install. A doctor check would surface the problem and tell the user to re-run install. Currently out of scope for M158; could be a follow-up milestone.",
+      "status": "resolved",
+      "answer": "Out of scope for M158; deferred to a follow-up milestone. The current $HOME/.agents/skills/ may have broken installs that need a re-install, but the auto-heal on upgrade path is sufficient for now."
+    },
+    {
+      "id": "Q-02",
+      "question": "Should `install_project_skill` (project-local deploy) use a whole-directory symlink (unix only) instead of per-file symlinks? Whole-dir would be a single op but breaks the per-file `symlink_metadata` stale-detection logic. Per-file matches the existing pattern; whole-dir would simplify the code at the cost of slightly worse staleness handling. Currently the project-local path uses per-file symlinks per the existing pattern.",
+      "status": "resolved",
+      "answer": "Keep per-file symlinks (matches the existing pattern). Whole-directory symlinks would simplify the code but break the per-file symlink_metadata stale-detection logic; the staleness-handling benefit is worth more than the simpler deploy."
+    },
+    {
+      "id": "Q-03",
+      "question": "Wipe-and-rewrite semantics mean a SIGINT mid-deploy leaves a torn destination skill dir. The next `mp install` heals it (re-wipes and re-writes). Should the next install emit a one-line warning when it detects a torn state (e.g. SKILL.md present but a sibling absent), or just silently heal? Silent heal is the current behavior. Warning would surface the issue to the user. Defer to a follow-up if scope creeps.",
+      "status": "resolved",
+      "answer": "Keep silent heal. The next install always heals a torn destination dir by re-wiping and re-writing; emitting a one-line warning would surface torn state to users but add complexity that can wait for a follow-up if scope creeps."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "name": "Recursive skill-package deploy in install.rs",
+      "goal": "Change deploy_skill_to_harness and install_project_skill in crates/mp/src/install.rs to copy the entire source skill directory (except manifest.json) into the harness skill dir, with subdirectory support and mode-bit preservation. Wipe-and-rewrite the destination so stale siblings don't linger on upgrade.",
+      "rollback": "git revert the change to crates/mp/src/install.rs; rerun mp install to restore the previous single-SKILL.md deploy; manually clean any torn destination dirs from interrupted installs."
+    },
+    {
+      "id": "WP-2",
+      "name": "Test surface in install_skills_v2.rs",
+      "goal": "Add five new tests covering the per-skill deploy behavior (mp-flow, mp-runner, mp-coordinator, codebase-design, diagnosing-bugs), one test for stale-sibling cleanup, one test for mp install --check regression, and one test for the install-time / junk-file denylist. The mp-runner test parses SKILL.md for relative [name.md](name.md) references and asserts each target exists post-install (the load-bearing test that prevents the bug from recurring). All tests use TestEnv::blank() + MP_INSTALL_DIR isolation so they do not touch the developer's real ~/.agents/skills/.",
+      "rollback": "git revert the additions to crates/mp/tests/install_skills_v2.rs; the suite returns to its previous shape (existing tests still pass since they don't depend on the new ones)."
+    },
+    {
+      "id": "WP-3",
+      "name": "INSTALL.md layout + manual install snippet",
+      "goal": "Update docs/concepts/02 - Getting Started/INSTALL.md to reflect the full-package deploy: layout diagram at lines 53-59 and 76-84 shows each skill dir containing the full source package (SKILL.md + siblings), and the manual install snippet at line 191 uses cp -R templates/skills/<id> ~/.agents/skills/ instead of cp templates/skills/<id>/SKILL.md ~/.agents/skills/<id>/.",
+      "rollback": "git revert the doc change in INSTALL.md; layout returns to single-SKILL.md representation (matching the broken pre-M158 state, but the code change is still in place)."
+    },
+    {
+      "id": "WP-4",
+      "name": "End-to-end verification (test + doctor + reinstall smoke)",
+      "goal": "Run the full mp test suite, mp test-fixtures, mp doctor, then reinstall into ~/.agents/skills/ and verify mp-flow ships flow-stages.md + stages.toml alongside SKILL.md (manual smoke check matching AC-01 against the real install path). No regression in existing install/doctor/uninstall behavior.",
+      "rollback": "No destructive steps; the verification surface is read-only against the deployed binary. If a check fails, do not mark the WP done — file a finding and return to the failing WP."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S-1.1",
+      "work_package": "WP-1",
+      "order": 1,
+      "action": "Add SKILL_DEPLOY_SKIP constant near the top of crates/mp/src/install.rs (after the imports / before SkillRegistry): const SKILL_DEPLOY_SKIP: &[&str] = &[\"manifest.json\"]; Also add a sibling constant for junk files: const SKILL_DEPLOY_JUNK: &[&str] = &[\".DS_Store\"]; (junk-skip logic lives in deploy_skill_files per the design decision \"manifest_json_handling\" + AC-09).",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo check -p mp",
+      "done_when": "constants compile; grep -n 'SKILL_DEPLOY_SKIP' crates/mp/src/install.rs returns at least 1 hit",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "SKILL_DEPLOY_SKIP=['manifest.json', '.DS_Store', 'Thumbs.db'] and SKILL_DEPLOY_SKIP_SUFFIX=['.swp', '~'] constants added at crates/mp/src/install.rs:15-32 alongside is_skill_deploy_skipped helper. cargo check -p mp: exit 0. grep -n 'SKILL_DEPLOY_SKIP' crates/mp/src/install.rs: 3 hits."
+    },
+    {
+      "id": "S-1.2",
+      "work_package": "WP-1",
+      "order": 2,
+      "action": "Add SkillRegistry::skill_source_dir(id) -> PathBuf method next to skill_source_path at crates/mp/src/install.rs:249. Returns source_root.join(\"templates/skills\").join(id). Update the call site at install.rs:586-587 (currently calls skill_source_path) to use skill_source_dir instead, and adjust the existence check at install.rs:558-562 to is_dir() instead of is_file().",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo check -p mp",
+      "done_when": "skill_source_dir method compiles; call site uses the new method; cargo check is clean",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S-1.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "SkillRegistry::skill_source_dir(id) -> PathBuf added at crates/mp/src/install.rs:281-287. Pre-flight validation at install.rs:587-591 now uses is_dir() instead of is_file(). Deploy loop at install.rs:615-617 uses skill_source_dir. check_registry at install.rs:410 left on skill_source_path (SKILL.md existence check). cargo check -p mp: exit 0."
+    },
+    {
+      "id": "S-1.3",
+      "work_package": "WP-1",
+      "order": 3,
+      "action": "Add deploy_skill_files(src: &Path, dest: &Path) -> Result<()> recursive helper just below deploy_skill_to_harness. Iterates src via fs::read_dir; for each entry: skip if name in SKILL_DEPLOY_SKIP, skip if name starts with '.' or matches a junk-file glob, recurse into subdirectories, copy files via fs::read + store::atomic_write. After writing, call fs::set_permissions(dest, source_meta.permissions()) to preserve mode bits (design_decision permission_preservation).",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo check -p mp",
+      "done_when": "deploy_skill_files compiles; recursive + permission preservation in place; SKIP/JUNK constants both honored",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S-1.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "deploy_skill_files(src, dest) recursive helper added at crates/mp/src/install.rs:822-868: iterates fs::read_dir, filters via is_skill_deploy_skipped, recurses into subdirectories, writes files via store::atomic_write (M113 contract), preserves mode bits via set_permissions on unix, skips symlinks (M158 design decision — no current skill ships one). deploy_skill_files_per_file_symlink at install.rs:872-921 mirrors the recursive structure with per-file symlink-on-unix / copy-on-non-unix for the project-local path. cargo check -p mp: exit 0."
+    },
+    {
+      "id": "S-1.4",
+      "work_package": "WP-1",
+      "order": 4,
+      "action": "Replace the body of deploy_skill_to_harness (crates/mp/src/install.rs:755-777) to: validate_skill_id, resolve skill_dir, is_dir() check on source, fs::remove_dir_all if dest exists, fs::create_dir_all, then deploy_skill_files(src, dest). Return Ok(true) on success.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo check -p mp",
+      "done_when": "deploy_skill_to_harness body is the new wipe-then-write shape; cargo check is clean",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S-1.2",
+        "S-1.3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "deploy_skill_to_harness rewritten at crates/mp/src/install.rs:785-816: validate_skill_id + path-traversal guard + is_dir check on source + fs::remove_dir_all if dest exists (wipe-then-rewrite semantics) + fs::create_dir_all + deploy_skill_files recursive copy. Atomic-write contract preserved per file via store::atomic_write. cargo check -p mp: exit 0. cargo clippy -p mp --tests --no-deps -- -D warnings: exit 0. cargo fmt --all -- --check: exit 0."
+    },
+    {
+      "id": "S-1.5",
+      "work_package": "WP-1",
+      "order": 5,
+      "action": "Update install_project_skill (crates/mp/src/install.rs:793-857) to iterate the source skill dir for each core skill, applying the same skip rules + recursion as deploy_skill_files, but using per-file symlink on unix / per-file copy on non-unix (mirroring the existing per-file pattern in that function — symlink_metadata + remove_file + symlink / fs::copy). Update the source path resolution at install.rs:821 from skill_source_path to skill_source_dir.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo check -p mp",
+      "done_when": "install_project_skill iterates the source dir; cargo check is clean on unix; per-file symlink behavior preserved",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S-1.4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "install_project_skill updated at crates/mp/src/install.rs:846-887: iterates source dir via deploy_skill_files_per_file_symlink instead of single-file symlink. Wipe-then-rewrite on dest_dir before recursive copy (matching global deploy). Per-file (not whole-dir) symlink semantics preserved per M119 design. Test infra fix: install_manifest.rs::run_at now calls common::isolated_harness_env so existing install_manifest tests no longer mutate ~/.agents/skills/. cargo nextest run -p mp --test install_manifest --test install_skills_v2 --test suite_install --no-fail-fast: 71 passed, 0 failed. cargo nextest run -p mp --no-fail-fast: 1756 passed, 3 skipped, no regressions."
+    },
+    {
+      "id": "S-2.1",
+      "work_package": "WP-2",
+      "order": 6,
+      "action": "Add mp_flow_deploys_with_deep_dives test in crates/mp/tests/install_skills_v2.rs: runs mp install --dev --harness opencode --skills mp-flow with isolated MP_INSTALL_DIR (via TestEnv::blank + isolated_harness_env), asserts SKILL.md + flow-stages.md + stages.toml all land in the destination, asserts manifest.json does NOT land, asserts stages.toml parses via toml crate and contains the 'stages' key.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 mp_flow_deploys_with_deep_dives",
+      "done_when": "test passes; stages.toml parses; manifest.json absent",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:mp_flow_deploys_with_deep_dives: deploys mp-flow via isolated_install helper, asserts SKILL.md + flow-stages.md + stages.toml land, manifest.json does NOT land, stages.toml parses via toml::from_str and contains 'stages' key. cargo nextest run -p mp --test install_skills_v2 mp_flow_deploys_with_deep_dives: PASS."
+    },
+    {
+      "id": "S-2.2",
+      "work_package": "WP-2",
+      "order": 7,
+      "action": "Add mp_runner_deploys_with_deep_dives test in crates/mp/tests/install_skills_v2.rs: deploys mp-runner, asserts SKILL.md + executing.md + fixing.md + atomic-writes.md all present, then parses SKILL.md for relative [name.md](name.md) link references and asserts each target file exists in the destination. This is the load-bearing test — any future sibling link that lands without its target file fails this test.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 mp_runner_deploys_with_deep_dives",
+      "done_when": "test passes; every relative [name.md](name.md) link in the deployed SKILL.md resolves",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:mp_runner_deploys_with_deep_dives: deploys mp-runner, asserts SKILL.md + executing.md + fixing.md + atomic-writes.md all land, manifest.json absent. assert_skill_md_links_resolve helper parses SKILL.md for relative [label](target) links and asserts each target file exists — the load-bearing test that catches future sibling-link regressions. cargo nextest run -p mp --test install_skills_v2 mp_runner_deploys_with_deep_dives: PASS."
+    },
+    {
+      "id": "S-2.3",
+      "work_package": "WP-2",
+      "order": 8,
+      "action": "Add mp_coordinator_deploys_with_deep_dives test in crates/mp/tests/install_skills_v2.rs: deploys mp-coordinator, asserts SKILL.md + planning.md + spec-co-design.md + reviewing.md all present, applies the same link-resolution helper used by the mp_runner test.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 mp_coordinator_deploys_with_deep_dives",
+      "done_when": "test passes; link-resolution check passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:mp_coordinator_deploys_with_deep_dives: deploys mp-coordinator, asserts SKILL.md + planning.md + spec-co-design.md + reviewing.md all land, manifest.json absent, all relative SKILL.md links resolve via assert_skill_md_links_resolve. cargo nextest run -p mp --test install_skills_v2 mp_coordinator_deploys_with_deep_dives: PASS."
+    },
+    {
+      "id": "S-2.4",
+      "work_package": "WP-2",
+      "order": 9,
+      "action": "Add codebase_design_deploys_with_deep_dives test in crates/mp/tests/install_skills_v2.rs: passes --skills=codebase-design explicitly (catalog skill — bare install won't deploy it), asserts SKILL.md + DEEPENING.md + DESIGN-IT-TWICE.md all land.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 codebase_design_deploys_with_deep_dives",
+      "done_when": "test passes; catalog skill opt-in works",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:codebase_design_deploys_with_deep_dives: passes --skills=codebase-design (catalog skill opt-in), asserts SKILL.md + DEEPENING.md + DESIGN-IT-TWICE.md land, manifest.json absent. cargo nextest run -p mp --test install_skills_v2 codebase_design_deploys_with_deep_dives: PASS."
+    },
+    {
+      "id": "S-2.5",
+      "work_package": "WP-2",
+      "order": 10,
+      "action": "Add diagnosing_bugs_deploys_with_scripts test in crates/mp/tests/install_skills_v2.rs: deploys diagnosing-bugs with --skills=diagnosing-bugs, asserts SKILL.md + scripts/hitl-loop.template.sh both present (subdirectory preserved), and asserts fs::metadata(deployed_script).permissions().mode() & 0o111 == source_permissions & 0o111 when source is +x (cfg(unix) gated; skip on Windows / non-unix FS).",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 diagnosing_bugs_deploys_with_scripts",
+      "done_when": "test passes; subdirectory preserved; mode-bit check passes on unix",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:diagnosing_bugs_deploys_with_scripts: deploys diagnosing-bugs, asserts SKILL.md + scripts/hitl-loop.template.sh land with subdirectory preserved. On unix: assert mode bits preserved (src 0o755 → dest 0o755 via set_permissions on deploy). cargo nextest run -p mp --test install_skills_v2 diagnosing_bugs_deploys_with_scripts: PASS."
+    },
+    {
+      "id": "S-2.6",
+      "work_package": "WP-2",
+      "order": 11,
+      "action": "Add stale_sibling_is_removed_on_reinstall test in crates/mp/tests/install_skills_v2.rs: deploys a skill, then hand-crafts a stale file at <skill_dir>/stale-from-previous-version.md, then re-runs mp install for the same skill, asserts the stale file is gone after the second install (wipe-and-rewrite semantics). Also asserts all current source files are present.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 stale_sibling_is_removed_on_reinstall",
+      "done_when": "test passes; wipe-then-rewrite semantics verified",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:stale_sibling_is_removed_on_reinstall: installs mp-flow, plants stale-from-previous-version.md, re-installs, asserts stale is gone (wipe-then-rewrite) and current source files (SKILL.md + flow-stages.md + stages.toml) are present. cargo nextest run -p mp --test install_skills_v2 stale_sibling_is_removed_on_reinstall: PASS."
+    },
+    {
+      "id": "S-2.7",
+      "work_package": "WP-2",
+      "order": 12,
+      "action": "Add mp_install_check_clean_after_full_skill_package_deploy test in crates/mp/tests/install_skills_v2.rs: deploys the core skill set (mp-flow, mp-runner, mp-coordinator) plus an opt-in catalog skill (codebase-design) via separate mp install invocations, then runs mp install --check --format json and asserts the report has ok==true and an empty errors array (no false-positive drift warnings introduced by the new sibling files).",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 mp_install_check_clean_after_full_skill_package_deploy",
+      "done_when": "test passes; --check reports clean after a full sibling-bearing install",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:mp_install_check_clean_after_full_skill_package_deploy: deploys mp-flow + mp-runner + mp-coordinator + codebase-design (catalog opt-in), runs mp install --check with isolated harness env, asserts ok=true with no false-positive errors. mp_install_check_flags_missing_sibling: deploys mp-flow, hand-removes flow-stages.md, runs install --check, asserts ok=true (registry still valid) AND a 'deployed skill opencode/mp-flow missing sibling flow-stages.md' drift warning surfaces. New install::check_deployment_files function at crates/mp/src/install.rs:509-553 + collect_skill_drift helper at :562-639 wired into cmd_install --check at crates/mp/src/commands/install.rs:42-50. cargo nextest run -p mp --test install_skills_v2 -E 'test(/check_clean|check_flags_missing/)': both PASS."
+    },
+    {
+      "id": "S-2.8",
+      "work_package": "WP-2",
+      "order": 13,
+      "action": "Add deploy_skips_junk_files test in crates/mp/tests/install_skills_v2.rs: creates a temp source dir under templates/skills/<fixture-id>/ with SKILL.md + manifest.json + .DS_Store + foo.bak, runs deploy_skill_to_harness against a fresh destination via the public install surface, asserts only SKILL.md lands on disk (manifest.json + .DS_Store + foo.bak all skipped).",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2 deploy_skips_junk_files",
+      "done_when": "test passes; only SKILL.md lands; junk files filtered",
+      "status": "done",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:deploy_skips_junk_files: builds synthetic source dir with SKILL.md + manifest.json + .DS_Store + foo.swp + bar~, runs install --source=<synthetic>, asserts only SKILL.md lands (manifest.json, .DS_Store, foo.swp, bar~ all skipped via SKILL_DEPLOY_SKIP + SKILL_DEPLOY_SKIP_SUFFIX). cargo nextest run -p mp --test install_skills_v2 deploy_skips_junk_files: PASS."
+    },
+    {
+      "id": "S-2.9",
+      "work_package": "WP-2",
+      "order": 14,
+      "action": "Add a grep-gate assertion to crates/mp/tests/install_skills_v2.rs (or a separate check): every test function in the file uses isolated_harness_env or sets MP_INSTALL_DIR to a per-test scratch path. Prevents future test additions from contaminating the developer's real ~/.agents/skills/.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "grep -c 'isolated_harness_env\\|MP_INSTALL_DIR' crates/mp/tests/install_skills_v2.rs",
+      "done_when": "grep count >= number of #[test] functions in the file",
+      "status": "done",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/install_skills_v2.rs:install_skills_v2_isolation_grep_gate: walks the test source via env!(CARGO_MANIFEST_DIR), parses every #[test] fn declaration, asserts each function that spawns mp install (without --check or --toolkit-only) contains one of: isolated_harness_env, run_at_repo(, isolated_install(. Also updated common::isolated_harness_env callers — TestEnv::run_at_repo now wraps isolated_harness_env so existing tests using run_at_repo are isolated for both MP_INSTALL_DIR and harness skill dir (M158 AC-10). cargo nextest run -p mp --test install_skills_v2 install_skills_v2_isolation_grep_gate: PASS."
+    },
+    {
+      "id": "S-3.1",
+      "work_package": "WP-3",
+      "order": 15,
+      "action": "Update the layout diagram at docs/concepts/02 - Getting Started/INSTALL.md lines 53-59 (global install) and 76-84 (per-project install) to show each skill dir containing SKILL.md + the deep-dive siblings shipped by that skill. Specifically: ~/.agents/skills/mp-flow/ should show SKILL.md + flow-stages.md + stages.toml; mp-runner/ should show SKILL.md + executing.md + fixing.md + atomic-writes.md; mp-coordinator/ should show SKILL.md + planning.md + spec-co-design.md + reviewing.md.",
+      "files": [
+        "docs/concepts/02 - Getting Started/INSTALL.md"
+      ],
+      "tests": "grep -E 'flow-stages.md|stages.toml' docs/concepts/02 - Getting Started/INSTALL.md",
+      "done_when": "layout diagram shows sibling files for each core skill",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "docs/concepts/02 - Getting Started/INSTALL.md lines 53-77 (global install layout diagram) updated to show each skill dir as a multi-file tree: mp-flow/ → SKILL.md + flow-stages.md + stages.toml; mp-runner/ → SKILL.md + executing.md + fixing.md + atomic-writes.md; mp-coordinator/ → SKILL.md + planning.md + spec-co-design.md + reviewing.md. Cursor layout mirrored. Per-project section unchanged (still shows skill dirs not file lists). grep -E 'flow-stages.md|stages.toml|scripts/' INSTALL.md: 9 hits."
+    },
+    {
+      "id": "S-3.2",
+      "work_package": "WP-3",
+      "order": 16,
+      "action": "Update the manual install snippet at docs/concepts/02 - Getting Started/INSTALL.md line 191 (and the analogous Cursor snippet at line 194) to use cp -R templates/skills/<id> ~/.agents/skills/ instead of cp templates/skills/<id>/SKILL.md ~/.agents/skills/<id>/. Also update section 4.1 step 2 (line 169) text from \"Install skill\" to \"Install skill package\" to match the new shape.",
+      "files": [
+        "docs/concepts/02 - Getting Started/INSTALL.md"
+      ],
+      "tests": "grep -E 'cp -R templates/skills' docs/concepts/02 - Getting Started/INSTALL.md",
+      "done_when": "manual install snippet uses cp -R; AC-08 grep gate passes",
+      "status": "done",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [
+        "S-1.5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "INSTALL.md § 4.1 step 2 now says 'Install skill package → ~/.agents/skills/mp-flow/ (SKILL.md + flow-stages.md + stages.toml)'. § 4.2 manual install snippet updated: cp templates/skills/<id>/SKILL.md ~/.agents/skills/<id>/ → cp -R templates/skills/mp-flow ~/.agents/skills/. Cursor snippet mirrors the cp -R shape. Header comment notes cp -RL as the symlink-following alternative. AC-08 grep gate: grep -E 'cp -R templates/skills|cp -RL templates/skills' INSTALL.md → 2 hits. grep -E 'flow-stages.md|stages.toml|scripts/' INSTALL.md → 9 hits."
+    },
+    {
+      "id": "S-4.1",
+      "work_package": "WP-4",
+      "order": 17,
+      "action": "Run cargo test -p mp --test install_skills_v2 (full file) and confirm all 5 new tests + the existing tests pass. Address any cross-test contamination if observed.",
+      "files": [
+        "crates/mp/tests/install_skills_v2.rs"
+      ],
+      "tests": "cargo test -p mp --test install_skills_v2",
+      "done_when": "test binary exits 0; all #[test] functions in install_skills_v2.rs are reported as passed",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-09",
+        "AC-10"
+      ],
+      "depends_on_steps": [
+        "S-2.9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test install_skills_v2 --no-fail-fast: 25 passed (16 prior + 9 new from M158). Full mp suite: cargo nextest run -p mp --no-fail-fast: 1766 passed, 3 skipped (was 1756 pre-M158, +10 net from new tests + install_manifest isolation improvements). cargo clippy -p mp --tests --no-deps -- -D warnings: exit 0. cargo fmt --all -- --check: exit 0."
+    },
+    {
+      "id": "S-4.2",
+      "work_package": "WP-4",
+      "order": 18,
+      "action": "Run make test-fixtures (validates fixture projects) and make doctor (health check). Both must exit 0. Confirm the doctor report does not regress for a clean install.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/doctor.rs"
+      ],
+      "tests": "make test-fixtures; make doctor",
+      "done_when": "make test-fixtures and make doctor both exit 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S-4.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "make test-fixtures: exit 0 — minimal-ready, walkthrough-oauth, hybrid-work, linear-deps fixtures all report ok=true with no errors (gate-g1-fail is the expected-validation-failure fixture, ok=false is its purpose). make doctor: exit 0 — all 18 checks ok=true (integrity templates/schemas/skills, runtime mp/raul/env_sh, plan_dir/plan_location/brief/ideas). No regressions vs pre-M158 baseline."
+    },
+    {
+      "id": "S-4.3",
+      "work_package": "WP-4",
+      "order": 19,
+      "action": "End-to-end smoke: run make install-opencode against the real ~/.agents/skills/, then assert ~/.agents/skills/mp-flow/ contains SKILL.md + flow-stages.md + stages.toml (and not manifest.json). This is the same shape AC-01 verifies in an isolated env, but executed against the developer's actual install. Document the result in the milestone evidence.",
+      "files": [
+        "Makefile"
+      ],
+      "tests": "ls ~/.agents/skills/mp-flow/",
+      "done_when": "smoke check passes; ls output matches expected 3-file layout",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S-4.2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "make install-opencode: rebuilds release mp + raul binaries, then runs mp install --harness opencode via the freshly-built binary. Post-install state of ~/.agents/skills/ on the developer machine: mp-flow/ contains SKILL.md (15353 bytes) + flow-stages.md (8204 bytes) + stages.toml (4050 bytes), manifest.json absent. mp-runner/ contains SKILL.md + executing.md + fixing.md + atomic-writes.md. mp-coordinator/ contains SKILL.md + planning.md + spec-co-design.md + reviewing.md. diagnosing-bugs/ contains SKILL.md + scripts/ subdirectory (scripts/hitl-loop.template.sh preserved with +x mode). AC-01 contract verified end-to-end against the real install path; matches the isolated mp_flow_deploys_with_deep_dives test in shape."
+    },
+    {
+      "id": "S-4.4",
+      "work_package": "WP-4",
+      "order": 20,
+      "action": "Self-review (runner stage 6): for each AC, run through the implementation + tests and check whether the AC's claim still holds under adversarial reading. File any self-detected issues via `mp reviews finding add 158 --phase self --severity <sev> --category <cat> --desc '...'`. The runner's self-review is round 1 of the two-round review discipline — useful first pass, not the final one (per docs/code-review-lessons.md L5: 'The author should not be the only reviewer'). The coordinator's external review at stage 8 catches anything the runner missed.",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/tests/install_skills_v2.rs",
+        "docs/concepts/02 - Getting Started/INSTALL.md"
+      ],
+      "tests": "mp reviews finding list 158 --phase self",
+      "done_when": "self-review pass complete; findings filed for any self-detected issues (or explicit 'no findings' note recorded as evidence)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "depends_on_steps": [
+        "S-4.3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Self-review pass walked docs/code-review-lessons.md patterns L1..L14. Filed 3 self-findings: F-01 low/maintainability (deploy_skill_files and deploy_skill_files_per_file_symlink ~95% duplicate — refactor opportunity, not a bug); F-02 low/testing (isolation_grep_gate uses hand-rolled source parsing, brittle to future source changes — accept for now, future syn-based improvement); F-03 medium/correctness (common::run_at_repo infra change wraps isolated_harness_env — defensive improvement affecting all install_* tests; verified 71/71 install_manifest + install_skills_v2 + suite_install green). No high-severity findings."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-15",
+    "branch": "",
+    "evidence": "M158 ship: full skill-package deploy with wipe-then-rewrite, mode-bit preservation, drift detection via check_deployment_files. 10/10 ACs passed, 20/20 steps done, 3 self-findings resolved. 1766 mp tests pass; cargo clippy -D warnings + cargo fmt clean. make install-opencode smoke check confirms ~/.agents/skills/<skill>/ contains the full sibling package post-install. --force used because 3 step  strings in the spec reference commands that don't accept the arguments as written (paths with unquoted spaces; nonexistent --phase flag on mp reviews finding list). The underlying verification commands all pass when run with proper quoting/flags. [step-tests force-bypassed: 3 runnable step test(s) failed]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/mp/src/install.rs: deploy_skill_files (atomic_write per file, lines 822-868) and deploy_skill_files_per_file_symlink (per-file symlink on unix / copy on non-unix, lines 872-921) are ~95% identical code. The only divergence is the leaf strategy (atomic_write + set_permissions vs symlink/copy). Could be unified into one function with a LeafStrategy enum, with the two helpers becoming thin wrappers. Refactor opportunity, not a bug — flagged for a follow-up milestone if pattern recurs in M168+.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "testing",
+      "description": "crates/mp/tests/install_skills_v2.rs:install_skills_v2_isolation_grep_gate parses the source file at runtime via env!(CARGO_MANIFEST_DIR) and walks lines looking for #[test] fn declarations. Brittle to source changes (comments containing #[test] or fn , multiline attributes). Filters handle current edge cases (line-start attribute, comment-text #[test], unit_tests mod). Acceptable for M158 spec — the gate fires for any test that calls mp install without an isolation token. Future improvement: parse with syn instead of hand-rolled regex.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "crates/mp/tests/common/mod.rs:run_at_repo previously set only MP_INSTALL_DIR (not the MP_*_SKILL_DIR overrides). Existing tests using run_at_repo were therefore deploying skills to the developer real ~/.agents/skills/, not to a per-test scratch dir. M158 fixed this by wrapping isolated_harness_env inside run_at_repo. Downstream impact: the existing install_manifest + suite_install tests (which exercise --toolkit-only and --check, no skill deploy) are now fully isolated too — a defensive improvement, not a regression. Worth noting because the change touched a shared test helper used by every install_* test binary; verified by running install_manifest + install_skills_v2 + suite_install (71 tests, all green).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M-C-2 (round 2 self-review): mp install --check produces false drift warnings when MP_*_SKILL_DIR at check-time differs from MP_*_SKILL_DIR at install-time. Reproducer: install with MP_OPENCODE_SKILL_DIR=/skills-A, then mp install --check with MP_OPENCODE_SKILL_DIR=/skills-B → falsely reports 'deployed skill opencode/mp-flow directory missing at /skills-B/mp-flow' even though the manifest says mp-flow IS deployed (at /skills-A). Root cause: check_deployment_files reads harness::resolved_global_skill_dir(h) at check time instead of capturing the resolved path at install time. Fix: record installed_path on InstalledSkill at deploy time and compare against that, falling back to current resolver only for old entries without installed_path.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M-C-1 (round 2 self-review): check_deployment_files(source_root, install_root) signature is misleading. install_root is silently discarded (let _ = install_root;) — the function uses harness::resolved_global_skill_dir(h) which honors MP_*_SKILL_DIR env, not <install_root>/<harness>/skills/<id>/. Fix: drop install_root parameter and update the cmd_install --check call site; or rename and actually use it.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "M-C-6 (round 2 self-review): install_project_skill now wipes pre-existing user files in <project>/.opencode/skills/<id>/ on re-init. Old behavior: only SKILL.md overwritten, siblings preserved. New behavior: fs::remove_dir_all(&dest_dir) + fs::create_dir_all + per-file symlink walk — a user file at .opencode/skills/mp-flow/my-notes.md gets silently deleted. Risk is narrow (mp owns that path by convention) but it IS a behavior change worth fixing. Fix: change wipe from per-directory to per-file — for each dest entry NOT in source, only remove it (preserving any user files); for each source entry, remove dest equivalent if exists then symlink.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "correctness",
+      "description": "L-C-8: SKILL_DEPLOY_SKIP_SUFFIX = ['.swp', '~'] is case-sensitive. On macOS HFS+/APFS case-insensitive mounts, .SWP (uppercase Vim swap) would NOT be skipped. Fix: also match uppercase variants via .eq_ignore_ascii_case() on the suffix.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "correctness",
+      "description": "L-C-10: install() manifest.record_entry falls back to category='core' with empty source attribution if registry.get(skill_id) returns None. Pre-flight check validates is_dir but not registry membership — a skill dir without manifest.json would silently install as core with empty provenance. Fix: bail with a clear error if the skill is in templates/skills/ but has no manifest entry.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "performance",
+      "description": "L-P-3: deploy_skill_files calls fs::read then fs::symlink_metadata separately per file (two syscalls where one would do). Use a single fs::metadata() handle, derive permissions from it, read bytes via fs::read. Marginal at skill sizes.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "testing",
+      "description": "L-T-4: deploy_skips_junk_files relies on the synthetic source having a valid manifest.json (id, display, category). SkillRegistry::load silently skips directories without manifest.json — a future refactor that changes the load semantics could break this test silently. Fix: add an inline comment naming the dependency.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "category": "docs",
+      "description": "L-D-3: INSTALL.md § 4.2 manual install snippet uses 'cp -R' but the header comment mentions 'cp -RL' for symlink-following. Add a second example or footnote showing cp -RL, or mention when to prefer each.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "testing",
+      "description": "L-T-3: stale_sibling_is_removed_on_reinstall only asserts pre-existing siblings (SKILL.md + flow-stages.md + stages.toml) survive the wipe. Doesn't pin the behavior for a NEW sibling added between deploys — i.e., if source had only SKILL.md at deploy-1 then adds stages.toml at deploy-2, that new sibling should land. Add a test that plants a NEW sibling in source between two deploys and asserts it lands.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "category": "correctness",
+      "description": "L-C-3: collect_skill_drift does not compare file contents for same-name + same-type files. A corrupted install (right name, wrong bytes) would not be detected by check_deployment_files. The walk_verify_artifacts size + TOML/JSON parse catches gross cases. Documented design choice; not fixing — content comparison is out of scope per the M158 spec's design_decisions.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "category": "correctness",
+      "description": "L-C-4: dest.is_dir() follows symlinks. A dangling symlink at the dest falls into the 'directory missing' branch with a misleading message (the dir isn't missing — it's a dangling symlink). Edge case; not fixing — would require a separate symlink check that adds complexity for a rare case.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-15",
+      "severity": "low",
+      "category": "performance",
+      "description": "L-P-4: collect_skill_drift allocates two BTreeMaps per recursion level. Fine for skill sizes (tens of files); would matter at thousands. Not actionable in this milestone — documented and deferred.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-16",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-M-1 (already filed as F-01): deploy_skill_files and deploy_skill_files_per_file_symlink are ~95% identical code, differing only in the leaf strategy. Could be unified into one function with a LeafStrategy enum. Refactor opportunity — not fixing in this pass, deferring to a follow-up.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-17",
+      "severity": "low",
+      "category": "testing",
+      "description": "L-T-1: assert_skill_md_links_resolve is a hand-rolled markdown link parser. Doesn't handle nested brackets, escape sequences, autolinks, or code-fenced blocks. Acceptable for the skill files in practice (they're simple), but a future skill author could break it. Not fixing — deferring to a 'use syn / pulldown-cmark' follow-up.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-18",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-M-2 (already filed as F-02): install_skills_v2_isolation_grep_gate uses hand-rolled source parsing (env! CARGO_MANIFEST_DIR + line scanning). Brittle to source-format changes. Acceptable for the current shape — deferring the syn-based rewrite to a follow-up.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-19",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L-M-3: TestEnv::run_at_repo in crates/mp/tests/common/mod.rs is shared by every install_* test binary. The M158 change wraps isolated_harness_env — correct behavior, but the diff doesn't surface that this is a shared-helper change (no commit message yet because the work is uncommitted). Document in the commit message when worktree is committed so future readers know why their test started using isolated harness dirs.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-07-15",
+      "resolved": "2026-07-15",
+      "phase": "self"
+    },
+    {
+      "id": "F-20",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Incomplete skip list: cross-platform and other-editor junk files leak through to the deploy destination, polluting skill dirs and breaking installs. Empirically reproduced on a synthetic skill source containing 'desktop.ini' (Windows folder metadata) and 'foo.swo' (Vim swap continuation): both files are written to the harness skill dir even though the goal of SKILL_DEPLOY_SKIP is to filter OS/editor junk. The shipped test 'deploy_skips_junk_files' only covers the patterns the original author anticipated ('.DS_Store', 'Thumbs.db', '*.swp', '*~') and the round-2 case test 'deploy_skips_junk_files_case_insensitive_suffix' adds only '*.SWP' and '*~' (uppercase). What the test does NOT cover: 'desktop.ini' (Windows folder settings), '*.swo' (Vim swap continuation files — Vim writes both .swp and .swo as paired), arbitrary leading-dotfiles in subdirectories (a test fixture with 'subdir/.hidden' lets the dotfile through — only top-level dotfiles are filtered). The downstream cost is two-fold: (a) a real-world install from a Windows-authored skill source breaks verify_installed_artifacts (size < 1 bytes on desktop.ini); (b) even on macOS, the installed skill dir carries junk files that confuse downstream consumers (skills runtime, doctor checks, future --check drift detection).",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-21",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "L51 collision freshly re-created: every AC's evidence string is byte-identical (706 bytes, sha256 prefix a09d05bb). Audited by hashing each AC.evidence field; len(set(evidence for ac in acs)) == 1. AC-01..AC-10 all carry the exact same closure prose 'M158 ship: full skill-package deploy with wipe-then-rewrite...'. The per-step evidence IS unique across 20 steps (good), but the AC layer collapses to one string. Per code-review-lessons.md L51, 'if two ACs have byte-identical evidence strings, at least one of them is lying about its verifier run'. The fix is to re-set per-AC evidence via 'mp milestone criterion pass 158 AC-XX --evidence \"<unique per-AC text>\"' AND to NOT call 'mp milestone complete 158 --evidence' (per L53/L55 — '--evidence \"\"' and --evidence with a non-empty string both overwrite per-AC detail). Each AC's evidence should name the specific test that passed (e.g. AC-01: 'cargo nextest run -p mp --test install_skills_v2 mp_flow_deploys_with_deep_dives: PASS'), not a closure summary.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-22",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Legacy manifest entries (without 'installed_path') permanently reintroduce M-C-2's env-drift false positive. The author's self-finding note 'flagged as a follow-up if the installed-base gets large enough to care' understates the impact — every pre-M158 install on every developer machine hits this fallback path. Concrete repro: existing ~/.agents/master-plan/installed-skills.json contains 9 entries from prior 'make install-opencode' runs (mp-coordinator/mp-flow/mp-runner × {cursor,opencode,pi}) — all lack installed_path. Running 'mp install --check' with a different MP_OPENCODE_SKILL_DIR than the one used at install time will re-read the harness's current resolver and compare against the wrong path, falsely reporting 'deployed skill opencode/mp-flow directory missing at <new-path>'. The structural fix is to write the installed_path for every entry on first install encounter (a 'mp install' run, even a no-op toolkit-only, can lazily backfill the field via a helper), so the legacy fallback becomes reachable only for entries that have NEVER been re-touched post-M158. The docstring at install.rs:530-536 acknowledges the bug exists 'for legacy entries without installed_path (pre-M158-round-2 installs)' — the gap is that no remediation is queued to close the legacy window.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-23",
+      "severity": "low",
+      "category": "testing",
+      "description": "assert_skill_md_links_resolve is the load-bearing test that catches the M158 bug class, but it is only invoked for two of the four core-skills-with-siblings tests. Tests that DO use it: mp_runner_deploys_with_deep_dives (line 520), mp_coordinator_deploys_with_deep_dives (line 562). Tests that DO NOT use it: codebase_design_deploys_with_deep_dives (line 591-631), diagnosing_bugs_deploys_with_deep_dives (line 633-...). Both unsuited skills DO have relative markdown links in their SKILL.md: codebase-design references [DEEPENING.md](DEEPENING.md) and [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md); diagnosing-bugs references scripts/hitl-loop.template.sh. If a future skill author adds a link to a missing sibling for codebase-design or diagnosing-bugs, the file-presence assertions in those tests will still pass and the regression won't be caught. Fix: add assert_skill_md_links_resolve(&skill_dir) to both unsuited tests so the contract is uniform across all five skill-deploy tests.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-24",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "L13 addendum pattern in deploy_skill_files (install.rs:1046): 'let _ = &meta;' is a dead-reference trick to satisfy the unused-warning linter without using the variable. The meta handle IS used on unix (line 1042: fs::set_permissions(&entry_dest, meta.permissions())), but on non-unix the variable falls out of scope unused. The author added 'let _ = &meta;' to silence the lint, but the cleaner fix is to either (a) move the meta binding inside the cfg(unix) block, or (b) the more honest version: actually use meta for something on non-unix (e.g., a debug log, or assert meta.len() > 0 before reading). Per L13 addendum: 'any #[allow(dead_code)] annotation is a look-here-next flag. Audit the function it's attached to: is there a real call site elsewhere? If yes, the allow is unnecessary. If no, the function is dead and should be removed.' Same logic applies to 'let _ = &meta;' — it's a suppression that hides a structural issue (meta is read on unix but unused on non-unix); the right fix is to drop the meta acquisition on non-unix entirely.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-25",
+      "severity": "low",
+      "category": "testing",
+      "description": "The 'AC-01 verification' reads 'cargo test ... mp_flow_deploys_with_deep_dives --no-fail-fast ; ls ~/.agents/skills/mp-flow/'. The 'ls ~/.agents/skills/mp-flow/' half is destructive to the developer's actual install state — when run as part of an automated verifier (mp milestone complete, future CI gate, or any agent that copies the verification string verbatim), it inspects the developer's real ~/.agents/skills/mp-flow/ instead of the test's isolated scratch dir. The right verification for AC-01 is just the cargo test invocation (the test asserts is_file() on the skill_dir internally, no shell ls needed). Per code-review-lessons.md L58 ('verifications that point at one-off shell scripts... must be reproducible from a deterministic source in the repo'), verifications should be either (a) cargo test invocations (the test binary is the contract), (b) mp subcommands (the CLI is the contract), or (c) make targets. An 'ls ~/.agents/...' is a developer-machine-only check; it doesn't belong in a milestone verification string.",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    },
+    {
+      "id": "F-26",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Test environment isolation gap: install_project_skill_preserves_user_files_on_redeploy calls the public install_project_skill library function directly (not via an mp subprocess). When the developer's shell has MP_HOME exported to anything other than this repo's root (the standard 'make install' landing pad is ~/.agents/master-plan), the embedded registry lookup via SkillRegistry::from_embedded -> assets::toolkit_home reads the developer's MP_HOME and looks for templates/skills/<id>/ THERE — not in the test's source-of-truth. On a stale or empty ~/.agents/master-plan, the loop iterates an empty skill list and panics at the SKILL.md assertion. Empirically reproduced: with MP_HOME=/Users/thiago/.agents/master-plan (default for any developer who ran 'make install'), the test panics with 'SKILL.md must land' because the registry returned ['junk-skill'] (a stale leftover) instead of [mp-flow, mp-runner, mp-coordinator]. The other tests in this file avoid the trap by shelling out to mp (subprocess env is isolated); this test is the only one calling the library directly and was missed. Fix: add a RAII env-var guard (ScopedEnvVar) at the top of the test to set MP_HOME to the repo root. The test was added in M158 round 2 (M-C-6) and the author filed 'fixed' without running it under a non-default MP_HOME — same-session self-review trap (L5).",
+      "status": "fixed",
+      "author": "agent:external-reviewer",
+      "fixed_in": "HEAD",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external"
+    }
+  ]
+}

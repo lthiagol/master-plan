@@ -1,0 +1,385 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "91"
+title = "Raul TUI top-tab navigation — replace sidebar with horizontal lane tabs"
+slug = "raul-tui-top-tab-navigation-replace-sidebar-with-horizontal-lane-tabs"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = ["87"]
+effort = "M"
+risk = "med"
+change_kind = ""
+priority = "normal"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = ""
+executed_by = ""
+
+[intent]
+outcome = "raul -i uses a browser-style horizontal tab bar at the top of the terminal for lane navigation (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board). The content pane fills the space below. Lane switching is one click or keystroke; long lists (especially Milestones) scroll via Page Up/Page Down and mouse wheel; drill-in, review board, and overview behaviors from M77/M84/M89 are preserved without the left sidebar, gutter resize, or sidebar/content focus split."
+
+[problem]
+description = "M77 rebuilt raul around a persistent left sidebar of tabbed lanes plus a right content pane — a deliberate improvement over the old view stack, but visually unlike familiar browser or IDE tab bars. The sidebar consumes horizontal space (~15–30 cols), requires a separate focus model (Tab toggles sidebar vs content), and ships gutter-drag resize machinery that most users never touch. Eight lanes (post-M89) also make the vertical sidebar long on short terminals. A top horizontal tab bar would give lanes equal prominence, reclaim width for content (especially Board and milestone detail), and match the mental model users asked for ('tabs like a web browser'). This is a layout shell replacement, not a feature add — all existing lanes and drill-in paths must survive the migration."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Replace left sidebar shell with a top horizontal tab bar listing all lanes (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board) in current Lane::ordered() order",
+    "Content pane renders below the tab bar at full terminal width (minus margins); list and detail views unchanged in behavior",
+    "Keyboard lane switching: Left/Right (or h/l) move active tab when tab bar is focused; number keys 1–8 jump directly to lane by order; Enter on tab bar moves focus into content",
+    "Mouse: click a tab label to select that lane and load its data",
+    "List scrolling in content pane: Page Up / Page Down move selection by one viewport page in scrollable list lanes — Milestones lane is the primary target; also Tracks, Backlog, and Overview inbox rows where the lane renders a vertical list",
+    "Mouse wheel: scroll up/down over the content list area moves list selection (or equivalent list viewport) — Milestones listing is the primary target; wheel events over the tab bar do not scroll the list",
+    "Focus model: Tab toggles between tab bar and content area (replacing sidebar_focused); footers and help overlay updated to document new keys including Page Up/Down and mouse wheel on lists",
+    "Responsive narrow terminals: below width threshold use compact tab labels (Lane::compact_label) and horizontal scroll/overflow indicator when tabs exceed width — no vertical sidebar fallback",
+    "Preserve default entry points: raul -i opens Overview; raul --board opens Board lane",
+    "Preserve drill-in, review menu, co-approval, board Kanban, overview inbox navigation, hide_done, and lane-specific list rendering — rewire navigation only",
+    "Remove or dead-code sidebar-only UX: gutter drag resize, [ ] sidebar width keys, sidebar Up/Down lane list, sidebar_width config surface in TUI",
+    "Migrate/rename tests from sidebar-centric names (tui_sidebar layout assertions) to tab-bar layout; update tui_responsive and tui_mouse for top-tab hit targets",
+    "Update docs/raul-tui-walkthrough.md (or equivalent) with new navigation keys, list scroll bindings, and layout diagram",
+]
+out_of_scope = [
+    "New lanes, new mp read paths, or Ideas lane (still deferred from M77)",
+    "Robustness bug fixes deferred to M87 (drill-in/hide_done, panics, truncation, co-approval)",
+    "Visual polish beyond tab-bar layout (markdown, icons, progress bars — M86; theme — M85)",
+    "Changing raul CLI flags or adding subcommands",
+    "Writable TUI actions (approve/groom still via mp/CLI or review menu)",
+    "Terminal-width-aware CLI table output (non-TUI)",
+    "Mouse wheel / Page Up-Down in detail views (MilestoneDetail scroll already uses Up/Down on detail_scroll — unchanged unless needed for parity)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "TUI layout renders a horizontal tab bar at the top with all eight lanes (Overview, Milestones, Path, Bugfixes, Tweaks, Backlog, Board) and a content pane filling the remainder below; no left sidebar column is drawn"
+verification = "crates/raul/tests/tui_tab_bar.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "Keyboard navigation: with tab bar focused, Left/Right (or h/l) changes active lane and loads lane data; number keys 1–8 jump to the corresponding lane by Lane::ordered() index"
+verification = "crates/raul/tests/tui_tab_bar.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "Mouse click on a tab label selects that lane, loads its list content, and highlights the active tab"
+verification = "crates/raul/tests/tui_mouse.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Focus model: Tab toggles focus between tab bar and content area; footers reflect the focused region; help overlay documents tab-bar keys (not sidebar Up/Down or [ ] resize)"
+verification = "crates/raul/tests/tui_tab_bar.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "Responsive narrow width: at or below threshold, tabs use compact_label and overflow tabs remain reachable via horizontal scroll or wrap indicator — layout does not revert to a left sidebar"
+verification = "crates/raul/tests/tui_responsive.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-06"
+description = "Default entry preserved: raul -i starts on Overview; raul --board starts on Board; drill-in from every lane (milestone, track, backlog, board card, path next, overview inbox) still opens detail and Esc/back returns to list"
+verification = "crates/raul/tests/tui_drill_in.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-07"
+description = "Sidebar-only mechanics removed from active paths: no gutter drag resize, no sidebar_width keyboard adjustment, no sidebar Up/Down lane list in runner event handling"
+verification = "crates/raul/tests/tui_tab_bar.rs"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-08"
+description = "Full raul test suite passes with no regressions"
+verification = "cargo test -p raul"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-09"
+description = "List scrolling in content pane: Page Up and Page Down move selected_index by one viewport page in Milestones list (and other scrollable list lanes); mouse wheel up/down over the list content area scrolls selection the same way. With a fixture list longer than the viewport, wheel and Page keys reach items beyond arrow-key-only range without leaving List state. Footer/help documents Page Up/Down and wheel on lists."
+verification = "crates/raul/tests/tui_list_scroll.rs"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Tab bar shell"
+goal = "Replace left sidebar with top horizontal tab bar and full-width content pane"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Input & scroll"
+goal = "Keyboard focus, mouse tabs, list Page Up/Down and wheel scrolling"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Preservation & cleanup"
+goal = "Drill-in, entry points, remove sidebar-only mechanics"
+rollback = ""
+
+[[work_packages]]
+id = "WP4"
+name = "Responsive & docs"
+goal = "Narrow-width tab overflow, test migration, walkthrough docs"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Replace sidebar shell with top horizontal tab bar rendering all eight lanes; content pane fills width below; remove left sidebar column from layout"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/render.rs",
+    "crates/raul/src/tui/app.rs",
+]
+tests = "crates/raul/tests/tui_tab_bar.rs"
+done_when = "Tab bar at top with content below; no sidebar column drawn"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP3"
+order = 2
+action = "Remove sidebar-only mechanics: gutter drag resize, sidebar_width keys, sidebar Up/Down lane list from runner event handling"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/app.rs",
+]
+tests = "crates/raul/tests/tui_tab_bar.rs"
+done_when = "No active sidebar resize or sidebar lane-list paths remain"
+status = "pending"
+covers_ac = ["AC-07"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Keyboard lane navigation: Left/Right or h/l on focused tab bar; number keys 1-8 jump to lane by ordered index; Enter moves focus into content"
+files = ["crates/raul/src/tui/runner.rs"]
+tests = "crates/raul/tests/tui_tab_bar.rs"
+done_when = "All keyboard lane switches work from tab bar focus"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Focus model: Tab toggles tab bar vs content; footers and help overlay document tab-bar keys (not sidebar Up/Down or bracket resize)"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/render.rs",
+]
+tests = "crates/raul/tests/tui_tab_bar.rs"
+done_when = "Tab toggles focus; footers reflect focused region"
+status = "pending"
+covers_ac = ["AC-04"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Mouse click on tab label selects lane, loads list content, highlights active tab"
+files = ["crates/raul/src/tui/runner.rs"]
+tests = "crates/raul/tests/tui_mouse.rs"
+done_when = "Clicking tab switches lane and highlights selection"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S6"
+work_package = "WP4"
+order = 6
+action = "Responsive narrow width: compact_label tabs, horizontal scroll or overflow indicator; no sidebar fallback"
+files = [
+    "crates/raul/src/tui/render.rs",
+    "crates/raul/src/tui/app.rs",
+]
+tests = "crates/raul/tests/tui_responsive.rs"
+done_when = "Narrow terminals use compact tabs with overflow reachability"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S7"
+work_package = "WP2"
+order = 7
+action = "List scrolling: Page Up/Down moves selection by viewport page; mouse wheel over list content scrolls selection; footer documents keys; tab bar ignores wheel"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/render.rs",
+]
+tests = "crates/raul/tests/tui_list_scroll.rs"
+done_when = "Wheel and Page keys reach items beyond arrow-only range in Milestones list"
+status = "pending"
+covers_ac = ["AC-09"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S8"
+work_package = "WP3"
+order = 8
+action = "Preserve default entry (raul -i Overview, raul --board Board) and drill-in/back from all lanes including hide_done paths from M87"
+files = [
+    "crates/raul/src/tui/runner.rs",
+    "crates/raul/src/tui/inbox_nav.rs",
+]
+tests = "crates/raul/tests/tui_drill_in.rs"
+done_when = "Entry points and drill-in/back work from every lane"
+status = "pending"
+covers_ac = ["AC-06"]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S9"
+work_package = "WP4"
+order = 9
+action = "Migrate sidebar-centric tests to tui_tab_bar.rs; update tui_mouse and tui_responsive hit targets"
+files = [
+    "crates/raul/tests/tui_tab_bar.rs",
+    "crates/raul/tests/tui_sidebar.rs",
+    "crates/raul/tests/tui_mouse.rs",
+    "crates/raul/tests/tui_responsive.rs",
+]
+tests = "crates/raul/tests/tui_tab_bar.rs"
+done_when = "Tab-bar layout tests replace sidebar assertions"
+status = "pending"
+covers_ac = [
+    "AC-01",
+    "AC-07",
+]
+depends_on_steps = ["S1"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S10"
+work_package = "WP4"
+order = 10
+action = "Update raul TUI walkthrough with tab-bar layout, focus keys, Page Up/Down, and mouse wheel bindings"
+files = ["docs"]
+tests = "manual: accepted — walkthrough review"
+done_when = "Walkthrough documents new navigation model"
+status = "pending"
+covers_ac = [
+    "AC-04",
+    "AC-09",
+]
+depends_on_steps = ["S9"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S11"
+work_package = "WP-close"
+order = 11
+action = "Run full raul test suite; fix regressions from tab-bar migration"
+files = []
+tests = "cargo test -p raul"
+done_when = "cargo test -p raul exit 0"
+status = "pending"
+covers_ac = ["AC-08"]
+depends_on_steps = ["S10"]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

@@ -1,0 +1,16 @@
+{
+  "id": "p3.1-hybrid-work-next-track",
+  "phase": "implemented",
+  "description": "Hybrid profile with next.prefer=track surfaces BF-02 before session milestones",
+  "fixture": "projects/hybrid-work",
+  "command": ["--plan-dir", ".mp", "next", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/next-step.json",
+    "fs_unchanged": true
+  },
+  "notes": "Session milestone under sessions/ is not in Rust path yet — documents target hybrid behavior."
+}

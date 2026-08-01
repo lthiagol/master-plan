@@ -1,0 +1,183 @@
+{
+  "milestone": {
+    "id": "09",
+    "title": "Scale and PM maturity",
+    "slug": "scale-pm",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "07"
+    ],
+    "effort": "L",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Post-v1 PM guardrails: concurrent write detection, intake dedup, meeting capture."
+  },
+  "problem": {
+    "description": "P5 items documented but ungrouped: no write conflict detection (ADR-007), idea dup-check, or mp note for meeting capture (B-09–B-11)."
+  },
+  "scope": {
+    "in_scope": [
+      "Optimistic concurrency: --if-updated on milestone write; conflict error code (B-09)",
+      "idea create warns on similar titles (normalized compare) (B-10)",
+      "mp note add — meeting capture → ideas.toml with source=meeting (B-11)",
+      "Document D-004 monorepo policy in DECISIONS.md + ADOPTION-PROFILES",
+      "EDGE-CASES concurrency section updated to present tense"
+    ],
+    "out_of_scope": [
+      "Capacity/sprint iterations",
+      "blocks_external vendor field",
+      "File locks or multi-writer merge",
+      "npm/Homebrew publish"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Stale milestone write rejected with conflict error when --if-updated mismatches",
+      "verification": "unit test",
+      "status": "passed",
+      "evidence": "milestone update --if-updated conflict test"
+    },
+    {
+      "id": "AC-02",
+      "description": "D-004 monorepo guidance published in DECISIONS.md",
+      "verification": "docs review",
+      "status": "passed",
+      "evidence": "DECISIONS ADR-012 + ADOPTION-PROFILES"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp note add creates idea; idea dup-check warns on create",
+      "verification": "integration test",
+      "status": "passed",
+      "evidence": "mp note add + idea dup-check"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Work package 1",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Work package 2",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Optimistic concurrency --if-updated on milestone write (B-09)",
+      "files": [
+        "crates/mp/src/milestone.rs",
+        "crates/mp/src/app.rs"
+      ],
+      "tests": "crates/mp/tests/concurrency.rs",
+      "done_when": "Stale write returns conflict error",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "idea dup-check warn on create (B-10)",
+      "files": [
+        "crates/mp/src/idea.rs"
+      ],
+      "tests": "crates/mp/tests/idea_dup.rs",
+      "done_when": "Similar title warns but allows create",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "mp note add command — meeting capture (B-11)",
+      "files": [
+        "crates/mp/src/note.rs",
+        "crates/mp/src/app.rs",
+        "docs/MP-COMMANDS.md"
+      ],
+      "tests": "crates/mp/tests/note.rs",
+      "done_when": "mp note add creates idea with source=meeting",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Document D-004 monorepo policy in DECISIONS.md",
+      "files": [
+        "docs/DECISIONS.md",
+        "docs/ADOPTION-PROFILES.md",
+        "docs/EDGE-CASES.md"
+      ],
+      "tests": "./scripts/check-docs.sh",
+      "done_when": "Single root master-plan/ documented as normative",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "concurrency, dup-check, mp note"
+  }
+}

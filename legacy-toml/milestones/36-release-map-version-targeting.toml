@@ -1,0 +1,178 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "36"
+title = "Release map & version targeting"
+slug = "release-map-version-targeting"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-27"
+updated = "2026-06-27"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Planners can assign each milestone to a target release version and view a map of which milestones ship in which version (planned and shipped), with dates."
+
+[problem]
+description = "mp currently tracks only a single project-wide target_version (`mp plan set --target-version`), so there is no way to express 'M1 and M2 ship in v1.0.0, M3 in v1.0.1, M4 in v1.2.0'. Milestones carry no per-milestone release targeting, there is no release registry mapping versions to milestone groups, and no command to view the planned-vs-shipped release map. As a result release scoping lives only in maintainers' heads and the hand-maintained CHANGELOG.md."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Per-milestone optional `target_version` field (e.g. '1.6.0'), distinct from the project-level next-version",
+    "Release registry (releases.toml or plan.toml [[releases]]) grouping milestone IDs by version with status (planned|shipped) and date",
+    "`mp release list` / `mp release map` - view version -> milestones (planned + shipped)",
+    "`mp release show <version>` - milestones, status, and date for one version",
+    "`mp milestone set-target-version <id> <ver>` (or `mp release assign <ver> --milestone <id>`)",
+    "`mp release ship <version>` - mark a planned version shipped and stamp the date",
+    "Integration tests: assign + map reflects it; show returns members; ship stamps date and guards on unfinished milestones",
+]
+out_of_scope = [
+    "Automated semver bumping heuristics (the user chooses the version string)",
+    "CI publishing / artifact upload (release scoping only, not distribution)",
+    "Git tag creation (existing release workflow owns tagging; mp may suggest it)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "A milestone can be assigned a target_version and `mp release map` lists it under that version"
+verification = "assign + map integration test asserting the milestone appears under the version"
+status = "passed"
+evidence = "release_assign tests pass; target_version and release registry work"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "`mp release show <version>` returns its milestones, status, and date"
+verification = "show test against a release with assigned milestones"
+status = "passed"
+evidence = "release_show tests pass; release map/show/list work"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "`mp release ship <version>` marks it shipped with today's date and refuses if any member milestone is not done (--force bypasses and records the bypass)"
+verification = "manual: ship + guard test (done allowed, not-done refused, --force overrides)"
+status = "passed"
+evidence = "release_ship tests pass; ship stamps date with guard and --force"
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "MP-COMMANDS.md documents the release commands and the planned-vs-shipped map concept"
+verification = "manual: accepted - doc review"
+status = "passed"
+evidence = "MP-COMMANDS.md documents release commands and planned-vs-shipped map"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Model + targeting"
+goal = "Per-milestone target_version field and a release registry mapping versions to milestone groups"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Release commands"
+goal = "mp release map/show/list read the registry and ship marks a version shipped with guards"
+rollback = ""
+
+[[work_packages]]
+id = "WP3"
+name = "Documentation"
+goal = "Document release commands and the planned-vs-shipped map concept"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Add per-milestone optional target_version field plus a releases registry (releases.toml or plan.toml [[releases]]) grouping milestone IDs by version with status (planned|shipped) and date, and a command to assign (mp milestone set-target-version or mp release assign)"
+files = []
+tests = "cargo test -p mp --test release_assign"
+done_when = "A milestone can be assigned a target_version and the release registry records it under that version"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP2"
+order = 2
+action = "Implement mp release list / mp release map (version -> milestones, planned + shipped) and mp release show <version> returning milestones, status, and date"
+files = []
+tests = "cargo test -p mp --test release_show"
+done_when = "mp release map lists milestones under their version and mp release show returns members, status, and date"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = ["S1"]
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Implement mp release ship <version> to mark a planned version shipped and stamp today's date, refusing if any member milestone is not done (--force bypasses and records the bypass)"
+files = []
+tests = "cargo test -p mp --test release_ship"
+done_when = "release ship stamps the date on done milestones and refuses (or forces) for not-done members"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = ["S2"]
+
+[[steps]]
+id = "S4"
+work_package = "WP3"
+order = 4
+action = "Document the release commands and the planned-vs-shipped map concept in MP-COMMANDS.md"
+files = []
+tests = "manual: accepted — doc review"
+done_when = "MP-COMMANDS.md documents release list/map/show/ship and the planned-vs-shipped concept"
+status = "done"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-27"
+branch = ""
+evidence = "All 4 steps done, all ACs passed, validate clean"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

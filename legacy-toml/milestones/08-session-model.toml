@@ -1,0 +1,173 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "08"
+title = "Session model depth"
+slug = "session-model"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["07"]
+effort = "M"
+risk = "med"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Hybrid/session profiles match ADOPTION-PROFILES: branch-bound sessions and session work in path."
+
+[problem]
+description = "sessions/ tree exists (D-002) but auto_bind_branch (D-003) is config-only; hybrid next-step never surfaces session milestone steps (B-08)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Enforce one active session per git branch (D-003, workflow.session.auto_bind_branch)",
+    "session start resumes or rejects duplicate branch; session show by current branch",
+    "Hybrid profile: session milestones in mp path / next-step when tracks exhausted (B-08)",
+    "mp validate covers session-scoped milestone.toml files",
+    "Scenario test + ADOPTION-PROFILES §8 status sync",
+    "Record D-002/D-003 evidence in milestone verification",
+]
+out_of_scope = [
+    "mp session focus command (deferred v0.3)",
+    "Portfolio / multi-session dashboard",
+    "Sprint/capacity planning",
+    "JSON schema on write (M07)",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "D-002/D-003 behavior implemented with branch-bound session lifecycle"
+verification = "unit tests + hybrid-work fixture"
+status = "passed"
+evidence = "session branch resume tests"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "Hybrid next-step returns session step when no pending tracks"
+verification = "p3.1-hybrid-work-next-session scenario"
+status = "passed"
+evidence = "hybrid next-step + path fallback"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Work package 1"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Work package 2"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Enforce one session per branch (D-003, auto_bind_branch)"
+files = [
+    "crates/mp/src/session.rs",
+    "crates/mp/src/config.rs",
+]
+tests = "crates/mp/tests/session_branch.rs"
+done_when = "Duplicate branch resumes or rejects per config"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "session show resolves current git branch when auto_bind_branch"
+files = ["crates/mp/src/session.rs"]
+tests = "crates/mp/tests/session_branch.rs"
+done_when = "session show without id finds branch session"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Hybrid path/next-step includes session milestones (B-08)"
+files = [
+    "crates/mp/src/path_engine.rs",
+    "crates/mp/src/app.rs",
+]
+tests = "crates/mp/tests/hybrid_session_path.rs"
+done_when = "next-step returns session step when tracks empty"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Scenario p3.1-hybrid-work-next-session + ADOPTION-PROFILES §8"
+files = [
+    "tests/scenarios/p3.1-hybrid-work-next-session/",
+    "docs/ADOPTION-PROFILES.md",
+]
+tests = "cargo test -p mp"
+done_when = "Scenario green; docs say implemented"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "D-002/D-003 session policy + hybrid path"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

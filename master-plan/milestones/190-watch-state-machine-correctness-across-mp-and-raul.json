@@ -1,0 +1,413 @@
+{
+  "milestone": {
+    "id": "190",
+    "title": "Watch state-machine correctness across mp and Raul",
+    "slug": "watch-state-machine-correctness-across-mp-and-raul",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "188",
+      "189"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T16:18:47.209242+00:00"
+  },
+  "intent": {
+    "outcome": "Watch follows one delivery lifecycle (complete means delivery done; review cycle in reviews registry); live run state persists on every observable transition; Raul preflight binds to an exact queue fingerprint; idle polling advances without keypresses."
+  },
+  "problem": {
+    "description": "Watch prompts and the state machine disagree on self-reviewed/reviewed. Live state is often only persisted at start/end. Per-item skip can mark the whole run terminal. Raul can start a queue different from the preflighted one. Crossterm wait_next blocks so the 3s poller only runs after input."
+  },
+  "scope": {
+    "in_scope": [
+      "Align prompts, next-stage, and eligibility with Option A delivery lifecycle",
+      "WatchRunStore::transition for atomic live persistence (observed lifecycle snapshot only)",
+      "Sequencer-only aggregate terminality including PartialFailure",
+      "Preflight fingerprint + invalidation on every queue mutation",
+      "Deadline-aware EventSource idle ticks; Watch restoration on lane init",
+      "Export eligibility projection; remove Raul allowlist drift"
+    ],
+    "out_of_scope": [
+      "Typed milestone transition table implementation details beyond consuming Group C",
+      "Annotation/co-approval UI (Group E)",
+      "ac_verify trust policy (Group F)",
+      "Comment cleanup (Group G)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Watch live state file and control paths persist every observable transition via WatchRunStore::transition; status readers observe active milestone/stage mid-run; generation/CAS protects concurrent stop/status updates.",
+      "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-02",
+      "description": "Watch control surfaces (status/stop/state) remain consistent with the durable run store during live runs without overwriting newer snapshots.",
+      "verification": "cargo nextest run -p mp --test watch_control --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-03",
+      "description": "Dry-run Watch end-to-end visits every Option A delivery state; skip remains non-terminal while later items run; mixed queues emit PartialFailure; external review is neither silently skipped nor represented twice.",
+      "verification": "cargo nextest run -p mp --test watch_dry_run --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-04",
+      "description": "Non-dry Watch runs align prompts, wait targets, next-stage, and completion gates with Option A; Raul eligibility matches mp eligibility including remediation.",
+      "verification": "cargo nextest run -p mp --test watch_non_dry_run --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-05",
+      "description": "Raul Watch preflight binds to exact ordered queue fingerprint; mutations invalidate; can_start requires match; restoration on lane init restores queue+outcome, reconciles missing IDs, and keeps start disabled until fresh preflight.",
+      "verification": "cargo nextest run -p raul --test tui_state --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-06",
+      "description": "Raul EventSource advances on idle deadline without keypress; Watch redraws after status changes; no busy-loop before deadline; queued input stays responsive.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-07",
+      "description": "Watch actions bump App::version exactly when state changes (selection, cursors, preflight, start/stop, refresh, clear, status, output, errors) and the event loop renders the changed view.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-08",
+      "description": "mp Watch/watch-related changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    },
+    {
+      "id": "AC-09",
+      "description": "raul Watch/TUI changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "option-a-lifecycle",
+      "choice": "Keep delivery phases small: complete means delivery completed; self/external review-cycle lives solely in the reviews registry; treat self-reviewed and reviewed as legacy read/migration aliases, not active Watch destinations (Option A).",
+      "rationale": "Watch prompts already teach Option A while state_machine.rs still waits on self-reviewed/reviewed, producing a contradictory second lifecycle (Finding 15)."
+    },
+    {
+      "area": "watch-run-store-transition",
+      "choice": "Introduce WatchRunStore::transition(event) that atomically persists stage, role, target, pane IDs, observed lifecycle snapshot, and per-item outcome; it never performs milestone lifecycle transitions (those go through mp durable executor).",
+      "rationale": "Live Watch state is only persisted at run start/end today, so control/status readers miss mid-run stage (Finding 16)."
+    },
+    {
+      "area": "sequencer-terminality",
+      "choice": "Keep per-item outcomes separate from aggregate run outcome; the sequencer is the sole owner of terminal run classification and emits PartialFailure for mixed completed/skipped/failed queues after halt or exhaustion.",
+      "rationale": "Per-item skip currently marks the entire Watch run terminal while later items remain active (Finding 17)."
+    },
+    {
+      "area": "preflight-fingerprint",
+      "choice": "Successful preflight stores the exact ordered queue fingerprint; every queue mutation path invalidates preflight and can_start compares current vs preflight fingerprint; restored queues always require a fresh matching preflight.",
+      "rationale": "Preflight remains valid after add/remove/reorder so Raul can start a different queue than the one that was preflighted (Finding 5 / 18)."
+    },
+    {
+      "area": "idle-event-source",
+      "choice": "EventSource waits until input arrives or the next Watch poll deadline expires; CrosstermSource uses event::poll(timeout) then read; timeout is an idle tick (not EOS); preserve burst coalescing and frame-rate limiting.",
+      "rationale": "wait_next blocks indefinitely so the 3s Watch poller only runs after a keypress (Finding 6)."
+    },
+    {
+      "area": "watch-redraw-version",
+      "choice": "Route Watch mutations through App methods or mutation results that call app.touch() exactly when state changes; cover selection, cursors, preflight, start/stop, refresh, clear, status, output, and errors.",
+      "rationale": "Several Watch actions mutate state without bumping App::version so the view never redraws (Additional Watch redraw remediation)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Option A lifecycle alignment",
+      "goal": "Align Watch prompts, state-machine wait targets, next-stage, completion gates, and Raul eligibility with Option A; export single eligibility projection from mp.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Durable run store and sequencer terminality",
+      "goal": "WatchRunStore::transition for atomic live persistence; sequencer solely owns aggregate terminality including PartialFailure.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Raul preflight, restore, idle, redraw",
+      "goal": "Fingerprint preflight with invalidation; restore on lane init; deadline-aware idle ticks; App::version bumps on Watch mutations.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Update Watch prompts, state_machine wait targets, next-stage logic, completion gates, and docs to Option A: complete = delivery done; self-reviewed/reviewed are legacy aliases not active Watch destinations; review cycle stays in reviews registry.",
+      "files": [
+        "crates/mp/src/watch/prompts.rs",
+        "crates/mp/src/watch/state_machine.rs",
+        "crates/mp/src/watch/classification.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_dry_run --test watch_non_dry_run --test watch_prompts --no-fail-fast",
+      "done_when": "End-to-end Watch visits only Option A delivery states; external review is neither silently skipped nor represented twice; watch_dry_run/non_dry_run/prompts green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Export a single next-stage/eligibility projection from mp; remove Raul independent drivable-lifecycle allowlist so Raul eligibility exactly matches mp including remediation.",
+      "files": [
+        "crates/mp/src/watch/",
+        "crates/raul/src/tui/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_non_dry_run --no-fail-fast",
+      "done_when": "Raul has no independent lifecycle allowlist; eligibility parity covers remediation; AC-04 green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Introduce WatchRunStore::transition(event) that atomically persists stage, role, target, pane IDs, observed lifecycle snapshot, and per-item outcome on every externally observable transition; protect with short-lived lock or generation/CAS; preserve last valid snapshot on transient I/O failure; never perform milestone lifecycle transitions.",
+      "files": [
+        "crates/mp/src/watch/run_state.rs",
+        "crates/mp/src/watch/state_machine.rs",
+        "crates/mp/src/commands/watch.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_state_file --test watch_control --no-fail-fast",
+      "done_when": "Control/status readers observe active milestone and stage mid-run; every transition increments generation and is atomically readable; concurrent stop/status do not overwrite newer snapshots.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Keep per-item outcomes separate from aggregate run outcome; make the sequencer the sole owner of terminal classification; compute one aggregate after halt or queue exhaustion; retain and emit PartialFailure for any mixture of completed/skipped/failed item outcomes.",
+      "files": [
+        "crates/mp/src/watch/state_machine.rs",
+        "crates/mp/src/watch/sequencer.rs",
+        "crates/mp/src/watch/classification.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_dry_run --test watch_control --no-fail-fast",
+      "done_when": "Skip followed by another milestone remains non-terminal; mixed queue produces documented aggregate; classification never reports terminal while a later item is active.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Invoke Watch restoration when the Watch lane initializes; restore persisted queue and terminal outcome together after candidates load; reconcile missing candidates by stable ID and surface omissions; require a new preflight before restarting a restored queue.",
+      "files": [
+        "crates/raul/src/tui/watch.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_state --no-fail-fast",
+      "done_when": "Restart after completed/stopped/failed/partial restores matching queue; missing IDs handled deterministically; start disabled until fresh matching preflight.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Represent successful preflight with exact ordered queue fingerprint; centralize queue mutations to update selection/cursors, clear candidate dependency status where required, invalidate preflight, and mark dirty; can_start compares current vs preflight fingerprint; invalidate on toggle/set/clear/reorder/refresh/dependency changes.",
+      "files": [
+        "crates/raul/src/tui/watch.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_state --no-fail-fast",
+      "done_when": "Preflight+add/remove/reorder/clear invalidates; same-queue refresh preserves; failed preflight never enables start; restored selections require new preflight.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Change EventSource to wait until input arrives or next idle/poll deadline; implement CrosstermSource with event::poll(timeout)+read; timeout is idle tick not EOS; calculate timeout from Watch poller next deadline; preserve burst coalescing and frame-rate limiting.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "done_when": "Fake time with no input yields repeated on_idle; Watch redraws after status changes without keypress; no busy loop before deadline; queued input remains responsive.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Expose Watch changes through App methods or mutation results that the action dispatcher converts into app.touch(); cover selection, both cursors, preflight, start, stop, refresh, clear, status, output, and errors; avoid unconditional redraws when no state changed.",
+      "files": [
+        "crates/raul/src/tui/watch.rs",
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "done_when": "Each Watch action bumps version exactly when state changes; event loop renders the changed view; clippy clean.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "M190 Group D Watch lifecycle, durable transitions, sequencer aggregate, Raul restoration/preflight/idle/redraw implemented; focused mp and raul suites plus clippy passed"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Finding 16 residual (L1/L2): `cmd_watch_control_stop` checks `run_outcome.is_none()` on a pre-lock load, then calls `WatchRunStore::transition(RunOutcome::GracefullyStopped)`. `transition` reloads under the lock and `set_run_outcome` always overwrites — there is no terminal-outcome guard. Race: (1) stop loads with run_outcome=None, (2) driver persists Completed/PartialFailure, (3) stop's transition reloads the newer terminal snapshot and replaces it with gracefully-stopped. This violates Finding 16's \"concurrent stop/status updates do not overwrite newer snapshots\" contract. Fix: inside `transition`/`set_run_outcome` (or the stop caller under the lock), refuse RunOutcome writes when an outcome is already present; add a regression that interleaves Completed then stop's GracefullyStopped and asserts Completed survives.",
+      "status": "fixed",
+      "author": "coordinator-stage8",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/watch_control.rs",
+        "new_range": {
+          "start_line": 126,
+          "end_line": 126
+        },
+        "side": "new"
+      },
+      "summary": "watch-control stop can overwrite a newer terminal run_outcome",
+      "confidence": "high",
+      "tags": [
+        "finding-16",
+        "watch-run-store",
+        "race"
+      ]
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Finding 18 residual: `restore_queue_from_status` normalizes persisted queue ids with `trim_start_matches('M')` so they match Raul candidates, but `parse_status` keeps `milestone_outcomes[].id` verbatim from the state file. `render_compact_queue` matches selected ids to outcome ids with exact string equality. If the watch queue was started with M-prefixed CLI ids (e.g. `mp watch M02`), restore yields selected=[\"02\"] while outcomes still carry id=\"M02\", so the restored terminal queue renders as pending instead of the recorded kinds. Repro shape is already in `restoring_terminal_queue_requires_new_preflight_and_reports_missing_ids` (queue uses M02/M01). Fix: normalize outcome ids the same way as queue ids (or compare via `normalize_milestone_id`), and pin a restore+render regression.",
+      "status": "fixed",
+      "author": "coordinator-stage8",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/watch.rs",
+        "new_range": {
+          "start_line": 1263,
+          "end_line": 1263
+        },
+        "side": "new"
+      },
+      "summary": "Restore strips M-prefix from queue but not outcome IDs",
+      "confidence": "high",
+      "tags": [
+        "finding-18",
+        "restore",
+        "id-normalization"
+      ]
+    }
+  ]
+}

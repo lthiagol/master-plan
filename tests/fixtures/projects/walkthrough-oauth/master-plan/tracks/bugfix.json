@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "archived_at": "",
+      "completed": "2026-06-12",
+      "created": "2026-06-10",
+      "done_when": "Secure flag set in prod config",
+      "effort": "S",
+      "evidence": "merged PR #42",
+      "id": "BF-01",
+      "problem": "Cookie missing Secure on HTTPS",
+      "status": "done",
+      "steps": [
+        "Add Secure to session cookie builder"
+      ],
+      "title": "Session cookie secure flag",
+      "verification": "cargo test cookie_flags"
+    }
+  ],
+  "track": {
+    "created": "2026-06-17",
+    "kind": "bugfix",
+    "perpetual": true,
+    "scope": "Production fixes",
+    "title": "Bugfixes"
+  }
+}

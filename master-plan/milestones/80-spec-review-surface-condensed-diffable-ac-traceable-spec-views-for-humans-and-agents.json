@@ -1,0 +1,223 @@
+{
+  "milestone": {
+    "id": "80",
+    "title": "Spec-review surface — condensed, diffable, AC-traceable spec views for humans and agents",
+    "slug": "spec-review-surface-condensed-diffable-ac-traceable-spec-views-for-humans-and-agents",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "82",
+      "93"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-01",
+    "updated": "2026-07-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Reviewing a milestone spec is fast and focused: a human (via raul) or an agent (via mp) gets a condensed, review-oriented view of a lean JSON spec — outcome, problem, scope, ACs with coverage and evidence status, open questions, and force-bypass flags — plus an AC-to-step-to-evidence traceability matrix and a what-changed-since-last-approval diff, without loading the full milestone document."
+  },
+  "problem": {
+    "description": "Spec review is the #1 pain point of SDD tooling. mp specs are dense structured documents; after M82 lean model and M92 JSON persistence, agents still lack a purpose-built review read path. During the 2026-07-01 review-backlog sweep, reviewing M48 and M62 required hand-slicing JSON. raul ships dashboards (M71) but no spec-review surface; mp has validate/challenge for spec quality but not review reading. This milestone closes that gap after M93 fragment reads exist — review view delegates to mp milestone ac show / --fields projections where possible."
+  },
+  "scope": {
+    "in_scope": [
+      "raul spec-review view (e.g. raul spec <id>): condensed render — outcome, problem, scope, ACs with coverage + evidence status, open questions, force-bypass flags — not raw full milestone JSON",
+      "AC-to-step-to-evidence traceability matrix in the review view, with force-bypassed ACs surfaced",
+      "Spec diff: what changed since the spec's last approval/revision (requires lightweight spec revision tracking — spike in grooming)",
+      "Agent-side review projection (mp spec review <id> or --review preset) reusing M79 --fields and M93 fragment reads"
+    ],
+    "out_of_scope": [
+      "Generic JSON projection / filtering / summary primitives (owned by M79)",
+      "Fragment write ops (owned by M93)",
+      "The post-completion execution review queue (owned by M64)",
+      "Code review gating (owned by M57)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "raul renders a condensed spec-review view (outcome, problem, scope, ACs with coverage + evidence status, open questions, force-bypass flags) without dumping the full milestone JSON document",
+      "verification": "crates/raul/tests/spec_review.rs",
+      "status": "passed",
+      "evidence": "crates/raul/tests/spec_review.rs green (6 tests); mp spec review/diff + raul spec <id> [--diff]; cargo test -p raul -p mp green; AC-03 verified via constructed git repo scenario"
+    },
+    {
+      "id": "AC-02",
+      "description": "The spec-review view includes an AC-to-step-to-evidence traceability matrix and visibly flags force-bypassed ACs",
+      "verification": "crates/raul/tests/spec_review.rs",
+      "status": "passed",
+      "evidence": "crates/raul/tests/spec_review.rs green (6 tests); mp spec review/diff + raul spec <id> [--diff]; cargo test -p raul -p mp green; AC-03 verified via constructed git repo scenario"
+    },
+    {
+      "id": "AC-03",
+      "description": "A diff view shows what changed in a spec since its last approval/revision",
+      "verification": "crates/raul/tests/spec_review.rs",
+      "status": "passed",
+      "evidence": "crates/raul/tests/spec_review.rs green (6 tests); mp spec review/diff + raul spec <id> [--diff]; cargo test -p raul -p mp green; AC-03 verified via constructed git repo scenario"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "raul spec-review view",
+      "goal": "Condensed spec render and AC traceability matrix in raul",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Spec diff & agent projection",
+      "goal": "What-changed-since-approval diff; mp spec review for agents",
+      "rollback": ""
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure",
+      "goal": "Verify tests, lint, and update plan",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement raul spec-review view: outcome, problem, scope, ACs with coverage/evidence, open questions, force-bypass flags",
+      "files": [
+        "crates/raul/src/commands",
+        "crates/raul/src/tui"
+      ],
+      "tests": "crates/raul/tests/spec_review.rs",
+      "done_when": "raul renders condensed review view without full milestone dump",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add AC-to-step-to-evidence traceability matrix; flag force-bypassed ACs",
+      "files": [
+        "crates/raul/src"
+      ],
+      "tests": "crates/raul/tests/spec_review.rs",
+      "done_when": "Traceability matrix visible in spec-review view",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Spike and implement spec revision tracking plus diff view since last approval",
+      "files": [
+        "crates/mp/src",
+        "crates/raul/src"
+      ],
+      "tests": "crates/raul/tests/spec_review.rs",
+      "done_when": "Diff view shows spec changes since last approval",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add mp spec review projection reusing M79 fields and M93 fragment reads",
+      "files": [
+        "crates/mp/src/commands"
+      ],
+      "tests": "crates/raul/tests/spec_review.rs",
+      "done_when": "Agents can get review-oriented JSON without hand-slicing",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP-close",
+      "order": 5,
+      "action": "cargo test -p raul; verify spec-review integration",
+      "files": [],
+      "tests": "cargo test -p raul",
+      "done_when": "cargo test -p raul exit 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-03",
+    "branch": "",
+    "evidence": "crates/raul/tests/spec_review.rs green (6 tests); mp spec review/diff + raul spec <id> [--diff]; cargo test -p raul -p mp green; AC-03 verified via constructed git repo scenario"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "spec_diff omits design_decisions. The module docstring (spec_review.rs:6-7) promises 'diffs the review-relevant spec fields (outcome, problem, scope, ACs, open questions, and design decisions)' and the review projection includes design_decisions (spec_review.rs:64), but diff_spec_fields (line 288) never compares design_decisions between base and current. A reviewer asking 'did the spec change?' who edited only a design decision sees 'No spec changes since baseline' — a silent false-negative. AC-03 is general ('what changed in a spec') so this violates the contract. Fix: add a diff_design_decisions helper keyed by area (or id if present), mirroring diff_open_questions, and call it from diff_spec_fields. Test gap: the only end-to-end diff test (raul_spec_diff_shows_changes_since_last_review) mutates intent.outcome only — no test mutates design_decisions, scope, open_questions, or an AC, so this omission was structurally uncatchable (L15).",
+      "status": "fixed",
+      "author": "zcode-review",
+      "fixed_in": "db63821",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "evidence_marks_force_bypass (spec_review.rs:109-111) is a byte-for-byte duplicate of the inline check in milestone_health.rs:130-131: 'evidence.contains(\"[force-bypassed\") || evidence.contains(\"[step-tests force-bypassed\")'. Two copies of the same magic-string predicate. If the marker format ever changes (e.g. '[step-tests force-bypassed]' → '[force-bypassed step-tests]'), one copy drifts silently and the review view disagrees with the health summary for the same milestone. Fix: extract a pub fn evidence_marks_force_bypass in milestone_health (or model) and call it from both sites. Classic L9 (new code duplicating existing helper) + L13 (DRY).",
+      "status": "fixed",
+      "author": "zcode-review",
+      "fixed_in": "db63821",
+      "created": "2026-07-03",
+      "resolved": "2026-07-03"
+    }
+  ]
+}

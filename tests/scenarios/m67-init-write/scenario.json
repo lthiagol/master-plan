@@ -1,0 +1,15 @@
+{
+  "id": "m67-init-write",
+  "phase": "implemented",
+  "description": "init --profile full creates master-plan on empty project root",
+  "fixture": "projects/write-blank",
+  "command": ["init", "--profile", "full", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_contains": "\"profile\": \"full\"",
+    "fs_unchanged": false
+  }
+}

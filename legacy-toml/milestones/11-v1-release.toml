@@ -1,0 +1,205 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "11"
+title = "v1.0 release and adoption checkpoint"
+slug = "v1-release"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["10"]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Tagged release with notes; adoption checklist verified for full + hybrid."
+
+[problem]
+description = "v0.2 scope shipped (M07–M10 done) but no semver tag, CHANGELOG, or published release artifact (B-16)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "CHANGELOG from milestone evidence",
+    "version bump in Cargo.toml",
+    "git annotated tag",
+    "GitHub release notes",
+    "ADOPTION-CHECKLIST smoke pass",
+]
+out_of_scope = [
+    "Homebrew formula (M14)",
+    "npm publish",
+    "Marketing site",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "Semver tag v1.0.0 exists on main with matching Cargo.toml version"
+verification = "git tag -l && grep version crates/mp/Cargo.toml"
+status = "passed"
+evidence = "v1.0.0 tag on commit 5615bbb with version 1.0.0 in Cargo.toml"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "Gitea release published with milestone summary"
+verification = "gitea release view or web UI"
+status = "passed"
+evidence = "Gitea release v1.0.0 published at https://gitea.casa.luizthiago.info/thiago/master-plan/releases/tag/v1.0.0"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "make adopt-check passes on tagged commit"
+verification = "make adopt-check"
+status = "passed"
+evidence = "make adopt-check passed on tagged commit 5615bbb"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Release prep"
+goal = "CHANGELOG and version"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Publish"
+goal = "Tag and GitHub release"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Audit M01–M10 completion evidence for release notes"
+files = [
+    "master-plan/milestones/",
+    "docs/PLANNING-STATUS.md",
+]
+tests = "./scripts/check-docs.sh"
+done_when = "Release notes outline covers all shipped milestones"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Draft CHANGELOG.md from milestone AC evidence"
+files = ["CHANGELOG.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "CHANGELOG has Added/Changed sections for M07–M10"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "RESOLVED: v1.0.0 direct stable (human decision 2026-06-18)"
+files = ["master-plan/milestones/11-v1-release.toml"]
+tests = "make adopt-check"
+done_when = "NC-01/NC-02 resolved: v1.0.0 direct stable"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP1"
+order = 4
+action = "Bump version in crates/mp/Cargo.toml and workspace manifests"
+files = [
+    "crates/mp/Cargo.toml",
+    "Cargo.toml",
+]
+tests = "cargo test -p mp"
+done_when = "cargo pkgid matches chosen semver"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Run make adopt-check + cargo test -p mp on release candidate"
+files = ["Makefile"]
+tests = "make adopt-check && cargo test -p mp"
+done_when = "All green before tag"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "HUMAN: Create annotated git tag and push to origin"
+files = []
+tests = "manual: verify version and release notes correct"
+done_when = "git tag -l shows chosen version on main"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S7"
+work_package = "WP2"
+order = 7
+action = "HUMAN: Publish Gitea release v1.0.0 with CHANGELOG body"
+files = ["CHANGELOG.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "Gitea release v1.0.0 visible in repo releases"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

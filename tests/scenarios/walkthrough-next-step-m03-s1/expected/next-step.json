@@ -1,0 +1,22 @@
+{
+  "milestone": {
+    "display": "M03",
+    "id": "03",
+    "title": "OAuth Login"
+  },
+  "step": {
+    "action": "Add OAuth config keys and Google client setup",
+    "done_when": "Config loads in test",
+    "files": [
+      "src/auth/oauth.rs",
+      "config/oauth.example.toml"
+    ],
+    "id": "S1",
+    "status": "pending",
+    "tests": "cargo test oauth_config"
+  },
+  "work_package": {
+    "id": "WP1",
+    "name": "OAuth flow"
+  }
+}

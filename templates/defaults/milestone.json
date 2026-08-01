@@ -1,0 +1,34 @@
+{
+  "milestone": {
+    "title": "Milestone title",
+    "slug": "milestone-slug",
+    "spec_status": "draft",
+    "execution_status": "planned",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal"
+  },
+  "intent": {
+    "outcome": "One verifiable sentence: what users can do after this ships."
+  },
+  "problem": {
+    "description": "Why this is needed \u2014 the gap it fills."
+  },
+  "scope": {
+    "in_scope": [
+      "Specific deliverable"
+    ],
+    "out_of_scope": [
+      "Explicit non-goal 1",
+      "Explicit non-goal 2"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "description": "Observable behavior that proves completion",
+      "verification": "cargo test -p mycrate or manual: accepted \u2014 reason"
+    }
+  ]
+}

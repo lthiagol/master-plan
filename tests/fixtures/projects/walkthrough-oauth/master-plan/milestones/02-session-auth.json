@@ -1,0 +1,65 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "Valid credentials return session",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "cargo test session_login"
+    },
+    {
+      "description": "Invalid credentials return 401",
+      "evidence": "fixture",
+      "id": "AC-02",
+      "status": "passed",
+      "verification": "cargo test session_reject"
+    }
+  ],
+  "intent": {
+    "outcome": "Users sign in with email and password; server issues session cookie."
+  },
+  "milestone": {
+    "change_kind": "greenfield",
+    "created": "2026-06-06",
+    "depends_on": [
+      "01"
+    ],
+    "effort": "M",
+    "execution_status": "done",
+    "id": "02",
+    "risk": "low",
+    "slug": "session-auth",
+    "spec_status": "verified",
+    "title": "Session Auth",
+    "updated": "2026-06-14"
+  },
+  "problem": {
+    "description": "Need authenticated sessions before OAuth."
+  },
+  "scope": {
+    "in_scope": [
+      "Login route",
+      "Session middleware",
+      "Password hash"
+    ],
+    "out_of_scope": [
+      "OAuth",
+      "MFA",
+      "Password reset"
+    ]
+  },
+  "verification": {
+    "branch": "main",
+    "date": "2026-06-14",
+    "evidence": "fixture"
+  },
+  "work_packages": [
+    {
+      "goal": "Password session auth",
+      "id": "WP1",
+      "name": "Sessions",
+      "rollback": "git revert session commits",
+      "steps": []
+    }
+  ]
+}

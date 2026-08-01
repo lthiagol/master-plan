@@ -1,0 +1,184 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "61"
+title = "Charter editing: remove + set for goals/nongoals/principles (+ dogfood refresh)"
+slug = "charter-editing-remove-set-for-goals-nongoals-principles-dogfood-refresh"
+spec_status = "verified"
+execution_status = "done"
+depends_on = []
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-29"
+updated = "2026-06-30"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0-rc.1"
+
+[intent]
+outcome = "The charter is fully editable through mp — append, remove, and replace (set) for goals, non-goals, and principles — so stale goals can be retired without a forbidden hand-edit of plan.toml, and this repo's rotted charter gets refreshed to the v2.0 direction."
+
+[problem]
+description = "mp plan goals / nongoals / principles are append-only: they expose `add` but no `remove` or `set` (replace). mp plan set covers project metadata (target_version, planning-status, stack) but NOT the goal collections. So there is no toolkit way to retire a stale goal — this repo's charter still lists 'Ship v0.3' and a v1 adoption goal while the project is on v2.0+ work (mp=agent, raul=human, CLI grouping redesign), and target_version reads 1.2. Correcting it requires a hand-edit of plan.toml, which is forbidden in the plan zone. Note: the brief is NOT a tooling gap — mp brief edit <id> --body --status already supports non-interactive edits; the brief topics are simply unfilled (a content gap this milestone dogfoods)."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Add `mp plan goals remove <text|index>` and `mp plan goals set --json @-` (replace the whole list). Mirror for `mp plan nongoals` and `mp plan principles`.",
+    "`remove` matches by exact text or by index (as shown by mp plan show); a no-match returns a clear error, not a silent no-op.",
+    "`set --json @-` replaces the entire collection in one write — enables bulk correction of stale goals.",
+    "Dogfood charter: remove the stale v0.3/v1 goals, add v2.0-direction goals (agent-only mp + human raul surface, CLI grouping redesign, grooming discipline), set target_version to the current line.",
+    "Dogfood brief: fill the empty brief topics (problem, audience, capabilities, success) via the existing mp brief edit.",
+]
+out_of_scope = [
+    "Changing the charter interview flow (mp interview checklist --checklist-type charter stays as the interactive path).",
+    "Versioning or history of charter changes.",
+    "New charter fields beyond goals/nongoals/principles and the metadata mp plan set already handles.",
+    "A TUI/editor for the charter (CLI only).",
+    "New brief commands (mp brief edit already suffices; this milestone only fills content).",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp plan goals remove <text> removes a goal and returns it; mp plan goals set --json @- replaces the whole list; equivalent commands exist for nongoals and principles"
+verification = "crates/mp/tests/charter_edit.rs"
+status = "passed"
+evidence = "remove and set commands implemented for goals/nongoals/principles; tests in crates/mp/tests/charter_edit.rs"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "mp plan goals remove on a non-existent text returns a clear error (no silent no-op, no partial write)"
+verification = "crates/mp/tests/charter_edit.rs"
+status = "passed"
+evidence = "remove on nonexistent text/index returns clear error; tested in goals_remove_nonexistent_errors and goals_remove_index_out_of_range_errors"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "This repo's charter reflects the v2.0 direction (no stale v0.3/v1 goals; target_version current) and the brief topics are filled"
+verification = "manual: accepted - mp plan show + mp brief show review"
+status = "passed"
+evidence = "charter refreshed: stale v0.3/v1 goals removed, v2.0-direction goals set, target_version=2.0; brief topics T01/T02/T03/T07 filled"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Charter collection editing (remove + set)"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Dogfood refresh (charter + brief)"
+goal = ""
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Implement remove and set for mp plan goals in crates/mp/src/charter.rs + cli.rs (GoalsCmd). remove matches by exact text or index (per mp plan show order); no-match returns a clear error. set --json @- replaces the whole list. Reuse the existing plan_goals_add write path."
+files = []
+tests = "crates/mp/tests/charter_edit.rs"
+done_when = "mp plan goals remove <text|index> and mp plan goals set --json @- work; remove errors clearly on no-match; charter_edit tests pass"
+status = "done"
+covers_ac = [
+    "AC-01",
+    "AC-02",
+]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Mirror the goals remove/set implementation to mp plan nongoals and mp plan principles (NongoalsCmd, PrinciplesCmd). Same semantics: remove by text|index with clear no-match error; set --json @- replaces the list."
+files = []
+tests = "crates/mp/tests/charter_edit.rs"
+done_when = "remove + set mirrored to nongoals and principles; charter_edit tests pass"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 3
+action = "Dogfood brief fill: use the existing mp brief edit <id> --body --status to fill the empty brief topics (at minimum T01 problem, T02 audience, T03 capabilities, T07 success) for this repo. No new command needed — mp brief edit already supports this."
+files = []
+tests = "manual: accepted - mp brief show review"
+done_when = "Brief topics filled (problem, audience, capabilities, success at minimum)"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 4
+action = "Dogfood charter refresh on this repo: use the new remove/set to delete the stale goals (Ship v0.3; v1 adoption paths) and set v2.0-direction goals (agent-only mp + human raul surface, CLI grouping redesign, grooming discipline). Set target_version to the current line via mp plan set --target-version."
+files = []
+tests = "manual: accepted - mp plan show review"
+done_when = "Charter reflects v2.0: stale v0.3/v1 goals removed, v2.0-direction goals added, target_version current"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = [
+    "S1",
+    "S2",
+]
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = "2026-06-29"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

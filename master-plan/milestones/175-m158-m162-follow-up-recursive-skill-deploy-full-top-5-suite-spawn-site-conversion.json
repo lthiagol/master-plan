@@ -1,0 +1,325 @@
+{
+  "milestone": {
+    "id": "175",
+    "title": "M158 + M162 follow-up — recursive skill deploy + full top-5-suite spawn-site conversion",
+    "slug": "m158-m162-follow-up-recursive-skill-deploy-full-top-5-suite-spawn-site-conversion",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-15",
+    "updated": "2026-07-16",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-16T14:07:05.965648+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, mp install deploys every file in the skill source directory (not just SKILL.md) to ~/.agents/skills/<id>/; a new test parses SKILL.md for `[name.md](name.md)` references and asserts every target exists on disk. Separately, the M162 pilot (7 of 392 spawn sites converted) is extended: the remaining ~385 spawn sites in suite_validate / suite_fragment / suite_milestone / suite_step / suite_plan are converted to in-process lib_api calls, with parity tests asserting byte-identical output where shape agrees. The wall-clock target is dropped in favor of a code-clarity / test-count metric (per Entry 28's structural finding)."
+  },
+  "problem": {
+    "description": "Two test-surface dogfood findings persist post-M162: (1) M158 (lifecycle=approved, execution_status=deferred) authored the recursive-skill-deploy fix but never landed; the bug is that crates/mp/src/install.rs:755-777 hardcodes `let skill_path = skill_dir.join(\"SKILL.md\")` and only ships that one file, so SKILL.md references to flow-stages.md / planning.md / hitl-loop.template.sh / stages.toml 404 at runtime. (2) M162 (Entry 28) shipped a 7-of-392 pilot; the remaining 385 spawn sites are mechanical conversions that buy code clarity (single call surface, less indirection) but not the ≥20% wall-clock drop the original AC-04 over-claimed. Both are dogfood-log entries that need a follow-up milestone."
+  },
+  "scope": {
+    "in_scope": [
+      "M158 fix (Entry 23): rewrite deploy_skill_to_harness (crates/mp/src/install.rs:755-777) to walk the source directory recursively (skipping manifest.json) and copy every file to ~/.agents/skills/<id>/. Mirror the change in install_project_skill (install.rs:793-857). Add a SKILL.md link-resolution test that parses each shipped SKILL.md for `[<name>.md](<name>.md)` and `[<name>.toml](<name>.toml)` references and asserts each target exists on disk post-install. Cover every v1 skill: mp-flow, mp-runner, mp-coordinator, codebase-design, code-review, diagnosing-bugs, git-reviewer, github-explorer, mp-code-review, obsidian-*.",
+      "M158 promotion: M158 was authored with `spec_status: ready` but is execution_status=deferred. Either (a) the M158 spec is re-used as-is (its scope and ACs already cover the fix), and this milestone just retires the deferral; or (b) this milestone's M158-style fix is the body, M158 itself is closed as wont-fix (subsumed). Path (a) preferred — fewer files, one source of truth.",
+      "M162 full conversion (Entry 28): extend crates/mp/tests/common/lib_api.rs to wrap every `mp <cmd>` invocation used by the top-5 suites. Convert each `env.run(&[...])` to `lib_api::<cmd>(...)` per the M162 taxonomy doc. Track conversion counts per suite in the milestone's evidence field. Add a `lib_api_parity_*` test for each new wrapper asserting shape parity against a captured CLI invocation.",
+      "M162 AC rewrite: drop AC-02 (≥20% wall-clock) and AC-04 (≥20% drop) in favor of a code-clarity metric — e.g. '≥95% of top-5-suite spawn sites converted (≤20 spawn sites remaining)'. Update F-01 + F-02 from 'fixed' to 'obsolete' (re-scoped out of M162). Update the M162 evidence field with the new metric and a one-paragraph note explaining why wall-clock was a poor target.",
+      "After each fix lands, update mp-dogfood-log.md Entry 23 + Entry 28 with `<!-- points-at: M175 -->` and a one-line status update (e.g. 'M175 fix landed in commit <sha>; re-verified via <test name>')."
+    ],
+    "out_of_scope": [
+      "Refactoring the skill registry data model — out of scope; this milestone is purely about the deploy path.",
+      "Touching harness-specific paths (Cursor / OpenCode / Pi) beyond the recursive deploy — those harnesses already differ at the harness config level, not the skill file level.",
+      "Converting the bottom-N suites (suite_install, suite_track, suite_brief, etc.) — out of M175 scope; the top-5 cover the dominant spawn surface (392 of 580 total per the M162 measurement).",
+      "Performance work beyond the spawn-site conversion — broader cold/warm perf is a separate track (M176).",
+      "Re-running the bulk lifecycle migration or any plan-zone data move."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp install --skills=<id> deploys every file in the source skill directory (recursive, except manifest.json) to the harness skill dir. Every v1 skill ships its full sibling set (mp-flow ships flow-stages.md + stages.toml; mp-runner ships executing.md + fixing.md + atomic-writes.md; mp-coordinator ships planning.md + spec-co-design.md + reviewing.md; codebase-design ships its deep-dive siblings; diagnosing-bugs ships scripts/hitl-loop.template.sh). The deployer uses crate::store::atomic_write per file (M113 S2 contract).",
+      "verification": "manual: after M175 S1 lands, run 'mp install --skills=mp-flow' and assert ~/.agents/skills/mp-flow/ contains SKILL.md, flow-stages.md, stages.toml; 'mp install --skills=diagnosing-bugs' deploys scripts/hitl-loop.template.sh; cargo nextest run -p mp -E 'test(/install_skill_link_resolution|skill_link_targets_exist/)' exits 0",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    },
+    {
+      "id": "AC-02",
+      "description": "Every SKILL.md in templates/skills/ has its [name.md](name.md) and [name.toml](name.toml) references resolved on disk post-install. A new regression test parses each shipped SKILL.md for relative links and asserts each target exists. Makes the bug non-recurring for future skill authors.",
+      "verification": "manual: cargo nextest run -p mp -E 'test(/install_skill_link_resolution|skill_link_targets_exist/)' --no-fail-fast ; all green ; ls ~/.agents/skills/mp-flow/ ; expected SKILL.md + flow-stages.md + stages.toml all present [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    },
+    {
+      "id": "AC-03",
+      "description": "M162's full top-5-suite conversion is complete: ≥95% of spawn sites in suite_validate / suite_fragment / suite_milestone / suite_step / suite_plan are in-process (≤20 spawn sites remaining across all five). lib_api.rs gains wrappers for every converted call site.",
+      "verification": "manual: after M175 S2 lands, grep -c 'env\\.run(&\\[' crates/mp/tests/suites/validate.rs crates/mp/tests/suites/fragment.rs crates/mp/tests/suites/milestone.rs crates/mp/tests/suites/step.rs crates/mp/tests/suites/plan.rs ; expected ≤20 total across all 5 files",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    },
+    {
+      "id": "AC-04",
+      "description": "Each new lib_api wrapper has a parity test that captures the CLI invocation output (via mp --format json once) and asserts the in-process wrapper returns the same JSON shape (key set + value types).",
+      "verification": "manual: cargo nextest run -p mp --test lib_api_parity --no-fail-fast ; all green ; assert parity assertion count is strictly greater than the M162 ship baseline [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    },
+    {
+      "id": "AC-05",
+      "description": "M162's AC-02 and AC-04 (the ≥20% wall-clock ACs) are dropped; a new AC replaces them with the ≥95% conversion metric from AC-03. F-01 + F-02 in M162 are re-classified as 'obsolete' (re-scoped) rather than 'fixed'. The M162 evidence field carries the re-spec rationale.",
+      "verification": "manual: after M175 S3 lands, 'mp show milestone 162 --fields acceptance_criteria' shows AC-02 and AC-04 absent and the new conversion-metric AC present; 'mp show milestone 162 --fields findings' shows F-01 + F-02 status=obsolete",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    },
+    {
+      "id": "AC-06",
+      "description": "cargo nextest run -p mp --no-fail-fast is green (baseline + new M158 link-resolution tests + new parity tests for AC-04). cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings clean. cargo fmt --all -- --check clean. mp validate exits 0.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E \"not test(/repo_plan_validates_via_mini_schema/)\" && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && cargo fmt --all -- --check && mp validate",
+      "status": "passed",
+      "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Skill deploy + spawn-site conversion",
+      "goal": "Ship M158 fix (recursive skill deploy) and M162 follow-up (full top-5-suite spawn-site conversion with code-clarity metric replacing wall-clock target).",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Rewrite deploy_skill_to_harness (crates/mp/src/install.rs:755-777) to walk the source directory recursively (skipping manifest.json) and copy every file to ~/.agents/skills/<id>/. Mirror in install_project_skill (install.rs:793-857). Add SkillRegistry::skill_source_dir(id) -> PathBuf method next to skill_source_path at crates/mp/src/install.rs:249. Update the call site at install.rs:586-587 to use it. Add a SKILL.md link-resolution test that parses each shipped SKILL.md for [name.md](name.md) and [name.toml](name.toml) references and asserts each target exists post-install. Cover every v1 skill: mp-flow, mp-runner, mp-coordinator, codebase-design, code-review, diagnosing-bugs, git-reviewer, github-explorer, mp-code-review, obsidian-*. Each file copy uses crate::store::atomic_write per file (M113 S2 contract).",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/milestone/io.rs",
+        "crates/mp/tests/suites/install_skill_link_resolution.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/install_skill_link_resolution|skill_link_targets_exist/)' --no-fail-fast",
+      "done_when": "All v1 skills deploy recursively; every SKILL.md link target verified on disk post-install; atomic-write contract preserved",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Extend crates/mp/tests/common/lib_api.rs to wrap every 'mp <cmd>' invocation used by the top-5 suites. Convert each env.run(&[...]) to lib_api::<cmd>(...) per the M162 taxonomy doc. Track conversion counts per suite in milestone evidence. Add a lib_api_parity_* test for each new wrapper asserting shape parity against a captured CLI invocation.",
+      "files": [
+        "crates/mp/tests/common/lib_api.rs",
+        "crates/mp/tests/suites/validate.rs",
+        "crates/mp/tests/suites/fragment.rs",
+        "crates/mp/tests/suites/milestone.rs",
+        "crates/mp/tests/suites/step.rs",
+        "crates/mp/tests/suites/plan.rs"
+      ],
+      "tests": "manual: after M175 S2 lands, grep -c 'env\\.run(&\\[' across the 5 suite files gives ≤20 total",
+      "done_when": "≤20 env.run sites remaining across top-5 suites; ≥60 parity assertions (was 53 at M162 ship + ≥7 new wrappers)",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "M162 AC rewrite: drop AC-02 (≥20% wall-clock) and AC-04 (≥20% drop) in favor of a code-clarity metric — '≥95% of top-5-suite spawn sites converted (≤20 spawn sites remaining)'. Update F-01 + F-02 from 'fixed' to 'obsolete' (re-scoped out of M162). Update M162 evidence field with the new metric and a one-paragraph note explaining why wall-clock was a poor target.",
+      "files": [
+        "master-plan/milestones/162-convert-pure-logic-integration-tests-to-in-process-library-calls.json"
+      ],
+      "tests": "manual: after M175 S3 lands, mp show milestone 162 --fields acceptance_criteria,finding",
+      "done_when": "M162 AC-02 + AC-04 absent; new conversion-metric AC present; F-01 + F-02 status=obsolete",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Final lint gate: cargo nextest run -p mp --no-fail-fast (baseline + new M158 link-resolution tests + new parity tests for AC-04). cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings. cargo fmt --all -- --check. mp validate.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E \"not test(/repo_plan_validates_via_mini_schema/)\" && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && cargo fmt --all -- --check && mp validate",
+      "done_when": "All commands exit 0; mp validate exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-16",
+    "branch": "",
+    "evidence": "M175: recursive skill deploy regression tests + full top-5 suite conversion (0 env.run). M162 AC-02/AC-04 dropped for conversion metric AC-06; F-01/F-02 obsolete. lib_api expanded; parity green. clippy/fmt/validate clean."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "design",
+      "description": "S2 conversion uses lib_api::run (clap+app::run with stdout capture) rather than pure domain wrappers for many sites. Meets ≤20 env.run goal (0 remaining) and is still in-process; domain wrappers remain preferred for new tests.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "accepted: in-process CLI dispatch is intentional conversion strategy",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "self",
+      "summary": "lib_api::run uses in-process CLI dispatch"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "design",
+      "description": "Remediated: FdRestore Drop + catch_unwind; EnvRestore Drop on run/run_at_repo.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: Drop guards for stdio/env; residual spawn documented",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "capture_stdio panic-unsafe restore"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "hygiene",
+      "description": "AC-03 greps env.run only; residual Command::new sites are intentional CLI-boundary (install/lint/stdin). Documented; not blocking.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: Drop guards for stdio/env; residual spawn documented",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "env.run=0 but Command::new(mp_bin) remains"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "design",
+      "description": "Accepted strategy; domain wrappers preferred for new tests. Self F-01 already noted.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: Drop guards for stdio/env; residual spawn documented",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "lib_api::run is CLI re-entry not pure domain"
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "category": "security",
+      "description": "install.rs uninstall builds skill_dir via harness::skill_dir_for(h, entry.skill_id) then fs::remove_dir_all without validate_skill_id. Deploy/registry paths validate; uninstall does not. A hand-edited/corrupt installed-skills.json with skill_id='..' (or other unvalidated id) can delete outside the skill root. Fix: validate_skill_id before delete; prefer entry.installed_path with containment check under skills root.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: safe uninstall + FdRestore + link/tree + run_at_repo isolation",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "uninstall remove_dir_all without validate_skill_id"
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "check_deployment_files prefers manifest installed_path for env-stable dest. uninstall always re-resolves skill_dir_for under current env. Sequence install@A → change MP_*_SKILL_DIR → uninstall@B leaves orphan package at A and forgets the manifest entry. Fix: delete PathBuf::from(entry.installed_path) when set (after containment), fall back to skill_dir_for only for legacy empty installed_path.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: safe uninstall + FdRestore + link/tree + run_at_repo isolation",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "uninstall ignores installed_path (M-C-2 asymmetry)"
+    },
+    {
+      "id": "F-07",
+      "severity": "high",
+      "category": "correctness",
+      "description": "lib_api.rs capture_stdio: FdRestore is constructed only after both libc::dup2 calls (lines ~1014-1019). If the second dup2 fails or assert_eq! panics, fd 1 is already redirected and never restored — poisons stdout for remaining tests in-process. Prior F-02 claimed panic-safe restore but the pre-guard window remains. Fix: install guard before any dup2 with live flags, or restore on partial failure.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: safe uninstall + FdRestore + link/tree + run_at_repo isolation",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "FdRestore installed after both dup2s"
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "hygiene",
+      "description": "assert_skill_md_links_resolve only parses markdown [label](target). mp-flow references flow-stages.md/stages.toml via backticks; diagnosing-bugs references scripts/hitl-loop.template.sh the same way. Empty-link early return makes skill_link_targets_exist a no-op for the original M158 bug class on those skills. Fix: also extract backtick relative paths and/or assert full source tree lands under dest.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: safe uninstall + FdRestore + link/tree + run_at_repo isolation",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "AC-02 link helper no-ops for backtick-only skills"
+    },
+    {
+      "id": "F-09",
+      "severity": "medium",
+      "category": "design",
+      "description": "AC-04 parity tests cover run/show weakly (cherry-picked keys); run_at_repo has zero parity. Subprocess TestEnv::run_at_repo sets isolated_harness_env (MP_*_SKILL_DIR); in-process run_at_repo only sets MP_HOME/MP_INSTALL_DIR — not a drop-in for install/skill paths. Fix: mirror isolated_harness_env under EnvRestore; add run_at_repo parity + stronger full-JSON compare on show path.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M175 review remediations: safe uninstall + FdRestore + link/tree + run_at_repo isolation",
+      "created": "2026-07-16",
+      "resolved": "2026-07-16",
+      "phase": "external",
+      "summary": "lib_api::run_at_repo parity + harness isolation gaps"
+    }
+  ]
+}

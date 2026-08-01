@@ -1,0 +1,230 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+findings = []
+
+[milestone]
+id = "96"
+title = "2.0 GA release — JSON-native agent-first toolkit ship"
+slug = "2-0-ga-release-json-native-agent-first-toolkit-ship"
+spec_status = "ready"
+execution_status = "planned"
+depends_on = [
+    "82",
+    "92",
+    "93",
+    "94",
+    "95",
+    "90",
+    "81",
+]
+effort = "S"
+risk = "low"
+change_kind = ""
+priority = "high"
+created = "2026-07-02"
+updated = "2026-07-02"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+target_version = "2.0.0"
+executed_by = ""
+
+[intent]
+outcome = "Master Plan toolkit ships as a coherent 2.0.0 release: lean JSON plan persistence, fragment-first agent I/O, search v2, dogfood doc split, size-aware positioning docs, updated brief/charter (TOML→JSON, clean-break), release map reflects the real milestone set, CHANGELOG and version tag cut, make install refreshes harness assets."
+
+[problem]
+description = "2.0.0-rc.1/rc.2 shipped the mp/raul split and early agent JSON defaults, but plan.toml still lists 2.0.0 GA as only M76+M83+M84. The actual 2.0 thesis — lean spec (M82), JSON on disk (M92), fragment ops (M93), search v2 (M95), dogfood ergonomics (M90), size-aware positioning (M81) — has no release capstone. Brief constraints still say TOML and backward compatibility while M92 is a clean break. Without a GA milestone, the JSON/agent-first wave ships piecemeal with no adoption checkpoint, stale release registry, and drift between docs and product reality."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Refresh master-plan/plan.toml releases: 2.0.0 planned milestone list includes M82, M90, M92, M93, M95, M81, M96 (and already-shipped rc members as documented)",
+    "mp milestone set-target-version for 2.0.0 GA members verified consistent with release registry",
+    "Update master-plan/brief.toml T04 constraints: JSON on disk, 2.0 clean break (no TOML plan artifacts, no back-compat shims)",
+    "Update charter if needed to reflect agent-first JSON and goal-2 fragment ops",
+    "CHANGELOG.md: generate or finalize 2.0.0 section from completed milestones (mp changelog generate or manual curation)",
+    "Version tag 2.0.0 + release notes (Gitea/GitHub per existing release process)",
+    "make install — refresh global harness skills/templates after doc changes",
+    "mp validate && make test && make test-fixtures && make test-scenarios green on release branch",
+    "SESSION-HANDOFF or release note summarizing 2.0 agent workflow (mp search, fragment ops, no grep master-plan/)",
+]
+out_of_scope = [
+    "Raul TUI top-tabs (M91) or robustness (M87) — may ship post-GA",
+    "Spec-review surface (M80) — post-M93 follow-up",
+    "Bulk metadata ops (M94) — ships in 2.0 wave but not blocking GA tag if done separately",
+    "Homebrew distribution (deferred backlog)",
+    "New features beyond release hygiene",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp release show 2.0.0 lists M82, M90, M92, M93, M95, M81, M96 (and documents rc history); release map matches plan reality"
+verification = "mp release show 2.0.0"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "master-plan/brief.toml constraints topic no longer claims TOML-on-disk or plan-file backward compatibility; states JSON + 2.0 clean break"
+verification = "manual: accepted — brief review at completion"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "CHANGELOG.md contains a 2.0.0 section covering JSON persistence, lean spec, fragment ops, and search v2 at minimum"
+verification = "manual: accepted — changelog review"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-04"
+description = "Git tag v2.0.0 exists with release notes; make install run post-tag"
+verification = "manual: accepted — release process"
+status = "pending"
+evidence = ""
+
+[[acceptance_criteria]]
+id = "AC-05"
+description = "mp validate exit 0; cargo test -p mp; cargo test -p raul exit 0 on release commit"
+verification = "cargo test -p mp"
+status = "pending"
+evidence = ""
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Release registry & brief"
+goal = "Verify 2.0.0 release map; update brief and charter for JSON clean break"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Changelog & tag"
+goal = "CHANGELOG 2.0.0 section, git tag, release notes, make install"
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "Verify mp release show 2.0.0 milestone list matches GA wave; reconcile plan.toml releases section"
+files = ["master-plan/plan.toml"]
+tests = "mp release show 2.0.0"
+done_when = "Release map lists M82,M90,M92,M93,M94,M95,M81,M96 plus rc history"
+status = "pending"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Update master-plan/brief.toml constraints: JSON on disk, 2.0 clean break; update charter if needed"
+files = [
+    "master-plan/brief.toml",
+    "master-plan/plan.toml",
+]
+tests = "manual: accepted — brief review at completion"
+done_when = "Brief no longer claims TOML or plan back-compat"
+status = "pending"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S3"
+work_package = "WP2"
+order = 3
+action = "Finalize CHANGELOG.md 2.0.0 section covering JSON, lean spec, fragments, search v2"
+files = ["CHANGELOG.md"]
+tests = "manual: accepted — changelog review"
+done_when = "CHANGELOG has substantive 2.0.0 section"
+status = "pending"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Cut v2.0.0 git tag with release notes; run make install to refresh harness assets"
+files = []
+tests = "manual: accepted — release process"
+done_when = "Tag exists and make install completed post-tag"
+status = "pending"
+covers_ac = ["AC-04"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[[steps]]
+id = "S5"
+work_package = "WP-close"
+order = 5
+action = "Full green gate: mp validate, cargo test -p mp, cargo test -p raul; SESSION-HANDOFF 2.0 agent workflow summary"
+files = []
+tests = "cargo test -p mp"
+done_when = "All tests green on release commit"
+status = "pending"
+covers_ac = ["AC-05"]
+depends_on_steps = []
+claimed_by = ""
+claimed_at = ""
+lease_expires_at = ""
+
+[verification]
+date = ""
+branch = ""
+evidence = ""
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

@@ -1,0 +1,60 @@
+{
+  "milestone": {
+    "id": "02",
+    "title": "Adoption and PM surface",
+    "slug": "adoption-pm",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "01"
+    ],
+    "effort": "L",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Profiles, brief, ideas, session, inbox, graph, charter."
+  },
+  "problem": {
+    "description": "WS1–WS4 adoption + PM commands (P3)."
+  },
+  "scope": {
+    "in_scope": [
+      "profiles",
+      "brief",
+      "ideas",
+      "session",
+      "inbox"
+    ],
+    "out_of_scope": [
+      "delta specs",
+      "export views"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "WS integration tests",
+      "verification": "cargo test -p mp",
+      "status": "passed",
+      "evidence": "shipped; cargo test -p mp green"
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "shipped; cargo test -p mp green"
+  }
+}

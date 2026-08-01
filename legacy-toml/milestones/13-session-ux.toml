@@ -1,0 +1,187 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "13"
+title = "Session UX depth"
+slug = "session-ux"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["08"]
+effort = "M"
+risk = "med"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Explicit session switching when auto_bind_branch is off; clearer hybrid session UX."
+
+[problem]
+description = "M08 shipped branch-bound sessions but deferred mp session focus (v0.3). Multi-session workflows need explicit switch command."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "mp session focus command",
+    "session list shows active marker",
+    "hybrid path respects focused session",
+    "ADOPTION-PROFILES §8–9 update",
+    "scenario test for focus + path",
+]
+out_of_scope = [
+    "Portfolio dashboard",
+    "Sprint/capacity planning",
+    "Multi-writer file locks",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "mp session focus sets active session when auto_bind_branch=false"
+verification = "integration test"
+status = "passed"
+evidence = "4 integration tests pass: focus sets active, unfocus clears, show resolves focused, rejects unknown"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "next-step uses focused session milestone steps"
+verification = "scenario test"
+status = "passed"
+evidence = "Focused session milestone loaded in path when auto_bind_branch=false"
+
+[[acceptance_criteria]]
+id = "AC-03"
+description = "ADOPTION-PROFILES documents focus workflow"
+verification = "docs review"
+status = "passed"
+evidence = "ADOPTION-PROFILES updated: focus commands, session focus section, resolved open questions"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "session focus CLI"
+goal = "Explicit session switching"
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Path integration"
+goal = "Focused session in queue"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "RESOLVED: focus in config.toml; error when no focus"
+files = [
+    "master-plan/milestones/13-session-ux.toml",
+    "docs/ADOPTION-PROFILES.md",
+]
+tests = "./scripts/check-docs.sh"
+done_when = "NC-01/NC-02 resolved"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "Implement mp session focus command"
+files = [
+    "crates/mp/src/session.rs",
+    "crates/mp/src/app.rs",
+]
+tests = "crates/mp/tests/session_focus.rs"
+done_when = "session focus sets active session"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "session list shows active/focused marker"
+files = ["crates/mp/src/session.rs"]
+tests = "crates/mp/tests/session_focus.rs"
+done_when = "session list JSON includes focused flag"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "Path/next-step uses focused session when auto_bind_branch=false"
+files = [
+    "crates/mp/src/path_engine.rs",
+    "crates/mp/src/app.rs",
+]
+tests = "crates/mp/tests/session_focus_path.rs"
+done_when = "next-step returns focused session step"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "Update ADOPTION-PROFILES + scenario test"
+files = [
+    "docs/ADOPTION-PROFILES.md",
+    "tests/scenarios/",
+]
+tests = "make test-scenarios"
+done_when = "Scenario covers focus + path"
+status = "done"
+covers_ac = ["AC-03"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "milestone complete"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

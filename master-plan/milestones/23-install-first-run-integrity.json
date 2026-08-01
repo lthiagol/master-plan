@@ -1,0 +1,186 @@
+{
+  "milestone": {
+    "id": "23",
+    "title": "Install & first-run integrity",
+    "slug": "install-first-run-integrity",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-24",
+    "updated": "2026-06-25",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "A fresh `mp install` + `mp init` never leaves a broken or partial install, and `mp doctor` reliably detects corrupt or empty artifacts."
+  },
+  "problem": {
+    "description": "Pilot P1/H1/H3/H6: `mp install` left zero-byte templates and skills; `mp init` left a partial plan dir on failure; `mp doctor` reported templates OK despite empties. This broke the entire pilot and erodes trust on first contact."
+  },
+  "scope": {
+    "in_scope": [],
+    "out_of_scope": [
+      "reworking the install distribution model",
+      "release signing / checksum verification of binaries"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp install verifies each copied template/skill is non-empty (size floor) and errors naming the offending path on empties",
+      "verification": "manual: truncate a template, run mp install, expect a failure naming the file",
+      "status": "passed",
+      "evidence": "install_integrity.rs tests: install_refuses_zero_byte_template, install_refuses_zero_byte_skill both pass"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp doctor fails (not warns) when a key template/skill is zero bytes or unparseable TOML",
+      "verification": "mp doctor --format json on a tree with an empty track.toml returns ok:false with a templates check",
+      "status": "passed",
+      "evidence": "doctor_integrity.rs tests: doctor_fails_on_empty_key_template, doctor_fails_on_unparseable_toml_template, doctor_fails_on_empty_agents_template all pass"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp init is transactional: on any failure mid-init no partial master-plan/ dir remains",
+      "verification": "manual: force a failure mid-init; assert no master-plan/ left behind [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "init_transactional.rs::init_transactional_no_partial_dir_on_failure passes"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp install --source error states 'repo root required' for a binary path; when --source omitted it prefers the running binary's adjacent templates",
+      "verification": "mp install --source /opt/homebrew/bin/mp returns a clear repo-root error",
+      "status": "passed",
+      "evidence": "install_source.rs::install_source_binary_path_errors passes"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Integrity checks",
+      "goal": "Make mp install/init/doctor detect and refuse corrupt/empty artifacts and never leave partial state",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "mp install: verify every copied template/skill is non-empty above a size floor; error names the offending path",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/assets.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "mp install refuses zero-byte or under-floor copied artifacts with a path-naming error",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "mp doctor hard-fails (ok:false) when a key template/skill is zero bytes or unparseable TOML, naming the check",
+      "files": [
+        "crates/mp/src/doctor.rs"
+      ],
+      "tests": "crates/mp/tests/doctor_integrity.rs: empty track.toml tree -> mp doctor --format json returns ok:false with a templates check",
+      "done_when": "doctor returns ok:false on empty/unparseable key templates",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Make mp init transactional: stage master-plan/ in a temp dir and atomically move into place; on any mid-init failure no partial master-plan/ remains",
+      "files": [
+        "crates/mp/src/bootstrap.rs",
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "crates/mp/tests/init_transactional.rs: force a failure mid-init; assert no master-plan/ left behind",
+      "done_when": "forced mid-init failure leaves no partial master-plan/ directory",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "mp install: when --source points at a binary path, error 'repo root required'; when --source is omitted, prefer the running binary's adjacent templates",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "crates/mp/tests/install_source.rs: mp install --source $(which mp) returns a clear repo-root error; default resolves adjacent templates",
+      "done_when": "binary --source yields repo-root error; omitted --source resolves adjacent templates",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "mp install: verify copied TOML templates are parseable (valid structure); error names the offending path",
+      "files": [
+        "crates/mp/src/install.rs",
+        "crates/mp/src/assets.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "mp install refuses unparseable copied templates with a path-naming error",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-25",
+    "branch": "",
+    "evidence": "All 5 steps done, 4 ACs passed, 14 new tests, full test suite green (67 tests), cargo check clean"
+  }
+}

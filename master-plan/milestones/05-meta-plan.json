@@ -1,0 +1,59 @@
+{
+  "milestone": {
+    "id": "05",
+    "title": "Meta master-plan",
+    "slug": "meta-plan",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "04"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-18",
+    "updated": "2026-06-18",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Track toolkit work in repo master-plan/; update handoff."
+  },
+  "problem": {
+    "description": "Work tracked only in handoff.md — dogfood the product."
+  },
+  "scope": {
+    "in_scope": [
+      "master-plan/",
+      "milestones",
+      "backlog",
+      "decisions"
+    ],
+    "out_of_scope": [
+      "release CI",
+      "npm publish"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp status reflects plan",
+      "verification": "mp status --format json",
+      "status": "passed",
+      "evidence": "meta plan bootstrapped; handoff points to master-plan/"
+    }
+  ],
+  "verification": {
+    "date": "2026-06-18",
+    "branch": "",
+    "evidence": "meta plan bootstrapped; handoff points to master-plan/"
+  }
+}

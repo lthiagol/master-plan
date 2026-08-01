@@ -1,0 +1,232 @@
+{
+  "milestone": {
+    "id": "64",
+    "title": "Mandatory independent review phase: execute→review→remediate cycle + review queue",
+    "slug": "mandatory-independent-review-phase-execute-review-remediate-cycle-review-queue",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-30",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "Autonomous execution is always followed by an independent review pass before work is considered shipped: AGENTS.md codifies the execution contract and the review cadence, and `mp review` gives a reviewer a frictionless queue of completed-but-unreviewed milestones with a sign-off command."
+  },
+  "problem": {
+    "description": "Two autonomous runs drifted in ways automated gates cannot catch. The M62 guardrail stops 'red tests marked green' (mechanical), and M60's W40-W43 catch poorly-groomed specs. But both runs also shipped SEMANTIC drift — wrong/missing implementations with passing or absent tests: M54's review CLI was entirely absent (no test failed because no test covered it); M52 shipped the wrong W30 semantics and its test passed. Only an independent fresh-eyes pass (comparing implementation to spec/ACs) caught these. Today review is opt-in (M57 code_review defaults off) and there is no queue or tracking for 'completed and awaiting review', so nothing makes the review pass routine. Worse: the process rules ('never complete on red tests', 'verification steps are mandatory', 'block+report, never fake completion') lived only in SESSION-HANDOFF.md, which was deleted — they have no permanent home. Honest caveat encoded in the spec: tooling makes review routine and visible; it CANNOT verify a review was good. The judgment of 'does this do what the spec meant' stays a fresh-eyes pass — this milestone guarantees that pass HAPPENS every time and is low-friction, not that it is automatic."
+  },
+  "scope": {
+    "in_scope": [
+      "Resurrect the execution-contract rules into AGENTS.md as a permanent section (never in a scratch handoff): never complete on red tests; a step tests value is a gate, not a suggestion; verification/dogfood steps are mandatory; on unfixable failure block+report, never fake completion; one commit per milestone; re-run mp validate after each completion.",
+      "Document the execute->review->remediate cadence in AGENTS.md as mandatory: autonomous execution is ALWAYS followed by an independent review pass (a different session/context than the executor) before work is considered shipped.",
+      "Bake 'verify, don't trust' into the review cadence: the reviewer reads the execution report FIRST, then verifies its claims against the diff/tests. The report and the agent's notes are claims — and the place drift can hide (the M62 summary said '0 failures' masking a flaky test) — never proof.",
+      "Add `mp reviews pending`: lists milestones with execution_status=done that have no review record (or were completed/recompleted after their last review), with a pointer to each milestone's spec/ACs so a reviewer has a frictionless queue.",
+      "Add `mp reviews pass <milestone> --verdict ok|changes-needed --reviewer <who> [--notes ...]`: records a review sign-off (verdict, reviewer, date) so the milestone leaves the pending queue. Re-review after re-completion updates the record.",
+      "Add `mp reviews list`/`show` for review history.",
+      "Add read-only `mp execution report`: for milestones in the review queue, compile step statuses (done/skipped/failed) + evidence + block_reasons + AC pass/fail, and surface each milestone's execution notes. The executing agent records its narrative (deviations from spec, deferred/skipped work + reason, decisions/assumptions) via the existing `mp note add` so drift is declared explicitly rather than buried. This report is what the reviewer reads first.",
+      "Surface the pending-review count in `mp status` so a reviewer knows work is waiting.",
+      "Update the master-planner skill and docs to reference the review phase (execute->review->remediate) so agents know the full cycle, including the expectation to record an execution narrative (notes) at handoff."
+    ],
+    "out_of_scope": [
+      "The completion guardrail itself (done in M62, hardened to bare-path tests in M63).",
+      "Reviewer-identity enforcement / blocking completion unless reviewer != executor (chosen NOT to build — review independence is a process expectation, not a hard gate).",
+      "Automated verification of review quality (impossible — review substance is judgment).",
+      "A separate reviewer-agent binary/profile (the parked agent-profiles idea).",
+      "Changing M57's in-flow code_review step gate (this milestone's review PASS is post-completion and complementary).",
+      "A new narrative write command (reuse mp note add; only the read-side mp execution report is new)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp reviews pending lists done milestones with no review record (or completed after their last review); the queue empties as each is signed off",
+      "verification": "crates/mp/tests/reviews_queue.rs",
+      "status": "passed",
+      "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+    },
+    {
+      "id": "AC-02",
+      "description": "mp reviews pass <M> --verdict --reviewer records a review sign-off and removes M from the pending queue; re-completing M re-queues it",
+      "verification": "crates/mp/tests/reviews_queue.rs",
+      "status": "passed",
+      "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+    },
+    {
+      "id": "AC-03",
+      "description": "AGENTS.md has a permanent Execution contract section, an execute->review->remediate cadence section, AND an explicit 'verify, don't trust' rule for reviewers",
+      "verification": "manual: accepted - AGENTS.md review",
+      "status": "passed",
+      "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+    },
+    {
+      "id": "AC-04",
+      "description": "mp status surfaces the pending-review count so a reviewer sees waiting work",
+      "verification": "crates/mp/tests/reviews_queue.rs",
+      "status": "passed",
+      "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+    },
+    {
+      "id": "AC-05",
+      "description": "mp execution report compiles step statuses/evidence/block_reasons/AC results for queued milestones and surfaces their execution notes (recorded via mp note add)",
+      "verification": "crates/mp/tests/execution_report.rs",
+      "status": "passed",
+      "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Execution contract in AGENTS.md",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Review queue + sign-off commands",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Visibility + skill/docs",
+      "goal": "",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Execution report (executor->reviewer handoff)",
+      "goal": "",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Resurrect the execution-contract rules into AGENTS.md as a PERMANENT section (they previously lived only in the deleted SESSION-HANDOFF.md): never complete on red tests; a step tests value is a gate not a suggestion; verification/dogfood steps are mandatory; on unfixable failure block+report, never fake completion; one commit per milestone; re-run mp validate after each completion. Add an execute->review->remediate cadence section: autonomous execution is ALWAYS followed by an independent review pass (different session/context than the executor). Add the explicit verify-dont-trust rule: the reviewer reads the execution report FIRST, then verifies its claims against the diff/tests — the report and agent notes are claims where drift hides (the M62 summary masked a flaky test), never proof.",
+      "files": [],
+      "tests": "manual: accepted - AGENTS.md review",
+      "done_when": "AGENTS.md has the Execution contract section, the execute->review->remediate cadence section, and the verify-dont-trust rule",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Implement the review record (per-milestone review status or a review log under reviews/) and `mp reviews pass <milestone> --verdict ok|changes-needed --reviewer <who> [--notes ...]`. Recording a pass removes the milestone from the pending queue. Re-completing a milestone after changes re-queues it for re-review.",
+      "files": [],
+      "tests": "crates/mp/tests/reviews_queue.rs",
+      "done_when": "mp reviews pass <M> --verdict --reviewer records a sign-off; M leaves the pending queue; re-completing M re-queues it",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Implement `mp reviews pending`: list milestones with execution_status=done that have no review record or were completed after their last review, each with a pointer to its spec/ACs. Add `mp reviews list` and `mp reviews show <M>` for history.",
+      "files": [],
+      "tests": "crates/mp/tests/reviews_queue.rs",
+      "done_when": "mp reviews pending lists done milestones with no review (or completed after last review); list/show work",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Surface the pending-review count in `mp status` (and inbox if natural) so a reviewer sees waiting work without running a separate command.",
+      "files": [],
+      "tests": "crates/mp/tests/reviews_queue.rs",
+      "done_when": "mp status shows the pending-review count",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Update the master-planner skill and relevant docs to reference the review phase (execute->review->remediate) so agents know the full cycle and where mp reviews fits. Note the honest limit: tooling makes review routine and visible; review quality stays a fresh-eyes judgment.",
+      "files": [],
+      "tests": "manual: accepted - skill/docs review",
+      "done_when": "master-planner skill + docs reference the review phase so agents know the full cycle",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP4",
+      "order": 6,
+      "action": "Implement read-only `mp execution report`: for milestones in the review queue, compile each step status (done/skipped/failed) + evidence + block_reason + AC pass/fail, and surface the milestone execution notes (the agent records deviations/deferred/decisions via the existing mp note add). Reuse mp note for the narrative — no new write command. This is the artifact the reviewer reads first.",
+      "files": [],
+      "tests": "crates/mp/tests/execution_report.rs",
+      "done_when": "mp execution report compiles step statuses/evidence/block_reasons/AC results for queued milestones and surfaces their execution notes",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-30",
+    "branch": "",
+    "evidence": "Tier A M64: reviews queue, execution report, AGENTS.md + skill docs"
+  }
+}

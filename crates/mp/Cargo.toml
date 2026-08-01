@@ -1,0 +1,49 @@
+[package]
+name = "mp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Master Plan CLI — spec-driven project planning for agents"
+
+[[bin]]
+name = "mp"
+path = "src/main.rs"
+
+[lib]
+name = "mp"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { version = "1", default-features = false, features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+clap = { version = "4", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
+include_dir = "0.7"
+mp-model = { path = "../mp-model" }
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+tempfile = { version = "3", default-features = false, features = ["getrandom"] }
+toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
+walkdir = "2"
+
+[dev-dependencies]
+# M161: jsonschema moved to crates/mp-oracle/tests so its 30-crate
+# transitive tree (fancy-regex, uuid-simd, email_address, idna,
+# referencing, fraction, ahash) is no longer linked into every mp test
+# binary. The 2 oracle tests (`mini_schema_parity`, `mini_schema_e2e`)
+# now live in the dedicated mp-oracle workspace member.
+
+[target.'cfg(unix)'.dev-dependencies]
+# M117 S1 integration test uses `libc::kill(pid, 0)` to assert no orphan
+# verifier subprocess survives the killpg cleanup. Same `libc 0.2,
+# default-features=false` package as the runtime dep; reusing the
+# dev-only dep keeps the verifier tests fully CI-portable (Windows is
+# out-of-scope for the toolkit today).
+libc = { version = "0.2", default-features = false }
+
+# libc is Unix-only. Pinned to 0.2; default-features=false to avoid pulling
+# the full std-compat surface. Used by mp's verifier-cancellation path
+# (M107/S3) to call libc::killpg on registered child process groups when
+# the global-deadline handler fires. Zero non-default transitive deps.
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", default-features = false }

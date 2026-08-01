@@ -1,0 +1,52 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "crosses-the-line done",
+      "evidence": "fixture",
+      "id": "AC-01",
+      "status": "passed",
+      "verification": "manual: fixture"
+    }
+  ],
+  "intent": {
+    "outcome": "Milestone 100 — first numeric id crossing the lex boundary at 100."
+  },
+  "milestone": {
+    "created": "2026-07-04",
+    "depends_on": [],
+    "effort": "S",
+    "execution_status": "done",
+    "id": "100",
+    "risk": "low",
+    "slug": "crosses-the-line",
+    "spec_status": "verified",
+    "title": "Crosses 100",
+    "updated": "2026-07-04"
+  },
+  "problem": {
+    "description": "Lexicographically between 10 and 11; numeric order must place this AFTER 11."
+  },
+  "scope": {
+    "in_scope": ["100"],
+    "out_of_scope": []
+  },
+  "steps": [
+    {
+      "action": "Do 100",
+      "covers_ac": ["AC-01"],
+      "done_when": "done",
+      "id": "S1",
+      "status": "done",
+      "tests": "manual: fixture",
+      "work_package": "WP1"
+    }
+  ],
+  "work_packages": [
+    {
+      "goal": "Bootstrap 100",
+      "id": "WP1",
+      "name": "WP1",
+      "rollback": "n/a"
+    }
+  ]
+}

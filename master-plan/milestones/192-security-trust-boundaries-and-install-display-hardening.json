@@ -1,0 +1,364 @@
+{
+  "milestone": {
+    "id": "192",
+    "title": "Security trust boundaries and install/display hardening",
+    "slug": "security-trust-boundaries-and-install-display-hardening",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "187",
+      "188"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T15:14:40.011640+00:00"
+  },
+  "intent": {
+    "outcome": "Repository-controlled verification cannot run before explicit trust; Raul never emits raw terminal controls from plan text; generated env.sh quotes arbitrary paths; uninstall deletes only within an opened canonical harness root."
+  },
+  "problem": {
+    "description": "ac_verify defaults to sh -c for plan verification without a trust gate. Raul renders untrusted strings without sanitizing ESC/OSC. install env.sh interpolates MP_INSTALL_DIR unsafely. Uninstall accepts absolute paths whose basename matches the skill id."
+  },
+  "scope": {
+    "in_scope": [
+      "Persist trust by canonical repo identity after confirmation; noninteractive fails closed",
+      "No verify execution including argv-only before trust",
+      "Display-boundary sanitizer for plan/subprocess strings in Raul",
+      "POSIX-quoted env.sh and atomic write",
+      "Uninstall via opened harness-root handle with no-follow semantics"
+    ],
+    "out_of_scope": [
+      "Making trusted verification a sandbox",
+      "Persistence transactions and schema fail-closed (Groups A/B provide prerequisites)",
+      "Watch UI correctness (Group D)",
+      "Comment cleanup (Group G)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Install/uninstall path quoting and harness-root containment: env.sh POSIX-quotes arbitrary paths and writes atomically; uninstall rejects traversal/symlinks and deletes only under opened canonical root.",
+      "verification": "cargo nextest run -p mp --test install_skills_v2 --no-fail-fast",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-02",
+      "description": "Install agent-deploy path remains correct after env.sh quoting and uninstall containment changes.",
+      "verification": "cargo nextest run -p mp --test install_deploys_mp_planner_agent --no-fail-fast",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-03",
+      "description": "Untrusted plan verification cannot execute before repository trust (touch, substitution, redirection, credential-read); trust is repo-scoped not symlink-inherited; argv-only rejects shell operators; trusted shell still supports documented commands.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/ac_verify/)'",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-04",
+      "description": "Raul display-boundary sanitizer strips/escapes OSC 52/8, CSI clear, CR, BEL, bidi overrides, and malicious Watch output; backend/PTY output contains no raw ESC from plan content.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/sanitize|control_char/)'",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-05",
+      "description": "Existing ac_verify suite binaries remain green as regression baseline for timeout/killpg/buffer caps alongside the trust gate.",
+      "verification": "cargo nextest run -p mp --test suite_ac_verify --no-fail-fast",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-06",
+      "description": "mp install/ac_verify changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    },
+    {
+      "id": "AC-07",
+      "description": "raul sanitizer changes are clippy-clean with warnings denied.",
+      "verification": "cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "ac-verify-trust-gate",
+      "choice": "Treat verification execution as an explicit capability: persist trust by canonical repository identity after confirmation; noninteractive fails closed unless trust exists; no repository-controlled verification (including argv-only) runs before trust; argv-only allowlist is post-trust shell-minimization; arbitrary shell is explicit post-trust opt-in showing the exact command; preserve timeout/process-group/bounded-output; document that trusted shell is intentional execution not a sandbox.",
+      "rationale": "ac_verify defaults to sh -c for plan verification without a trust gate (Finding 19)."
+    },
+    {
+      "area": "display-boundary-sanitizer",
+      "choice": "Add one display-boundary sanitizer for every untrusted plan/subprocess string in Raul; preserve newline/tab only where structurally intended; escape or visibly replace C0/C1, ESC, DEL, bidi overrides, and unsafe zero-width controls; keep Unicode width/truncation after sanitization.",
+      "rationale": "Raul renders untrusted strings without sanitizing ESC/OSC, enabling terminal control injection (Finding 20)."
+    },
+    {
+      "area": "env-sh-posix-quoting",
+      "choice": "Encode installation paths with a correct POSIX single-quote routine (or avoid generated shell source); write env.sh atomically; returned path snippets use the same safe encoder.",
+      "rationale": "Generated env.sh interpolates MP_INSTALL_DIR unsafely, enabling command injection via path characters (Finding 21)."
+    },
+    {
+      "area": "uninstall-harness-containment",
+      "choice": "Store canonical harness root plus relative installed artifact path; reject symlink components; delete relative to an opened canonical harness-root directory handle with no-follow semantics; verify containment, target type, and artifact identity; refuse deletion when containment cannot be established.",
+      "rationale": "Uninstall accepts absolute paths whose basename matches the skill id, escaping harness roots (Finding 22)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "ac_verify trust gate",
+      "goal": "Repository-scoped trust before any verification execution; argv-only and shell modes post-trust only.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Raul display sanitizer",
+      "goal": "Single display-boundary sanitizer for untrusted plan/subprocess strings.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Install env.sh quoting and uninstall containment",
+      "goal": "POSIX-quoted atomic env.sh; uninstall via opened harness-root handle with no-follow semantics.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Treat verification execution as an explicit capability in ac_verify: persist trust by canonical repository identity after confirmation; noninteractive fails closed unless trust already exists; no repository-controlled verification command including argv-only executes before trust.",
+      "files": [
+        "crates/mp/src/ac_verify.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/ac_verify/)'",
+      "done_when": "Untrusted touch/substitution/redirection/credential-read do not execute before trust; trust is repo-scoped and not inherited by symlinked path.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Provide argv-only allowlisted execution as post-trust shell-minimization for standard test commands; keep arbitrary shell as explicit post-trust opt-in displaying the exact command; preserve timeout, process-group termination, and bounded output; document that trusted shell is intentional execution not sandboxing.",
+      "files": [
+        "crates/mp/src/ac_verify.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_ac_verify --test ac_verify_drain_buffer_cap --test ac_verify_per_ac_timeout_killpg --no-fail-fast",
+      "done_when": "argv-only rejects shell operators; trusted shell supports documented commands; existing timeout/killpg/buffer caps still pass.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add one display-boundary sanitizer for every untrusted plan/subprocess string in Raul (milestones, backlog, annotations, Watch logs/output, errors); preserve newline/tab only where structurally intended; escape or visibly replace C0/C1, ESC, DEL, bidi overrides, and unsafe zero-width controls; keep Unicode width/truncation after sanitization.",
+      "files": [
+        "crates/raul/src/text.rs",
+        "crates/raul/src/tui/"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/sanitize|control_char/)'",
+      "done_when": "OSC 52/8, CSI clear, CR, BEL, bidi overrides, and malicious Watch output are sanitized; PTY/backend has no raw ESC from plan content.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add Raul tests matching sanitize|control_char covering Finding 20 cases; wire sanitizer at all listed render boundaries.",
+      "files": [
+        "crates/raul/src/text.rs",
+        "crates/raul/tests/"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/sanitize|control_char/)'",
+      "done_when": "AC-04 -E filter matches ≥1 passing test; clippy clean.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Encode installation paths with a correct POSIX single-quote routine (or avoid generated shell source); write env.sh atomically; ensure returned path snippets use the same safe encoder.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test install_skills_v2 --test install_deploys_mp_planner_agent --no-fail-fast",
+      "done_when": "Spaces, quotes, $(), backticks, backslashes, and newlines are safely encoded; sourcing env.sh in isolated shell yields exact values with no side effects.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Store canonical harness root plus relative installed artifact path; reject symlink components; perform deletion relative to an opened canonical harness-root directory handle with no-follow semantics; verify containment, target type, and expected artifact identity; refuse deletion when containment cannot be established.",
+      "files": [
+        "crates/mp/src/install.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test install_skills_v2 --test install_manifest --no-fail-fast",
+      "done_when": "Malicious absolute paths and lexical traversal rejected; symlinked parent/dangling link/root replacement handled; valid moved installs under updated root work; permission failures leave artifacts consistent.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "M192 stages 5-7: Findings 19-22 implemented; all six steps done; AC-01..AC-07 passed; self-review F-01/F-02/F-03 fixed; release binaries rebuilt."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Legacy installed-skill rows were backfilling installed_path only, leaving the new harness_root/artifact_path containment fields absent after upgrade; fixed by atomically backfilling all containment metadata when the configured root canonicalizes.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/install.rs"
+      },
+      "summary": "Backfill containment metadata for legacy rows",
+      "confidence": "high"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Descriptor-relative recursive uninstall could encounter an ordinary permission failure after deleting some children; fixed by preflighting write/search permission across the anchored target tree before the first unlink and preserving the manifest on failure.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/install.rs"
+      },
+      "summary": "Preflight uninstall permissions before mutation",
+      "confidence": "high"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The completion gate found that preflight traversal advanced the directory offset shared by dup(), causing the removal walk to see EOF and unlinkat(AT_REMOVEDIR) to fail with ENOTEMPTY for legitimate skills. Fixed by rewinding each fdopendir stream before enumeration.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self",
+      "anchor": {
+        "path": "crates/mp/src/install.rs",
+        "new_range": {
+          "start_line": 520,
+          "end_line": 520
+        },
+        "side": "new"
+      },
+      "summary": "Reset duplicated directory stream offsets before traversal",
+      "confidence": "high"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Finding 19 regression: reject_symlink_components walks every absolute prefix and fails closed on platform intermediary symlinks (macOS /var → /private/var, /tmp → /private/tmp). Any non-canonical project_root under /var/folders or /tmp therefore cannot establish or use repository trust via the CLI — mp milestone verify reports \"trust is not inherited through symlinked path /var\" before the trust prompt/store runs. The intended rule (symlink alias must not inherit trust for the same repo) is sound, but the implementation over-rejects prefix rewrites. ac_verify_trust.rs masks this by canonicalize()-ing the temp root before run_one_in (L15/L17). Reproducer: mktemp -d project under /var/folders, mp init + milestone with runnable verification, MP_VERIFY_TRUST_STORE pointing at a fresh path, mp milestone verify --project-root <tmpdir> (non-canon) → symlink error; same with $(realpath <tmpdir>) → normal \"not trusted\" fail-closed. Production /Users paths are unaffected. Fix direction: key trust on canonical identity while limiting the no-inheritance check to aliases of the repository root (or canonicalize in PlanContext without re-opening alias inheritance).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/ac_verify.rs",
+        "new_range": {
+          "start_line": 143,
+          "end_line": 143
+        },
+        "side": "new"
+      },
+      "summary": "Trust gate rejects macOS system prefix symlinks",
+      "confidence": "high"
+    }
+  ]
+}

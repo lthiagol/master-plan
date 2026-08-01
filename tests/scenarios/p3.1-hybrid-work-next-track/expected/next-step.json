@@ -1,0 +1,22 @@
+{
+  "item": {
+    "archived_at": "",
+    "completed": "",
+    "created": "2026-06-17",
+    "done_when": "Webhook retried up to 3 times with backoff",
+    "effort": "S",
+    "evidence": "",
+    "id": "BF-02",
+    "problem": "Transient failures drop events",
+    "status": "pending",
+    "steps": [
+      "Add retry policy to webhook client"
+    ],
+    "title": "Retry timeout on webhook delivery",
+    "verification": "cargo test webhook_retry"
+  },
+  "track": {
+    "kind": "bugfix",
+    "title": "Bugfixes"
+  }
+}

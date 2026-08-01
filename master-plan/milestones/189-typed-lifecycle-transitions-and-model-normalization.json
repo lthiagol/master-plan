@@ -1,0 +1,544 @@
+{
+  "milestone": {
+    "id": "189",
+    "title": "Typed lifecycle transitions and model normalization",
+    "slug": "typed-lifecycle-transitions-and-model-normalization",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "187"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-19",
+    "updated": "2026-07-19",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-19T14:01:49.838310+00:00"
+  },
+  "intent": {
+    "outcome": "mp-model owns a typed MilestoneEvent transition table; mp is the sole durable executor; Raul consumes shared projections; legacy nested step IDs cannot produce duplicates; remediation restores the exact prior lifecycle."
+  },
+  "problem": {
+    "description": "Lifecycle is an allowlist, not a transition table, so set-lifecycle allows arbitrary jumps and terminal regressions. Raul duplicates legacy mapping and maps exec done to complete while mp-model maps it to non-terminal done. Remediation collapses distinct origins. normalize_steps_from_disk can accept duplicate nested step IDs."
+  },
+  "scope": {
+    "in_scope": [
+      "Typed MilestonePhase, overlays, MilestoneEvent, and pure transition() in mp-model",
+      "CLI commands submit events; raw assignment is migration-only",
+      "Reviews registry solely owns review-cycle verdicts; self-reviewed/reviewed are legacy aliases",
+      "Remove Raul duplicate lifecycle derivation",
+      "Reject duplicate legacy step IDs; exact remediation pre-state restore"
+    ],
+    "out_of_scope": [
+      "Watch driver/prompt alignment and Raul preflight/idle (Group D)",
+      "Annotation cursor and co-approval UX (Group E)",
+      "Persistence transaction engine (Group A)",
+      "Comment remediation (Group G)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp-model owns typed MilestonePhase, overlays, MilestoneEvent, and pure transition(current, event, context) -> Result<TransitionEffects>; exhaustive valid/invalid transitions reject arbitrary jumps (including draft->complete and complete->draft) and synchronize lifecycle/spec/execution projections; normalize_steps_from_disk rejects duplicate legacy nested step IDs with both locations, preserving top-level precedence only for supported migration inputs.",
+      "verification": "cargo nextest run -p mp-model --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp-model --no-fail-fast: 47 passed"
+    },
+    {
+      "id": "AC-02",
+      "description": "Raul has no duplicate legacy lifecycle derivation: Value adapters extract fields and delegate to mp-model; legacy execution_status done maps to nonterminal lifecycle done (not complete); tui_status_parity compares Raul output to mp-model across the documented matrix including unknown, empty, cancelled, blocked, deferred, and in-progress.",
+      "verification": "cargo nextest run -p raul --test tui_status_parity --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_status_parity --no-fail-fast: 10 passed"
+    },
+    {
+      "id": "AC-03",
+      "description": "mp is the sole durable transition executor: public lifecycle CLI paths submit MilestoneEvents instead of assigning lifecycle strings; raw set-lifecycle remains migration-only; legacy spec/execution setters cannot bypass transition gates or terminal regressions.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast: 19 passed"
+    },
+    {
+      "id": "AC-04",
+      "description": "Reviews registry solely owns self/external review-cycle state; self-reviewed and reviewed are legacy read/migration aliases not active destinations; remediation captures the exact pre-state lifecycle and restores that value when findings clear (done->remediation->done and complete->remediation->complete); invalid remediation origins are rejected.",
+      "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast: 14 passed"
+    },
+    {
+      "id": "AC-05",
+      "description": "End-to-end lifecycle reliability holds after the shared transition table: all-steps-done complete path, stuck-exec warnings, and reviews-pass promotion remain consistent with mp-model projections.",
+      "verification": "cargo nextest run -p mp --test transition_reliability --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test transition_reliability --no-fail-fast: 17 passed"
+    },
+    {
+      "id": "AC-06",
+      "description": "Review-side mutation paths (findings, remediation entry/exit, review_state) stay consistent with the shared transition executor and reviews-registry ownership.",
+      "verification": "cargo nextest run -p mp --test suite_review --no-fail-fast",
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_review --no-fail-fast: 67 passed"
+    },
+    {
+      "id": "AC-07",
+      "description": "mp crate with tests compiles under Clippy with warnings denied after transition-executor wiring.",
+      "verification": "cargo clippy -p mp --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "cargo clippy -p mp --tests --no-deps -- -D warnings: exit 0"
+    },
+    {
+      "id": "AC-08",
+      "description": "mp-model crate with tests compiles under Clippy with warnings denied after typed phase/event/transition and normalize changes.",
+      "verification": "cargo clippy -p mp-model --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "cargo clippy -p mp-model --tests --no-deps -- -D warnings: exit 0"
+    },
+    {
+      "id": "AC-09",
+      "description": "raul crate with tests compiles under Clippy with warnings denied after lifecycle projection delegation.",
+      "verification": "cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "status": "passed",
+      "evidence": "cargo clippy -p raul --tests --no-deps -- -D warnings: exit 0"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "transition-ownership",
+      "choice": "mp-model owns typed MilestonePhase, overlays, MilestoneEvent, and pure transition(current, event, context) -> Result<TransitionEffects>; mp is the sole durable executor that applies TransitionEffects to disk; CLI raw lifecycle assignment is migration-only.",
+      "rationale": "LIFECYCLE_STATES is an allowlist; set-lifecycle and legacy setters currently allow arbitrary jumps and terminal regressions with no single owner."
+    },
+    {
+      "area": "review-cycle",
+      "choice": "Self/external review-cycle state lives solely in the reviews registry; self-reviewed and reviewed become legacy read/migration aliases, not active milestone destinations; delivery phases stay small with complete as terminal delivery.",
+      "rationale": "Reviews, Watch, completion, and raw setters each owned part of review rungs, producing contradictory lifecycles (Group C Finding 13 / Group D decision alignment)."
+    },
+    {
+      "area": "raul-projection",
+      "choice": "Raul removes duplicate legacy lifecycle mapping and delegates derivation to mp-model (Value adapters extract fields only); legacy execution_status done maps to nonterminal lifecycle done.",
+      "rationale": "Raul currently mirrors and diverges from mp-model, mapping exec done to complete while mp-model maps it to done."
+    },
+    {
+      "area": "remediation-restore",
+      "choice": "Entering remediation captures the exact current lifecycle as remediation_pre_state (after validating an allowed origin) and restores exactly that value when relevant findings clear; behavior lives in the shared transition function.",
+      "rationale": "Current reviews code hard-codes done/self-reviewed on entry, collapsing complete->remediation back to done."
+    },
+    {
+      "area": "normalize-step-ids",
+      "choice": "normalize_steps_from_disk mutably tracks every accepted nested step ID, rejects duplicates with a validation error naming both locations, and preserves top-level precedence only for explicitly supported migration inputs; canonical serialization strips nested steps.",
+      "rationale": "Current normalize silently skips duplicate nested IDs against a frozen top-level set, dropping work without error."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Typed transition table and normalize",
+      "goal": "mp-model owns MilestonePhase/overlays/MilestoneEvent, pure transition(), and duplicate nested-step ID rejection with locations.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "mp durable executor and remediation",
+      "goal": "CLI submits events; raw assignment migration-only; reviews registry owns review cycle; exact remediation pre-state restore.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Raul shared projection",
+      "goal": "Remove Raul duplicate lifecycle mapping; delegate to mp-model; exec done -> nonterminal done; parity matrix.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Introduce typed MilestonePhase, overlay flags (blocked/deferred/cancelled/needs-regrooming), MilestoneEvent, and TransitionEffects in mp-model; keep LIFECYCLE_STATES as a migration/read allowlist only.",
+      "files": [
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp-model/src/lib.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --no-fail-fast",
+      "done_when": "Types compile and are exported; unit tests pin the phase/overlay/event vocabulary.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp-model --no-fail-fast: 47 passed"
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement pure transition(current, event, context) -> Result<TransitionEffects> encoding valid sources/destinations, gate requirements, overlay changes, timestamps, and legacy-field synchronization; reject arbitrary jumps including draft->complete and complete->draft.",
+      "files": [
+        "crates/mp-model/src/milestone.rs",
+        "crates/mp-model/tests/model_invariants.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --no-fail-fast",
+      "done_when": "Exhaustive valid/invalid transition table tests pass; every transition produces synchronized lifecycle/spec/execution projections.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp-model --no-fail-fast: transition table tests passed"
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Fix normalize_steps_from_disk: mutable seen-ID set inserts every accepted nested step ID; reject duplicates with validation errors naming both locations; preserve top-level precedence only for supported migration inputs; prepare_for_disk continues stripping nested steps.",
+      "files": [
+        "crates/mp-model/src/normalize.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --no-fail-fast",
+      "done_when": "Duplicate IDs across WPs and nested vs top-level fail with locations; unique nested steps and round-trip load/normalize/write/reload pass.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp-model --no-fail-fast: duplicate nested ID tests passed"
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Make mp the sole durable transition executor: lifecycle CLI commands (approve/complete/block/defer/reopen/set-status and related) submit MilestoneEvents and apply TransitionEffects; restrict raw set-lifecycle (and bulk raw assignment) to explicit migration tooling.",
+      "files": [
+        "crates/mp/src/milestone/spec.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/src/commands/milestone_bulk.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast",
+      "done_when": "Public setters cannot arbitrary-jump or regress terminals; migration-only raw path remains; lifecycle_setter_overlay and clippy pass.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast: 19 passed; self-review dry-run parity fixed"
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Keep self/external review-cycle state solely in the reviews registry; treat self-reviewed/reviewed as legacy read/migration aliases not active destinations; wire complete/reviews-pass ceremony through the shared transition table.",
+      "files": [
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/milestone/complete.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast",
+      "done_when": "Active destinations exclude self-reviewed/reviewed; ceremony and transition_reliability suites pass.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "lifecycle_complete_ceremony: 14 passed; transition_reliability: 17 passed"
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Remediation entry validates allowed origins, stores the exact current lifecycle in remediation_pre_state, and restores exactly that value when findings clear (via shared transition); reject invalid remediation origins.",
+      "files": [
+        "crates/mp/src/reviews.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_review --no-fail-fast",
+      "done_when": "done->remediation->done and complete->remediation->complete restore exact pre-state; invalid origins rejected; suite_review and lifecycle_complete_ceremony green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04",
+        "AC-06",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp --test suite_review --no-fail-fast: 67 passed including exact complete remediation restore"
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Remove Raul duplicate legacy lifecycle mapping; keep only a thin Value adapter that extracts fields and delegates all derivation to mp_model::effective_lifecycle_from_legacy (and related helpers); map legacy execution_status done to nonterminal lifecycle done.",
+      "files": [
+        "crates/raul/src/tui/status.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_status_parity --no-fail-fast",
+      "done_when": "No independent Raul lifecycle allowlist/derivation remains; exec done projects to done; unit helpers agree with mp-model.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p raul --test tui_status_parity --no-fail-fast: 10 passed"
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Expand tui_status_parity to an exhaustive matrix over documented spec/execution values comparing Raul output directly to mp-model (unknown, empty, cancelled, blocked, deferred, in-progress, done, complete); remove lifecycle eligibility allowlists from Raul in favor of mp/mp-model projections.",
+      "files": [
+        "crates/raul/tests/tui_status_parity.rs",
+        "crates/raul/src/tui/status.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_status_parity --no-fail-fast",
+      "done_when": "Parity suite fails if Raul diverges from mp-model on any matrix cell; raul clippy clean.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "tui_status_parity matrix: 10 passed; cargo clippy -p raul --tests --no-deps -- -D warnings: exit 0"
+    }
+  ],
+  "verification": {
+    "date": "2026-07-19",
+    "branch": "",
+    "evidence": "M189 AC-01..AC-09 verified via the locked existing targets; self-review F-01 resolved."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Legacy set-spec-status dry-run mutates only spec_status in its preview, so it can report success for a source-state transition that the shared event table rejects on commit (L7 dry-run honesty).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-03/L3: event_for_spec_status maps verified→MilestoneEvent::Complete with no gates in gate_errors_for_spec_status. Reproducer: approved milestone + `mp milestone set-spec-status <id> verified` jumps lifecycle draft/groomed-blocked paths aside — from approved it lands lifecycle=complete/spec=verified/exec=done without running complete_milestone gates (AC verify, steps, open findings). Public complete path is gated; this legacy setter is not.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/milestone/spec.rs",
+        "new_range": {
+          "start_line": 575,
+          "end_line": 575
+        },
+        "side": "new"
+      },
+      "summary": "set-spec-status verified bypasses complete gates"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "correctness",
+      "description": "L7: compute_set_status_preview only assigns execution_status in-memory and reports empty gates. Live set_execution_status runs G1/start gates, verified-required for done, terminal refusal, and apply_transition. Reproducers: draft→in-progress dry-run shows success fields+gates=[]; live fails G1. in-progress→done without verified dry-run success; live errors execution_status done requires spec_status verified. Preview also omits lifecycle/overlay flips the transition table would apply.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/milestone.rs",
+        "new_range": {
+          "start_line": 107,
+          "end_line": 107
+        },
+        "side": "new"
+      },
+      "summary": "set-status --dry-run lies about transition outcomes"
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "category": "correctness",
+      "description": "AC-04 incomplete routing after demoting self-reviewed/reviewed to aliases: add_finding only EnterRemediation for (done|complete)+self findings, or (self-reviewed|reviewed)+external findings. Active destinations are done/complete, so stage-8 external findings on done/complete do not enter remediation (reproducer: complete+external stays complete; done+external stays done). Legacy on-disk self-reviewed+external still enters and collapses pre_state via from_lifecycle→Done. External review on post-M189 milestones never auto-escalates.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/reviews.rs",
+        "new_range": {
+          "start_line": 861,
+          "end_line": 861
+        },
+        "side": "new"
+      },
+      "summary": "External findings on done/complete skip remediation"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "AC-03: MilestoneEvent::MigrateRaw exists only in mp-model (no call sites). set_lifecycle always bail!s migration-only for every caller including bulk. migrate_milestone_file still does m.milestone.lifecycle = new_lc string assignment, bypassing the shared transition executor and the documented MigrateRaw escape hatch (spec.rs comment is false). Migration-only raw path is neither available via CLI nor routed through the transition table.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/migrate.rs",
+        "new_range": {
+          "start_line": 203,
+          "end_line": 203
+        },
+        "side": "new"
+      },
+      "summary": "MigrateRaw unused; migrate raw-assigns lifecycle"
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "L7 residual: compute_complete_preview and compute_approve_preview mutate legacy spec/exec (and ACs) without apply_transition, so dry-run omits lifecycle flips. Reproducer: `mp milestone complete <id> --dry-run` fields show only spec_status/execution_status; live writes lifecycle=complete. approve --dry-run similarly shows spec_status ready without lifecycle=approved. Contrasts with bulk set-spec-status dry-run which was fixed to use the transition table (self F-01).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/milestone.rs",
+        "new_range": {
+          "start_line": 210,
+          "end_line": 210
+        },
+        "side": "new"
+      },
+      "summary": "complete/approve dry-run skip transition preview"
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Transition table: Block has no phase guard; Cancel always sets cancelled. Reproducer: lifecycle=complete then `mp milestone block` → complete+blocked+execution_status=blocked; `mp milestone set-status cancelled` → complete+cancelled=true. Terminal delivery phase remains complete while overlays/exec diverge. Spec called for overlay combination validation; complete is not protected the way Defer is (Defer correctly rejects complete).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp-model/src/milestone.rs",
+        "new_range": {
+          "start_line": 254,
+          "end_line": 254
+        },
+        "side": "new"
+      },
+      "summary": "Block/Cancel overlays allowed on complete"
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Group C Finding 4 / S8: remove lifecycle eligibility allowlists from Raul in favor of mp/mp-model projections. DRIVABLE_LIFECYCLES still hard-codes approved/in-progress/self-reviewed/reviewed (plus LIFECYCLE_NODES/FILTER/GAUGE lists). Effective lifecycle derivation was delegated, but eligibility remains a Raul-owned allowlist including demoted review aliases as active drive targets — out of step with reviews-registry ownership of review rungs.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/raul/src/tui/watch.rs",
+        "new_range": {
+          "start_line": 35,
+          "end_line": 35
+        },
+        "side": "new"
+      },
+      "summary": "Raul still keeps lifecycle eligibility allowlist"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "correctness",
+      "description": "Finding 9 residual: nested duplicate IDs across WPs correctly error with both locations, but when a nested id collides with an existing top-level step, normalize silently skips the nested step (top_level.contains) without reporting the nested location. Group C asked to preserve top-level precedence while reporting every conflicting nested location; current behavior is silent drop only (pinned by top_level_steps_take_precedence_over_legacy).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp-model/src/normalize.rs",
+        "new_range": {
+          "start_line": 27,
+          "end_line": 27
+        },
+        "side": "new"
+      },
+      "summary": "Top-level vs nested step ID conflict silent"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "correctness",
+      "description": "stage-9 remediation entry trigger (F-04)",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-07-19",
+      "resolved": "2026-07-19",
+      "phase": "external",
+      "summary": "stage9-entry"
+    }
+  ]
+}

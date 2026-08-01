@@ -1,0 +1,195 @@
+success_criteria = []
+assumptions = []
+design_decisions = []
+open_questions = []
+risks = []
+follow_ups = []
+
+[milestone]
+id = "10"
+title = "Documentation alignment"
+slug = "doc-alignment"
+spec_status = "verified"
+execution_status = "done"
+depends_on = ["06"]
+effort = "M"
+risk = "low"
+change_kind = ""
+priority = "normal"
+created = "2026-06-18"
+updated = "2026-06-25"
+blocked_at = ""
+block_reason = ""
+blocked_by = ""
+
+[intent]
+outcome = "Docs match v1 RC; agents stop hitting stale planned labels."
+
+[problem]
+description = "MP-COMMANDS, PM-WORKFLOWS, DESIGN-REVIEW still read pre-M06; mislead agents."
+
+[context]
+related = []
+references = []
+
+[behavior]
+scenarios = []
+edge_cases = []
+
+[requirements]
+functional = []
+needs_clarification = []
+
+[interface]
+endpoints = []
+config_keys = []
+cli_commands = []
+entities = []
+
+[scope]
+in_scope = [
+    "Header/status sync across docs",
+    "MP-COMMANDS shipped command blocks",
+    "PM-WORKFLOWS §5-6 rewrite",
+    "DESIGN-REVIEW historical banner",
+    "SPEC gate matrix alignment",
+    "Test/scenario counts",
+]
+out_of_scope = [
+    "Full MP-COMMANDS line-by-line rewrite",
+    "npm/Homebrew docs",
+]
+
+[[acceptance_criteria]]
+id = "AC-01"
+description = "No stale not-implemented headers in top-tier docs"
+verification = "grep audit + review"
+status = "passed"
+evidence = "grep audit: no stale not-implemented headers in top-tier docs"
+
+[[acceptance_criteria]]
+id = "AC-02"
+description = "AGENT-READINESS remains sole runtime matrix"
+verification = "docs review"
+status = "passed"
+evidence = "AGENT-READINESS sole runtime matrix; PLAYBOOK §8 updated"
+
+[technical_context]
+language = ""
+dependencies = []
+storage = ""
+testing = ""
+target_platform = ""
+constraints = []
+performance_goals = []
+
+[[work_packages]]
+id = "WP1"
+name = "Work package 1"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP2"
+name = "Work package 2"
+goal = ""
+rollback = ""
+
+[[work_packages]]
+id = "WP-close"
+name = "Closure"
+goal = "Verify tests, lint, and update plan"
+rollback = ""
+
+[[steps]]
+id = "S1"
+work_package = "WP1"
+order = 1
+action = "AGENT-PLAYBOOK + EDGE-CASES present-tense pass (B-13)"
+files = [
+    "docs/AGENT-PLAYBOOK.md",
+    "docs/EDGE-CASES.md",
+]
+tests = "./scripts/check-docs.sh"
+done_when = "No stale planned labels for shipped commands"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S2"
+work_package = "WP1"
+order = 2
+action = "SPEC §5.1 gate matrix Rust column sync (B-14)"
+files = ["docs/SPEC.md"]
+tests = "cargo test -p mp"
+done_when = "Rust today column matches validate.rs"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S3"
+work_package = "WP1"
+order = 3
+action = "MP-COMMANDS §20 phase table v1 shipped (B-15)"
+files = ["docs/MP-COMMANDS.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "Phase table marks v1 RC phases shipped"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S4"
+work_package = "WP2"
+order = 4
+action = "MP-COMMANDS shipped blocks + stale headers"
+files = ["docs/MP-COMMANDS.md"]
+tests = "./scripts/check-docs.sh"
+done_when = "No not-implemented headers for shipped commands"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S5"
+work_package = "WP2"
+order = 5
+action = "PM-WORKFLOWS §5-6 + DESIGN-REVIEW banner"
+files = [
+    "docs/PM-WORKFLOWS.md",
+    "docs/DESIGN-REVIEW.md",
+]
+tests = "./scripts/check-docs.sh"
+done_when = "Sections reflect v1 RC truth"
+status = "done"
+covers_ac = ["AC-01"]
+depends_on_steps = []
+
+[[steps]]
+id = "S6"
+work_package = "WP2"
+order = 6
+action = "Header sync + TESTING scenario counts"
+files = [
+    "docs/TESTING.md",
+    "docs/PLANNING-STATUS.md",
+]
+tests = "cargo test -p mp"
+done_when = "Counts accurate; AGENT-READINESS sole matrix"
+status = "done"
+covers_ac = ["AC-02"]
+depends_on_steps = []
+
+[verification]
+date = "2026-06-18"
+branch = ""
+evidence = "M10 doc alignment: B-13–B-15, gate matrix, phase table, PM-WORKFLOWS §5-6"
+
+[delta]
+domain = ""
+base_version = 0
+added = []
+modified = []
+removed = []

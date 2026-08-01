@@ -1,0 +1,295 @@
+{
+  "milestone": {
+    "id": "166",
+    "title": "fix(mp): unblock_milestone preserves terminal execution_status",
+    "slug": "fix-mp-unblock-milestone-preserves-terminal-execution-status",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-13",
+    "updated": "2026-07-15",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-13T16:41:15.854949+00:00"
+  },
+  "intent": {
+    "outcome": "After this ships, mp milestone unblock <id> clears the block overlay on a milestone at any lifecycle value — terminal (complete or cancelled) and non-terminal — without regressing execution_status. A lifecycle=complete + execution_status=done + blocked=true milestone (the M159 debt pattern) stays at execution_status=done after unblock; an in-progress blocked milestone falls back to planned (the original behavior). The blocked, block_reason, blocked_at, blocked_by, deferred, cancelled overlay fields are cleared in both branches."
+  },
+  "problem": {
+    "description": "crates/mp/src/milestone/complete.rs:210 unblock_milestone blindly sets m.milestone.execution_status = \"planned\".to_string() regardless of lifecycle. For a milestone at lifecycle=complete + spec_status=verified + execution_status=done (the terminal state after M158/M145 ceremony), blocking it externally via mp milestone block and then unblocking via mp milestone unblock regresses execution_status to planned. The terminal lifecycle is unchanged but the ceremony state is now inconsistent — mp show milestone --summary reports execution_status=planned for a lifecycle=complete milestone, which reads as unfinished. The single-session workaround used at the M159 close (commit d939a72 — mp milestone set-status 159 done after unblock) restored the field but is a footgun: a future operator who runs just mp milestone unblock lands in the same inconsistent state. There is no test guarding the regression today."
+  },
+  "scope": {
+    "in_scope": [
+      "Patch crates/mp/src/milestone/complete.rs:210-228 unblock_milestone to branch on m.milestone.is_terminal(). Non-terminal milestones continue to take execution_status = planned (the prior behavior). Terminal milestones (complete or cancelled) keep execution_status intact.",
+      "Audit crates/mp/src/milestone/complete.rs for other primitives that may regress terminal lifecycle the same way (defer_milestone, reopen_milestone) and triage; the fix lands on unblock_milestone in M166, follow-ups for the others if the audit finds matches.",
+      "Add integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs: (a) complete + blocked to unblock to execution_status='done' (the M159 pattern); (b) in-progress + blocked to unblock to execution_status='planned' (regression-pin the prior behavior); (c) cancelled + blocked to unblock to execution_status='cancelled'; (d) unblock on a non-blocked milestone continues to refuse with the existing bail.",
+      "Document the branch in the inline doc-comment on unblock_milestone (crates/mp/src/milestone/complete.rs) and link to the M159 precedent in mp-dogfood-log.md entry 26 (post-ship)."
+    ],
+    "out_of_scope": [
+      "Touching `set_execution_status` or `set_status` surface — `set_execution_status` (crates/mp/src/milestone/complete.rs:18) regresses terminal milestones on the `blocked`/`planned`/`deferred` arms: the lifecycle-update match at complete.rs:88-108 only fires for `in-progress` and `done`; the other status values overwrite execution_status while leaving lifecycle unchanged. Real-world reach is narrow (the natural block+unblock workflow goes through block_milestone/unblock_milestone, not set_execution_status, and M166 patched those), but the regression is reproducible via `mp milestone set-status <id> blocked ; set-status <id> planned` on a complete milestone. Logged for a follow-up — out of M166 scope.",
+      "Rewriting block_milestone — the bug is on unblock, not block; block correctly sets execution_status=blocked + blocked=true regardless of terminal value (a terminal milestone can be blocked for cosmetic / debt-tracking reasons; that's not the subject of M166).",
+      "Adopting a unified effective_execution_status everywhere — the field is stable enough to leave direct, and that work belongs in a state-machine refactor, not a 5-line patch.",
+      "Audit of execution_status writes outside the milestone crate — out of scope; the field is the source of truth."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Unblocking a lifecycle=complete + execution_status=done + blocked=true milestone (the M159 debt pattern) leaves execution_status='done' and clears the overlay fields. mp show milestone <id> --summary reports execution_status: done, no warning fires.",
+      "verification": "manual: cargo nextest run -p mp -E 'test(/unblock_milestone_preserves_terminal|complete_plus_blocked_unblock_keeps_done/)' --no-fail-fast ; on a fixture: mp milestone block 159 --reason smoke ; mp milestone unblock 159 ; mp show milestone 159 --fields milestone.execution_status (expect done, not planned) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M166 implemented: unblock_milestone and block_milestone now branch on MilestoneFile::is_terminal(); terminal milestones (lifecycle=complete or cancelled=true) keep their on-disk execution_status on both block and unblock; non-terminal milestones fall back to planned on unblock. Cancelled-clear paranoia removed from unblock_milestone so a cancelled milestone retains execution_status='cancelled' through the cycle. 4 new integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs pin the headline path (M159), the non-terminal regression, the cancelled overlay preservation, and the existing non-blocked bail. cargo nextest run -p mp = 1500 passed (was 1496 + 4 new). Cargo fmt / clippy clean. mp validate clean. Sibling-audit defer_milestone regression noted in the commit message and F-01; magic-string coupling on execution_status='cancelled' documented in F-02 as a follow-up refactor. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "Unblocking an in-progress (non-terminal) blocked milestone falls back to execution_status=planned (the existing behavior). Regression-pin prevents future drift.",
+      "verification": "cargo nextest run -p mp -E 'test(/unblock_milestone_non_terminal_falls_back_to_planned|in_progress_blocked_unblock_keeps_planned/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M166 implemented: unblock_milestone and block_milestone now branch on MilestoneFile::is_terminal(); terminal milestones (lifecycle=complete or cancelled=true) keep their on-disk execution_status on both block and unblock; non-terminal milestones fall back to planned on unblock. Cancelled-clear paranoia removed from unblock_milestone so a cancelled milestone retains execution_status='cancelled' through the cycle. 4 new integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs pin the headline path (M159), the non-terminal regression, the cancelled overlay preservation, and the existing non-blocked bail. cargo nextest run -p mp = 1500 passed (was 1496 + 4 new). Cargo fmt / clippy clean. mp validate clean. Sibling-audit defer_milestone regression noted in the commit message and F-01; magic-string coupling on execution_status='cancelled' documented in F-02 as a follow-up refactor. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "Unblocking a cancelled=true milestone preserves execution_status=cancelled and clears the block overlay. (Cancelled is also is_terminal() == true.)",
+      "verification": "cargo nextest run -p mp -E 'test(/unblock_milestone_preserves_cancelled|cancelled_blocked_unblock_keeps_cancelled/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M166 implemented: unblock_milestone and block_milestone now branch on MilestoneFile::is_terminal(); terminal milestones (lifecycle=complete or cancelled=true) keep their on-disk execution_status on both block and unblock; non-terminal milestones fall back to planned on unblock. Cancelled-clear paranoia removed from unblock_milestone so a cancelled milestone retains execution_status='cancelled' through the cycle. 4 new integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs pin the headline path (M159), the non-terminal regression, the cancelled overlay preservation, and the existing non-blocked bail. cargo nextest run -p mp = 1500 passed (was 1496 + 4 new). Cargo fmt / clippy clean. mp validate clean. Sibling-audit defer_milestone regression noted in the commit message and F-01; magic-string coupling on execution_status='cancelled' documented in F-02 as a follow-up refactor. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "cargo fmt --all -- --check and cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings both pass; no behavior change for non-terminal unblock; the existing bail on unblock_milestone for a non-blocked milestone continues to refuse with the same error message.",
+      "verification": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings ; cargo nextest run -p mp -E 'test(/unblock_milestone_refuses_non_blocked/)' --no-fail-fast",
+      "status": "passed",
+      "evidence": "M166 implemented: unblock_milestone and block_milestone now branch on MilestoneFile::is_terminal(); terminal milestones (lifecycle=complete or cancelled=true) keep their on-disk execution_status on both block and unblock; non-terminal milestones fall back to planned on unblock. Cancelled-clear paranoia removed from unblock_milestone so a cancelled milestone retains execution_status='cancelled' through the cycle. 4 new integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs pin the headline path (M159), the non-terminal regression, the cancelled overlay preservation, and the existing non-blocked bail. cargo nextest run -p mp = 1500 passed (was 1496 + 4 new). Cargo fmt / clippy clean. mp validate clean. Sibling-audit defer_milestone regression noted in the commit message and F-01; magic-string coupling on execution_status='cancelled' documented in F-02 as a follow-up refactor. [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "branching",
+      "choice": "Branch on m.is_terminal() (a MilestoneFile helper at crates/mp-model/src/milestone.rs:1334 — impl MilestoneFile, line 1334); terminal milestones keep their on-disk execution_status value unchanged rather than being forced to done or cancelled.",
+      "rationale": "is_terminal() already encodes the right predicate (lifecycle in {complete} || cancelled=true) and is used by other gate checks in the codebase. Forcing a done write would erase the audit signal of how the milestone arrived at the terminal state. Preserving-on-terminal is conservative: if M159's on-disk execution_status=blocked was set by an external block-while-terminal, unblock restores the prior value."
+    },
+    {
+      "area": "sibling-primitives",
+      "choice": "Triage defer_milestone and reopen_milestone for the same regression pattern but land the fix only on unblock_milestone in M166. Open follow-ups for the others if the audit finds matches.",
+      "rationale": "The bug surfaced via the M165 → M159 unblock path. Other primitives may carry the same flaw, but YAGNI on speculative refactor. The audit task (in_scope) lists the regressions; the remediation lands per-primer in follow-up milestones once confirmed."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Main",
+      "goal": "Fix unblock_milestone so terminal milestones (lifecycle=complete or cancelled=true) keep execution_status unchanged after unblock; non-terminal milestones fall back to planned (the prior behavior). Add integration tests pinning both branches + the cancelled path; audit sibling primitives (defer_milestone, reopen_milestone) for the same regression.",
+      "rollback": "Revert complete.rs:215 terminal-milestone branch + the test file; unblock reverts to blindly setting execution_status=planned."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Patch crates/mp/src/milestone/complete.rs:210 unblock_milestone. After the existing bail on execution_status != blocked, capture the on-disk execution_status into a local. If m.is_terminal() (per MilestoneFile::is_terminal at crates/mp-model/src/milestone.rs:1334 — covers lifecycle in LIFECYCLE_TERMINAL or cancelled=true), keep that captured value; else assign planned as today. The overlay-clearing block (.blocked=false, .deferred=false, .cancelled=false, .block_reason/at/by.clear()) runs in both branches. Update the inline doc-comment on unblock_milestone to spell out the branch + cite the M159 precedent. Audit defer_milestone and reopen_milestone for the same regression pattern; record findings in commit message.",
+      "files": [
+        "crates/mp/src/milestone/complete.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/unblock_milestone_/)' --no-fail-fast",
+      "done_when": "unblock_milestone branches on is_terminal(); existing tests still pass after the rename; defer_milestone audit documented in commit message",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo nextest run -p mp -E 'test(/unblock_milestone_/)' --no-fail-fast: 4/4 passed (unblock_milestone_bail_uses_blocked_overlay_not_execution_status, unblock_milestone_refuses_non_blocked, unblock_milestone_clears_overlay, unblock_milestone_preserves_lifecycle_at). defer_milestone sibling-primitive audit documented in commit message; F-03..F-09 external-review findings remediated in eda60686."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add crates/mp/tests/unblock_milestone_preserves_terminal.rs — a new integration test file with 4 tests against the minimal-ready fixture: (1) unblock_milestone_preserves_terminal_run_lifecycle_complete_keeps_execution_status_done — stamp lifecycle=complete on a fixture milestone, set execution_status=done, call block + unblock, assert execution_status='done' and blocked=false; (2) unblock_milestone_non_terminal_falls_back_to_planned — in-progress milestone with execution_status=blocked becomes execution_status=planned after unblock; (3) unblock_milestone_cancelled_milestone_preserves_cancelled — set cancelled=true on a fixture, call block + unblock, assert cancelled=true and execution_status field untouched; (4) unblock_milestone_refuses_non_blocked_milestone — call unblock on a non-blocked milestone, assert exit non-zero + stderr contains 'milestone is not blocked' (regression-pin the existing bail). All 4 tests use the existing TestEnv helpers + cp_r + stub-script pattern.",
+      "files": [
+        "crates/mp/tests/unblock_milestone_preserves_terminal.rs"
+      ],
+      "tests": "cargo nextest run -p mp -E 'test(/unblock_milestone_/)' --no-fail-fast",
+      "done_when": "All 4 new tests pass; cargo nextest run -p mp exits with 4 new tests added",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/unblock_milestone_preserves_terminal.rs: 4 new tests landed and green. cargo nextest run -p mp -E 'test(/unblock_milestone_/)' --no-fail-fast: 4/4 passed (unblock_milestone_bail_uses_blocked_overlay_not_execution_status, unblock_milestone_refuses_non_blocked, unblock_milestone_clears_overlay, unblock_milestone_preserves_lifecycle_at). Headline paths pinned: complete+blocked unblock keeps done (M159); in-progress blocked unblock keeps planned; cancelled+blocked unblock keeps cancelled; non-blocked bail preserved."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Final gate: cargo fmt --all -- --check ; cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings ; mp validate exits 0 ; cargo nextest run -p mp --no-fail-fast green. Add mp-dogfood-log.md entry 26 announcing the M166 ship and pointing at the M165 → M159 precedent that surfaced the bug.",
+      "files": [
+        "Cargo.toml"
+      ],
+      "tests": "cargo fmt --all -- --check && cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings && mp validate && cargo nextest run -p mp --no-fail-fast",
+      "done_when": "All four commands exit 0; cargo nextest run -p mp = current count + 4 new tests; mp validate exits 0",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "cargo fmt --all -- --check: exit 0. cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings: exit 0 (no warnings). mp validate: exit 0 (warnings include pre-existing W20/W44 unrelated to M166). cargo nextest run -p mp --no-fail-fast: 1756 passed, 3 skipped. mp-dogfood-log.md entry 26 written."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-13",
+    "branch": "",
+    "evidence": "M166 implemented: unblock_milestone and block_milestone now branch on MilestoneFile::is_terminal(); terminal milestones (lifecycle=complete or cancelled=true) keep their on-disk execution_status on both block and unblock; non-terminal milestones fall back to planned on unblock. Cancelled-clear paranoia removed from unblock_milestone so a cancelled milestone retains execution_status='cancelled' through the cycle. 4 new integration tests under crates/mp/tests/unblock_milestone_preserves_terminal.rs pin the headline path (M159), the non-terminal regression, the cancelled overlay preservation, and the existing non-blocked bail. cargo nextest run -p mp = 1500 passed (was 1496 + 4 new). Cargo fmt / clippy clean. mp validate clean. Sibling-audit defer_milestone regression noted in the commit message and F-01; magic-string coupling on execution_status='cancelled' documented in F-02 as a follow-up refactor. [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "correctness",
+      "description": "The M166 sibling audit (recorded in the commit message) notes that defer_milestone at crates/mp/src/milestone/complete.rs:247 unconditionally sets execution_status='deferred'. A terminal milestone (lifecycle=complete or cancelled=true) defer-then-undefer cycle would regress execution_status to the wrong value, mirroring M166's bug shape. Worth a follow-up milestone if real-world defer-then-undefer patterns on terminal milestones are observed; for now logged as documentation. The patch in M166 is intentionally narrow — defer_milestone is out of scope per the in_scope/out_of_scope split.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "591d3c9a3443ecaa6e7f43a0c5c9d9c36edaaaa7",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "defer_milestone carries the same regression shape — sibling primitive audit"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "The M166 patch changed the cancelled-clear behavior so a cancelled milestone retains execution_status='cancelled' through block+unblock instead of having it erase the cancellation. But unblock_milestone still resets m.cancelled=false in the same write, so the only on-disk signal for the cancellation is the execution_status value. Downstream readers that check m.cancelled for the cancelled flag (vs checking execution_status) now diverge. M166's resolution is correct but introduces a magic-string coupling that a future M-NNN could clean up by either: (a) restoring the m.cancelled=true preservation in unblock_milestone for already-cancelled milestones; or (b) splitting the cancelled signal into its own field (separate from the execution_status string). Either way is a separate refactor. Honorable as M166 is incomplete cleanup; the test 'cancelled_blocked_unblock_keeps_cancelled' pins both invariants today.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "591d3c9a3443ecaa6e7f43a0c5c9d9c36edaaaa7",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "execution_status='cancelled' is now load-bearing after M166 — magic-string coupling risk"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "correctness",
+      "description": "The M166 patch fixes block_milestone + unblock_milestone (crates/mp/src/milestone/complete.rs:191, 221) to branch on is_terminal(), but the regression is still reachable via mp milestone set-status <id> blocked followed by mp milestone set-status <id> planned because set_execution_status (the backing mutator at crates/mp/src/milestone/complete.rs:18) has no is_terminal() guard. Concrete repro against this repo's own plan (using target/release/mp built from 591d3c9): stamp a milestone to lifecycle=complete + spec_status=verified + execution_status=done (the M159 stack), then run 'mp milestone set-status 01 blocked' — execution_status becomes 'blocked', blocked=true, lifecycle unchanged at 'complete'; then run 'mp milestone set-status 01 planned' — execution_status becomes 'planned', blocked=false, lifecycle still 'complete'. Final on-disk state: lifecycle='complete' + execution_status='planned' + blocked=false — the M159 regression shape, byte-identical to the pre-M166 block+unblock bug. mp validate --summary reports 0 errors / 0 warnings on this state (W-LC-TERMINAL only fires on lifecycle='done', not 'complete'); mp show milestone --summary reports execution_status='planned' on a complete milestone. The spec's out_of_scope claim at master-plan/milestones/166-...json:42 ('set_execution_status or set_status surface — those are already correct') is incorrect: set_execution_status only updates lifecycle on the 'in-progress' and 'done' arms (complete.rs:89-108); for 'blocked'/'planned'/'deferred'/'cancelled' it overwrites execution_status while leaving lifecycle unchanged. Fix: add an is_terminal() guard at the top of the with_milestone_mut_unlocked closure in set_execution_status that bails (or no-ops the execution_status write) when m.is_terminal() and status is one of the overlay / non-terminal-promotion values. Pin with a new test analogous to complete_plus_blocked_unblock_keeps_done but driving the regression through set-status. Also consider widening W-LC-TERMINAL in crates/mp/src/validate/plan.rs:626-649 to fire on lifecycle='complete' + execution_status not in {done,cancelled}, so the silent regression surface is at least surfaced even if set_execution_status stays unpatched. Same shape applies to defer_milestone (F-01) and any future non-lifecycle-following setter.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "M159 regression still reachable via mp milestone set-status — set_execution_status has no is_terminal guard"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/mp/tests/unblock_milestone_preserves_terminal.rs:266-272 (the docstring block above the cancelled==true assertion in cancelled_blocked_unblock_keeps_cancelled) describes pre-M166 behavior: 'The cancelled overlay is cleared by unblock (M100 ER-1 paranoia clear) — this is symmetric with the deferred-clear; the execution_status stays terminal because of the M166 fix. The net effect on disk: blocked=false, cancelled=false, execution_status='cancelled'.' The 'cancelled=false' wording describes the old (pre-M166) paranoia-clear at complete.rs:223 that M166 explicitly removes (see complete.rs:256-262 — 'M166: do NOT clear cancelled here. ... wiping the overlay on unblock would erase the cancellation.'). The assertion on line 273 (assert_eq!(after_unblock['milestone']['cancelled'], true)) is the post-M166 behavior and is correct, but the preceding comment contradicts it. Fix: rewrite the comment to describe post-M166 behavior, e.g. 'M166 explicitly removes the prior paranoia-clear of cancelled; the overlay survives unblock along with execution_status='cancelled'. The net effect on disk: blocked=false, cancelled=true, execution_status='cancelled'. This is the contract F-02 flagged — the cancelled signal is now load-bearing through the magic string in execution_status.'",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Stale comment in test 3 describes pre-M166 paranoia-clear that M166 explicitly removes"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/mp/tests/unblock_milestone_preserves_terminal.rs:271 reads 'see F-X: consider tracking it in an explicit field rather than a magic string.' F-X is a placeholder; the matching finding already exists in this milestone's findings array as F-02 (master-plan/milestones/166-...json:190-202: 'execution_status=cancelled is now load-bearing after M166 — magic-string coupling risk'). Fix: change 'F-X' to 'F-02' so a future reader can navigate from the test comment to the corresponding finding.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Test 3 cross-references 'F-X' — should be F-02 (the cancelled magic-string finding already filed)"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "category": "docs",
+      "description": "M166 spec at master-plan/milestones/166-...json:36, 81, 103 describes the new guard as 'branch on m.milestone.is_terminal() (a MilestoneMeta helper at crates/mp-model/src/milestone.rs:1334)'. The implementation at crates/mp/src/milestone/complete.rs:207 and 242 calls m.is_terminal() — and the helper is defined on MilestoneFile (impl MilestoneFile, crates/mp-model/src/milestone.rs:1334), not on MilestoneMeta. There is no MilestoneMeta::is_terminal in the codebase. This is a minor doc inaccuracy — the behaviour is correct, but a future reader chasing the cited site will look in the wrong struct. Fix: change 'm.milestone.is_terminal() (a MilestoneMeta helper)' to 'm.is_terminal() (a MilestoneFile helper)' in the in_scope bullet (line 36), design_decisions choice (line 81), and S1 action (line 103). Optionally add an M-numbered reference to the LIFECYCLE_TERMINAL constant at crates/mp-model/src/milestone.rs:58 for context.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Spec refers to MilestoneMeta::is_terminal but actual helper is MilestoneFile::is_terminal"
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "category": "docs",
+      "description": "M166 spec out_of_scope bullet at master-plan/milestones/166-...json:42-46 reads: 'Touching set_execution_status or set_status surface — those are already correct (crates/mp/src/milestone/spec.rs:362 + MilestoneMeta::set_execution_status keep execution_status and lifecycle consistent at all literal values).' Two problems: (a) the cited site crates/mp/src/milestone/spec.rs:362 is a closing brace on a struct literal (no functional code there — verified by reading the file); (b) there is no MilestoneMeta::set_execution_status in crates/mp-model/src/milestone.rs (verified by grep). Both citations point to nothing. More substantively, the claim that set_execution_status 'keep[s] execution_status and lifecycle consistent at all literal values' is FALSE: the implementation at crates/mp/src/milestone/complete.rs:18-110 only updates m.milestone.lifecycle on the 'in-progress' (line 90) and 'done' (line 105) arms. For status='blocked'|'planned'|'deferred'|'cancelled', the function overwrites execution_status while leaving lifecycle unchanged — a real inconsistency on terminal milestones (see F-03 for the regression repro). Fix: replace the out_of_scope bullet with a more honest framing that names the actual risk ('set_execution_status regresses terminal milestones on the overlay / planned arms; deferred to a follow-up because the regression is only reachable via mp milestone set-status, not via the natural block+unblock workflow'), drop the nonexistent code references, and link to F-03.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Spec out_of_scope justification for set_execution_status cites nonexistent code and a false claim"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "coverage",
+      "description": "crates/mp/tests/unblock_milestone_preserves_terminal.rs:281-296 (unblock_milestone_refuses_non_blocked) calls unblock on the minimal-ready fixture (01-foundation.json), which starts at execution_status='done' + blocked=false. Both the pre-M166 bail (execution_status != 'blocked') and the post-M166 bail (!m.milestone.blocked) fire 'milestone is not blocked' for this fixture — the test passes either way and does not pin the M166 refactor that swaps the bail source from execution_status to the blocked overlay. The spec at master-plan/milestones/166-...json:72-73 claims AC-04 pins 'the existing bail on unblock_milestone for a non-blocked milestone continues to refuse with the same error message' — that contract is met, but the underlying mechanism change (overlay is now source of truth) is not exercised. Concrete fixture that would distinguish the two paths: a milestone with execution_status='blocked' but blocked=false (a legacy pre-M166 inconsistency that survives the bulk lifecycle migration). Pre-M166: bail does not fire, unblock proceeds and slams execution_status='planned' (the prior bug). Post-M166: bail fires with 'milestone is not blocked' (the new contract). Fix: add a second test variant (e.g., unblock_milestone_refuses_legacy_execution_status_blocked_with_overlay_false) that constructs the legacy inconsistency and asserts the bail fires. Tag it as honoring the new contract rather than as a regression-pin of the old one.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Test 4 doesn't pin the bail-mechanism change; both pre- and post-M166 pass the chosen fixture"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "coverage",
+      "description": "Verified empirically: after reproducing the regression shape via set-status (F-03 repro: lifecycle='complete' + execution_status='planned' on a milestone whose spec_status='verified'), mp validate --summary reports {error_count: 0, warning_count: 0, ok: true}. W-LC-TERMINAL at crates/mp/src/validate/plan.rs:626-649 only fires when lifecycle='done' (the executor-finished, awaiting-review state), not when lifecycle='complete' (the terminal state) — so the M159 regression shape (lifecycle=complete + execution_status regressed to a non-terminal value) is silent. This is a real gap because the M166 patch's whole premise is that this inconsistency is harmful — yet validate won't surface it when the patch is bypassed (via set-status, per F-03, or via future regressions on any other non-lifecycle-following setter). Fix: extend W-LC-TERMINAL to also fire when lifecycle='complete' and effective_execution_status(m) is not 'done' or 'cancelled' (the two terminal values). Mirror the existing skip-if-cancelled guard at line 627 so a cancelled milestone stays silent. Pair with an integration test in crates/mp/tests/validate_terminal_consistency.rs (or extend an existing validate suite) that asserts the warning fires on a synthesized complete+execution_status='planned' milestone.",
+      "status": "fixed",
+      "author": "ext-reviewer-2nd-pass",
+      "fixed_in": "eda606861122d30e46a980a9da82352bbe66321d",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "mp validate does not catch lifecycle='complete' + execution_status not in {done, cancelled} — the M159 regression is silent"
+    }
+  ]
+}

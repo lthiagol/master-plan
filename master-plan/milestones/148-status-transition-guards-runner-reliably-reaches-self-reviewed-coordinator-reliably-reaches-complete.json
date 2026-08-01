@@ -1,0 +1,284 @@
+{
+  "milestone": {
+    "id": "148",
+    "title": "Status-transition guards: runner reliably reaches self-reviewed, coordinator reliably reaches complete",
+    "slug": "status-transition-guards-runner-reliably-reaches-self-reviewed-coordinator-reliably-reaches-complete",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-10",
+    "updated": "2026-07-13",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-12T20:20:09.529442+00:00"
+  },
+  "intent": {
+    "outcome": "The lifecycle transitions documented in mp-runner (stage 7 → self-reviewed) and mp-coordinator (stage 10 clean → advance to complete) happen reliably and visibly. raul shows the correct status because the agent does not silently skip the transition. The fix is investigation-driven: confirm whether the gap is (a) the agent skipping a documented step, or (b) a missing single primitive for the final transition, then apply the minimal fix — sharper skill instruction, a plan_gaps/validate warning, or a unified transition command."
+  },
+  "problem": {
+    "description": "Observers see milestones stuck in the wrong lifecycle state (e.g., all steps done but still 'in-progress' instead of 'self-reviewed'; findings remediated but still 'remediation' instead of 'complete'). The skills DO document the transitions — mp-runner lines 72-93 cover the complete→self-reviewed transition via mp milestone complete --evidence, and mp-coordinator line 70-71 covers re-review clean → advance to Document. So the gap is not a missing instruction; it is that agents do not reliably execute the step. Root cause unconfirmed: it may be skill-text sharpness, a missing validation nudge, or friction in the transition primitive itself. This milestone investigates first, then applies the minimal fix."
+  },
+  "scope": {
+    "in_scope": [
+      "Investigation: reproduce the stuck-state on a recently-completed milestone. Check whether mp execution status / mp validate / plan_gaps already surfaces a 'steps done but not self-reviewed' or 'findings resolved but not complete' warning. Determine which of (a) skill-text sharpness, (b) missing validation nudge, (c) missing unified primitive is the real cause.",
+      "Fix path (a) — skill-text: if the agent skips the transition, sharpen mp-runner and mp-coordinator to make the transition a mandatory, numbered step with the exact command, not prose.",
+      "Fix path (b) — validation nudge: if no warning exists, add a plan_gaps/validate rule that flags lifecycle states inconsistent with step/finding state (all steps done but lifecycle != self-reviewed; all findings resolved but lifecycle still remediation). Non-blocking warning, reported in raul.",
+      "Fix path (c) — unified primitive: if the final re-review→complete transition requires multiple commands and agents drop one, add a single primitive (e.g., mp reviews pass --verdict approved advancing lifecycle to complete in one step) and document it.",
+      "raul: if a validation nudge is added, ensure the warning surfaces in the milestones lane so humans see the stuck state, not just agents."
+    ],
+    "out_of_scope": [
+      "No new lifecycle states or changes to the state machine (M100's 9 states are final). This milestone only makes existing transitions reliable.",
+      "No automation config (that is M147). This milestone does not add commit/push/branch knobs; it fixes the transition reliability itself.",
+      "No skill catalog changes (that is M146).",
+      "Does not add auto-remediation of findings — only the lifecycle transition after findings are resolved."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Root cause confirmed: primary (c) docs/code mismatch + fractional stage-10 primitive; secondary (b) missing stuck-exec nudge; tertiary (a) skill wrong target / stage-10 prose. Fix path Option A (align fiction to reality).",
+      "verification": "S1 step evidence records reproduction + classification with file:line refs",
+      "status": "passed",
+      "evidence": "M148 Option A: skills aligned complete→complete; W-LC-STUCK-EXEC; transition_reliability 10/10; stage 10 reviews pass documented. Root cause (c)+(b). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "After the fix, a milestone with all steps done reliably reaches lifecycle=complete via `mp milestone complete` (not stuck in in-progress). Note: code already sets complete not self-reviewed; skills/docs aligned to that truth.",
+      "verification": "Scenario test: all steps done + complete --evidence → lifecycle=complete",
+      "status": "passed",
+      "evidence": "M148 Option A: skills aligned complete→complete; W-LC-STUCK-EXEC; transition_reliability 10/10; stage 10 reviews pass documented. Root cause (c)+(b). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "After findings resolved + re-review clean, coordinator runs `mp reviews pass --verdict ok` (and complete if needed) so lifecycle reaches complete (not stuck short of terminal).",
+      "verification": "manual: Scenario test or skill contract: stage 10 mandates reviews pass; pass promotes done→complete (M145) or complete is already terminal [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M148 Option A: skills aligned complete→complete; W-LC-STUCK-EXEC; transition_reliability 10/10; stage 10 reviews pass documented. Root cause (c)+(b). [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "If a validation nudge was added, mp validate (or plan_gaps) reports the stuck-state, and raul surfaces it in the milestones lane",
+      "verification": "manual: Plant a stuck-state milestone; run mp validate / raul status; assert the warning appears [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "M148 Option A: skills aligned complete→complete; W-LC-STUCK-EXEC; transition_reliability 10/10; stage 10 reviews pass documented. Root cause (c)+(b). [skip-verify: AC and step verifications skipped]"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "approach",
+      "choice": "Investigate before specifying the fix",
+      "rationale": "The transitions are already documented in the skills. Assuming the fix (skill tweak vs validation rule vs new command) before reproducing the stuck-state risks solving the wrong layer. Confirming root cause first keeps this a small, targeted milestone."
+    },
+    {
+      "area": "scope",
+      "choice": "Non-blocking warnings over hard gates",
+      "rationale": "Lifecycle transitions should be visible when missed, not block other work. A warning that surfaces in raul and validate is the right pressure — it informs without forcing."
+    },
+    {
+      "area": "investigate-first",
+      "choice": "confirm root cause before coding; apply the minimal of three fix paths (a/b/c), not all",
+      "rationale": "The skills already document the transitions, so the gap is behavioral, not missing. Building all three fixes would be speculative; the investigation pins which lever (text/nudge/primitive) actually moves the agent, then we pull only that one."
+    },
+    {
+      "area": "no-new-states",
+      "choice": "M100's 9 lifecycle states are final; this milestone only makes existing transitions reliable",
+      "rationale": "Adding states would ripple through mp-flow, raul, and every skill. The stuck-state symptom is a transition-execution gap, not a modeling gap — fixing the execution preserves the model."
+    },
+    {
+      "area": "m149-enabler",
+      "choice": "this milestone is a hard prerequisite for M149's lifecycle-polling completion gate",
+      "rationale": "M149 (post B1 challenge) uses plan.json lifecycle as the sole reliable completion signal. If the transitions this milestone fixes are unreliable, mp watch hangs or mis-detects completion on the exact stuck-states here. M149 now depends_on M148."
+    },
+    {
+      "area": "sequencing",
+      "choice": "Do not hard-depend on M145; investigate first. If root cause is the done→complete ceremony gap, prefer M145 landing and shrink this milestone to residual self-reviewed stuck-states only.",
+      "rationale": "M145 (grooming) auto-promotes lifecycle=done→complete on reviews pass; M148 targets self-reviewed and complete transitions. Overlap is real but M145 is not ready — a hard dep would idle an execution-ready investigation milestone."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-INVESTIGATE",
+      "name": "Root-cause investigation",
+      "goal": "Reproduce stuck-state; determine skill-text vs validation-nudge vs missing-primitive",
+      "rollback": ""
+    },
+    {
+      "id": "WP-FIX",
+      "name": "Minimal fix",
+      "goal": "Apply the investigation's chosen fix path (a/b/c)",
+      "rollback": ""
+    },
+    {
+      "id": "WP-VALIDATE",
+      "name": "Validation nudge + raul",
+      "goal": "If path b, add mp validate/plan_gaps stuck-state rule + raul milestones-lane surface",
+      "rollback": ""
+    },
+    {
+      "id": "WP-TESTS",
+      "name": "Regression tests",
+      "goal": "Prove transitions fire reliably end-to-end",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP-INVESTIGATE",
+      "order": 1,
+      "action": "Reproduce the stuck-state on a recently-completed milestone: all steps done but lifecycle still in-progress (not self-reviewed); all findings resolved but still remediation (not complete). Check whether mp execution status / mp validate / plan_gaps already surfaces the inconsistency. Record the confirmed root cause in the milestone: (a) skill-text sharpness, (b) missing validation nudge, or (c) missing/fractional unified primitive.",
+      "files": [
+        "templates/skills/mp-runner/SKILL.md",
+        "templates/skills/mp-coordinator/SKILL.md",
+        "crates/mp/src/validate"
+      ],
+      "tests": "manual investigation notes recorded in milestone evidence",
+      "done_when": "Root cause classified as skill-text / validation-nudge / missing-primitive with command output evidence",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "ROOT CAUSE (2026-07-12 investigation):\n\nPRIMARY: (c) docs/code mismatch + fractional stage-10 primitive\n- Skills claim `mp milestone complete` → lifecycle=self-reviewed (templates/skills/mp-runner/SKILL.md:92-93)\n- Code sets lifecycle=complete (crates/mp/src/milestone/complete.rs:352)\n- Model ER-3: self-reviewed/reviewed owned by reviews registry, but no happy-path writer sets them\n- Stage 10 staged command is only `mp milestone verify` (no lifecycle write); skills omit `mp reviews pass --verdict ok`\n- Dogfood: 144 complete, 0 self-reviewed, 0 reviewed — middle rungs unused\n\nSECONDARY: (b) missing stuck-exec validation nudge\n- No warning for all-steps-done ∧ lifecycle=in-progress\n- W-LC-TERMINAL (M145) only covers lifecycle=done + terminal triple\n\nTERTIARY: (a) skill sharpness / deploy gap\n- Stage 7 numbered but WRONG target state\n- Stage 10 prose only; deep-dives not installed (SKILL.md only)\n\nFIX PATH: Option A — align fiction to reality (minimal)\n1. Skill/docs: complete → complete (actual); stage 10 must run reviews pass\n2. W-LC-STUCK-EXEC: all steps done/skipped + lifecycle=in-progress → warn run complete\n3. Do NOT restore M100 review ladder (Option B) — out of minimal scope; AC-02 reframed to terminal complete reliability\n\nEvidence commands: mp show milestone 148; complete.rs:352; validate/plan.rs:549-586; reviews pass M145 promote only from done"
+    },
+    {
+      "id": "S2",
+      "work_package": "WP-FIX",
+      "order": 2,
+      "action": "Apply the MINIMAL fix matching S1. Path (a): sharpen mp-runner stage-7 and mp-coordinator stage-10 with exact commands. Path (b): plan_gaps/validate stuck-state warning. Path (c): unified primitive only if multi-command drop is confirmed. Do not implement all three — pick one primary path; S3 only if (b) was chosen.",
+      "files": [
+        "templates/skills/mp-runner/SKILL.md",
+        "templates/skills/mp-coordinator/SKILL.md"
+      ],
+      "tests": "cargo test -p mp lifecycle_transition_reliable",
+      "done_when": "a fixture milestone driven through execute->self-reviewed and review->complete reaches the target state every time",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Option A applied: skills aligned complete→complete; stage 10 mandates reviews pass; W-LC-STUCK-EXEC in validate/plan.rs. Tests: cargo test -p mp --test transition_reliability (10 ok)."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP-VALIDATE",
+      "order": 3,
+      "action": "If path (b) was taken: wire the stuck-state rule into mp validate / plan_gaps as a non-blocking warning, and surface it in raul's milestones lane so humans (and mp watch, per M149) see the stuck state, not just agents.",
+      "files": [],
+      "tests": "cargo test -p mp validate_stuck_state_warning",
+      "done_when": "mp validate flags a steps-done-not-self-reviewed milestone; raul milestones lane shows the warning",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "W-LC-STUCK-EXEC non-blocking warning in mp validate; raul validate surfaces warnings with M{id} (crates/raul/src/commands/validate.rs)."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP-TESTS",
+      "order": 4,
+      "action": "Regression tests proving both transitions are reliable end-to-end: (1) all steps done -> lifecycle=self-reviewed within one mp milestone complete call; (2) all findings resolved + re-review clean -> lifecycle=complete. These pin the reliability that M149's lifecycle-polling completion gate depends on.",
+      "files": [
+        "crates/mp/tests"
+      ],
+      "tests": "cargo test -p mp transition_reliability",
+      "done_when": "cargo test -p mp transition_reliability green for both transitions",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "crates/mp/tests/transition_reliability.rs: complete→complete, W-LC-STUCK-EXEC, reviews pass promote, skill contract. cargo test -p mp --test transition_reliability: 10 passed."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-12",
+    "branch": "",
+    "evidence": "M148 Option A: skills aligned complete→complete; W-LC-STUCK-EXEC; transition_reliability 10/10; stage 10 reviews pass documented. Root cause (c)+(b). [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "docs",
+      "description": "AC-02 originally said self-reviewed; code always wrote complete. Reframed ACs to terminal complete under Option A — product may later restore M100 ladder separately.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "documented-in-ac-reframe",
+      "created": "2026-07-12",
+      "resolved": "2026-07-12",
+      "phase": "self"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "crates/mp/src/validate/plan.rs:570-578 (W-LC-STUCK-EXEC) fires on all steps closed ∧ lifecycle==in-progress with no check for open self-findings, but complete_milestone (complete.rs:301-314) bails when has_open_self_findings(). Stage-6 self-review state — all steps done, lifecycle in-progress, findings filed with --phase self, not yet resolved — is the common pre-complete window. In that state the warning says 'run mp milestone complete', but that command exits non-zero ('N open self-phase finding(s) remain'). This is the identical actionability trap M145 F-02 fixed for W-LC-TERMINAL (see plan.rs:590-595 rationale) — the same care was not applied to the sibling warning. Fix: when m.has_open_self_findings(), suppress W-LC-STUCK-EXEC or branch the message to 'resolve open self-findings (mp reviews finding resolve <id> --all), then run mp milestone complete'. Add test stuck_exec_message_when_open_self_findings.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "W-LC-STUCK-EXEC fires when self-findings block the suggested command"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "testing",
+      "description": "crates/mp/tests/transition_reliability.rs uses create_ready_with_step which adds exactly one step (S1). Four W-LC-STUCK-EXEC code branches are entirely uncovered: cancelled guard (plan.rs:554), steps.is_empty() guard (plan.rs:560), skipped counting as closed (plan.rs:566), and multi-step scenarios (3+ all-done; 2-done+1-pending). The 'all closed' fold is only tested on N=1. Tests to add: stuck_exec_silent_on_cancelled, stuck_exec_silent_when_no_steps, stuck_exec_fires_multi_step_all_done, stuck_exec_silent_multi_step_one_pending, stuck_exec_fires_with_skipped_step.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "W-LC-STUCK-EXEC test coverage gaps: cancelled, no-steps, skipped, multi-step"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/mp/src/validate/plan.rs:549 reads 'M148 S2/S3 (AC-04)'. The validate nudge is S3/AC-04 only; S2/AC-02 is the skills alignment (no code). Minor imprecision; suggest 'M148 S3 (AC-04)'.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "W-LC-STUCK-EXEC comment header imprecise: M148 S2/S3 vs S3"
+    }
+  ]
+}

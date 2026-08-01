@@ -1,0 +1,302 @@
+{
+  "milestone": {
+    "id": "134",
+    "title": "raul TUI smoothness: frame gate, batch drain, dirty signal, sync output",
+    "slug": "raul-tui-smoothness-frame-gate-batch-drain-dirty-signal-sync-output",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-10T12:13:26.721412+00:00"
+  },
+  "intent": {
+    "outcome": "raul's TUI event loop is responsive under rapid input (held keys, scroll wheels) with no visible jitter or render storms, and individual frames don't tear when complex redraws happen (board view, detail view with markdown)."
+  },
+  "problem": {
+    "description": "The TUI event loop in crates/raul/src/tui/runner.rs:104+ is fully synchronous and re-renders on every crossterm::event::read(). Holding j or k to scroll produces a render storm — one full redraw per key repeat, no rate limit, no batching. There is no dirty-signal: even when state hasn't changed (e.g. key is a no-op for the current focus), a full redraw happens. There is no synchronized output (CSI ?2026) wrapping the draw, so complex views (board with 7 columns, detail with markdown) can show intermediate frames. See ~/ai-notes/projects/personal/master-plan/tui-redesign.md for the full herdr analysis. herdr's src/app/mod.rs applies all four of these techniques and the user reports its TUI feels noticeably smoother despite sharing the same ratatui 0.30 + crossterm 0.29 stack."
+  },
+  "scope": {
+    "in_scope": [
+      "Frame rate gate: cap renders at ~60fps (MIN_RENDER_INTERVAL = 16ms) so held-key storms can't outrun the display",
+      "Batched event processing: use crossterm::event::poll(Duration::ZERO) in a drain loop, process N pending events, render once",
+      "Dirty-signal flag: skip terminal.draw() when no state change occurred (set needs_render = true only on actual mutations)",
+      "Synchronized output guard: RAII struct wrapping CSI ?2026 h/l around every terminal.draw() call",
+      "Tests pinning the four behaviors: rate gate caps the redraw count under synthetic storms; batch drain coalesces N events into 1 render; dirty signal skips draws when state is unchanged; sync output sends the begin/end sequences",
+      "Manual verification: hold j/k in a 50-row list, confirm no visible jitter; switch lanes rapidly, confirm no tearing"
+    ],
+    "out_of_scope": [
+      "Async I/O (tokio, event channel) — see M138 below",
+      "Compute-then-render separation, ViewState, mode enum — separate milestone (M135, M136)",
+      "Scrollbars, keybinds, config TUI — separate milestones (M137, M139-M140)",
+      "Replacing crossterm::event::read() with custom byte framer (herdr's src/raw_input.rs pattern) — not justified for raul's needs",
+      "Animations or spinners — no animations exist in raul"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Sustained key-repeat input (e.g. holding j) results in at most 60 redraws per second (frame rate gate). Test simulates 100 events arriving in 100ms; assert redraw count is bounded by the 16ms gate.",
+      "verification": "crates/raul/tests/tui_smoothness.rs",
+      "status": "passed",
+      "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+    },
+    {
+      "id": "AC-02",
+      "description": "When multiple events are pending (poll(Duration::ZERO) returns true N times in a row), they are processed and a single terminal.draw() is issued for the batch.",
+      "verification": "crates/raul/tests/tui_smoothness.rs",
+      "status": "passed",
+      "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+    },
+    {
+      "id": "AC-03",
+      "description": "When a key event is a no-op for the current focus (e.g. pressing j on a list with no items below the cursor), the dirty-signal flag is not set and no redraw happens. Test injects the event and asserts the redraw counter is unchanged.",
+      "verification": "crates/raul/tests/tui_smoothness.rs",
+      "status": "passed",
+      "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+    },
+    {
+      "id": "AC-04",
+      "description": "Every terminal.draw() call is wrapped in a synchronized output guard: stdout receives CSI ?2026 h (begin) before the draw and CSI ?2026 l (end) after. RAII ensures the end is always sent even on panic.",
+      "verification": "cargo test -p raul --test tui_smoothness sync_output_guard_writes_begin_and_end",
+      "status": "passed",
+      "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+    },
+    {
+      "id": "AC-05",
+      "description": "All existing raul tests still pass: cargo test -p raul exits 0. No regression in lane navigation, list rendering, detail rendering, board view, modal/overlay behavior.",
+      "verification": "cargo test -p raul",
+      "status": "passed",
+      "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-rate-gate",
+      "name": "Frame rate gate",
+      "goal": "Cap TUI render rate at ~60fps (16ms) to eliminate jitter under sustained key-repeat input",
+      "rollback": ""
+    },
+    {
+      "id": "wp-event-loop",
+      "name": "Event loop: drain + dirty signal",
+      "goal": "Drain pending crossterm events in a batch before rendering; skip draw when state did not change",
+      "rollback": ""
+    },
+    {
+      "id": "wp-sync-output",
+      "name": "Synchronized output",
+      "goal": "RAII guard wrapping CSI ?2026 h/l around every terminal.draw() to eliminate frame tearing",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "Pin all 4 behaviors in crates/raul/tests/tui_smoothness.rs; ensure cargo test -p raul exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-rate-gate",
+      "order": 1,
+      "action": "Add MIN_RENDER_INTERVAL constant (16ms) and last_render: Instant in the run_tui loop. Gate terminal.draw() with can_render_now() and set needs_render=true on skip.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_smoothness.rs",
+      "done_when": "Sustained key-repeat (100 events in 100ms) results in at most ~60 redraws/sec; gated renders do not advance state",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-event-loop",
+      "order": 2,
+      "action": "Replace blocking crossterm::event::read() with a drain loop using poll(Duration::ZERO). Process all pending events, then render once at the end of the batch.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_smoothness.rs",
+      "done_when": "Synthetic batch of N pending events produces exactly 1 terminal.draw() call; count is asserted in test",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-event-loop",
+      "order": 3,
+      "action": "Add needs_render: bool flag. Only set true on state mutations (lane change, list scroll, mode enter, etc.). Skip terminal.draw() when false.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_smoothness.rs",
+      "done_when": "No-op key event for current focus leaves redraw counter unchanged; test injects such an event",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-sync-output",
+      "order": 4,
+      "action": "Add SyncOutputGuard RAII struct. begin() writes CSI ?2026 h, Drop writes CSI ?2026 l. Wrap every terminal.draw() call site in a guard.",
+      "files": [
+        "crates/raul/src/tui/runner.rs"
+      ],
+      "tests": "crates/raul/tests/tui_smoothness.rs",
+      "done_when": "Stdout stream around a draw contains the begin/end CSI sequences; test asserts on the byte stream",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "wp-tests",
+      "order": 5,
+      "action": "Author crates/raul/tests/tui_smoothness.rs with the 4 test cases: rate-gate storm, batch drain, no-op dirty, sync-output stream.",
+      "files": [
+        "crates/raul/tests/tui_smoothness.rs"
+      ],
+      "tests": "crates/raul/tests/tui_smoothness.rs",
+      "done_when": "The test file exists and contains 4 named test cases pinning AC-01..AC-04",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "wp-tests",
+      "order": 6,
+      "action": "Run cargo test -p raul. Verify all existing tests still pass and the new tui_smoothness tests are green.",
+      "files": [
+        "crates/raul/tests/tui_smoothness.rs"
+      ],
+      "tests": "cargo test -p raul",
+      "done_when": "cargo test -p raul exits 0; zero regressions",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-10",
+    "branch": "",
+    "evidence": "M134 implemented: FrameClock (with_interval configurable), SyncOutputGuard RAII, EventSource trait + CrosstermSource, generic run_loop. App gains a version counter bumped by every mutator. All 5 ACs pass. 7 new tests in tui_smoothness.rs; full raul suite (388 tests) green."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Code review (remediation applied): handle_esc on ContentState::List was writing app.tab_bar_focused = true directly without calling touch(). The dirty-signal contract was broken — pressing Esc on List while content was focused wouldn't trigger a redraw. Fix: capture prior focus flag, write true, bump version only on actual change (matches the AC-03 no-op-event rule). Same idempotent fix for the non-List branch. App::touch visibility changed from private to pub(crate) so runner.rs helpers can call it. Two new inline unit tests pin the contract.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external",
+      "summary": "M134 review: handle_esc dirty-signal violation fixed + 2 unit tests added",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M134",
+        "remediated",
+        "correctness"
+      ]
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "When needs_render && !frame_clock.can_render(), run_loop skips the draw and blocks on wait_next(). A deferred frame is held until the next input event, not until the gate opens. After a burst ends mid-interval, the last mutation can remain unpainted until another key. Fix: before blocking, if needs_render, poll/sleep for remaining min_interval so deferred draw fires without waiting for input. Location: crates/raul/src/tui/runner.rs:352-415",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "Deferred frame blocked until next input",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M134"
+      ]
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "robustness",
+      "description": "SyncOutputGuard ignores write/flush errors (let _ =). A failed begin still drops an end sequence; silent I/O failure. Propagate or log write failures; at least fail begin loudly in debug. Location: crates/raul/src/tui/runner.rs:217-241",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "SyncOutputGuard ignores write/flush errors",
+      "confidence": "medium",
+      "tags": [
+        "code-review",
+        "M134"
+      ]
+    }
+  ]
+}

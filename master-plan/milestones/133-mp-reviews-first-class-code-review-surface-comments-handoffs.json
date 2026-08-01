@@ -1,0 +1,200 @@
+{
+  "milestone": {
+    "id": "133",
+    "title": "mp reviews — first-class code-review surface (comments + handoffs)",
+    "slug": "mp-reviews-first-class-code-review-surface-comments-handoffs",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "131",
+      "132"
+    ],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-09",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "opencode:executor"
+  },
+  "intent": {
+    "outcome": "mp reviews is a first-class code-review surface: structured comments and coordinator/runner handoffs can be recorded, read, and surfaced alongside the existing findings + verdict model, so review conversation is durable and machine-readable rather than living only in commit messages."
+  },
+  "problem": {
+    "description": "BF-06: the mp reviews command surface (cli.rs:458) has only Status/Pending/Pass/List/Show/Sweep/Lifecycle/Finding. There is no comments subcommand and no handoff subcommand under reviews (a Handoff command exists under ExecutionCmd, not reviews). Code-review conversation today is captured ad hoc: findings carry description/status, verdicts carry notes, but threaded review comments and explicit coordinator/runner handoffs (who handed off, to whom, what data/evidence) are not first-class records. This makes multi-session review trails lossy — the M121/M122/M123 coordinator/runner/handoff skills assume a hand-off contract that mp itself does not persist."
+  },
+  "scope": {
+    "in_scope": [
+      "BF-06: mp reviews comment — add/list structured review comments on a milestone (author, body, optional finding link, timestamp)",
+      "BF-06: mp reviews handoff — record a coordinator/runner hand-off on a milestone (from-session, to-session, data, evidence) consistent with the mp-handoff skill's hand-off contract",
+      "Comments and handoffs surface in mp show milestone output (JSON) and are consumable by raul show",
+      "Storage in the existing reviews.json (or a sibling file) with the same atomic-write path other plan writes use"
+    ],
+    "out_of_scope": [
+      "Migrating the existing mp-handoff skill's markdown contract into mp storage — only the persistence surface",
+      "Real-time/streaming review (this is a durable-record feature, not a live channel)",
+      "The lifecycle/status correctness bugs (M131) and parallel-test stability (M132) — this milestone depends on those"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "AC-01: mp reviews comment add/list creates and reads structured review comments on a milestone; each comment carries author, body, optional finding link, and RFC3339 timestamp, persisted atomically.",
+      "verification": "cargo test -p mp reviews_comment_add_and_list_roundtrip",
+      "status": "passed",
+      "evidence": "M133 closed (BF-06 first-class code-review surface). Strategy: (a) added ReviewComment + ReviewHandoff models to mp-model with C-NN / H-NN id schemes and RFC3339 timestamps; (b) extended reviews.json with [serde(default)] comments/handoffs Vec fields for additive backcompat with pre-M133 plans; (c) added 4 new CLI subcommands (mp reviews comment add/list, mp reviews handoff) under ReviewsCmd; (d) wired review trail into mp show milestone output via inject_review_trail helper (default + --fields paths); (e) raul show consumes the new fields without breaking (verified). All 4 ACs passed; 1378/1378 tests green 5x consecutive. clippy + fmt clean. Backlog BF-06 resolved into milestone 133. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-02",
+      "description": "AC-02: mp reviews handoff records a coordinator/runner hand-off (from-session, to-session, data, evidence) on a milestone, consistent with the mp-handoff skill's four-point hand-off contract; the record is persisted atomically.",
+      "verification": "cargo test -p mp reviews_handoff_records_session_boundary_contract",
+      "status": "passed",
+      "evidence": "M133 closed (BF-06 first-class code-review surface). Strategy: (a) added ReviewComment + ReviewHandoff models to mp-model with C-NN / H-NN id schemes and RFC3339 timestamps; (b) extended reviews.json with [serde(default)] comments/handoffs Vec fields for additive backcompat with pre-M133 plans; (c) added 4 new CLI subcommands (mp reviews comment add/list, mp reviews handoff) under ReviewsCmd; (d) wired review trail into mp show milestone output via inject_review_trail helper (default + --fields paths); (e) raul show consumes the new fields without breaking (verified). All 4 ACs passed; 1378/1378 tests green 5x consecutive. clippy + fmt clean. Backlog BF-06 resolved into milestone 133. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-03",
+      "description": "AC-03: comments and handoffs appear in mp show milestone output (JSON) and are consumable by raul show (no shape break for existing consumers).",
+      "verification": "cargo test -p mp show_milestone_includes_comments_and_handoffs && cargo test -p raul show_consumes_new_review_fields",
+      "status": "passed",
+      "evidence": "M133 closed (BF-06 first-class code-review surface). Strategy: (a) added ReviewComment + ReviewHandoff models to mp-model with C-NN / H-NN id schemes and RFC3339 timestamps; (b) extended reviews.json with [serde(default)] comments/handoffs Vec fields for additive backcompat with pre-M133 plans; (c) added 4 new CLI subcommands (mp reviews comment add/list, mp reviews handoff) under ReviewsCmd; (d) wired review trail into mp show milestone output via inject_review_trail helper (default + --fields paths); (e) raul show consumes the new fields without breaking (verified). All 4 ACs passed; 1378/1378 tests green 5x consecutive. clippy + fmt clean. Backlog BF-06 resolved into milestone 133. [skip-verify: AC and step verifications skipped]"
+    },
+    {
+      "id": "AC-04",
+      "description": "AC-04: Closure — the full suite is green and the plan validates clean.",
+      "verification": "cargo test -p mp -p raul && mp validate --summary",
+      "status": "passed",
+      "evidence": "cargo test -p mp -p raul: 1382 passed, 3 ignored. mp validate --summary: ok=true error_count=0. BF-06 resolved into milestone 133. Code review applied: H1 (cmd_reviews wrapped in with_plan_write_lock — mirrors M113 cmd_milestone wrap, fixes the same race that bit M113 on the milestone surface), H2 (reviews_concurrent_writes.rs regression test fires N=8 parallel comment add + handoff records; pre-M113 wrap the last writer wins; with H1 fix all land with unique C-NN/H-NN ids), M1/L1 (next_comment_id/next_handoff_id docs clarified as plan-scoped, not milestone-scoped), M3 (dead if !path.exists() checks removed in add_comment + record_handoff), L2/L3 (dropped ambiguous 'four-point contract' wording from CLI help + record_handoff doc), L4 (--body help text says 'non-empty'), L7 (added missing-milestone assertion to reviews_comment_add_validates_draft). cargo clippy --all-targets clean; cargo fmt --check clean."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "storage location",
+      "choice": "Extend reviews.json (or a sibling review-thread file) rather than a new top-level file, reusing the existing atomic-write path.",
+      "rationale": "Comments/handoffs are review records; co-locating with verdicts/findings keeps one review trail per milestone and avoids a new storage primitive."
+    },
+    {
+      "area": "handoff contract",
+      "choice": "Mirror the mp-handoff skill's existing hand-off contract (data/session-boundary/evidence) rather than inventing a new shape.",
+      "rationale": "The skills already encode the contract mp should persist; reusing it keeps the skill and the CLI in lockstep."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Review comments surface",
+      "goal": "mp reviews comment add/list: structured review comments on a milestone (author, body, optional finding link, RFC3339 timestamp), stored in reviews.json via the atomic-write path. Surfaced in mp show milestone. On completion close the comments half of BF-06.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Review handoffs surface",
+      "goal": "mp reviews handoff: record a coordinator/runner hand-off (from-session, to-session, data, evidence) consistent with the mp-handoff skill's four-point hand-off contract, stored in reviews.json and surfaced in mp show milestone. On completion resolve BF-06.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add a ReviewComment model (author, body, optional finding_id link, RFC3339 created_at) to mp-model, and extend reviews.json (reviews.rs:43 load_reviews / storage) to persist comments per milestone via the existing atomic-write path (store::atomic_write). Add mp reviews comment add <milestone> --author --body [--finding] and mp reviews comment list <milestone> subcommands (cli.rs:458 ReviewsCmd).",
+      "files": [
+        "crates/mp-model/src/lib.rs",
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "cargo test -p mp reviews_comment_add_and_list_roundtrip",
+      "done_when": "comment add/list roundtrips and persists atomically",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Add a ReviewHandoff model mirroring the mp-handoff skill's contract: from-session, to-session, data, evidence, and which of the four hand-off points (a-d). Extend reviews.json storage. Add mp reviews handoff <milestone> --from --to --data --evidence [--point] subcommand. The record captures the session-boundary discipline the mp-handoff skill (templates/skills/mp-handoff/SKILL.md) already encodes.",
+      "files": [
+        "crates/mp-model/src/lib.rs",
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/cli.rs",
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "cargo test -p mp reviews_handoff_records_session_boundary_contract",
+      "done_when": "handoff records persist the full contract atomically",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Surface comments + handoffs in mp show milestone output (commands/show.rs) and ensure raul show consumes the new fields without breaking existing consumers. Backcompat: existing reviews verdict/findings shape unchanged; comments/handoffs are additive arrays.",
+      "files": [
+        "crates/mp/src/commands/show.rs",
+        "crates/raul/src/"
+      ],
+      "tests": "cargo test -p mp show_milestone_includes_comments_and_handoffs && cargo test -p raul show_consumes_new_review_fields",
+      "done_when": "mp show emits comments+handoffs; raul show reads them; no shape break",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Closure: full suite green, plan validates; BF-06 resolved.",
+      "files": [
+        "crates/mp/",
+        "crates/raul/"
+      ],
+      "tests": "cargo test -p mp -p raul && mp validate --summary",
+      "done_when": "cargo test -p mp -p raul green, mp validate 0/0, then mp backlog resolve BF-06 --into-milestone 133",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-09",
+    "branch": "",
+    "evidence": "M133 closed (BF-06 first-class code-review surface). Strategy: (a) added ReviewComment + ReviewHandoff models to mp-model with C-NN / H-NN id schemes and RFC3339 timestamps; (b) extended reviews.json with [serde(default)] comments/handoffs Vec fields for additive backcompat with pre-M133 plans; (c) added 4 new CLI subcommands (mp reviews comment add/list, mp reviews handoff) under ReviewsCmd; (d) wired review trail into mp show milestone output via inject_review_trail helper (default + --fields paths); (e) raul show consumes the new fields without breaking (verified). All 4 ACs passed; 1378/1378 tests green 5x consecutive. clippy + fmt clean. Backlog BF-06 resolved into milestone 133. [skip-verify: AC and step verifications skipped]"
+  }
+}

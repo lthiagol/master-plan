@@ -1,0 +1,166 @@
+{
+  "milestone": {
+    "id": "33",
+    "title": "Clean init & collection lifecycle",
+    "slug": "clean-init-collection-lifecycle",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-27",
+    "updated": "2026-06-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "mp init produces clean, valid collections and a config whose location matches the chosen --plan-dir, and decision/idea records can be removed through the CLI."
+  },
+  "problem": {
+    "description": "Field testing (lazybrew adoption, I-03/I-10/I-12) found: (1) the init preset hardcodes location='master-plan' even when --plan-dir .mp is used, requiring a post-init config fix; (2) init emits empty placeholder [[decisions]]/[[ideas]]/[[items]] rows with id='', which surface as bogus records in `mp decision list`/`mp idea list`; (3) there is no CLI way to delete a decision or idea record (mp decision has only add/list; mp idea has no hard delete), so the empty placeholders could only be removed by hand-editing TOML - violating the never-hand-edit rule."
+  },
+  "scope": {
+    "in_scope": [
+      "init preset uses the --plan-dir value as the default location (no hardcoded master-plan)",
+      "init emits empty collections (no id='' placeholder rows) across decisions/ideas/backlog",
+      "New `mp decision remove <id>` and `mp idea remove <id>` (hard delete, distinct from soft dismiss/archive)",
+      "Integration tests: init location matches --plan-dir; list returns empty after fresh init; remove deletes record"
+    ],
+    "out_of_scope": [
+      "Soft-delete lifecycle changes for dismiss/archive (already work)",
+      "Backlog remove command (backlog already has resolve; evaluate separately if needed)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "After `mp init --plan-dir .mp`, the generated config has location='.mp' with no manual fix",
+      "verification": "init test asserting config location equals --plan-dir",
+      "status": "passed",
+      "evidence": "init_plan_dir tests pass; init honors --plan-dir"
+    },
+    {
+      "id": "AC-02",
+      "description": "After fresh init, `mp decision list`, `mp idea list`, and `mp list backlog` return empty arrays (no id='' placeholders)",
+      "verification": "init + list integration test",
+      "status": "passed",
+      "evidence": "init_empty_collections tests pass; no placeholder rows"
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp decision remove <id>` and `mp idea remove <id>` delete the record and validate stays green",
+      "verification": "add -> remove -> list-empty test",
+      "status": "passed",
+      "evidence": "collection_remove tests pass; decision/idea remove added"
+    },
+    {
+      "id": "AC-04",
+      "description": "Removing an id='' scaffold row is achievable via CLI (no hand-edit required)",
+      "verification": "scenario test on a legacy init-created placeholder",
+      "status": "passed",
+      "evidence": "remove_legacy_placeholder tests pass; legacy id='' removable"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Clean init",
+      "goal": "init preset honors --plan-dir and emits empty collections with no id='' placeholders",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Collection remove lifecycle",
+      "goal": "decision and idea records can be hard-deleted via CLI, including legacy id='' placeholders",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Make init preset use the --plan-dir value as the default config location instead of hardcoded 'master-plan'",
+      "files": [],
+      "tests": "cargo test -p mp --test init_plan_dir",
+      "done_when": "After mp init --plan-dir .mp, config has location='.mp' with no manual fix",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Make init emit empty collections (no id='' placeholder rows) across decisions, ideas, and backlog",
+      "files": [],
+      "tests": "cargo test -p mp --test init_empty_collections",
+      "done_when": "After fresh init, mp decision list / mp idea list / mp list backlog return empty arrays",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Implement mp decision remove <id> and mp idea remove <id> as hard-delete commands (distinct from soft dismiss/archive)",
+      "files": [],
+      "tests": "cargo test -p mp --test collection_remove",
+      "done_when": "mp decision remove and mp idea remove delete the record and validate stays green",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Ensure legacy id='' scaffold rows from older init output are removable via the new remove commands (no hand-edit required)",
+      "files": [],
+      "tests": "cargo test -p mp --test remove_legacy_placeholder",
+      "done_when": "Removing an id='' row succeeds through the CLI",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-27",
+    "branch": "",
+    "evidence": "All 4 steps done, all ACs passed, validate clean"
+  }
+}

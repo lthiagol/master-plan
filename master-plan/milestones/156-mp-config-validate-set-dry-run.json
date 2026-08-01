@@ -1,0 +1,343 @@
+{
+  "milestone": {
+    "id": "156",
+    "title": "mp config validate + set --dry-run",
+    "slug": "mp-config-validate-set-dry-run",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-11",
+    "updated": "2026-07-13",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-13T01:08:36.825455+00:00"
+  },
+  "intent": {
+    "outcome": "mp config validate reports structured JSON errors/warnings without writing; mp config set --dry-run previews a change using the same validate path. Unblocks the raul Settings TUI (M140) and any agent that wants safe config edits."
+  },
+  "problem": {
+    "description": "raul Settings TUI (and agents) need a non-writing validate path before committing config edits. Today mp config set always writes; there is no validate subcommand or --dry-run preview."
+  },
+  "scope": {
+    "in_scope": [
+      "mp config validate (current config or --file <path>) emitting JSON { ok, errors[{field,message}], warnings[{field,message}] }",
+      "mp config set --dry-run: parse+validate without writing",
+      "Tests in crates/mp/tests/config_validate.rs and config_set.rs covering good/bad values and no-write guarantee"
+    ],
+    "out_of_scope": [
+      "raul Settings TUI (M140)",
+      "Live config reload / file watching",
+      "Atomic multi-field transactions"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp config validate` (no args = current config; `--file <path>` = candidate) emits JSON { ok: bool, errors: [{field, message}], warnings: [{field, message}] }. Bad config → ok:false with structured errors; good → ok:true with empty errors.",
+      "verification": "cargo test -p mp --test config_validate",
+      "status": "passed",
+      "evidence": "Self-review F-01..F-03 fixed: semantic gate shared set/dry-run; bounded --file read; try_load_config on dry-run. cargo test -p mp --test config_validate + config_set green (incl. real_set_rejects_invalid_profile_same_as_dry_run)."
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp config set <key> <value> --dry-run` parses and validates but does NOT write config. Known-good: exit 0, file unchanged. Known-bad: non-zero, error reported, file unchanged.",
+      "verification": "cargo test -p mp --test config_set",
+      "status": "passed",
+      "evidence": "Self-review F-01..F-03 fixed: semantic gate shared set/dry-run; bounded --file read; try_load_config on dry-run. cargo test -p mp --test config_validate + config_set green (incl. real_set_rejects_invalid_profile_same_as_dry_run)."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "scope",
+      "choice": "Split mp validate/dry-run out of the former M140 Settings mega-milestone",
+      "rationale": "mp-side validate is independently shippable and is the hard dependency for Settings field-edit. One milestone spanning two crates invited catch-all cargo-test steps and blocked TUI work behind CLI work."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-validate",
+      "name": "config validate",
+      "goal": "mp config validate subcommand with JSON ok/errors/warnings",
+      "rollback": ""
+    },
+    {
+      "id": "wp-dry-run",
+      "name": "config set --dry-run",
+      "goal": "mp config set --dry-run reuses validate path and never writes",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-validate",
+      "order": 1,
+      "action": "Add `mp config validate` in crates/mp/src/commands/config.rs (CLI wiring under crates/mp/src/cli/). Validates current config or --file <path>. JSON output: { ok, errors[{field,message}], warnings[{field,message}] }.",
+      "files": [
+        "crates/mp/src/commands/config.rs",
+        "crates/mp/src/cli/mod.rs"
+      ],
+      "tests": "cargo test -p mp --test config_validate",
+      "done_when": "mp config validate returns structured JSON; bad config ok:false; good ok:true",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-dry-run",
+      "order": 2,
+      "action": "Extend `mp config set` with --dry-run. Reuse the validate path. With --dry-run, parse+validate but do not write the config file.",
+      "files": [
+        "crates/mp/src/commands/config.rs"
+      ],
+      "tests": "cargo test -p mp --test config_set",
+      "done_when": "dry-run never mutates config on disk; bad values fail closed",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-13",
+    "branch": "",
+    "evidence": "Self-review F-01..F-03 fixed: semantic gate shared set/dry-run; bounded --file read; try_load_config on dry-run. cargo test -p mp --test config_validate + config_set green (incl. real_set_rejects_invalid_profile_same_as_dry_run)."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "dry-run vs real set asymmetry: config_set_dry_run runs collect_semantic_issues after apply (so workflow.profile=bogus / invalid strictness fail closed), but config_set writes without that check. Real set can persist values that dry-run rejects — breaks M140 validate-then-set contract if anything skips dry-run. Fix: run the same semantic gate before write_config in config_set.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "set/dry-run semantic gate split"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "correctness",
+      "description": "load_config_from_path uses unbounded fs::read_to_string; store::try_load_config uses read_text_bounded(MAX_PLAN_FILE_BYTES). Candidate --file path should share the bounded reader.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "validate --file unbounded read"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "correctness",
+      "description": "config_set_dry_run uses store::load_config (corrupt/missing falls back to defaults silently) while config_validate uses try_load_config. Dry-run on a corrupt project config should surface a structured error, not preview against defaults.",
+      "status": "fixed",
+      "author": "runner",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "self",
+      "summary": "dry-run silent corrupt-config fallback"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "The 'shared semantic gate' claim was partial. config_set ran reject_semantic_issues which collects all errors then bail!s on the first one, while set --dry-run and validate collect and emit them all. Real-set failures therefore surfaced only the first error, requiring a user to iterate one fix at a time. Fix: restructured config_set to share apply_config_set + collect_semantic_issues with set --dry-run, both emit the same ConfigSetReport JSON shape with the full error list. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "set/dry-run error-reporting asymmetry"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "set_agent_field rejected bare tokens with whitespace via parse_command_argv, but collect_semantic_issues only checked cmd.is_empty(). A hand-written config with agent.*.command = ['opencode --flag'] would pass validate and set --dry-run, persist through set, then blow up at herdr execution. Fix: extracted validate_command_argv and called it from collect_semantic_issues, mirroring the parse-time rule. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "whitespace-in-argv in semantic gate"
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "ConfigValidateReport.warnings was part of the documented JSON contract {ok, errors, warnings} but _warnings was never written. Downstream consumers could not trust the field's semantics. Fix: populated warnings with the empty-workflow.profile signal. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "warnings field permanently empty"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "category": "correctness",
+      "description": "apply_config_set accepted empty string for workflow.profile (and the semantic gate also allowed it). The persisted disk state was benign but indistinguishable from a fresh project's default. Fix: rejected empty string at apply_config_set; the warning fires only on-disk when the user hand-edited an empty profile. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "empty workflow.profile accepted at apply-time"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "category": "correctness",
+      "description": "load_config_from_path called path.exists() then read_text_bounded, leaving a TOCTOU window for symlink swaps. Fix: collapsed to a single fs::metadata call plus is_file() check. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "TOCTOU between path.exists and read"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "category": "security",
+      "description": "Real-set success path echoed the full ProjectConfig including argv-shaped agent.*.command strings to stdout. A user passing secrets through that key would leak them in transcript. Fix: redact to <redacted: N tokens> placeholder in ConfigSetReport.config. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "agent.*.command redaction in set report"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Three near-identical blocks across config_set_dry_run, config_validate, and cmd_config. Fix: extracted load_error_issue, roles_iter, emit_and_exit_on_fail helpers in crates/mp/src/config_cmd.rs and crates/mp/src/commands/config.rs. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "helper extraction (load_error_issue, roles_iter, emit_and_exit_on_fail)"
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "category": "correctness",
+      "description": "KEYBIND_ACTIONS listed open_board but no Keybinds field existed for it (M164 dropped the board lane). mp config set keybinds.open_board was silently accepted by the validator and ignored at runtime. Fix: removed the orphan entry from KEYBIND_ACTIONS in crates/mp/src/config.rs. Commit 72118a5.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "open_board orphan in KEYBIND_ACTIONS"
+    },
+    {
+      "id": "F-12",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "crates/mp/src/config_cmd.rs:33, 251-265 — fn config_set_dry_run and struct ConfigSetDryRunReport are vestigial from the pre-remediation split. After F-04 unified both paths through config_set(ctx, key, value, dry_run: bool), the dispatcher in commands/config.rs:38 calls config_set with the bool. config_set_dry_run has zero callers anywhere in the repo (verified via grep). Both symbols are pub so they leak across the crate boundary. Fix: delete ConfigSetDryRunReport and config_set_dry_run plus their doc-comments. Spec only guarantees ConfigSetReport shape.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "Dead code: ConfigSetDryRunReport + config_set_dry_run have zero callers post F-04"
+    },
+    {
+      "id": "F-13",
+      "severity": "medium",
+      "category": "correctness",
+      "description": "crates/mp/src/config_cmd.rs:53-62, 202-214 — config_set computes and discards the warnings vector: lines 202-204 collect warnings from collect_semantic_issues, but ConfigSetReport has no warnings field, so any non-error warning (e.g. empty workflow.profile) is silently dropped on stdout. mp config validate shows the warning; mp config set ui.theme mocha --dry-run (same config) does not. Downstream consumers cannot tell whether the warnings field is meaningful for set/dry-run. Fix: add pub warnings: Vec<ConfigFieldIssue> to ConfigSetReport and populate it on both branches.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "ConfigSetReport.warnings missing; warnings collected then discarded"
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "category": "correctness",
+      "description": "crates/mp/src/config_cmd.rs:387-394 — ui.icons has semantic validation against {none,ascii,unicode}. ui.theme has none. A user can mp config set ui.theme nonexistent and validation passes. crates/raul/src/tui/action.rs:636-639 then runs Palette::by_name(theme) which returns None and the app's palette is silently left unchanged. The user expects their theme change to apply and sees nothing. Fix: add KNOWN_THEMES = &['mocha','macchiato','frappe','latte','dracula'] (or read it from theme::ALL) and reject unknown theme strings in collect_semantic_issues. Surface an actionable error like the existing 'expected one of relaxed|full'.",
+      "status": "fixed",
+      "author": "ext-reviewer",
+      "fixed_in": "d0a723af3104a781526ab45b5a67f71cfd9beefc",
+      "created": "2026-07-13",
+      "resolved": "2026-07-13",
+      "phase": "external",
+      "summary": "ui.theme validation missing; unknown theme passes validate and silently no-ops at runtime"
+    },
+    {
+      "id": "F-15",
+      "severity": "low",
+      "category": "security",
+      "description": "crates/mp/src/config_cmd.rs:336-348, 215-244 — F-09 redacted ConfigSetReport.config.agent.*.command in the success path. It does not redact ConfigSetReport.value which echoes the caller-supplied raw string verbatim (line 219, 241). Stdout-redacted transcripts (CI logs, shell history exports, screen capture) will still see e.g. ['opencode','--flag','s3cret'] echoed in the value field. Fix: redact value symmetrically when the key starts with 'agent.' and ends with '.command' on the success path, or add a clarifying sentence that value is intentionally un-redacted because the caller is the source. Fix-as-code preferable.",
+      "status": "open",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "",
+      "phase": "external",
+      "summary": "F-09 redaction scope partial: ConfigSetReport.value echoed verbatim"
+    },
+    {
+      "id": "F-16",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/mp/src/config_cmd.rs:290-323, store.rs:19-29 — F-08 description claims the loader 'collapsed to a single fs::metadata call plus is_file() check'. In code, load_config_from_path does its own metadata() (line 291), then calls store::read_text_bounded which calls metadata() again (store.rs line 20). Two stat syscalls on the same path; the second's TOCTOU window narrowed but didn't close. Fix: inline the read into load_config_from_path to make one metadata call + size check on the already-fetched metadata, OR update F-08's prose to say 'single explicit metadata check + size check; inner reader has its own stat'.",
+      "status": "open",
+      "author": "ext-reviewer",
+      "fixed_in": "",
+      "created": "2026-07-13",
+      "resolved": "",
+      "phase": "external",
+      "summary": "F-08 description vs code: still two stat calls, only TOCTOU window narrowed"
+    }
+  ]
+}

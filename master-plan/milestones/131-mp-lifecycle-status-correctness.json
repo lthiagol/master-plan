@@ -1,0 +1,250 @@
+{
+  "milestone": {
+    "id": "131",
+    "title": "mp lifecycle/status correctness",
+    "slug": "mp-lifecycle-status-correctness",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "med",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-07-09",
+    "updated": "2026-07-09",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "zcode"
+  },
+  "intent": {
+    "outcome": "The unified lifecycle field and status derivation are consistent across every milestone transition, so any consumer reading lifecycle directly classifies milestones correctly and the status/review surfaces never silently swallow errors or derive the wrong state."
+  },
+  "problem": {
+    "description": "Five independent correctness defects cluster in the milestone lifecycle/status/review code paths. (1) B-75 [high]: block_milestone/defer_milestone write execution_status but never lifecycle, so blocked/deferred milestones drift — reopen_milestone and complete_milestone already write lifecycle (M100 ER-1), but block/defer were missed. inject_legacy_status_view papers over the display layer but the on-disk record is inconsistent. (2) BF-17: mp status --summary swallows build_lanes errors via .ok() (status.rs:31), silently emitting empty lanes; raul/dashboard consumers see no signal that lanes failed to build. (3) BF-14: resolve_finding derives pre_state from the single finding being resolved (reviews.rs:613), so for a milestone with mixed self+ external findings the recorded pre_state depends on which finding is resolved last — order-dependent. (4) BF-13: thread-entry validation lives only in add_finding_with_phase (reviews.rs:507), not in load_milestone/mp validate, so invalid thread entries persist if added any other way. (5) BF-16: migrate_kinds takes plan_dir directly and skips ensure_plan_exists (migrate.rs:471), bypassing the plan-exists guard."
+  },
+  "scope": {
+    "in_scope": [
+      "B-75: block_milestone + defer_milestone write lifecycle (mirror reopen/complete ER-1 pattern)",
+      "BF-17: mp status --summary surfaces/handles build_lanes errors instead of swallowing via .ok()",
+      "BF-14: pre_state derivation order-independent for mixed self+external findings",
+      "BF-13: thread-entry validation moves into load_milestone / mp validate",
+      "BF-16: migrate_kinds calls ensure_plan_exists"
+    ],
+    "out_of_scope": [
+      "Retiring inject_legacy_status_view (deferred until a follow-up confirms no consumer reads legacy fields directly)",
+      "BF-06 first-class reviews comments/handoff surface (tracked separately as M133)",
+      "The parallel-cargo-test race cluster (B-70/B-73/B-77, tracked as M132)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "B-75 (revised read-side fix): blocked/deferred/cancelled overlays are honored by every milestone-routing read path that currently filters on effective_lifecycle alone. SPEC §4.3 places blocked/deferred/cancelled on the execution_status axis as orthogonal overlays, NOT lifecycle values (model.rs:148-149 'blocked is now an overlay, not a lifecycle'); so the setters correctly leave lifecycle untouched. The defect was a read-side asymmetry — execution_lane guards overlays (path_engine.rs:582) but grooming_lane (784) filters on lifecycle only, so a deferred draft/groomed milestone leaked into the grooming lane. Fix: add overlay guards to the lane filters lacking them, mirroring execution_lane's pattern.",
+      "verification": "cargo test -p mp path_engine::grooming_lane_excludes_deferred && cargo test -p mp path_engine::lanes_honor_overlays",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    },
+    {
+      "id": "AC-02",
+      "description": "BF-17: mp status --summary no longer silently swallows build_lanes errors; a build_lanes failure is surfaced (error field or explicit empty-with-reason) rather than collapsed to empty lanes via .ok().",
+      "verification": "cargo test -p mp status_summary_surfaces_build_lanes_error",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    },
+    {
+      "id": "AC-03",
+      "description": "BF-14: resolve_finding's pre_state derivation is order-independent — resolving findings in any order on a milestone with mixed self + external findings yields the same recorded pre_state.",
+      "verification": "cargo test -p mp resolve_finding_pre_state_order_independent",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    },
+    {
+      "id": "AC-04",
+      "description": "BF-13: thread-entry validation runs in load_milestone / mp validate (not only in add_finding_with_phase), so an invalid thread entry is flagged (W53 warning) regardless of how it was added. Per the validate exit-code contract, W53 is a non-fatal warning (validate exits 0); it surfaces the defect rather than hard-rejecting, consistent with other data-quality W-codes.",
+      "verification": "cargo test -p mp validate_rejects_invalid_thread_entry",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    },
+    {
+      "id": "AC-05",
+      "description": "BF-16: migrate_kinds calls ensure_plan_exists before operating, so it cannot run against a non-existent plan dir.",
+      "verification": "cargo test -p mp migrate_kinds_requires_plan_exists",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    },
+    {
+      "id": "AC-06",
+      "description": "Closure: the full suite stays green and the plan validates clean after all five fixes.",
+      "verification": "cargo test -p mp && mp validate --summary",
+      "status": "passed",
+      "evidence": "M131 shipped"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "lifecycle write pattern",
+      "choice": "Route block/defer through the same lifecycle-write the ER-1 setters use, rather than computing lifecycle from execution_status on read.",
+      "rationale": "Consistency with reopen/complete; avoids a second derivation site that could itself drift."
+    },
+    {
+      "area": "B-75 verification depth",
+      "choice": "Assert on the raw on-disk lifecycle field, not the display layer.",
+      "rationale": "inject_legacy_status_view masks the drift in show output; only a raw-field assertion pins the actual fix."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Lifecycle setter consistency",
+      "goal": "block_milestone/defer_milestone write lifecycle (B-75); migrate_kinds calls ensure_plan_exists (BF-16). On completion resolve B-75 + BF-16 in the backlog.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Status & review derivation correctness",
+      "goal": "mp status --summary surfaces build_lanes errors (BF-17); resolve_finding pre_state order-independent for mixed-phase findings (BF-14); thread-entry validation in load/validate (BF-13). On completion resolve BF-17 + BF-14 + BF-13.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "B-75 (revised): the setters are correct per SPEC §4.3 — blocked/deferred are overlays, not lifecycle values. The defect is read-side: grooming_lane (path_engine.rs:784) filters on effective_lifecycle alone with no overlay guard, so a deferred draft/groomed milestone leaks into the grooming lane (execution_lane already guards at line 582). Add overlay guards (deferred/cancelled, and confirm blocked) to the lane filters that lack them, mirroring execution_lane's established pattern. Do NOT modify the setters — writing lifecycle=blocked would violate the data model (rank 0, lost progress state).",
+      "files": [
+        "crates/mp/src/milestone.rs",
+        "crates/mp/tests/suite_milestone.rs"
+      ],
+      "tests": "cargo test -p mp --lib milestone::block_milestone && cargo test -p mp --lib milestone::defer_milestone",
+      "done_when": "grooming_lane excludes deferred/cancelled milestones; lanes_honor_overlays test pins the contract; then mp backlog resolve B-75 --into-milestone 131 --reason 'fixed read-side: lane filters honor overlays per SPEC §4.3'",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Read-side fix per SPEC §4.3: added overlay guards (blocked/deferred/cancelled) to grooming_lane (path_engine.rs:784) and extended execution_lane's M125 blocked guard to deferred/cancelled (line 582). Setters unchanged — blocked/deferred are overlays not lifecycle values (model.rs:148-149). Tests: grooming_lane_excludes_deferred + lanes_honor_overlays, 11/11 path_engine::tests pass."
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "BF-16: migrate_kinds (migrate.rs:471) takes plan_dir directly and never calls ensure_plan_exists (paths.rs:31). Add the guard so it cannot operate on a non-existent plan dir.",
+      "files": [
+        "crates/mp/src/migrate.rs",
+        "crates/mp/tests/suite_migrate.rs"
+      ],
+      "tests": "cargo test -p mp migrate_kinds_requires_plan_exists",
+      "done_when": "migrate_kinds bails on a missing plan dir; then mp backlog resolve BF-16 --into-milestone 131",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "Added plan_dir.is_dir() guard at the top of migrate_kinds (migrate.rs:471). migrate_kinds takes a raw plan_dir (not PlanContext) so it bypassed the dispatcher's ensure_plan_exists; now it bails with 'plan directory not found'. Test migrate_kinds_requires_plan_exists passes."
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "BF-17: cmd_status (status.rs:31) swallows build_lanes errors via .ok() and silently falls back to empty lanes (lines 52-56). Surface the error instead — an error/reason field or explicit empty-with-reason — so raul/dashboard consumers get a signal that lanes failed to build.",
+      "files": [
+        "crates/mp/src/commands/status.rs",
+        "crates/mp/tests/suite_status.rs"
+      ],
+      "tests": "cargo test -p mp status_summary_surfaces_build_lanes_error",
+      "done_when": "build_lanes failure is surfaced, not swallowed; then mp backlog resolve BF-17 --into-milestone 131",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "BF-17: status.rs now captures build_lanes Result (was .ok()) and surfaces a top-level lanes_error string (null when healthy). Empty-lanes backcompat preserved. Test status_summary_surfaces_build_lanes_error: healthy=null, corrupted-milestone=non-null string, command stays green."
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "BF-14: resolve_finding (reviews.rs:582) derives pre_state from phase_at_resolve of the SINGLE finding being resolved (lines 615-622). For mixed self+external findings the recorded pre_state depends on resolution order. Derive pre_state from the milestone's overall finding state (any open self vs any open external), not the one finding.",
+      "files": [
+        "crates/mp/src/reviews.rs",
+        "crates/mp/tests/suite_reviews.rs"
+      ],
+      "tests": "cargo test -p mp resolve_finding_pre_state_order_independent",
+      "done_when": "pre_state is identical regardless of resolution order on mixed-phase findings; then mp backlog resolve BF-14 --into-milestone 131",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "BF-14: resolve_finding now derives pre_state from the milestone's WHOLE finding set (any external finding => self-reviewed, else done), not phase_at_resolve of the last-resolved finding. Two order-independence tests (self-first / external-first) both exit to self-reviewed."
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "BF-13: thread-entry validation lives only in add_finding_with_phase (reviews.rs:494-523), not in load_milestone/mp validate. Move/duplicate the validation into the validate path so an invalid thread entry is flagged (W53 warning) regardless of how it was added. NOTE: W53 is a non-fatal warning per the validate exit-code contract (exits 0); it surfaces the defect rather than hard-rejecting, which is the intended behavior since fatal-on-bad-thread-entry would break mp validate on plans with legacy hand-authored entries.",
+      "files": [
+        "crates/mp/src/reviews.rs",
+        "crates/mp/src/validate",
+        "crates/mp/tests/suite_reviews.rs"
+      ],
+      "tests": "cargo test -p mp validate_rejects_invalid_thread_entry",
+      "done_when": "mp validate flags (W53) invalid thread entries on load; then mp backlog resolve BF-13 --into-milestone 131",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "BF-13: thread-entry validation now runs in validate_plan (validate/plan.rs) emitting W53 per offending finding, not only in add_finding_with_phase. Test validate_rejects_invalid_thread_entry confirms a bad 'at' timestamp written directly to disk is flagged."
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Closure: run the full suite and validate; confirm all five fixes landed and backlog items B-75/BF-13/BF-14/BF-16/BF-17 are resolved.",
+      "files": [
+        "crates/mp/"
+      ],
+      "tests": "cargo test -p mp && mp validate --summary",
+      "done_when": "cargo test -p mp green, mp validate 0/0, B-75+BF-13+BF-14+BF-16+BF-17 resolved in backlog",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": "All 5 fixes shipped (S1-S5), 6/6 ACs passed, 910 mp + 365 raul tests green, mp validate 0 errors. B-75/BF-13/BF-14/BF-16/BF-17 all resolved in backlog. json_shape golden regenerated for the lanes_error field."
+    }
+  ],
+  "verification": {
+    "date": "2026-07-09",
+    "branch": "",
+    "evidence": "M131 shipped"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://master-plan.dev/schemas/annotation.schema.json",
+  "title": "Annotation",
+  "description": "Human annotation on a plan entity — review request, suggestion, or approval.",
+  "type": "object",
+  "required": ["target", "kind"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^AN-[0-9]{2}$"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "M##, M##/S##, or doc path"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["review-request", "break-down", "decouple", "change-suggestion", "approval-request", "note"]
+    },
+    "body": {
+      "type": "string",
+      "default": ""
+    },
+    "author": {
+      "type": "string",
+      "default": ""
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "addressed", "resolved"],
+      "default": "open"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "resolved_at": {
+      "type": "string",
+      "default": ""
+    }
+  }
+}

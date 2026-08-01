@@ -1,0 +1,15 @@
+{
+  "id": "p3.1-hybrid-work-session-show",
+  "phase": "implemented",
+  "description": "mp session show returns feature-oauth session with ready status",
+  "fixture": "projects/hybrid-work",
+  "command": ["--plan-dir", ".mp", "session", "show", "feature-oauth", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/session-show.json",
+    "fs_unchanged": true
+  }
+}

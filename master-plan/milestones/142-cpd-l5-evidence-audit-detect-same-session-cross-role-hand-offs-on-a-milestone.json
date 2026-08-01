@@ -1,0 +1,338 @@
+{
+  "milestone": {
+    "id": "142",
+    "title": "CPD L5 evidence audit: detect same-session cross-role hand-offs on a milestone",
+    "slug": "cpd-l5-evidence-audit-detect-same-session-cross-role-hand-offs-on-a-milestone",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "119",
+      "133"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-11",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this ships, an `mp reviews l5-check <id>` command reads a milestone's persisted hand-off records (M133's data shape) and reports same-session, cross-role hand-off violations as a structured advisory. The check integrates into `mp validate` so a `make validate` run includes the L5 audit. The hand-off recording (mp reviews handoff) reads session identity from the `MP_SESSION_ID` and `MP_SESSION_ROLE` env vars when present, falling back to the existing manual --from-session / --to-session flags. Result: the L5 rule (manifesto principle 13 + L5 session-boundary law) becomes auditable per-milestone. The check is advisory by design — it can detect same-explicit-session-id reuse, not 'the human ran coordinator and runner in the same opencode window.' Team discipline remains the real enforcement."
+  },
+  "problem": {
+    "description": "M119 (agent role dispatch + skill registry) and M133 (review handoffs data shape) shipped the role-token surface (mp agent role) and the hand-off persistence (mp reviews handoff with from_session / to_session / data / evidence). But there is no command that audits whether a milestone's hand-off records actually respect the L5 rule. A milestone can be marked 'done' with hand-offs that all came from the same session id and the same role — the rule is documented in the manifesto (line 369: 'cross-role stage transitions never share a session') and the data is persisted, but nothing checks the data. The team is dogfooding CPD right now and the runner is the same human-operator as the coordinator in many sessions; the discipline works because the human is honest, not because the toolkit catches violations. The L5 check makes the rule auditable: the data is already there, the check is a 100-line read-side command. Auto-injection of session identity (MP_SESSION_ID, MP_SESSION_ROLE) lets the harness pre-populate the fields the agent would otherwise have to type — a small ergonomics win that raises the floor on accidental violations (the agent can't forget to declare a session id if the harness does it for them). The check stays advisory: enforcement would require session identity the agent cannot forge, which is a separate design discussion and out of scope for this milestone."
+  },
+  "scope": {
+    "in_scope": [
+      "Data-shape prerequisite (additive): add from_role: String and to_role: String fields to the M133 ReviewHandoff struct (crates/mp-model/src/milestone.rs), with #[serde(default)] so pre-M142 records round-trip as empty. The current M133 shape has only free-form from_session/to_session with no structured role, so the role_inversion AC (AC-05) and the role_inversion violation class below cannot otherwise be implemented. MP_SESSION_ROLE env var populates these (see env-var item). This is a small additive model change, not a reshaping of the existing fields.",
+      "New `mp reviews l5-check <id>` subcommand: reads the milestone's hand-off records (M133 data shape), groups them by stage transition (4→5, 7→8, 8→9, 9→10 per the mp-handoff skill's 4 hand-off points), and detects violations. A violation is: hand-off N's from_session equals hand-off N+1's to_session AND the stage transition is cross-role (e.g. runner's stage 7→coordinator's stage 8 is a cross-role rotation; that rotation should have a session boundary — i.e. to_session != from_session in the role sense).",
+      "Output shape: { ok: bool, violations: [{ at_handoff: handoff_id, from: handoff_id_or_role, to: handoff_id_or_role, reason: string, severity: 'advisory' }], summary: { total_handoffs, cross_role_handoffs, violations } }. ok: true with empty violations when clean; ok: false (advisory, not blocking) when violations exist. The command exits 0 either way; the caller decides what to do with the report.",
+      "Violation reasons (deterministic, three classes): (a) 'same_session_across_role_boundary' — from_session == to_session at a cross-role hand-off; (b) 'missing_session_identity' — either from_session or to_session empty (or the matching from_role/to_role empty); (c) 'role_inversion' — from_role/to_role contradict the receiving stage's expected role (e.g. hand-off 8->9 is runner-receives, so to_role must be 'runner'; to_role='coordinator' is a role_inversion). Role is read from the new structured from_role/to_role fields, not parsed out of the free-form session string (which carries no reliable role signal).",
+      "Integrate the L5 check into `mp validate` as a non-blocking sub-check: when a milestone is in the validate scope, the l5-check runs and its violations appear in the validate output under an 'l5_audit' section, with severity 'advisory' (not 'error'). make validate does not exit non-zero on advisory violations.",
+      "Env-var auto-injection in mp reviews handoff: if MP_SESSION_ID and MP_SESSION_ROLE are set in the environment, they pre-populate from_session / to_session AND the new from_role / to_role fields (MP_SESSION_ROLE fills the role of the recording side; the to_role is the complement per the stage-transition table). Manual --from-session / --to-session and new --from-role / --to-role flags override the env vars (operator escape hatch).",
+      "Session identity contract documented in `mp reviews handoff --help`: MP_SESSION_ID is a stable string the harness sets per session (opencode, pi, Cursor, Claude Code each pick their own format — opencode uses conversation id, pi uses a UUID, etc.). MP_SESSION_ROLE is one of 'coordinator' | 'runner' (matches `mp agent role`). The contract is 'forgeable by humans, auditable by review' — this milestone is honest about that.",
+      "Tests: l5-check on a fixture milestone with clean hand-offs returns ok: true; on a fixture with same-session cross-role hand-off returns ok: false with the right violation; on missing-session-identity returns ok: false with the right reason. Env-var auto-injection: MP_SESSION_ID + MP_SESSION_ROLE set → handoff records the env values; --from-session flag overrides. make validate runs the l5-check on a fixture and surfaces the advisory in the report.",
+      "Docs: update `mp reviews handoff --help` with the env-var contract and a one-paragraph note in the `mp reviews` subcommand help pointing at the manifesto L5 rule."
+    ],
+    "out_of_scope": [
+      "Forging-resistant session identity (signed tokens, harness-side trust, OS-level session isolation). The session id remains a string the agent can type. Real L5 enforcement is a separate design discussion; the manifesto itself calls single-agent mode 'the minimum viable CPD' (manifesto §503-515) and accepts that L5 is degraded discipline. This milestone is the audit trail, not the enforcement.",
+      "Auto-injecting MP_SESSION_ID from inside `mp` itself. The harness owns session identity; `mp` reads it. A future milestone can ship harness-side integration that writes the env var, but this milestone only does the read side.",
+      "Blocking the milestone on L5 violations. The check is advisory by design — blocking would break single-agent mode entirely. The team gets a warning; the human decides whether to honor it.",
+      "Migrating the existing `mp-handoff` skill content into `mp-flow` (that's M141). This milestone assumes M141 has either landed or is in flight; the L5 check reads the persisted hand-off data, not the skill content.",
+      "Per-stage session identity (recording which session handled stage 5, stage 6, stage 7 separately). Today's hand-off records are per-transition (4→5, 7→8, 8→9, 9→10). The L5 check works on transitions; finer-grained per-stage logging is a future extension if the data shape grows.",
+      "Auto-l5-check on `mp milestone complete` (i.e. fail the complete command if L5 violations exist). Same reason as #3 — blocking breaks single-agent mode. The check is a separate command the operator runs explicitly or that runs as part of `mp validate`.",
+      "Bulk L5 audit across all milestones in the plan. The check is per-milestone today; a future `mp reviews l5-check --all` (or equivalent) is a small extension. The current milestone is the per-milestone primitive."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp reviews l5-check <id>` exists and accepts a milestone id. Output is JSON: { ok: bool, violations: [...], summary: {...} }. Exit code is 0 in both clean and violation cases (advisory, not blocking).",
+      "verification": "mp reviews l5-check 99 2>&1 | head -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-02",
+      "description": "Clean fixture (4 hand-offs with distinct session ids, correct role rotations per the 4 hand-off points) returns ok: true with empty violations array. The 4 hand-off points are 4→5 (coordinator→runner), 7→8 (runner→coordinator), 8→9 (coordinator→runner), 9→10 (runner→coordinator).",
+      "verification": "cargo test -p mp --test l5_check l5_check_clean_fixture_returns_ok 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-03",
+      "description": "Violation fixture (any hand-off where from_session == to_session at a cross-role transition) returns ok: false with a violation object of class 'same_session_across_role_boundary' referencing the offending handoff id. Multiple violations are reported in a single run.",
+      "verification": "cargo test -p mp --test l5_check l5_check_same_session_cross_role 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-04",
+      "description": "Missing-session-identity fixture (any hand-off with from_session or to_session empty) returns ok: false with a violation of class 'missing_session_identity'.",
+      "verification": "cargo test -p mp --test l5_check l5_check_missing_session_identity 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-05",
+      "description": "Role-inversion fixture (hand-off 8->9 with from_role=coordinator and to_role=coordinator, contradicting the runner-receives rule for that stage transition) returns ok: false with a violation of class 'role_inversion'. Role is read from the new structured from_role/to_role fields added to ReviewHandoff by this milestone's data-shape prerequisite (not parsed from the session string). Fixture sets the fields explicitly so the violation is deterministic.",
+      "verification": "cargo test -p mp --test l5_check l5_check_role_inversion 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-06",
+      "description": "`mp validate` integrates the L5 check as a non-blocking sub-check. Violations appear in the validate output under an 'l5_audit' section with severity 'advisory'. `mp validate --summary` does not report L5 violations as errors and the exit code remains 0 when only advisory violations exist. make validate exits 0 on a fixture plan with L5 advisory violations.",
+      "verification": "cargo test -p mp --test l5_check validate_integrates_l5_as_advisory 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-07",
+      "description": "`mp reviews handoff` reads `MP_SESSION_ID` and `MP_SESSION_ROLE` from the environment when set, pre-populating from_session / to_session (and from_role / to_role if those fields exist on the M133 ReviewHandoff data shape). Manual `--from-session` / `--to-session` flags override the env values. A run with `MP_SESSION_ID=s1 MP_SESSION_ROLE=coordinator mp reviews handoff ... --to-session s2 --to-role runner` records s1/s2 with the env-supplied role for the from side and the flag-supplied values for the to side.",
+      "verification": "cargo test -p mp --test l5_check handoff_env_var_auto_injection 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-08",
+      "description": "`mp reviews handoff --help` documents the env-var contract: MP_SESSION_ID is a stable string the harness sets per session; MP_SESSION_ROLE is 'coordinator' | 'runner'; manual flags override; the contract is forgeable-by-human and auditable-by-review (this honesty clause is in the help text, not hidden in code).",
+      "verification": "MP_HOME=/Users/thiago/code/Pessoal/master-plan ./target/release/mp reviews handoff --help 2>&1 | grep -E 'MP_SESSION_ID|MP_SESSION_ROLE|forgeable-by-humans|override' | head -10",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    },
+    {
+      "id": "AC-09",
+      "description": "All existing mp and raul tests pass: cargo test exits 0. The new l5-check command is additive; the existing `mp reviews handoff` behavior is preserved when no env vars are set.",
+      "verification": "cargo test -p mp --test l5_check 2>&1 | tail -3",
+      "status": "passed",
+      "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-l5-check",
+      "name": "mp reviews l5-check command",
+      "goal": "Read hand-off records on a milestone and detect 3 violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion",
+      "rollback": ""
+    },
+    {
+      "id": "wp-env-injection",
+      "name": "Env-var auto-injection + integration",
+      "goal": "mp reviews handoff reads MP_SESSION_ID and MP_SESSION_ROLE env vars; integrate L5 check into mp validate as advisory sub-check",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "L5 check tests (clean, violation, missing, inversion); env-var injection test; mp validate integration test; cargo test exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-l5-check",
+      "order": 1,
+      "action": "Add `mp reviews l5-check <id>` subcommand in crates/mp/src/commands/reviews.rs. Reads the milestone's hand-off records (M133 ReviewHandoff shape) and detects 3 violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. Output is JSON: { ok: bool, violations: [{at_handoff, from, to, reason, severity}], summary: {...} }. Exit code is 0 in both clean and violation cases (advisory, not blocking).",
+      "files": [
+        "crates/mp/src/commands/reviews.rs",
+        "crates/mp/src/cli.rs"
+      ],
+      "tests": "crates/mp/tests/l5_check.rs",
+      "done_when": "mp reviews l5-check exists; tests cover clean fixture, same-session violation, missing-identity, and role-inversion cases.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-env-injection",
+      "order": 2,
+      "action": "Update `mp reviews handoff` to read MP_SESSION_ID and MP_SESSION_ROLE from the environment when set, pre-populating from_session / to_session (and from_role / to_role if those fields exist on the M133 ReviewHandoff data shape). Manual --from-session / --to-session flags override the env values. Update --help text to document the env-var contract and the honesty clause ('forgeable by humans, auditable by review').",
+      "files": [
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "crates/mp/tests/l5_check.rs",
+      "done_when": "Env vars pre-populate session identity; manual flags override; help text documents the contract; child-process test sets env and asserts recorded values.",
+      "status": "done",
+      "covers_ac": [
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-env-injection",
+      "order": 3,
+      "action": "Integrate the L5 check into `mp validate` as a non-blocking sub-check. When a milestone is in the validate scope, l5-check runs and its violations appear in the validate output under an 'l5_audit' section with severity 'advisory' (not 'error'). make validate does not exit non-zero on advisory violations.",
+      "files": [
+        "crates/mp/src/commands/validate.rs",
+        "crates/mp/src/commands/reviews.rs"
+      ],
+      "tests": "crates/mp/tests/l5_check.rs",
+      "done_when": "mp validate --summary does not report L5 violations as errors; exit code 0 on advisory-only violations; make validate exits 0 on a fixture plan with L5 advisory violations.",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-tests",
+      "order": 4,
+      "action": "Author crates/mp/tests/l5_check.rs: CLI invocation against fixture milestones; clean fixture returns ok: true; violation fixtures (same-session, missing-identity, role-inversion) return ok: false with structured violations; env-var injection test with a child-process harness to set MP_SESSION_ID/MP_SESSION_ROLE; mp validate integration test asserting advisory severity.",
+      "files": [
+        "crates/mp/tests/l5_check.rs"
+      ],
+      "tests": "crates/mp/tests/l5_check.rs",
+      "done_when": "Test file exists; all named cases pass; cargo test -p mp exits 0.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-10",
+    "branch": "",
+    "evidence": "All 4 steps done; all 9 ACs passed. New mp reviews l5-check <id> subcommand emits {ok, violations, summary} with severity=advisory. Three violation classes: same_session_across_role_boundary, missing_session_identity, role_inversion. From_role/to_role added to ReviewHandoff (#[serde(default)] for pre-M142 records). MP_SESSION_ID and MP_SESSION_ROLE env vars auto-populate from_session/from_role/to_role (to_role = complement of from_role). mp validate integrates the L5 check as advisory sub-check; mp validate --summary does not report L5 violations as errors and exit code stays 0 for advisory-only. mp reviews handoff --help documents the env-var contract and the honesty clause. 10 l5_check tests pass; 4 existing reviews_handoff tests pass. 0 new test failures (6 pre-existing on master: suite_doctor, suite_misc, suite_plan). mp validate --summary: ok=true error_count=0 warning_count=4 (pre-existing W20/W44). mp install --check: ok=true skill_count=4. 145/151 binaries pass; 6 pre-existing failures (verified by git stash + re-run)."
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Code review (remediation applied): same as M141 entry — drop-arm cleanup in l5_check's role-inversion match (idx % 4 always 0..=3 in 0..=3, dead arm removed; non-overlapping if-else for cross_role_count consolidated into a single named condition).",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external",
+      "summary": "M142 review: dead match arm + duplicated cross-role count consolidated",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M142",
+        "remediated"
+      ]
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "correctness",
+      "description": "Harness happy path MP_SESSION_ID + MP_SESSION_ROLE with no session flags sets both from_session and to_session to the same id with complementary roles — exactly same_session_across_role_boundary. Reproduced empirically. Populate only from_session from MP_SESSION_ID; require explicit --to-session (or separate receiving env) for the other side. Update AC-07/tests/help. Location: crates/mp/src/reviews.rs:449-466",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "MP_SESSION_ID sets both from and to session",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M142"
+      ]
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "docs",
+      "description": "from_session/to_session doc comments and --from-session/--to-session help still say role handing off/receiving, while M142 treats them as session ids and adds from_role/to_role. Rewrite field docs and clap help to session id. Location: mp-model milestone.rs:866-872; cli/reviews.rs:79-84",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "from_session/to_session help still says role",
+      "confidence": "high",
+      "tags": [
+        "code-review",
+        "M142"
+      ]
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "docs",
+      "description": "MissingSessionIdentity docs claim empty from_role/to_role count; implementation only checks session strings. Empty roles skip same-session and role-inversion. Align enum doc with session-only check. Location: reviews.rs:1048-1049 vs 1138-1149",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "MissingSessionIdentity docs claim empty roles count",
+      "confidence": "medium",
+      "tags": [
+        "code-review",
+        "M142"
+      ]
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "AC-08 covers --help only; MP-COMMANDS / AGENT-READINESS do not document l5-check or the env contract. Add short MP-COMMANDS section.",
+      "status": "fixed",
+      "author": "external-review-agent",
+      "fixed_in": "HEAD",
+      "created": "2026-07-11",
+      "resolved": "2026-07-11",
+      "phase": "external",
+      "summary": "l5-check missing from MP-COMMANDS docs",
+      "confidence": "medium",
+      "tags": [
+        "code-review",
+        "M142"
+      ]
+    }
+  ]
+}

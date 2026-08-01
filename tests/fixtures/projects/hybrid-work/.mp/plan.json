@@ -1,0 +1,30 @@
+{
+  "project": {
+    "name": "acme-internal-api",
+    "description": "Fixture — brownfield work repo with hybrid adoption profile",
+    "stack": ["rust", "postgres"],
+    "platforms": ["api"],
+    "created": "2026-06-17",
+    "target_version": "",
+    "planning_status": "ready-for-execution",
+    "planning_phase": "milestones"
+  },
+  "charter": {
+    "goals": ["Maintain internal API reliability"],
+    "non_goals": ["Public SaaS launch"]
+  },
+  "metrics": {
+    "lines_of_code": 12000,
+    "unit_tests": 210,
+    "integration_tests": 18,
+    "coverage_percent": 71.0,
+    "checked_at": "2026-06-17"
+  },
+  "execution": {
+    "mode": "planning",
+    "handoff_at": "",
+    "handoff_by": "",
+    "strategy": "resume_then_ready",
+    "interleave": "milestone"
+  }
+}

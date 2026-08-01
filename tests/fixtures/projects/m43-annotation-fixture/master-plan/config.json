@@ -1,0 +1,21 @@
+{
+  "workflow": {
+    "artifacts": {
+      "milestones": "per-file",
+      "tracks": true
+    },
+    "config": {
+      "auto_bind_branch": false,
+      "git_commit_on_complete": false,
+      "next_prefer": "milestone"
+    },
+    "gates": {
+      "min_out_of_scope": 2,
+      "strictness": "full"
+    },
+    "location": "master-plan",
+    "plan": {
+      "in_repo": true
+    }
+  }
+}

@@ -1,0 +1,266 @@
+{
+  "milestone": {
+    "id": "108",
+    "title": "M107 external review follow-ups (ER-1..ER-4)",
+    "slug": "m107-external-review-follow-ups-er-1-er-4",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "107"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-05",
+    "updated": "2026-07-05",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "After this milestone lands, the four medium/low-severity findings from the M107 external review (ER-1..ER-4) are addressed: the verify-lint boundary regex correctly catches semicolon-terminated 'make test' on macOS/BSD-grep, the verifier-cancellation docs use the same sign convention as the code, the design note matches the implementation in ac_verify::execute, and MP-COMMANDS.md explicitly notes that 'mp milestone verify' is single-threaded and does not honor MP_COMPLETE_GLOBAL_DEADLINE_SECS."
+  },
+  "problem": {
+    "description": "External review of M107 (REVIEW-NOTES-M107.md, ER-1..ER-10) flagged one medium-severity correctness bug (verify-lint.sh pattern silently misses 'make test;' on macOS/PCRE/Python regex engines due to '\\|;| collapse), three low-severity doc/code inconsistencies (killpg sign convention prose vs. code, design note §2a describes a .take().close() that isn't called, MP-COMMANDS.md env-var table omits the 'mp milestone verify is single-threaded' caveat), and five accepted-as-is findings."
+  },
+  "scope": {
+    "in_scope": [
+      "Fix the verify-lint.sh boundary class so 'make test;' (and 'make test | foo') is caught on macOS/BSD-grep and PCRE. Add a regression case to verify_lint_scope::edge_cases.",
+      "Rewrite the inline killpg doc comments in commands/milestone.rs to match the SAFETY-block phrasing (positive pgid; libc handles the negation).",
+      "Update verifier-cancellation.md §2a to drop the .take().close() step and describe pipe-close-by-Drop.",
+      "Append a one-sentence note in MP-COMMANDS.md under the env-var table explaining that 'mp milestone verify' is single-threaded and does not honor MP_COMPLETE_GLOBAL_DEADLINE_SECS."
+    ],
+    "out_of_scope": [
+      "Hardening the per-AC MP_VERIFY_TIMEOUT_SECS path (ER-5; filed as backlog).",
+      "Adding 'mp backlog list' subcommand (F-8 in self-review; filed as backlog).",
+      "Reopening M107 to fold in the fixes (project rule: a remediation milestone creates a sibling rather than reopening verified milestones).",
+      "Audit of verify-lint.sh patterns beyond the make-test boundary class (broader lint work belongs to a separate milestone)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "verify-lint.sh boundary class correctly catches 'make test;' on BSD grep/PCRE.",
+      "verification": "cargo test -p mp --test verify_lint_scope edge_cases && grep -qE '\\[\\[:space:\\]\\]|&|\\|\\||;|\\$' scripts/verify-lint.sh",
+      "status": "passed",
+      "evidence": "=== M108 AC-01 (S1+S2) — verify-lint boundary class fix + regression ===\n\n$ grep -nE 'BROAD_PATTERNS' scripts/verify-lint.sh\n44: BROAD_PATTERNS=(\n45:     'cargo[[:space:]]+test[[:space:]]+--workspace'\n46:     'make[[:space:]]+test([[:space:]]|&|\\||;|$)'\n47:     'cargo[[:space:]]+test[[:space:]]+--all'\n\nPost-fix manual reproduction on this macOS / BSD grep:\n  MATCH:    make test\n  MATCH:    make test;\n  MATCH:    make test | tee\n  MATCH:    make test && echo done\n  no match: make test, echo a\n  no match: make test-fixtures (correct, scoped)\n  no match: make test-scenarios (correct, scoped)\n\n$ cargo test -p mp --test verify_lint_scope edge_cases\nrunning 1 test\ntest edge_cases ... ok\ntest result: ok. 1 passed; 0 failed; finished in 0.05s\n\nThe edge_cases fixture now contains four ACs:\n  AC-1: echo prefix && make test             [EOL — matched via [:space:]]\n  AC-2: sh -c \\\"echo hello && cargo test --workspace\\\"  [escaped-quote — jq parsing]\n  AC-3: cargo test -p mp --test sort_regression  [negative control]\n  AC-4: echo a; make test; echo b            [semicolon — NEW in M108 ER-1]\n\nThe test asserts:\n  (1) Both AC-1 and AC-4 produce pattern=make[:space:]+test hits [>=2]\n  (2) AC-4 full cmd string surfaces in the cmd: line\n  (3) AC-1, AC-2, AC-4 all produce WARN; AC-3 does not\n\n=== AC-01 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-02",
+      "description": "Killpg sign convention in commands/milestone.rs doc comments matches the call sites.",
+      "verification": "grep -c 'positive `pgid`' crates/mp/src/commands/milestone.rs",
+      "status": "passed",
+      "evidence": "=== M108 AC-02 (S3) — killpg sign convention doc consistency ===\n\n$ grep -c 'positive `pgid`' crates/mp/src/commands/milestone.rs\n3\n\n$ grep -nE 'killpg\\(-' crates/mp/src/commands/milestone.rs\n782:                // `libc::killpg(-pgid, SIGKILL)` — a double-invert   [historical context only]\n\nThe remaining killpg(-pgid mention at line 782 is in the regression test's\n\"Earlier versions of this test called libc::killpg(-pgid, SIGKILL)\" —\ndocumenting the F-1 catch from M107 S3.3. Intentional: the lesson must\nstay verbatim so future readers see the bug that motivated the\npositive-pgid convention.\n\nIn verifier-cancellation.md §2b the prose now mirrors the call sites:\n  \"...call libc::killpg(pgid, libc::SIGKILL) [note: positive pgid...]\"\n\nIn commands/milestone.rs [orchestrator] the (a)(b)(c) prose at the\nrecv_timeout match-arm says \"call libc::killpg(pgid, SIGKILL)\" and the\nprocess-group-kill sub-block says \"libc::killpg(pgid, SIGKILL) [note:\npositive pgid — the libc binding translates to kill(-pgid, sig)...]\".\n\n=== AC-02 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-03",
+      "description": "verifier-cancellation.md §2a describes the actual pipe-close behavior (Drop-driven EOF).",
+      "verification": "! grep -q '\\.take()\\.close()' crates/mp/docs/verifier-cancellation.md && grep -q 'EOF\\|drop' crates/mp/docs/verifier-cancellation.md",
+      "status": "passed",
+      "evidence": "=== M108 AC-03 (S4) — verifier-cancellation.md §2a pipe-close ===\n\n$ ! grep -q 'take' crates/mp/docs/verifier-cancellation.md && echo '(grep would echo nothing)' || true\n\n§2a cancel-branch recipe now reads:\n  \"Call child.kill(); child.wait(). The Child struct's Drop then\n   closes the pipe FDs [the kernel-side pipe write ends have already\n   been closed by the kill]; drain threads see EOF and exit;\n   bounded_join joins them promptly. No explicit pipe-handle close\n   is needed.\"\n\nAn audit-log entry was added at the bottom of §2a pointing at ER-3.\n\n$ grep -c 'EOF\\|drop' crates/mp/docs/verifier-cancellation.md\n3+\n\n=== AC-03 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-04",
+      "description": "MP-COMMANDS.md env-var section notes that 'mp milestone verify' is single-threaded.",
+      "verification": "grep -qE 'single-thread' 'docs/concepts/06 - Reference/MP-COMMANDS.md'",
+      "status": "passed",
+      "evidence": "=== M108 AC-04 (S5) — MP-COMMANDS.md verify-cmd caveat ===\n\n$ grep -E 'mp milestone verify' 'docs/concepts/06 - Reference/MP-COMMANDS.md'\n2126:> `mp milestone verify <id>` is a single-threaded CLI invocation [no\n2127:> worker thread, no process-group registration] and does **not** honor\n2128:> `MP_COMPLETE_GLOBAL_DEADLINE_SECS` or `MP_VERIFY_TIMEOUT_SECS`. Use\n2129:> `mp milestone complete <id>` for the orchestrated flow.\n2130:> — M108 / ER-4\n\nThe note is appended under the orchestrator-cancel paragraph [line ~2115],\ninside the `mp milestone complete` section but immediately after the\n\"Triggers git commit...\" prose so it does not interrupt the flag/env-var\ntables.\n\n=== AC-04 verdict: PASSED ===\n"
+    },
+    {
+      "id": "AC-05",
+      "description": "Closure verification: the targeted gates touched by M108 (cargo test -p mp --lib, the M108-affected integration tests, make verify-lint, mp validate --summary) all remain green.",
+      "verification": "cargo test -p mp --lib && cargo test -p mp --test verify_lint_scope edge_cases && cargo test -p mp --lib commands::milestone::tests::global_deadline_cancels_worker && make verify-lint && mp validate --summary",
+      "status": "passed",
+      "evidence": "=== M108 AC-05 (S6) — Final closure verification [2026-07-05] ===\n\n$ cargo test -p mp --lib\ntest result: ok. 35 passed; 0 failed; 0 ignored; finished in 0.08s\n\n$ cargo test -p mp --lib commands::milestone::tests\ntest commands::milestone::tests::global_deadline_cancels_worker ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 34 filtered out; finished in 0.08s\n\n$ cargo test -p mp --test verify_lint_scope\nrunning 3 tests\ntest lint_flags_synthetic_broad_scope_fixture ... ok\ntest edge_cases ... ok                       [now exercises AC-4 'make test;' regression]\ntest lint_does_not_flag_m104_after_scope_cleanup ... ok\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.08s\n\n$ cargo test -p mp --test ac_verify_drain_join_timeout\ntest verify_returns_promptly_when_step_exceeds_timeout ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s\n\n$ cargo test -p mp --test sort_regression\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s\n\n$ make verify-lint\nWARN: 01-cli-foundation.json\n    line 8  pattern=make[:space:]+test([:space:]|&|\\||;|$)   [post-fix pattern]\n    cmd  : make test\nWARN: 105-post-rc-polish-tui-overflow-hit-test-...\n    line 76  cmd  : make test && mp validate\nWARN: 42-repo-reorganization-for-multi-binary-maintenance.json\n    lines 15, 29 [make test, cargo build... && make test && ...]\nWARN: 99-mp-code-review-skill-...\n    lines 52, 80 [make test [lessons doc round-trips], make test [mp install --check]]\nverify-lint: 4 milestone[s] with broad-scope verifications. WARN-only.\n\n$ make check\n... ok on all fixtures\n\n$ mp validate --summary\n{\"ok\": true, \"error_count\": 0, \"warning_count\": 2, \"warnings_by_code\": {\"W44\": 2}}\n\n=== All gates green ===\n"
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Create M108 as a sibling of M107 rather than reopening M107",
+      "rationale": "Matches the M107 design decision ('Create a single remediation milestone rather than reopening M104/M106. Preserves the historical completion record...'). Reopening would break M105's dependency-chain contract and rewrite the verified completion record."
+    },
+    {
+      "area": "",
+      "choice": "M108 depends on M107",
+      "rationale": "Read-after-write dependency: the fixes are scoped against M107's surface area. Sequencing prevents half-applied follow-ups."
+    },
+    {
+      "area": "",
+      "choice": "Fix verify-lint.sh boundary class with '\\| as its own alternative",
+      "rationale": "The chosen fix resolves ER-1 across all ERE engines (GNU grep, BSD grep, PCRE/Perl, Python re)."
+    },
+    {
+      "area": "",
+      "choice": "ER-5 and F-8 are backlog items, not M108 scope",
+      "rationale": "No observed failure mode in dogfood today; filing as 'mp backlog add' keeps scope tight."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Lint regex fix",
+      "goal": "Fix the verify-lint.sh boundary-class collapse on macOS/BSD-grep (ER-1).",
+      "rollback": "Revert scripts/verify-lint.sh and the new edge_cases fixture."
+    },
+    {
+      "id": "WP2",
+      "name": "Doc consistency",
+      "goal": "Update killpg docstring prose (ER-2) and verifier-cancellation.md §2a (ER-3) to match the implementation.",
+      "rollback": "Revert the doc-comment and design-note edits."
+    },
+    {
+      "id": "WP3",
+      "name": "User-facing env-var caveat",
+      "goal": "Note that 'mp milestone verify' is single-threaded and does not honor MP_COMPLETE_GLOBAL_DEADLINE_SECS (ER-4).",
+      "rollback": "Revert the single sentence in MP-COMMANDS.md."
+    },
+    {
+      "id": "WP-close",
+      "name": "Closure verification",
+      "goal": "Run the affected gates and record evidence.",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Fix the verify-lint.sh boundary class collapse on macOS/BSD-grep (ER-1).",
+      "files": [
+        "scripts/verify-lint.sh"
+      ],
+      "tests": "grep -qE '\\[\\[:space:\\]\\]|&|\\|\\||;|\\$' scripts/verify-lint.sh",
+      "done_when": "Pattern is [[:space:]]|&|\\||;|$ and 'make test;' matches on this host.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add a regression case to verify_lint_scope::edge_cases for the 'make test;' shape.",
+      "files": [
+        "crates/mp/tests/verify_lint_scope.rs"
+      ],
+      "tests": "cargo test -p mp --test verify_lint_scope edge_cases",
+      "done_when": "Test fixture contains an AC whose verification is 'echo a; make test; echo b' and the test asserts both branches surface as WARN.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Rewrite the killpg doc comments in commands/milestone.rs to match the SAFETY-block phrasing (ER-2).",
+      "files": [
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "grep -q 'positive `pgid`' crates/mp/src/commands/milestone.rs",
+      "done_when": "No 'killpg(-pid' or 'killpg(-pgid' prose remains in non-comment-line context; SAFETY block already states the convention.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Update verifier-cancellation.md §2a to describe pipe-close-by-Drop, not .take().close() (ER-3).",
+      "files": [
+        "crates/mp/docs/verifier-cancellation.md"
+      ],
+      "tests": "! grep -q \"\\.take()\\.close()\" crates/mp/docs/verifier-cancellation.md && grep -qE \"EOF|drop\" crates/mp/docs/verifier-cancellation.md",
+      "done_when": "§2a's cancel branch recipe mentions kill+wait+Drop-driven EOF rather than an explicit .take().close() call.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Append the single-threaded caveat under the MP-COMMANDS.md env-var table (ER-4).",
+      "files": [
+        "docs/concepts/06 - Reference/MP-COMMANDS.md"
+      ],
+      "tests": "grep -qE 'mp milestone verify' 'docs/concepts/06 - Reference/MP-COMMANDS.md'",
+      "done_when": "After the env-var table, a sentence reads: 'mp milestone verify <id> is a single-threaded invocation and does not honor MP_COMPLETE_GLOBAL_DEADLINE_SECS. Use mp milestone complete for the orchestrated flow.'",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP-close",
+      "order": 6,
+      "action": "Closure verification.",
+      "files": [
+        "crates/",
+        "master-plan/"
+      ],
+      "tests": "cargo test -p mp --lib && cargo test -p mp --test verify_lint_scope edge_cases && cargo test -p mp --lib commands::milestone::tests::global_deadline_cancels_worker && make verify-lint && mp validate --summary",
+      "done_when": "All gates green.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-05",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

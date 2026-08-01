@@ -1,0 +1,132 @@
+{
+  "milestone": {
+    "id": "99",
+    "title": "mp-code-review skill — turn docs/code-review-lessons.md into a runnable review agent",
+    "slug": "mp-code-review-skill-turn-docs-code-review-lessons-md-into-a-runnable-review-agent",
+    "lifecycle": "groomed",
+    "blocked": true,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "119"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-07-03",
+    "updated": "2026-07-05",
+    "blocked_at": "2026-07-05T14:17:32.577396+00:00",
+    "block_reason": "user will handle that later",
+    "blocked_by": "user",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "M99's original `mp-code-review` content (the lesson-pattern library as a runnable skill) has been subsumed into the reviewing sub-mode of `mp-coordinator` (M121) per the user's two-agent / four-role architecture. M99 stays as the historical anchor: the canonical home for the lesson-pattern library is now `templates/skills/mp-code-review/SKILL.md` (the procedural wrapper over the patterns); the deep-dive of when/how to run the patterns lives in M121's reviewing sub-mode. The lesson patterns themselves (`docs/code-review-lessons.md`) are unchanged — M99/M121 are split across the content (lessons) vs. the procedure (when to run them). M121 references M99 as the primary sub-skill for the reviewing sub-mode."
+  },
+  "problem": {
+    "description": "M99 was the original mp-code-review skill spec. The two-agent / four-role architecture requires the reviewing sub-mode to live inside the coordinator's role skill, not as a top-level separate skill. The mp-code-review SKILL.md stays (as the procedural wrapper over the lesson-pattern library), but the reviewing deep-dive (when to run the patterns, the two-round review discipline, the L5 session-boundary rule) lives in M121's `mp-coordinator/reviewing.md`. M99 is preserved as the historical anchor; the canonical work is in M121. M123 (`mp-handoff`) carries the cross-cutting hand-off protocol between the runner's executing sub-mode and the coordinator's reviewing sub-mode."
+  },
+  "scope": {
+    "in_scope": [
+      "Author Pattern: blocks in docs/code-review-lessons.md for the chosen lessons (the doc currently has zero Pattern: blocks)",
+      "SKILL.md covers the review lifecycle: pre-screen (run pattern checks), read (walk lessons checklist), reproduce (empirical edge cases), file (via mp reviews finding add), re-check (post-remediation)",
+      "Pre-screen pattern library mapping >=5 lessons to runnable grep/ripgrep patterns, pinned to exact lesson titles: L6 'New bulk paths that bypass single-path validation', L8 'Operation-level args that re-validate per target', L13 'Dead code sneaking in via refactors', L14 'Awkward control flow left over from earlier iterations', L15 'Tests written against the implementation, not the spec'",
+      "Each pattern ships with a positive fixture (must match) and a negative fixture (must not match)",
+      "Pre-screen regression suite runs the patterns against the M94 commit range and catches a representative subset (>=3 of F-01..F-10 spanning >=2 distinct lesson categories), not just one",
+      "mp install --check (delivered by M98) enforces bidirectional consistency: every Pattern: block has an owner script in the skill and vice versa",
+      "Skill embeds or links the lessons catalog so a reviewer without repo access can still run it",
+      "Install hook: mp-code-review registers via the skill registry (mp install --skills=mp-code-review, delivered by M98)"
+    ],
+    "out_of_scope": [
+      "Replacing human review (the skill is a force multiplier, not a replacement)",
+      "Auto-fixing findings (the skill files; mp-flow remediates)",
+      "Cross-repo review (scoped to mp / repos that follow the same plan-discipline)",
+      "Replacing mp reviews pass (mp-code-review calls it; does not replace it)",
+      "Building mp install --check or the skill registry itself (owned by M98; M99 consumes them)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Pattern: blocks authored in docs/code-review-lessons.md for L6, L8, L13, L14, L15 (the doc starts with zero; each block carries the pattern + a positive and negative fixture)",
+      "verification": "cargo test -p mp --test code_review_patterns 2>&1 | tail -5; grep -q 'test result: ok'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "SKILL.md defines the review lifecycle (pre-screen -> read -> reproduce -> file -> re-check) with mp commands per stage",
+      "verification": "manual: skill content review",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Pattern library ships >=5 runnable grep/ripgrep patterns pinned to exact lesson titles (L6, L8, L13, L14, L15); each has a positive fixture (must match) and a negative fixture (must not match)",
+      "verification": "crates/mp/tests/code_review_patterns.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Pre-screen regression suite run against the M94 commit range catches >=3 of F-01..F-10 spanning >=2 distinct lesson categories (not just one easy catch)",
+      "verification": "crates/mp/tests/code_review_patterns.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "mp install --check (from M98) passes when every Pattern: block has an owner script in the skill and vice versa; fails non-zero with a precise diff on mismatch",
+      "verification": "mp install --check exits 0; cargo test -p mp --test code_review_patterns exits 0",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Skill installs via mp install --skills=mp-code-review using the registry delivered by M98",
+      "verification": "manual: install test",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Skill embeds or links the lessons catalog so a reviewer without repo access can still run it",
+      "verification": "manual: skill content review",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "cargo test -p mp exits 0 including the pattern-fixture tests",
+      "verification": "cargo test -p mp",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "docs/code-review-lessons.md is the only editable copy of the patterns catalog. Single source of truth principle. The skill is a build artifact generated from the doc; humans edit the doc via PR, not the skill directly. mp install syncs doc → skill one-way; mp install --check fails the build when a Pattern: block in the doc has no corresponding script in the skill (or vice versa). The procedural deep-dive (when to run the patterns, the two-round review discipline, the L5 session-boundary rule) lives in M121's `mp-coordinator/reviewing.md` — M99 owns the patterns, M121 owns the procedure.",
+      "rationale": "Single source of truth principle. The skill is a build artifact generated from the doc; humans edit the doc via PR, not the skill directly. mp install syncs doc → skill one-way; mp install --check fails the build when a Pattern: block in the doc has no corresponding script in the skill (or vice versa)."
+    },
+    {
+      "area": "",
+      "choice": "Lessons without a Pattern: block stay doc-only",
+      "rationale": "Some lessons (methodology, policy, wisdom like L1, L5, L11, L15, L17, L19, L20) don't reduce to runnable grep/lint checks. Forcing them into pattern form would lose the educational layer. The doc captures the why; the skill captures the what-runs. The skill is the runtime slice of the playbook; the doc is the playbook."
+    },
+    {
+      "area": "",
+      "choice": "L15 is a PATTERN lesson (correcting the earlier design_decision that listed L15 as non-pattern)",
+      "rationale": "L15 'Tests written against the implementation, not the spec' is runnable: a grep for tests that assert on private/internal module state or that mirror implementation structure rather than spec behavior. The non-pattern set is therefore L1, L5, L11, L17, L19, L20 (methodology/policy/wisdom). Resolves the contradiction between the original scope (L15 as pattern) and the original design_decision #2 (L15 as non-pattern)."
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

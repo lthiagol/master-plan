@@ -1,0 +1,269 @@
+{
+  "milestone": {
+    "id": "29",
+    "title": "Self-contained binary via embedded assets",
+    "slug": "self-contained-binary-via-embedded-assets",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "medium",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-25",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "The mp binary ships with all templates and schemas compiled in, so it runs with zero filesystem setup — enabling zero-config `cargo install` and Homebrew installs with no MP_HOME and no separate asset files."
+  },
+  "problem": {
+    "description": "Today mp reads templates and schemas from disk via toolkit_home() (assets.rs `read_embedded` does std::fs::read_to_string). Any distribution that ships only the binary — Homebrew's documented `cargo install --path crates/mp`, `cargo install mp`, or copying the binary — breaks because the assets cannot be found. Only `make install` works because it copies templates/ and schemas/ to ~/.agents/master-plan. This blocks the zero-config install story and forces every user to manage MP_HOME or asset files manually."
+  },
+  "scope": {
+    "in_scope": [
+      "Embed templates/ and schemas/ into the binary at compile time (include_dir / rust-embed / include_str!)",
+      "Resolve asset reads from embedded assets first, with MP_HOME remaining an optional filesystem override",
+      "Verify `cargo install --path crates/mp` produces a fully working mp with no asset files present",
+      "Remove MP_HOME from install guidance and docs (keep it as an optional override)",
+      "Add a parity test confirming embedded template output matches the on-disk equivalents",
+      "Update INSTALL.md and the make install message to reflect the self-contained binary"
+    ],
+    "out_of_scope": [
+      "Embedding the master-planner SKILL.md (handled by the skill install path)",
+      "Embedding the full docs/ tree (runtime doc lookup stays filesystem/MP_HOME-based)",
+      "Changing plan-zone discovery (master-plan/ vs .mp/) logic",
+      "Publishing a new Homebrew formula (separate milestone; this one unblocks it)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Templates and schemas are compiled into the binary",
+      "verification": "manual: Run mp with no templates/ or schemas/ on disk and no MP_HOME set; core commands (mp init, mp doctor, mp validate) succeed",
+      "status": "passed",
+      "evidence": "templates/ + schemas/ embedded via include_dir (assets.rs EMBEDDED_TEMPLATES/EMBEDDED_SCHEMAS); read_embedded/schema.rs load_validator/doctor use embedded. zero_config_doctor_init_validate test green: mp doctor+init+validate succeed with no MP_HOME, no CARGO_MANIFEST_DIR, no assets on disk."
+    },
+    {
+      "id": "AC-02",
+      "description": "cargo install produces a working mp with zero additional setup",
+      "verification": "manual: `cargo install --path crates/mp` then invoke mp on a clean PATH; runs without MP_HOME or asset files [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "cargo build --release -p mp green; zero-config test runs the release binary on a clean PATH with MP_HOME/CARGO_MANIFEST_DIR unset and no asset files -> mp init/validate succeed."
+    },
+    {
+      "id": "AC-03",
+      "description": "Embedded asset output is byte-identical to on-disk output",
+      "verification": "Golden/scenario parity test comparing embedded vs filesystem template rendering",
+      "status": "passed",
+      "evidence": "embedded_assets_match_disk test green: all 27 templates + 8 schemas byte-identical between embedded registry and repo source."
+    },
+    {
+      "id": "AC-04",
+      "description": "MP_HOME remains honored as an optional override (backward compatible)",
+      "verification": "manual: Setting MP_HOME still overrides embedded assets; existing behavior preserved [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "mp_home_overrides_embedded_assets test green: an AGENTS-TEMPLATE.md planted under MP_HOME wins over the embedded copy in mp init output. read_embedded checks MP_HOME disk file first."
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "",
+      "choice": "Gate count scaling: reserve G11-G20 for execution gates, G1-G10 for spec gates",
+      "rationale": "Prevents ad-hoc gate numbering as the validation engine grows"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Embed assets",
+      "goal": "Embed templates/ and schemas/ into the binary; resolve asset reads from embedded bytes with MP_HOME as a disk override",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Parity + zero-config tests",
+      "goal": "Prove embedded output is byte-identical to on-disk and that core commands work with no assets on disk / no MP_HOME",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Docs + install + gate",
+      "goal": "Reflect self-contained binary in INSTALL/make message; verify all ACs green",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add include_dir dep to crates/mp/Cargo.toml; embed templates/ and schemas/ trees as Dir statics in assets.rs (include_dir! relative to crate root).",
+      "files": [
+        "crates/mp/Cargo.toml crates/mp/src/assets.rs"
+      ],
+      "tests": "cargo build -p mp",
+      "done_when": "cargo build -p mp green; EMBEDDED_TEMPLATES / EMBEDDED_SCHEMAS statics exist and contain all 27 template + 8 schema files",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Rewrite read_embedded/read_embedded_if_exists in assets.rs: MP_HOME disk file takes precedence (override), else fall back to embedded bytes. Keep toolkit_home() for install/path uses.",
+      "files": [
+        "crates/mp/src/assets.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "read_embedded resolves from embedded when no disk file; MP_HOME disk file overrides embedded",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Route schema.rs schema reads through the embedded layer (schema_path / load) so mp validate works with no schemas/ on disk.",
+      "files": [
+        "crates/mp/src/schema.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "mp validate green with no schemas/ dir on disk (schemas served from embedded)",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Update doctor.rs health checks: templates/schemas are embedded, so do not fail when absent on disk; report embedded-asset availability instead of disk presence.",
+      "files": [
+        "crates/mp/src/doctor.rs"
+      ],
+      "tests": "cargo test -p mp",
+      "done_when": "mp doctor green with no templates/ or schemas/ on disk",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add parity test (crates/mp/tests/embedded_assets_parity.rs): for every template and schema, assert read_embedded(rel) == fs::read_to_string(repo_root/rel) (byte-identical).",
+      "files": [
+        "crates/mp/tests/embedded_assets_parity.rs"
+      ],
+      "tests": "crates/mp/tests/embedded_assets_parity.rs",
+      "done_when": "cargo test -p mp --test embedded_assets_parity green; every embedded asset matches the on-disk source",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add zero-config test: in a TempDir with MP_HOME unset and no templates/schemas on disk, run mp validate / mp doctor / mp init and assert success.",
+      "files": [
+        "crates/mp/tests/embedded_assets_zero_config.rs"
+      ],
+      "tests": "crates/mp/tests/embedded_assets_zero_config.rs",
+      "done_when": "zero-config test green; core commands work with zero filesystem assets",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Update docs/INSTALL.md and the make install message to reflect the self-contained binary (zero-config cargo install / Homebrew; MP_HOME is now optional override only).",
+      "files": [
+        "docs/INSTALL.md Makefile"
+      ],
+      "tests": "manual: accepted - doc + message review",
+      "done_when": "INSTALL.md + make install message describe zero-config install; no MP_HOME requirement stated",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Final M29 gate: verify all 4 ACs (embedded assets, cargo install zero-config, byte-identical parity, MP_HOME override). Run mp validate + cargo test -p mp + make adopt-check green; record evidence.",
+      "files": [],
+      "tests": "cargo test -p mp",
+      "done_when": "All 4 ACs verified green; mp validate green; cargo test -p mp green; make adopt-check green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-25",
+    "branch": "",
+    "evidence": "All 4 ACs verified green: embedded assets (include_dir), zero-config cargo install/release build, byte-identical parity (35 assets), MP_HOME override honored. cargo test -p mp (50 suites), make test-scenarios, make adopt-check, mp validate all green."
+  }
+}

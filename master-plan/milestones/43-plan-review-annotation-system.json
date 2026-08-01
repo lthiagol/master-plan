@@ -1,0 +1,333 @@
+{
+  "milestone": {
+    "id": "43",
+    "title": "Plan annotation system (review requests + approval gate)",
+    "slug": "plan-review-annotation-system",
+    "lifecycle": "complete",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "40"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-06-28",
+    "updated": "2026-06-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "2.0.0-rc.1",
+    "executed_by": ""
+  },
+  "intent": {
+    "outcome": "A new annotation artifact (AN-##) that lets humans (via raul) mark milestones/steps/docs for AI review, request break-downs/decouples/changes, suggest edits, or request approval — stored in annotations.toml alongside canonical docs without modifying them — with agents reading the open queue via mp annotation and transitioning items open -> addressed -> resolved. An open approval-request annotation HARD-BLOCKS the target milestones spec_status: ready (gate G14), making approve-before-ready a real enforcement rather than advisory."
+  },
+  "problem": {
+    "description": "Humans reviewing the plan (via raul) have no way to leave actionable feedback on plan entities without editing canonical docs. They want to mark a milestone for AI review, request a break-down or decouple, suggest a change, or request approval — and track whether the agent addressed it. Agents need a queue to pick up these requests. This must not mutate canonical docs (specs stay clean); annotations live alongside, as ideas/backlog already do. Approval requests should be enforceable, not just advisory, so a spec cannot silently go ready over an unaddressed approval demand."
+  },
+  "scope": {
+    "in_scope": [
+      "New plan artifact: annotation items (AN-##) in master-plan/annotations.toml (single queue file, mirroring ideas.toml/backlog.toml precedent)",
+      "Annotation types in crates/mp-model: AnnotationFile + AnnotationItem (serde), mirroring IdeaEntry/BacklogItem; re-exported from mp",
+      "Annotation item shape: id, target (M## / M##/S## / doc path), kind (review-request | break-down | decouple | change-suggestion | approval-request | note), body, author, status (open | addressed | resolved), created_at, resolved_at",
+      "mp annotation commands mirroring mp idea: create, list (--open / --target / --kind / --author filters), show, update, resolve, reopen, remove",
+      "3-state lifecycle: human creates (open) -> agent does work and marks addressed -> human verifies and marks resolved. approval-request typically open -> resolved directly (human action). Invalid transitions rejected.",
+      "Gate G14: a milestone with an open (non-resolved) approval-request annotation cannot reach spec_status: ready; integrated into validate_milestone_ready + mp validate. Resolving the annotation unblocks it.",
+      "Schema + validation gate R1 (missing/invalid target, body, kind, status) for annotations.toml; mp validate covers it",
+      "mp sync indexes annotation counts into plan state",
+      "Open annotation count surfaced in mp status + mp inbox (mirroring the idea/backlog inbox loop at inbox.rs:98-114)",
+      "raul annotation surface: create delegates to mp annotation create (raul never writes annotations.toml); list/show read via mp --format json; gate test asserts no annotations.toml write path in raul",
+      "Docs: MP-COMMANDS.md (annotation commands + G14), AGENT-PLAYBOOK.md (agent annotation loop), SPEC.md (G14 gate matrix row), master-planner SKILL.md (annotation workflow)",
+      "Golden scenario + integration tests for the annotation lifecycle (create -> list -> addressed -> resolved) and the G14 gate (open approval blocks ready; resolved unblocks)"
+    ],
+    "out_of_scope": [
+      "raul TUI (that is M44) — this milestone ships data model + mp commands + raul CLI surface only",
+      "Editing/rewriting canonical plan docs from an annotation (annotations are requests; agents apply changes via existing mp commands)",
+      "Per-entity sidecar files (single queue file chosen)",
+      "Auto-promoting annotations into tracks/milestones (the agent resolves by doing the work via existing mp commands)",
+      "Annotation threading/nested comments (one item, one resolution; no discussion tree)",
+      "Gate-blocking for non-approval kinds (only approval-request hard-blocks ready; other kinds are advisory tracking)"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "annotations.toml queue exists with AnnotationFile/AnnotationItem types in crates/mp-model; schema-validated with R1 gate (missing/invalid target, body, kind, status rejected); mp validate covers it",
+      "verification": "manual: mp validate on a fixture with annotations passes; malformed items rejected with R1 [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "AnnotationFile + AnnotationItem types in crates/mp-model/src/lib.rs (serde); master-plan/annotations.toml queue; R1 schema gate rejects missing/invalid target/body/kind/status; tests/annotation_validate.rs (5) + tests/annotation_store.rs (2) pass."
+    },
+    {
+      "id": "AC-02",
+      "description": "mp annotation create/list/show/update/resolve/reopen/remove all work and emit stable --format json; list supports --open/--target/--kind/--author filters",
+      "verification": "crates/mp/tests/annotation.rs + golden scenario pass",
+      "status": "passed",
+      "evidence": "mp annotation create/list/show/update/resolve/reopen/remove implemented (crates/mp/src/commands/annotation.rs); list supports --open/--target/--kind/--author; tests/annotation.rs (14 tests) + golden scenario m43-annotation-lifecycle pass; emits stable --format json."
+    },
+    {
+      "id": "AC-03",
+      "description": "3-state lifecycle enforced (open -> addressed -> resolved); invalid transitions (e.g. resolved -> addressed) rejected with a clear error",
+      "verification": "crates/mp/tests/annotation.rs transition tests",
+      "status": "passed",
+      "evidence": "3-state lifecycle (open->addressed->resolved, resolved->open reopen) enforced in tests/annotation.rs: annotation_lifecycle_open_addressed_resolved, annotation_addressed_from_resolved_rejected, annotation_reopen_from_addressed_rejected, annotation_resolve_from_resolved_rejected."
+    },
+    {
+      "id": "AC-04",
+      "description": "Gate G14: a milestone with an open (non-resolved) approval-request annotation cannot reach spec_status: ready (blocked on set-spec-status ready AND mp validate); resolving the annotation unblocks it",
+      "verification": "manual: crates/mp/tests/annotation_gate.rs (block + unblock) [manual-auto-prefix: 2026-07-16]",
+      "status": "passed",
+      "evidence": "Gate G14 implemented: non-resolved approval-request targeting a milestone blocks set-spec-status ready, approve, AND mp validate; resolving clears it; tests/annotation_gate.rs (4 tests: g14_block_set_spec_status_ready, g14_block_validate, g14_block_step_target, g14_only_approval_request_blocks)."
+    },
+    {
+      "id": "AC-05",
+      "description": "Open annotation count surfaced in mp status + mp inbox (mirrors the idea/backlog inbox loop at inbox.rs:98-114)",
+      "verification": "mp status --format json includes annotation open count; mp inbox lists open annotations",
+      "status": "passed",
+      "evidence": "mp status --format json includes annotations_open (computed on-demand, no PlanFile change) + per-milestone approval_blocked; mp inbox lists open annotations; tests/annotation_inbox.rs (4 tests) pass."
+    },
+    {
+      "id": "AC-06",
+      "description": "raul annotation delegates writes to mp annotation create and never writes annotations.toml directly (asserted by gate test); raul annotation list/show read via mp --format json",
+      "verification": "crates/raul/tests/annotation.rs + no-write gate test",
+      "status": "passed",
+      "evidence": "raul annotation create delegates to mp annotation create; list/show read via mp --format json; crates/raul/tests/annotation.rs + crates/raul/tests/no_write_gate.rs assert raul never writes annotations.toml."
+    },
+    {
+      "id": "AC-07",
+      "description": "Docs document the annotation workflow end-to-end: MP-COMMANDS.md (commands + G14), AGENT-PLAYBOOK.md (agent loop), SPEC.md (G14 gate matrix row), master-planner SKILL.md (workflow)",
+      "verification": "manual: accepted - doc review",
+      "status": "passed",
+      "evidence": "Docs updated: MP-COMMANDS.md (mp annotation reference + G14 note), docs/concepts/01/AGENT-PLAYBOOK.md (agent annotation loop), docs/concepts/03/SPEC.md (G14 gate matrix row + R1 note), templates/skills/master-planner/SKILL.md (workflow + G1-G14 error table)."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Data model + storage",
+      "goal": "AnnotationFile/AnnotationItem types in mp-model; load/save annotations.toml; mp sync indexes counts",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "mp commands + validation + gate",
+      "goal": "mp annotation command surface; R1 validation gate; G14 approval gate; status/inbox surfacing",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "raul + docs + tests",
+      "goal": "raul annotation surface (delegates to mp); docs; golden scenario + integration tests",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add AnnotationFile + AnnotationItem types to crates/mp-model/src/lib.rs (serde Serialize/Deserialize), mirroring IdeaEntry/BacklogItem. Fields: id, target (String), kind (String), body (String), author (String), status (String), created_at, resolved_at. kind allowed values: review-request | break-down | decouple | change-suggestion | approval-request | note. status allowed values: open | addressed | resolved. Re-export from mp so internal modules see them.",
+      "files": [],
+      "tests": "cargo build --release -p mp-model && cargo build --release -p mp",
+      "done_when": "AnnotationFile/AnnotationItem compile in mp-model with serde; mp re-exports them; cargo build green",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Storage layer: add load_annotations plus a write helper to store.rs, following the SAME pattern idea.rs uses to persist ideas (idea.rs has no save_ideas function; it writes via the store resource writer - mirror that exact code path). Storage file is master-plan/annotations.toml as a [[annotations]] array. Add an annotations bootstrap seed to store::init_plan (store.rs:29; note there is no store::init) that creates an empty annotations.toml on mp init if absent. mp sync (sync.rs) rebuilds/updates annotation counts in plan state. Round-trip save/load preserves items.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation_store.rs",
+      "done_when": "load_annotations and the idea.rs-mirrored write helper work; mp init (init_plan) creates an empty annotations.toml; mp sync indexes annotation counts; round-trip save/load preserves items",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Implement mp annotation create / list / show. create takes target, kind, body, author and appends an AN-## item (status open, created_at stamped). list supports --open, --target, --kind, --author filters. show <id> prints one item. All emit stable --format json (the agent API per ADR-008/D-011). Add CLI variant + app dispatch + commands/annotation.rs handler mirroring commands/idea.rs.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation.rs",
+      "done_when": "mp annotation create/list/show work and emit stable --format json; filters function; AN-## ids auto-assigned",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Implement mp annotation update / resolve / reopen / remove with 3-state transition enforcement. Valid transitions: open->addressed, open->resolved, addressed->resolved, resolved->open (reopen). Reject invalid transitions (e.g. resolved->addressed) with a clear error. update edits body/kind/author. resolve stamps resolved_at. remove deletes the item.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation.rs",
+      "done_when": "update/resolve/reopen/remove work; invalid transitions rejected with errors; resolved_at stamped on resolve; stable --format json",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Add schema + R1 validation gate for annotations.toml. Schema (mini_schema) rejects items missing/invalid target, body, kind (not in allowed set), or status (not in allowed set). Add a validate_annotations function in validate.rs emitting R1 issues; wire it into mp validate so malformed annotations fail validation.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation_validate.rs",
+      "done_when": "Schema validates annotation items; mp validate emits R1 for missing/invalid target/body/kind/status; valid annotations pass",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Implement gate G14: a milestone with a non-resolved (open or addressed) approval-request annotation cannot reach spec_status: ready. NOTE: validate_milestone_ready (validate.rs:342) takes only (m: &MilestoneFile) and has no access to annotations, so G14 is implemented where ctx IS available: (a) in validate_plan (validate.rs:22, ctx in scope) by loading annotations once and scanning for kind=approval-request targeting the milestone (M## or its steps) with status != resolved; (b) at the mp milestone set-spec-status <id> ready AND mp milestone approve call sites (inject an annotation check there). Resolving the annotation clears the block. Only approval-request blocks; other kinds do not.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation_gate.rs",
+      "done_when": "G14 blocks ready when an open approval-request annotation targets the milestone, firing on mp milestone set-spec-status ready, mp milestone approve, AND mp validate; resolving the annotation unblocks; only approval-request blocks (other kinds do not)",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S5"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Surface open annotation counts and a per-milestone gate flag in mp status and mp inbox, mirroring the idea/backlog loop at inbox.rs:98-114. mp status --format json includes an annotations open count (computed on-demand; do NOT add a field to PlanFile/mp-model - compute from annotations.toml at status time) AND a per-milestone approval_blocked boolean (or gates_blocked list) so raul (M44) can render the blocked indicator without re-deriving gate logic. mp inbox lists open annotations as actionable items with an mp annotation show <id> action hint.",
+      "files": [],
+      "tests": "crates/mp/tests/annotation_inbox.rs",
+      "done_when": "mp status --format json includes open annotation count (on-demand, no PlanFile change) and a per-milestone approval_blocked flag; mp inbox lists open annotations; raul status picks it up via the same JSON",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Implement raul annotation: raul annotation create prompts for target/kind/body and delegates to mp annotation create (shell-out, never writes annotations.toml). raul annotation list/show read via mp --format json and render styled views. Add a gate test asserting raul source has no annotations.toml write path (no save_annotations, no fs::write to annotations.toml) — only the mp annotation create delegation.",
+      "files": [],
+      "tests": "crates/raul/tests/annotation.rs",
+      "done_when": "raul annotation create/list/show work via mp delegation; gate test confirms raul never writes annotations.toml; styled rendering",
+      "status": "done",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [
+        "S7"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Docs: MP-COMMANDS.md (mp annotation command reference + examples + G14 note), AGENT-PLAYBOOK.md (agent annotation loop: read open queue -> do work -> mark addressed/resolve), SPEC.md (add G14 row to the gate matrix + R1 annotation note), master-planner SKILL.md (annotation workflow for humans/agents). Also refresh the master-planner SKILL.md error-code table (its gate section currently lists only G1-G10) to include G11-G14.",
+      "files": [],
+      "tests": "manual: accepted — doc review (commands, agent loop, G14 gate matrix, SKILL workflow)",
+      "done_when": "All four docs document the annotation workflow + G14 end-to-end; SKILL.md gate table covers G1-G14; no stale references",
+      "status": "done",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S8"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Golden scenario + integration tests for the full annotation lifecycle and the G14 gate. Add a golden scenario under tests/scenarios/ exercising create -> list -> addressed -> resolved, and an approval-request blocking then unblocking a milestone ready transition. Confirm mp validate and set-spec-status ready both honor G14. Full green pass.",
+      "files": [],
+      "tests": "make test-scenarios && cargo test -p mp annotation",
+      "done_when": "Golden scenario passes; integration tests cover lifecycle + G14 block/unblock; make test + make test-scenarios green",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S9"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-06-28",
+    "branch": "",
+    "evidence": "milestone complete"
+  }
+}

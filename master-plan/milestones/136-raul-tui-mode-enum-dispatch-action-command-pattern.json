@@ -1,0 +1,287 @@
+{
+  "milestone": {
+    "id": "136",
+    "title": "raul TUI mode enum dispatch + action/command pattern",
+    "slug": "raul-tui-mode-enum-dispatch-action-command-pattern",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "135"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-07-09",
+    "updated": "2026-07-10",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-07-10T18:14:08.490019+00:00"
+  },
+  "intent": {
+    "outcome": "raul's TUI replaces the giant inline match chain in runner.rs (~450 lines mixing global keys, tab-bar focus, lane-specific logic, and command dispatch) with a Mode enum + per-mode handler functions. The dispatcher becomes a small top-level function: 'given this mode and this key, return a Vec<Action>'. Adding a new mode (Board, Detail, Input, Help, Settings — required for M140) is a clean additive change."
+  },
+  "problem": {
+    "description": "crates/raul/src/tui/runner.rs:132-218 contains a giant inline match chain that mixes concerns: global keys (q, Q, Esc, b, Tab) are checked before is_input_active(); input mode only handles Esc/Enter/Backspace/Char; tab_bar_focused routes to handle_tab_bar_key; lane-specific logic inlines Board special cases (Left/Right/Char('r')) and then falls through to handle_event(); handle_event() then has its own massive match on (ContentState, Event) pairs. Hard to test, hard to extend, easy to forget a path. herdr's src/app/input/ has 13 mode-specific sub-modules (terminal.rs, modal.rs, mouse.rs, navigate.rs, selection.rs, copy_mode.rs, settings.rs, overlays.rs, sidebar.rs, …) and an exhaustive Mode enum of 17 variants. The dispatcher is small; the work lives in per-mode handlers."
+  },
+  "scope": {
+    "in_scope": [
+      "New Mode enum in crates/raul/src/tui/mode.rs: Normal, Input, Help, AnnotationThread, ReviewMenu, Settings, plus any other current 'inline-mode' state currently scattered through runner.rs",
+      "Replace inline mode checks with active_mode: Mode field on App",
+      "New module crates/raul/src/tui/modes/ with one file per mode (normal.rs, input.rs, help.rs, settings.rs, …) each exporting handle_key(mode, key, app) -> Vec<Action>",
+      "New Action enum in crates/raul/src/tui/action.rs: Quit, Up, Down, Enter, OpenTab(id), SelectItem(id), CreateAnnotation(text), ApproveAnnotation(id), ResolveAnnotation(id), OpenSettings, OpenHelp, … — pure data, no side effects",
+      "New fn apply_action(app: &mut App, action: Action) that mutates App and shells out to mp — this is where the side effects live, separate from the dispatch",
+      "Top-level dispatch becomes ~20 lines: match (app.active_mode, key) -> dispatch",
+      "Tests: for each mode, a unit test that the handler returns the right action for a representative key set; for apply_action, a test that the right mp invocation (or App mutation) happens for each action"
+    ],
+    "out_of_scope": [
+      "Adding new user-facing features — this is a refactor of existing behavior",
+      "Keybinds from config (M138-M139) — Mode and Action are the data structures keybinds dispatch on, but key parsing and config loading are separate milestones",
+      "Settings TUI content (M140) — Settings mode is registered here; the actual settings menu/forms land in M140",
+      "Prefix mode (herdr's ctrl+b style) — not justified for raul today"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A Mode enum exists with one variant per distinct UI mode in raul (Normal, Input, Help, AnnotationThread, ReviewMenu, Settings — plus any inline state currently scattered in runner.rs). The App struct has an active_mode: Mode field. Grep test asserts no inline mode flags remain in runner.rs. NOTE on Settings: Mode::Settings is registered here as a variant, but its handler is a clean no-op stub (dispatches nothing, or shows a 'settings coming in M140' placeholder) until M140 fills it — so M136 landing before M140 does not leave a broken dispatch path.",
+      "verification": "cargo test -p raul --test tui_modes",
+      "status": "passed",
+      "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+    },
+    {
+      "id": "AC-02",
+      "description": "An Action enum exists with one variant per user-intent mutation (Quit, Up, Down, Enter, OpenTab, SelectItem, CreateAnnotation, ApproveAnnotation, ResolveAnnotation, OpenSettings, OpenHelp, etc). All current behaviors of the inline match are expressible as a Vec<Action> sequence.",
+      "verification": "cargo test -p raul --test tui_modes",
+      "status": "passed",
+      "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+    },
+    {
+      "id": "AC-03",
+      "description": "Per-mode handler modules (modes/normal.rs, modes/input.rs, modes/help.rs, modes/settings.rs) each export a handle_key function that takes (key, &App) -> Vec<Action>. The function is pure: no I/O, no mp shell-outs, no App mutation.",
+      "verification": "cargo test -p raul --test tui_modes",
+      "status": "passed",
+      "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+    },
+    {
+      "id": "AC-04",
+      "description": "apply_action(app, action) is the single place that mutates App and shells out to mp. Side effects (load_data_for_lane, create_annotation, etc) live here and only here. Grep test asserts no mp shell-out calls inside the per-mode handlers.",
+      "verification": "cargo test -p raul --test tui_modes",
+      "status": "passed",
+      "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+    },
+    {
+      "id": "AC-05",
+      "description": "All existing raul tests still pass: cargo test -p raul exits 0. No regression in lane navigation, list interaction, detail scrolling, annotation create/resolve/approve, board view, modal/help overlay behavior.",
+      "verification": "cargo test -p raul",
+      "status": "passed",
+      "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "wp-mode-enum",
+      "name": "Mode enum + active_mode field",
+      "goal": "Replace inline mode flags in runner.rs with a single Mode enum on App; remove is_input_active-style scattered checks",
+      "rollback": ""
+    },
+    {
+      "id": "wp-action-enum",
+      "name": "Action enum + apply_action",
+      "goal": "Action enum (Quit, Up, Down, OpenTab, SelectItem, CreateAnnotation, etc.) with apply_action() that owns all App mutation and mp shell-out",
+      "rollback": ""
+    },
+    {
+      "id": "wp-modes-modules",
+      "name": "Per-mode handler modules",
+      "goal": "crates/raul/src/tui/modes/ with one file per mode (normal.rs, input.rs, help.rs, settings.rs); each exports handle_key(key, &App) -> Vec<Action>",
+      "rollback": ""
+    },
+    {
+      "id": "wp-tests",
+      "name": "Tests + closure",
+      "goal": "Per-mode handler unit tests; apply_action tests; cargo test -p raul exits 0",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "wp-mode-enum",
+      "order": 1,
+      "action": "Create crates/raul/src/tui/mode.rs with Mode enum: Normal, Input, Help, AnnotationThread, ReviewMenu, Settings. Add active_mode: Mode to App in app.rs. Remove any inline mode flags (input_mode boolean, show_help, show_review_menu) and replace reads with active_mode match.",
+      "files": [
+        "crates/raul/src/tui/mode.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "crates/raul/tests/tui_modes.rs",
+      "done_when": "Mode enum exists with the 6 variants; active_mode is the only mode-state field on App.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "wp-action-enum",
+      "order": 2,
+      "action": "Create crates/raul/src/tui/action.rs with Action enum covering all current user-intent mutations (Quit, Up, Down, Enter, OpenTab, SelectItem, CreateAnnotation, ApproveAnnotation, ResolveAnnotation, OpenSettings, OpenHelp, etc.). Delete the old Event enum from event.rs.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/event.rs"
+      ],
+      "tests": "crates/raul/tests/tui_modes.rs",
+      "done_when": "Action enum exists; old Event enum is removed from event.rs.",
+      "status": "done",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "wp-action-enum",
+      "order": 3,
+      "action": "Implement apply_action(app: &mut App, action: Action) in action.rs. Move all side effects (load_data_for_lane, create_annotation shell-out, etc.) here. The function is the single place that mutates App and shells out to mp.",
+      "files": [
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "crates/raul/tests/tui_modes.rs",
+      "done_when": "apply_action is the only place that mutates App from dispatch; no mp shell-outs from per-mode handlers.",
+      "status": "done",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "wp-modes-modules",
+      "order": 4,
+      "action": "Create crates/raul/src/tui/modes/ with normal.rs, input.rs, help.rs, settings.rs (plus any other current inline-mode state). Each exports handle_key(key, &App) -> Vec<Action> — pure, no I/O, no App mutation.",
+      "files": [
+        "crates/raul/src/tui/modes/",
+        "crates/raul/src/tui/mod.rs"
+      ],
+      "tests": "crates/raul/tests/tui_modes.rs",
+      "done_when": "Each mode has its own handle_key function; no per-mode handler calls MpRunner.",
+      "status": "done",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "wp-tests",
+      "order": 5,
+      "action": "Author crates/raul/tests/tui_modes.rs: per-mode unit tests asserting handle_key returns the right Action for representative key sets; apply_action tests asserting the right mp invocation or App mutation for each Action; grep test asserting no mp shell-out calls inside modes/.",
+      "files": [
+        "crates/raul/tests/tui_modes.rs"
+      ],
+      "tests": "crates/raul/tests/tui_modes.rs",
+      "done_when": "Test file exists; covers all 6 modes; covers apply_action for at least 5 Action variants.",
+      "status": "done",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "wp-tests",
+      "order": 6,
+      "action": "Run cargo test -p raul. Verify all existing tests still pass and the new tui_modes tests are green.",
+      "files": [
+        "crates/raul/tests/tui_modes.rs"
+      ],
+      "tests": "cargo test -p raul",
+      "done_when": "cargo test -p raul exits 0; zero regressions.",
+      "status": "done",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "2026-07-10",
+    "branch": "",
+    "evidence": "{\n  \"scope\": \"M136 closes the mode-enum + action/command pattern refactor. Pre-M136 the runner.rs::dispatch_event had a 90-line inline match chain that mixed global keys, tab-bar focus, lane-specific logic, and command dispatch; it has shrunk to a 12-line top-level match on (app.active_mode, key) that fans out to per-mode handlers (modes/normal.rs etc.) returning Vec<Action> and a single apply_action(app, action) reducer that owns all App mutation + mp shell-out\",\n  \"tests_passed\": \"cargo test -p raul: 429 passed, 56 suites, 0 regressions. cargo test -p mp: 1047 passed, 3 ignored. cargo clippy -p raul --all-targets: No issues found. cargo fmt --check: clean. mp validate: ok=true warning_count=9 (pre-existing W20/W44)\",\n  \"files_added\": [\n    \"crates/raul/src/tui/mode.rs\",\n    \"crates/raul/src/tui/action.rs\",\n    \"crates/raul/src/tui/runner_helpers.rs\",\n    \"crates/raul/src/tui/modes/mod.rs\",\n    \"crates/raul/src/tui/modes/normal.rs\",\n    \"crates/raul/src/tui/modes/input.rs\",\n    \"crates/raul/src/tui/modes/help.rs\",\n    \"crates/raul/src/tui/modes/annotation_thread.rs\",\n    \"crates/raul/src/tui/modes/review_menu.rs\",\n    \"crates/raul/src/tui/modes/settings.rs\",\n    \"crates/raul/tests/tui_modes.rs\"\n  ],\n  \"files_modified\": [\n    \"crates/raul/src/tui/mod.rs\",\n    \"crates/raul/src/tui/app.rs\",\n    \"crates/raul/src/tui/runner.rs\",\n    \"crates/raul/src/tui/render.rs\",\n    \"crates/raul/src/tui/view_state.rs\",\n    \"crates/raul/src/tui/inbox_nav.rs\",\n    \"crates/raul/src/tui/event.rs (Event enum deleted)\",\n    \"crates/raul/tests/tui_tab_bar.rs\",\n    \"crates/raul/tests/tui_review_menu.rs\",\n    \"crates/raul/tests/tui_dashboard.rs\",\n    \"crates/raul/tests/tui_sidebar.rs\",\n    \"crates/raul/tests/board_view.rs\",\n    \"crates/raul/tests/tui_review_actions.rs\",\n    \"crates/raul/tests/tui_annotation.rs\",\n    \"crates/raul/tests/tui_footer.rs\",\n    \"crates/raul/tests/tui_path_inbox.rs\"\n  ],\n  \"key_invariants\": [\n    \"App has no show_help/input_mode/input_buffer/show_review_menu fields; the four pre-M136 inline mode flags are gone (tui/modes/normal.rs is the only mode-shape handler)\",\n    \"No mp shell-outs (runner.run*, MpRunner, reads::) appear in crates/raul/src/tui/modes/* — pinned by tui_modes.rs::no_mp_shell_outs_in_per_mode_handlers\",\n    \"runner.rs::dispatch_event reads no inline mode flags — pinned by tui_modes.rs::no_inline_mode_flags_in_runner_rs\",\n    \"Mode::ReviewMenu(_), Mode::Input(_), Mode::Settings all hold their mode-local state inside the variant; closing a mode drops its state by construction\"\n  ]\n}\n"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "maintainability",
+      "description": "action.rs::apply_enter duplicates the entire Action::ConfirmCoApproval body in its ContentState::CoApproval arm instead of delegating. The sibling MilestoneDetail and AnnotationThread arms delegate via 'return apply_action(app, runner, Action::...)', and the CoApproval arm comment says 'Same as ConfirmCoApproval' yet inlines ~17 lines of identical logic (resolve/reopen_annotation + co_approval_approve + load_annotations + check_approval_status). Drift risk: if the confirm flow changes in one arm, the other silently diverges. Remediation: replace the inlined body with 'return apply_action(app, runner, Action::ConfirmCoApproval);'.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M136 remediation (uncommitted)",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "modes/normal.rs::handle_overview_lane_key has an 'is_help_active(app)' guard (first branch) that is unreachable post-M136. is_help_active checks app.active_mode == Mode::Help, but dispatch_key routes Mode::Help to modes::help::handle_key, never to modes::normal::handle_key. So handle_overview_lane_key (which only runs when active_mode == Normal) can never observe is_help_active == true. The doc comment even admits it is kept 'as a guard even though Mode::Help is the canonical help state'. This is dead defensive code that obscures the real key table in a refactor whose goal is clarity. Remediation: remove the is_help_active branch (and the now-unused is_help_active helper if nothing else uses it), leaving the r/R/?/fall-through match.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M136 remediation (uncommitted)",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "Action::GoBack is a dead variant. Its own doc comment states 'Currently no mode handler emits this action' and its apply_action arm just calls apply_esc(app, runner) — i.e. it is an alias for Action::Esc that nothing produces. Every exhaustive match on Action (including the tui_modes.rs::actions_have_required_variants exhaustiveness test) has to carry an arm for it. Keeping speculative 'forward-compatible for M140' variants violates YAGNI and undermines the milestone's goal of a clean, exhaustive action/command surface; M140 can re-add the variant when it actually wires a 'g' binding. Remediation: remove Action::GoBack, its apply_action arm, and its exhaustiveness-test entry.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "M136 remediation (uncommitted)",
+      "created": "2026-07-10",
+      "resolved": "2026-07-10",
+      "phase": "external"
+    }
+  ]
+}
