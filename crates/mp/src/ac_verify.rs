@@ -1683,11 +1683,16 @@ fn execute(
     const SUCCESS_DRAIN_JOIN_TIMEOUT: Duration = Duration::from_secs(2);
     let capture_bytes =
         |handle: Option<std::thread::JoinHandle<()>>, buf: &Arc<Mutex<Vec<u8>>>| -> Vec<u8> {
-            let bytes = buf.lock().expect("drain buf poisoned").clone();
+            // Join the drain thread BEFORE snapshotting the buffer. The
+            // drain thread may still be reading the last bytes from the
+            // kernel pipe when the child exits; cloning first (the
+            // pre-fix order) raced on fast-exit commands like `echo`
+            // and intermittently produced truncated output. See the
+            // v1.0.0-rc1 WIP-CI follow-up for the symptom.
             if let Some(h) = handle {
                 bounded_join(h, SUCCESS_DRAIN_JOIN_TIMEOUT);
             }
-            bytes
+            buf.lock().expect("drain buf poisoned").clone()
         };
     let stdout_bytes: Vec<u8> = capture_bytes(stdout_handle, &stdout_buf);
     let stderr_bytes: Vec<u8> = capture_bytes(stderr_handle, &stderr_buf);
