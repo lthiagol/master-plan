@@ -97,13 +97,13 @@ jobs:
 
           sed -i.bak -E \
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
-            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
+            -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
             -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
             Formula/master-plan.rb
 
           sed -i.bak -E \
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
-            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
+            -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
             -e "s|^  version \".*\"|  version \"${VERSION}-dev.${DATE}\"|" \
             -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
             Formula/master-plan-dev.rb
