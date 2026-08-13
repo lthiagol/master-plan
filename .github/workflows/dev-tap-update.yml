@@ -5,7 +5,7 @@ name: dev-tap-update
 # produces a new formula version. The stable master-plan formula is
 # unaffected (tag pushes still flow through stable-ci.yml's tap-update job).
 
-on:
+"on":
   push:
     branches: [wip]
   workflow_dispatch:
@@ -93,4 +93,3 @@ jobs:
           This PR targets stable. CI runs brew audit + style.
           PRBODY
           gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan-dev: bump to ${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
-# last_trigger: 20260813T212629Z
