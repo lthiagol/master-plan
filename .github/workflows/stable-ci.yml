@@ -55,12 +55,17 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Checkout master-plan (so `git rev-list` can resolve the tag)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Resolve tag + commit SHA + SHA256
         id: meta
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           COMMIT=$(git rev-list -n 1 "${GITHUB_REF_NAME}")
-          SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" | sha256sum | cut -d' ' -f1)
+          SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" | sha256sum | cut -d ' ' -f1)
           DATE=$(date -u +%Y%m%d)
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "commit=${COMMIT}"    >> "$GITHUB_OUTPUT"
@@ -92,13 +97,13 @@ jobs:
 
           sed -i.bak -E \
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
-            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
+            -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
             -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
             Formula/master-plan.rb
 
           sed -i.bak -E \
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
-            -e "s|^  url \".*\"|      url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
+            -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
             -e "s|^  version \".*\"|  version \"${VERSION}-dev.${DATE}\"|" \
             -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
             Formula/master-plan-dev.rb

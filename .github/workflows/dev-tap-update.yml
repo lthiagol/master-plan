@@ -1,0 +1,95 @@
+name: dev-tap-update
+
+# Auto-bump the master-plan-dev formula on every push to wip.
+# This makes the dev cut a true rolling release — every commit on wip
+# produces a new formula version. The stable master-plan formula is
+# unaffected (tag pushes still flow through stable-ci.yml's tap-update job).
+
+"on":
+  push:
+    branches: [wip]
+  workflow_dispatch:
+
+jobs:
+  dev-tap-update:
+    name: bump master-plan-dev formula
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout master-plan
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute tarball SHA256 for current wip HEAD
+        id: meta
+        run: |
+          COMMIT="${GITHUB_SHA}"
+          SHORT_SHA="${COMMIT:0:8}"
+          DATE=$(date -u +%Y%m%d)
+          BASE_TAG=$(git describe --tags --abbrev=0)
+          BASE_TAG="${BASE_TAG#v}"
+          SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz" | sha256sum | cut -d ' ' -f1)
+          VERSION="${BASE_TAG}-dev.${DATE}-${SHORT_SHA}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}"   >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}"         >> "$GITHUB_OUTPUT"
+          echo "date=${DATE}"       >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: lthiagol/homebrew-tap
+          ref: stable
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Bump master-plan-dev formula
+        working-directory: homebrew-tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          COMMIT:  ${{ steps.meta.outputs.commit }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          SHA:     ${{ steps.meta.outputs.sha }}
+        run: |
+          BRANCH="dev-master-plan-${SHORT_SHA}"
+          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+
+          sed -i.bak -E \
+            -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
+            -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
+            -e "s|^  version \".*\"|  version \"${VERSION}\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
+            Formula/master-plan-dev.rb
+
+          rm -f Formula/*.bak
+          git add Formula/master-plan-dev.rb
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "master-plan-dev: bump to ${VERSION} (commit ${SHORT_SHA})"
+          git push -u origin "$BRANCH" --force
+
+      - name: Open PR against homebrew-tap:stable
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          SHORT_SHA="${{ steps.meta.outputs.short_sha }}"
+          BRANCH="dev-master-plan-${SHORT_SHA}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          SHA="${{ steps.meta.outputs.sha }}"
+          COMMIT="${{ steps.meta.outputs.commit }}"
+          cat > /tmp/pr_body.md <<PRBODY
+          Auto-bump from ${{ github.repository }} commit ${SHORT_SHA}.
+
+          * master-plan-dev.rb -> ${VERSION} (tracks commit ${COMMIT:0:7})
+          * SHA256: ${SHA}
+
+          This PR targets stable. CI runs brew audit + style.
+          PRBODY
+          gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan-dev: bump to ${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
