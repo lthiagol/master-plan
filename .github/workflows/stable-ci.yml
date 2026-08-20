@@ -133,3 +133,17 @@ jobs:
           This PR targets stable. CI runs brew audit + style on the formulas.
           PRBODY
           gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan: bump to v${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
+
+      - name: Auto-merge the formula bump PR
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          BRANCH="bump-master-plan-v${{ steps.meta.outputs.version }}"
+          # Auto-merge waits for the tap's `lint formulas` check, then squash-merges
+          # the throwaway head branch. Requires `gh repo edit --enable-auto-merge` on
+          # the tap (already enabled on lthiagol/homebrew-tap). Falls through with a
+          # clear warning if disabled or if the PR was opened in a race.
+          gh pr merge --repo lthiagol/homebrew-tap \
+            --auto --squash --delete-branch \
+            "$BRANCH" \
+            || echo "::warning::auto-merge not enabled on lthiagol/homebrew-tap or PR not found; manual merge required"
