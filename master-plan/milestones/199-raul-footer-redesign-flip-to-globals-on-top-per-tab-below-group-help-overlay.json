@@ -1,0 +1,469 @@
+{
+  "milestone": {
+    "id": "199",
+    "title": "raul footer redesign — flip to globals-on-top + per-tab below, group help overlay",
+    "slug": "raul-footer-redesign-flip-to-globals-on-top-per-tab-below-group-help-overlay",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-24",
+    "updated": "2026-08-24",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-24T23:20:01.344417+00:00"
+  },
+  "intent": {
+    "outcome": "raul's footer reads as a balanced two-row legend: a stable upper line of universal keybinds (identical on every tab) and a contextual lower line of lane-specific affordances. The help overlay mirrors the same Global / Per-lane split, so users learn one mental model."
+  },
+  "problem": {
+    "description": "Today's footer (M183 / M187) puts per-tab keys on top and globals on bottom, but the globals line claims keys that are actually lane-conditional (F:filter, /:search, h:hide-done, S:sort, o:cycle all only work on specific lanes) — so the legend loses credibility. The per-tab footers are also uneven: the Enter binding is called 'go' on Overview, 'select' on list, 'action' on detail, etc. There is no consistent visual rhythm between the two rows, and the help overlay is one flat list that doesn't mirror the footer's structure."
+  },
+  "scope": {
+    "in_scope": [
+      "Flip the footer layout in crates/raul/src/tui/render/chrome.rs: globals on top (h-2), per-tab on bottom (h-1).",
+      "Trim the globals line to the six keys that are genuinely universal on every lane + content_state + mode: q:quit, ?:help, Tab/Shift+Tab:lanes, ↑↓/jk:move, ⏎:go, r:refresh. Use the verb 'go' for the Enter binding (user-picked over 'drill' / 'select' / 'open').",
+      "Replace the per-tab footer methods (footer_overview, footer_list, footer_content, footer_settings) with a per-(lane, content_state) table that uses consistent action verbs and only lists lane-specific affordances (no duplicates of globals).",
+      "Right-truncate the per-tab line with … when the natural content exceeds the available width. Globals line keeps its existing collapse-to-prefix behavior.",
+      "Hide the per-tab line entirely when a lane has no lane-specific affordances (Path is the only such case in v1).",
+      "Group help overlay entries under 'Global' and 'Per-lane' headings so the help overlay mirrors the footer split. The Per-lane group lists the keys for the active lane only.",
+      "Update tui_footer_two_lines.rs to pin the new layout: globals on h-2, per-tab on h-1, and the new per-tab content per lane. Add a new tui_footer_per_lane.rs test that walks all (lane, content_state) pairs and asserts the per-tab line is the expected string."
+    ],
+    "out_of_scope": [
+      "Rebinding any default key — the user may rebind via mp config, but the milestone only changes the rendering layer; default bindings in keybinds.rs stay unchanged.",
+      "Adding new affordances to the Path tab — Path is read-mostly and ⏎:go is enough. A real Path affordance (e.g. copy-path) is a separate milestone if ever needed.",
+      "Splitting the globals line into 'Nav / Actions / Exit' sections with bold labels — considered and rejected; labels add noise on a 6-item line.",
+      "Replacing the r:refresh / r:resolve context-override behavior — globals always says r:refresh, AnnotationThread's per-tab line says r:resolve. Two rows visible, user picks by tab. Matches today's behavior; no new abstraction.",
+      "Width-overflow rework on the globals line — it already collapses to a prefix; only the per-tab line gets the new right-truncate-with-… treatment in this milestone.",
+      "Touching the modal footers (LifecycleFilter, SearchInput, SortRebind, ReviewMenu, AnnotationThread) — each modal already has its own single-line footer and that contract is preserved.",
+      "Any change to the Lane enum, App state, or the keybinds schema — this is a render-layer refactor plus help-overlay grouping; Keybinds fields are unchanged."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Footer renders as two horizontal lines: globals on top (row h-2), per-tab on bottom (row h-1). The globals line content is the six universal bindings: `q:quit · ?:help · Tab/Shift+Tab:lanes · ↑↓/move · ⏎:go · r:refresh`.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_two_lines/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Per-tab line content for every (lane, content_state) pair matches the per-(lane, content_state) table. No key in the per-tab line duplicates one in the globals line (except r:resolve vs r:refresh on AnnotationThread, by design).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_per_lane/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Both lines use the same visual style: dim color, · separator, center-aligned. No divider, no bold contrast between them.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_visual_style/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Per-tab line right-truncates with `…` when the natural content exceeds the available width. Globals line keeps its existing collapse-to-prefix behavior at narrow widths.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_widths/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "On Path, the per-tab line is empty so the footer is one row tall (globals only). On every other lane, the footer is two rows.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_path_empty/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Help overlay (?) is grouped under 'Global' and 'Per-lane' headings. The Global group lists the same six bindings as the globals line. The Per-lane group lists only the lane-specific keys for the active lane.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_help_overlay/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Modal footers are unchanged: LifecycleFilter, SearchInput, SortRebind, ReviewMenu, and AnnotationThread each keep their dedicated single-line footer. q still quits, ? still opens help, r still refreshes in list contexts and resolves in AnnotationThread.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_modal|lifecycle_filter|search_input|sort_rebind|review_menu|annotation_thread/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "cargo fmt --all -- --check passes; cargo clippy -p raul --tests --no-deps -- -D warnings passes; cargo nextest run -p raul --no-fail-fast exits 0; mp validate exits 0.",
+      "verification": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo nextest run -p raul --no-fail-fast && mp validate",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Layout direction",
+      "choice": "Flip: globals on top (h-2), per-tab on bottom (h-1).",
+      "rationale": "Stable reference belongs in the most-glanceable position. Today the stable row sits at the bottom and the changing row is right against the content, so the user has to re-read the legend every tab switch. Putting globals on top means: tab switch, top row stays still, lower row updates."
+    },
+    {
+      "area": "Globals line content",
+      "choice": "Six keys: q:quit, ?:help, Tab/Shift+Tab:lanes, ↑↓/jk:move, ⏎:go, r:refresh.",
+      "rationale": "Each of these is provably active on every (lane, content_state, mode) combination. We removed the lane-conditional items (F:filter, /:search, h:hide-done, S:sort, o:cycle) from globals because they don't fire on Path / Watch / Overview / Settings / AnnotationThread — keeping them in globals was a credibility leak. The user explicitly chose 'go' over 'drill' / 'select' / 'open' for the Enter verb (continuity with the current Overview footer)."
+    },
+    {
+      "area": "Esc on globals",
+      "choice": "Excluded.",
+      "rationale": "Esc is universal but its meaning shifts by mode (back out of modal, back out of detail, back out of input). Listing it once as 'back' would mislead. The user confirmed: keep globals at six items."
+    },
+    {
+      "area": "Per-tab line content",
+      "choice": "A per-(lane, content_state) table that only lists lane-specific affordances, no duplicates of globals (except r:resolve vs r:refresh on AnnotationThread).",
+      "rationale": "With globals owning quit / help / move / select / refresh / lanes, the per-tab line is the *delta* from the global baseline. The user picks the right key by reading the row that matches their active tab — no mental translation."
+    },
+    {
+      "area": "Visual style",
+      "choice": "Same dim color, same · separator, same center alignment on both rows. No divider. No bold contrast between rows.",
+      "rationale": "Both rows are reference; making one row brighter would suggest 'this is the important one', which is the wrong message. Consistent typography keeps the legend reading as one balanced block."
+    },
+    {
+      "area": "Help overlay grouping",
+      "choice": "Group help entries under 'Global' and 'Per-lane' headings. Per-lane group is always the active lane's keys.",
+      "rationale": "The help overlay and the footer should teach the same mental model. If help is one flat list but footer is two rows, the user has to translate between them. With both grouped, finding 'where was that key?' is a single mental operation. Showing the active lane's group first puts the most relevant keys at the top of the overlay."
+    },
+    {
+      "area": "Width overflow on per-tab line",
+      "choice": "Right-truncate with … on the per-tab line. Keep globals line's existing collapse-to-prefix behavior.",
+      "rationale": "Per-tab is contextual and forgiving — losing the rightmost (least-discoverable) entry is fine. Globals are load-bearing — losing the rightmost entry might lose a critical key, so the collapse-to-prefix behavior (which preserves quit and works outward) stays."
+    },
+    {
+      "area": "Empty per-tab fallback",
+      "choice": "Hide the per-tab line entirely when a lane has no lane-specific affordances. Footer is 1 row on Path, 2 rows elsewhere.",
+      "rationale": "Path is the only lane in v1 with no per-tab keys (read-mostly surface; ⏎:go covers the main action). A blank row or a placeholder (`─`) adds visual noise. The 1-row ↔ 2-row layout shift on Path tab switch is the right tradeoff for keeping Path uncluttered."
+    },
+    {
+      "area": "r:refresh vs r:resolve context conflict",
+      "choice": "Globals always says r:refresh. AnnotationThread's per-tab line says r:resolve. No special-casing in the globals line.",
+      "rationale": "Honoring the context override in the globals line would require either a per-mode globals line (breaks the 'identical on every tab' promise) or a stacked glyph (ugly). Two rows visible, user picks by tab — matches today's behavior, no new abstraction needed."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should the per-tab line on each lane include or exclude a hint when a feature is conditionally available (e.g. 'A:annotate' only on lanes with annotation support)?",
+      "status": "resolved",
+      "answer": "Show the key if the action is contextually available on the current lane + content_state, hide it if not. The per-tab table is built per (lane, content_state), not per row, so the line is naturally lane-conditional — no extra hint needed."
+    },
+    {
+      "id": "Q-02",
+      "question": "When Settings has staged edits, should the Settings per-tab line show '[Save (s)*]' (current) or split into a separate per-tab line for the dirty state?",
+      "status": "resolved",
+      "answer": "Keep the current dirty-state indicator inline: `[Save (s)*]` when staged, `[Save (s)]` when clean. The per-tab line already carries this signal today; the redesign just relocates it from globals-on-top to per-tab-on-bottom."
+    },
+    {
+      "id": "Q-03",
+      "question": "Does the user want the help overlay to remember which Per-lane group was last expanded, or always show the active lane's group first?",
+      "status": "resolved",
+      "answer": "Always show the active lane's group first. The help overlay is contextual to the current view, so the most-relevant group belongs on top. No expansion state to manage."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Footer render layer + per-tab table",
+      "goal": "Add Keybinds::footer_per_tab() with the new per-(lane, content_state) table. In chrome.rs::render_footer, flip the layout (globals on h-2, per-tab on h-1), trim globals to the 6 universal keys, right-truncate the per-tab line with … on overflow, hide the per-tab line when empty (Path), and unify the visual style on both rows (same dim color, same · separator, same center, no divider).",
+      "rollback": "Revert changes to crates/raul/src/tui/keybinds.rs (drop the new footer_per_tab method) and crates/raul/src/tui/render/chrome.rs (revert render_footer to M187 layout, restore the old globals line, drop the right-truncate helper, restore unconditional 2-row footer area)."
+    },
+    {
+      "id": "WP2",
+      "name": "Help overlay grouping (Global / Per-lane)",
+      "goal": "Refactor crates/raul/src/tui/modes/help.rs to render help entries under two headings: 'Global' (the six universal bindings) and 'Per-lane' (only the keys for the active lane). Active lane's group is shown first. Update the help_overlay to consume a structured value (global entries + per-lane entries) rather than the flat list.",
+      "rollback": "Revert modes/help.rs to the flat-list renderer. No data layer change required — the help overlay entry list shape reverts, and no downstream consumer reads the grouped form."
+    },
+    {
+      "id": "WP3",
+      "name": "Tests + full AC pass",
+      "goal": "Update tui_footer_two_lines.rs to assert the new layout (globals on h-2, per-tab on h-1) and the new content. Add new TUI tests: tui_footer_per_lane.rs (every (lane, content_state) pair), tui_footer_path_empty.rs (Path is 1-row), tui_footer_visual_style.rs (same style on both rows), tui_footer_widths.rs (per-tab right-truncates with … on overflow; globals keeps collapse-to-prefix), tui_help_overlay.rs (Global/Per-lane grouping). Run cargo fmt, cargo clippy, cargo nextest, mp validate; pass all 8 ACs; confirm no modal regression.",
+      "rollback": "Revert the new TUI test files and the updates to tui_footer_two_lines.rs. No other files are touched by this WP, so the rollback is file-level only. ACs revert to pending."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add Keybinds::footer_per_tab(lane, content_state, open_only, settings_staged) method in crates/raul/src/tui/keybinds.rs that returns the per-(lane, content_state) string from the new table. Table covers: Overview, Milestones (list + detail), Path, Backlog (list + detail), Ideas, Watch, Settings (with dirty-state indicator), AnnotationThread, CoApproval. Each entry uses consistent action verbs (F:filter, /:search, h:hide-done, S:sort, o:cycle, A:annotate, m:menu, r:resolve, R:reopen, p:approve, n/p:next-item, [/]:section, Space:start, D:detach, [Save (s)*] / [Save (s)]). Return an empty string for Path (the only empty case in v1).",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_per_tab|keybinds::)/' --no-run",
+      "done_when": "footer_per_tab returns the expected per-(lane, content_state) string for every variant in a new unit test, with Path returning the empty string",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "In chrome.rs::render_footer, flip the layout: globals row on the top (h-2), per-tab row on the bottom (h-1). Trim the globals line in footer_globals_line to the 6 truly-universal keys: q:quit · ?:help · Tab/Shift+Tab:lanes · ↑↓/move · ⏎:go · r:refresh. Drop the lane-conditional items (F:filter, /:search, h:hide-done, S:sort, o:cycle) — they move to the per-tab line. Use 'go' (not 'drill') as the Enter verb. footer_for routes by (lane, content_state) through the new Keybinds::footer_per_tab method (delegated to chrome.rs). Modal footers (LifecycleFilter, SearchInput, SortRebind, ReviewMenu, AnnotationThread) keep their dedicated single-line footer — preserved by the early-return branches.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_two_lines|footer_globals|footer_per_tab/)'",
+      "done_when": "Globals row renders on h-2 with the six universal bindings; per-tab row renders on h-1 with the per-(lane, content_state) content; existing modal early-returns are preserved",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "In chrome.rs, add a right-truncate-with-… helper for the per-tab line. The helper is grapheme-safe (uses unicode_segmentation::UnicodeSegmentation like the existing fit_footer_width), measures width with unicode_width, and appends a … when truncating. Use it from render_footer in place of the existing per-tab render path. Globals line keeps its existing collapse-to-prefix behavior unchanged. Add a unit test in the same file or in keybinds.rs that builds a long per-tab string, truncates it at multiple widths (60, 80, 120), and asserts the result ends with … and the leftmost tokens are preserved.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_width|right_truncate|tui_footer_widths/)'",
+      "done_when": "right_truncate_with_ellipsis helper exists, is grapheme-safe, and the per-tab line uses it in render_footer; unit tests at widths 60, 80, 120 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "In chrome.rs (and view_state.rs if needed), hide the per-tab line when the active lane returns an empty per-tab string. Implementation: when the per-tab string is empty, set view.footer_area.height to 1 (globals only) instead of 2. When the per-tab string is non-empty, keep footer_area.height = 2. The compute_view function owns the height decision (single source of truth); render_footer renders the globals row at the available y and skips the per-tab row when height is 1. Add a TUI test tui_footer_path_empty.rs that switches to Lane::Path, asserts view.footer_area.height == 1, and asserts the rendered buffer has only one footer row.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_path_empty|footer_area_height/)'",
+      "done_when": "Path footer is 1 row tall; all other lanes are 2 rows; switching to Path causes a 1-row ↔ 2-row height transition",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "In chrome.rs::render_footer, unify the visual style on both rows: same dim color, same · separator, same center alignment. The globals row already uses Style::default().fg(palette.dim) — apply the same style to the per-tab row. Drop any accent-bold or contrast modifiers. No divider row between them. Add a TUI test tui_footer_visual_style.rs that renders the footer at width 120 and asserts every non-empty cell in both rows has the same foreground color (the dim palette color) — no bold modifier, no accent color, no divider row.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_visual_style|footer_style/)'",
+      "done_when": "Both rows render in dim color, centered, with · separator; no divider row; visual_style test confirms identical style on both rows",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "In crates/raul/src/tui/modes/help.rs, refactor the help overlay to render entries under two headings: 'Global' and 'Per-lane'. Add a new helper Keybinds::help_entries_grouped(active_lane) -> (Vec<HelpEntry>, Vec<HelpEntry>) that returns (global_entries, per_lane_entries). The global group is always the same six bindings: quit, help, lane-switch, move, go, refresh. The per-lane group is the lane-specific keys for the active lane (same content as Keybinds::footer_per_tab for the active lane, but in structured form). The overlay renders the global group on top, then the per-lane group below, each with a heading line. Add a TUI test tui_help_overlay.rs that opens the help overlay on Milestones and asserts the rendered text contains 'Global' heading, 'Per-lane' heading, and the per-lane keys (F:filter, /:search, h:hide-done, S:sort, o:cycle, A:annotate) without the six globals duplicated in the per-lane section.",
+      "files": [
+        "crates/raul/src/tui/modes/help.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_help_overlay|help_entries_grouped|help/)'",
+      "done_when": "help overlay renders two groups with headings; Keybinds::help_entries_grouped returns the expected split; tui_help_overlay passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Update crates/raul/tests/tui_footer_two_lines.rs to assert the new layout: globals on row h-2 (top), per-tab on row h-1 (bottom). The test currently asserts per-tab on h-2 and globals on h-1 — swap those row indices. Also update the per-tab content assertion to match the new Keybinds::footer_list() output (which now uses the new per-(lane, content_state) table). Globals content assertion stays similar but checks for the 6 trimmed keys, not the old 9.",
+      "files": [
+        "crates/raul/tests/tui_footer_two_lines.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_two_lines/)'",
+      "done_when": "tui_footer_two_lines test passes with the new layout (globals h-2, per-tab h-1) and new content set",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Add a new TUI test crates/raul/tests/tui_footer_per_lane.rs that walks every (lane, content_state) pair and asserts the per-tab line content matches the new Keybinds::footer_per_tab() output. Cover all 7 lanes (Overview, Milestones, Path, Backlog, Ideas, Watch, Settings) and the relevant content states (List, MilestoneDetail, BacklogDetail, AnnotationThread, CoApproval). For each pair, render at width 120 and assert the per-tab row (h-1) is the expected string. Path returns the empty string and the test asserts the per-tab row is empty (only the globals row is present).",
+      "files": [
+        "crates/raul/tests/tui_footer_per_lane.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_per_lane/)'",
+      "done_when": "tui_footer_per_lane test passes; every (lane, content_state) pair is covered; Path is asserted as empty",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Add a new TUI test crates/raul/tests/tui_footer_path_empty.rs that asserts: (a) on Lane::Path, view.footer_area.height == 1; (b) the rendered buffer has only one footer row (the globals row, no per-tab row); (c) switching from Milestones (height 2) to Path (height 1) and back to Milestones (height 2) transitions correctly. This pins the 'hide per-tab on empty' behavior introduced in S4.",
+      "files": [
+        "crates/raul/tests/tui_footer_path_empty.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_path_empty/)'",
+      "done_when": "Path is 1-row footer; transition from Milestones to Path to Milestones works without state corruption",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 10,
+      "action": "Add a new TUI test crates/raul/tests/tui_help_overlay.rs that opens the help overlay (press ?) on Lane::Milestones and asserts the rendered text contains: (a) 'Global' heading, (b) the six global keys (q:quit, ?:help, Tab/Shift+Tab:lanes, ↑↓/move, ⏎:go, r:refresh), (c) 'Per-lane' heading, (d) the per-lane keys for Milestones (F:filter, /:search, h:hide-done, S:sort, o:cycle, A:annotate). Also assert the per-lane section does NOT contain the six globals (no duplication). On Lane::Path, the per-lane section should be empty (or contain only 'no per-lane keys' marker).",
+      "files": [
+        "crates/raul/tests/tui_help_overlay.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_help_overlay/)'",
+      "done_when": "Help overlay test passes; Global/Per-lane groups render with correct content; no duplication",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP3",
+      "order": 11,
+      "action": "Add a new TUI test crates/raul/tests/tui_footer_visual_style.rs that renders the footer at width 120 on Lane::Milestones and asserts: (a) every non-empty cell in both rows has the same foreground color (the dim palette color); (b) no cell has the BOLD modifier; (c) the separator character is ' · ' in both rows; (d) both rows are center-aligned (same x-offset from the left edge); (e) no divider row between them (the area between row 1 and row 2 is empty).",
+      "files": [
+        "crates/raul/tests/tui_footer_visual_style.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_visual_style/)'",
+      "done_when": "Both rows have identical style; centered; no divider; no bold modifier",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP3",
+      "order": 12,
+      "action": "Add a new TUI test crates/raul/tests/tui_footer_widths.rs that exercises width-overflow behavior on both rows at widths 60, 80, 120, 160. Assert: (a) at width 120, both rows fit without truncation; (b) at width 80 with a long per-tab line (Milestones), the per-tab row ends with '…' and the leftmost tokens are preserved (F:filter, /:search, h:hide-done); (c) globals line collapses to prefix behavior at width 60 (preserves the leading q:quit · ?:help tokens); (d) Path at width 60 has only the globals row, no per-tab row. Pin the new right-truncate-with-… behavior on the per-tab row and the existing collapse-to-prefix on the globals row.",
+      "files": [
+        "crates/raul/tests/tui_footer_widths.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_footer_widths/)'",
+      "done_when": "Widths test passes; per-tab truncates with …; globals collapses to prefix; Path is globals-only at all widths",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP3",
+      "order": 13,
+      "action": "Run the full verification matrix for M199: cargo fmt --all -- --check; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo nextest run -p raul --no-fail-fast; mp validate. Then for each AC, run its verification command and pass the criterion with evidence: AC-01 (cargo nextest -E 'test(/tui_footer_two_lines/)'), AC-02 (cargo nextest -E 'test(/tui_footer_per_lane/)'), AC-03 (cargo nextest -E 'test(/tui_footer_visual_style/)'), AC-04 (cargo nextest -E 'test(/tui_footer_widths/)'), AC-05 (cargo nextest -E 'test(/tui_footer_path_empty/)'), AC-06 (cargo nextest -E 'test(/tui_help_overlay/)'), AC-07 (cargo nextest -E 'test(/tui_modal|lifecycle_filter|search_input|sort_rebind|review_menu|annotation_thread/)'), AC-08 (the same fmt + clippy + nextest + mp validate commands above). Evidence is test name + exit code, not prose. If any AC cannot honestly pass, block the milestone with a reason and escalate.",
+      "files": [],
+      "tests": "cargo fmt --all -- --check && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo nextest run -p raul --no-fail-fast && mp validate",
+      "done_when": "All 8 ACs pass with non-prose evidence; fmt + clippy + nextest + validate all exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

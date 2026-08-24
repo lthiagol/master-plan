@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-07-24",
-    "updated": "2026-07-24",
+    "updated": "2026-08-20",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -33,15 +33,15 @@
   },
   "scope": {
     "in_scope": [
-      "Default agent harness config: when only one harness skill is installed (or on first project setup), auto-set agent.runner.harness and agent.coordinator.harness to the available one; surface the decision in mp doctor; fold the harness config check into execution handoff so handoff does not look ready while watch cannot start.",
-      "herdr spawn API realignment: update mp watch herdr integration to herdr 0.7.x shape — create/ensure the runner pane via herdr pane APIs (workspace/tab/pane), then `herdr agent start <name> --kind opencode --pane <id>` (cwd as a pane property if herdr 0.7.x models it that way). Verify against the current stable herdr release.",
-      "Version gate: mp doctor and watch preconditions check the herdr CLI shape (e.g. `herdr agent start --help` contains the expected flags); fail fast with a clear `mp X requires herdr >= Y` message instead of a silent crash after boot.",
-      "Spawn diagnostics: on any herdr command failure, append a structured watch.log event capturing full argv, stdout, stderr, and exit status; set run_state to a terminal failure kind (distinct from `stale`); exit non-zero from the foreground watch driver when spawn fails.",
-      "Watch readiness parity: fold watch preconditions (harness config + herdr CLI compat) into mp execution check / execution handoff so the readiness signal reflects real watch spawnability (or explicitly document two readiness surfaces if folding is rejected)."
+      "Default agent harness config: during `mp init` (primary, user-driven path) when exactly one harness skill is installed and `agent.runner.harness` / `agent.coordinator.harness` are unset, auto-set both to the available harness. Lazy fallback on first `mp watch` invocation if not already set. Surface the auto-set value in `mp doctor` (UI section). On multiple installed harnesses, surface the ambiguity in `mp doctor` instead of picking.",
+      "herdr spawn API realignment: update mp watch herdr integration to herdr 0.7.x shape — create/ensure the runner pane via herdr pane APIs (workspace/tab/pane), then `herdr agent start <name> --kind opencode --pane <id>`. cwd is a pane property (set during pane create) or a follow-up pane set-cwd command, whichever herdr 0.7.x exposes. Verify against the current stable herdr release.",
+      "Version gate: `mp doctor` and `mp watch` preconditions detect herdr CLI shape (e.g. `herdr agent start --help` contains the expected flags); fail fast with a clear `mp X requires herdr >= Y` message instead of a silent crash after boot.",
+      "Spawn diagnostics: on any herdr command failure, append a structured `spawn_error` event to watch.log capturing full argv, stdout, stderr, and exit status; set run_state to a terminal failure kind (distinct from `stale`); exit non-zero from the foreground watch driver when spawn fails.",
+      "Watch readiness parity: fold watch preconditions (harness config + herdr CLI compat) into `mp execution check` / `execution handoff` so a single readiness signal reflects real watch spawnability (per DD-04). The two signals in `mp doctor` (readiness check, M198 `ui.show_watch_tab` value) are explicitly independent and named distinctly."
     ],
     "out_of_scope": [
       "M149 is not reopened for re-derivation; this milestone builds on M149 and adds the herdr-0.7.x realignment + diagnostics + readiness parity.",
-      "Issue D (verify-ac `unknown` noise) — already addressed by completed M177 (verification gate hardening). No new work here unless M177's heuristic misses the specific prose forms seen in andre M01 (Q-01 to confirm during execution).",
+      "Issue D (verify-ac `unknown` noise) — already addressed by completed M177. If M177's heuristic misses specific prose forms during execution, file a follow-up milestone (Q-01 resolution); not folded into M197's scope.",
       "Fixing andre M01 S3 — separate; per the report's non-goals, will run manually or after the watch fix lands.",
       "Changing herdr itself or shipping a legacy herdr pin — file separately against the herdr project if needed; mp adapts to current stable herdr."
     ]
@@ -49,8 +49,8 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Default harness config: on a fresh project with exactly one installed harness skill, mp watch preconditions either auto-configure agent.runner.harness / agent.coordinator.harness or mp doctor surfaces the missing config and a one-liner to set it.",
-      "verification": "manual: accepted — fresh-project fixture (mp init, one harness installed) reaches mp watch preconditions green or doctor surfaces the exact missing-config command.",
+      "description": "Default harness config: during `mp init` (primary path, user-driven), when exactly one harness skill is installed and `agent.runner.harness` / `agent.coordinator.harness` are unset, auto-set both. Lazy fallback on first `mp watch` invocation if not already set. The auto-set value is surfaced in `mp doctor` (UI section). On multiple installed harnesses, surface the ambiguity in `mp doctor` instead of picking.",
+      "verification": "manual: accepted — fresh-project fixture (mp init, one harness installed) reaches mp watch preconditions green; multi-harness fixture surfaces the ambiguity in doctor; lazy-fallback fixture (init not run, mp watch run first) auto-sets on first watch invocation.",
       "status": "pending",
       "evidence": ""
     },
@@ -103,6 +103,11 @@
       "area": "Readiness surfaces",
       "choice": "Fold harness config and herdr CLI compat into mp execution check / execution handoff so a single readiness signal reflects real watch spawnability (preferred). Fallback: explicitly document two surfaces (execution handoff vs watch) if folding is rejected.",
       "rationale": "A single readiness signal avoids the can_handoff:true / watch:red confusion (Issue E). Documentation alone is weaker than a single gate; folding is the stronger fix."
+    },
+    {
+      "area": "Cross-reference with M198 (mp doctor surface)",
+      "choice": "The readiness signal (this milestone, M197) and the `ui.show_watch_tab` user preference (M198) are independent signals that will both appear in `mp doctor`. They will be named distinctly: the readiness line is the watch-capability check (harness config + herdr CLI shape, can mp watch spawn right now), and the preference line is the user-toggle (do I have the watch tab visible in the TUI). A user reading doctor should not confuse them. If the names are too similar, prefix the readiness line (e.g. `watch.preconditions`) and keep the preference line as `ui.show_watch_tab`.",
+      "rationale": "Both milestones are about the \"watch\" feature but measure different things. M197 reports capability (herdr shape, harness config). M198 reports preference (user opt-in to the TUI tab). Conflating them in a single doctor line would hide a real capability gap behind a user preference, or vice versa. Explicit separation makes the doctor output actionable."
     }
   ],
   "open_questions": [
@@ -110,13 +115,146 @@
       "id": "Q-01",
       "question": "Does M177 (verification gate hardening, complete) catch the specific prose forms that produced `unknown` in the andre M01 AC verification report, or does M01's AC data predate M177's enforcement? Confirm during execution; if M177 misses these forms, extend its prose-detection heuristic.",
       "status": "resolved",
-      "answer": "Resolved: M177 prose-detection coverage for andre M01 AC forms is verified during execution via AC-03 end-to-end. If M177 misses andre M01 specific prose forms, extend the heuristic within M197 (fold into scope as a fallback). Otherwise M177 already covers; no new work."
+      "answer": "M177 prose-detection coverage is accepted as-is for this milestone. If M177 misses the specific andre M01 prose forms during execution, file a follow-up milestone (M-NEW: extend M177 prose heuristic) rather than expanding M197 scope at execution time. M197 AC-03 end-to-end run is the verification surface; if it produces `unknown` instead of a clear pass/fail, that is a M177 gap, not an M197 gap."
     },
     {
       "id": "Q-02",
       "question": "In herdr 0.7.x, is the runner working directory a pane property or an agent-start flag? Confirm by reading the herdr pane-create APIs during execution; affects the realigned spawn sequence.",
       "status": "resolved",
       "answer": "Implementation detail, confirmed during execution by reading herdr 0.7.x pane APIs. The realigned spawn sequence (D1) accommodates cwd as a pane property (set during pane create) or via a follow-up pane set-cwd command, whichever herdr 0.7.x exposes. Not a design fork."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Default harness config + doctor surface",
+      "goal": "Auto-set agent.runner.harness and agent.coordinator.harness to the single installed harness skill during mp init (user-driven, primary path) OR on first mp watch invocation if not already set (lazy fallback). Surface the auto-set value in mp doctor. The auto-set is silent-on-success and explicit-on-conflict (if multiple harnesses are installed, surface the ambiguity in doctor instead of picking).",
+      "rollback": "Revert the auto-set code paths in init and watch preconditions. Revert the doctor surface addition. Existing user-set values are preserved (the auto-set only fills unset values)."
+    },
+    {
+      "id": "WP2",
+      "name": "herdr 0.7.x spawn API realignment",
+      "goal": "Realign mp watch's herdr integration to herdr 0.7.x: create/ensure the runner pane via herdr pane APIs (workspace/tab/pane), then herdr agent start <name> --kind opencode --pane <id>. cwd is set as a pane property (during pane create) or via a follow-up pane set-cwd command, whichever herdr 0.7.x exposes — confirm during execution per Q-02. Verify against the current stable herdr release.",
+      "rollback": "Revert the herdr argv changes; restore the previous (legacy) argv. The legacy argv matches the M149-era spawn shape; mp will be broken against herdr 0.7.x until this milestone lands again."
+    },
+    {
+      "id": "WP3",
+      "name": "herdr version gate + spawn diagnostics",
+      "goal": "Two related guards: (1) herdr CLI version gate in mp doctor and mp watch preconditions — detect herdr CLI shape (herdr agent start --help contains the expected flags) and fail fast with mp X requires herdr >= Y on mismatch, instead of crashing mid-spawn. (2) Spawn diagnostics — on any herdr command failure, capture argv + stdout + stderr + exit code as a structured watch.log event, set run_state to a terminal failure kind (distinct from stale), and exit non-zero from the foreground watch driver.",
+      "rollback": "Revert the version-gate check in doctor + watch preconditions. Revert the spawn-failure terminal state. The previous silent-crash behavior returns."
+    },
+    {
+      "id": "WP4",
+      "name": "Watch readiness parity + verification",
+      "goal": "Fold watch preconditions (harness config + herdr CLI compat) into mp execution check / execution handoff so the readiness signal reflects real watch spawnability. Single readiness surface (preferred, per DD-04). Add a verification matrix: AC-03 end-to-end against current stable herdr; AC-04 forced-failure repro; AC-05 readiness parity.",
+      "rollback": "Revert the readiness-folding change. Execution check / handoff return to their previous (pre-WP4) shapes; the two-readiness-surfaces confusion (can_handoff:true / watch:red) returns."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement harness auto-set: during mp init, when exactly one harness skill is installed and agent.runner.harness / agent.coordinator.harness are unset, auto-set both. Lazy fallback on first mp watch invocation if not already set. Surface the auto-set value in mp doctor (UI section). On multiple installed harnesses, surface the ambiguity in doctor and do not pick.",
+      "files": [
+        "crates/mp/src/init_cmd.rs",
+        "crates/mp/src/watch_cmd.rs",
+        "crates/mp/src/doctor_cmd.rs"
+      ],
+      "tests": "manual: accepted — fresh-project fixture (mp init, one harness installed) reaches mp watch preconditions green or doctor surfaces the exact missing-config command.",
+      "done_when": "Fresh project with one harness reaches mp watch preconditions green; doctor shows the auto-set values; multiple-harness case surfaces the ambiguity instead of picking.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Update mp watch's herdr integration to herdr 0.7.x shape: create/ensure the runner pane via herdr pane APIs (workspace/tab/pane), then herdr agent start <name> --kind opencode --pane <id>. cwd is a pane property (set during pane create) or a follow-up pane set-cwd command, whichever herdr 0.7.x exposes. Verify against the current stable herdr release end-to-end.",
+      "files": [
+        "crates/mp/src/watch_herdr.rs"
+      ],
+      "tests": "manual: accepted — mp watch <id> against current stable herdr reaches state_persisted past ensure_pane (no silent exit); watch.log shows the pane-create and agent-start events.",
+      "done_when": "mp watch end-to-end against current stable herdr reaches state_persisted past ensure_pane; watch.log shows the pane-create and agent-start events.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Add herdr CLI version gate: in mp doctor and mp watch preconditions, detect herdr CLI shape (herdr agent start --help contains the expected flags) and fail fast with a clear mp X requires herdr >= Y message. No silent crash after boot.",
+      "files": [
+        "crates/mp/src/doctor_cmd.rs",
+        "crates/mp/src/watch_preconditions.rs"
+      ],
+      "tests": "manual: accepted — doctor against an incompatible herdr (or a stubbed older shape) prints the version-gate message and exits non-zero with no spawn attempt.",
+      "done_when": "Doctor against an incompatible herdr prints the version-gate message and exits non-zero; no spawn attempt is made.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Add spawn diagnostics: on any herdr command failure, capture argv + stdout + stderr + exit code as a structured spawn_error event in watch.log. Set run_state to a terminal failure kind (distinct from stale). Foreground watch driver exits non-zero on spawn failure.",
+      "files": [
+        "crates/mp/src/watch_herdr.rs",
+        "crates/mp/src/watch_log.rs"
+      ],
+      "tests": "manual: accepted — forced-failure repro produces a structured spawn_error event in watch.log, a terminal failure state (not stale), and a non-zero foreground exit.",
+      "done_when": "Forced-failure repro produces a structured spawn_error event, a terminal failure state (not stale), and a non-zero foreground exit.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP4",
+      "order": 5,
+      "action": "Fold watch preconditions (harness config + herdr CLI compat) into mp execution check / execution handoff so a single readiness signal reflects real watch spawnability. Verification matrix: AC-03 end-to-end against current stable herdr; AC-04 forced-failure repro; AC-05 readiness parity (the surfaces name watch preconditions, not only execution-mode readiness).",
+      "files": [
+        "crates/mp/src/execution_check.rs",
+        "crates/mp/src/handoff.rs"
+      ],
+      "tests": "manual: accepted — readiness surfaces name watch preconditions, not only execution-mode readiness.",
+      "done_when": "A single readiness surface (execution check / handoff) reflects harness config + herdr CLI compat; the surfaces explicitly name the watch preconditions.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
     }
   ],
   "verification": {

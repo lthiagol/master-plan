@@ -3,8 +3,8 @@
     "id": "194",
     "title": "mp init AGENTS.md gaps — stale templates, missing cross-links, and unresolvable doc refs in consumer projects",
     "slug": "mp-init-agents-md-gaps-stale-templates-missing-cross-links-and-unresolvable-doc-refs-in-consumer-projects",
-    "lifecycle": "groomed",
-    "spec_status": "review",
+    "lifecycle": "approved",
+    "spec_status": "ready",
     "execution_status": "planned",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,19 +17,19 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-07-23",
-    "updated": "2026-07-23",
+    "updated": "2026-08-20",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-07-23T20:45:47.889604+00:00"
+    "lifecycle_at": "2026-08-20T17:19:49.682740+00:00"
   },
   "intent": {
     "outcome": "mp init produces correct, self-contained agent instructions that an agent can follow without missing doc references or stale paths, regardless of whether the project already has a root AGENTS.md."
   },
   "problem": {
-    "description": ""
+    "description": "On consumer projects that adopt master-plan, the agent-instruction surface shipped by `mp init` is broken in four ways. (1) ROOT-AGENTS-SNIPPET.md uses project-relative `docs/...` references that don't resolve against the actual installed toolkit (~/.agents/master-plan/), so agents in consumer projects follow stale paths. (2) AGENTS-TEMPLATE.md does the same with `../docs/...` references — the project doesn't have a docs/ tree with mp content. (3) `mp init` silently skips when a root AGENTS.md already exists, so the user thinks init worked but the agent is missing critical instructions (or has stale ones). (4) There's no refresh path — once init has run, picking up template fixes requires manual surgery. The net effect: agents in consumer projects follow stale or unresolvable doc paths, leading to confused behavior or silent failures when they try to look up mp commands."
   },
   "scope": {
     "in_scope": [
@@ -90,14 +90,116 @@
     {
       "id": "Q-01",
       "question": "Should we also vendor a minimal subset of toolkit docs into the project's master-plan/ so that doc references work even offline? Or rely entirely on the toolkit installation path?",
-      "status": "open",
-      "answer": ""
+      "status": "resolved",
+      "answer": "Rely on toolkit-absolute paths (~/.agents/master-plan/docs/...) per the in-scope design decision. Vendoring a minimal subset into the project would duplicate content, drift from the canonical docs, and break the consumer-surface hygiene rule (templates/skills/** and templates/AGENTS-TEMPLATE.md must be self-contained without internal provenance). Trade-off accepted: offline use cases would need a separate mechanism — out of scope for M194; if needed, file as a follow-up (e.g., mp init --vendor-docs)."
     },
     {
       "id": "Q-02",
       "question": "For mp init --refresh: should it also refresh config.json / plan.json if the template defaults changed, or just AGENTS.md?",
-      "status": "open",
-      "answer": ""
+      "status": "resolved",
+      "answer": "mp init --refresh rewrites master-plan/AGENTS.md only — scope is intentionally narrow and predictable. Config drift (config.json / plan.json schema changes) gets a separate doctor check (e.g., mp doctor config-drift) rather than being folded into a doc-refresh flag; folding config rewrites into --refresh is surprising and harder to revert. If schema-level config migration is needed, that's a separate mp config migrate command — out of scope for M194."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Fix doc references in templates",
+      "goal": "Fix doc references in templates/ROOT-AGENTS-SNIPPET.md and templates/AGENTS-TEMPLATE.md to use toolkit-absolute paths (~/.agents/master-plan/docs/...) per the in-scope design decision. Resolves the 4-issue problem statement and unblocks consumer projects that currently have agents following stale or unresolvable doc paths.",
+      "rollback": "Revert the templates/ changes. Templates are pure files in the consumer-surface, so rollback is just a file revert."
+    },
+    {
+      "id": "WP2",
+      "name": "mp init handles existing root AGENTS.md",
+      "goal": "Make mp init's behavior explicit when a project already has a root AGENTS.md: print the snippet to stdout with instructions for manual merge, and accept --force (overwrite) and --merge (append). Eliminates the silent-skip behavior that leaves users thinking init worked.",
+      "rollback": "Revert the init mode changes. The default behavior returns to the previous silent-skip; the explicit modes are additive."
+    },
+    {
+      "id": "WP3",
+      "name": "mp init --refresh and tests",
+      "goal": "Add mp init --refresh to re-write master-plan/AGENTS.md from the current binary's embedded template, with a dry-run or confirmation prompt. Scope is AGENTS.md only (per Q-02). Test the suite_init integration tests (AC-03, AC-04) and verify the regression matrix (AC-01, AC-02).",
+      "rollback": "Revert the --refresh flag addition and the new test. Reverts to the pre-WP3 init command surface."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Audit templates/ROOT-AGENTS-SNIPPET.md doc references; replace any project-relative paths (e.g. docs/...) with toolkit-absolute paths (~/.agents/master-plan/docs/...) per the design decision. Each replacement must resolve to an existing file at the toolkit install path.",
+      "files": [
+        "templates/ROOT-AGENTS-SNIPPET.md"
+      ],
+      "tests": "grep -n 'docs/' templates/ROOT-AGENTS-SNIPPET.md",
+      "done_when": "All doc references in ROOT-AGENTS-SNIPPET.md resolve to ~/.agents/master-plan/docs/... (per AC-01 verification).",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Audit templates/AGENTS-TEMPLATE.md doc references; replace any project-relative paths (e.g. ../docs/...) with toolkit-absolute paths (~/.agents/master-plan/docs/...). Every doc reference in the template must be resolvable from the installed toolkit location.",
+      "files": [
+        "templates/AGENTS-TEMPLATE.md"
+      ],
+      "tests": "grep -rn '../docs/' templates/AGENTS-TEMPLATE.md",
+      "done_when": "No project-relative ../docs/ references remain in AGENTS-TEMPLATE.md; all references are toolkit-absolute.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Modify mp init's existing-AGENTS.md path to print the snippet to stdout with manual-merge instructions; add --force (overwrite) and --merge (append) flags. The default behavior is the explicit warn + print; --force and --merge are opt-in.",
+      "files": [
+        "crates/mp/src/init_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_init --no-fail-fast",
+      "done_when": "mp init on a project with an existing root AGENTS.md prints the snippet and the manual-merge instructions; --force overwrites; --merge appends.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP3",
+      "order": 4,
+      "action": "Add mp init --refresh that re-writes master-plan/AGENTS.md from the current binary's embedded template. Default: confirmation prompt; --yes to skip. Scope is AGENTS.md only (Q-02 resolution: config.json / plan.json drift is a separate doctor check, not folded into --refresh).",
+      "files": [
+        "crates/mp/src/init_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_init --no-fail-fast -E 'test(/refresh/)'",
+      "done_when": "mp init --refresh overwrites master-plan/AGENTS.md from the embedded template; --yes skips the prompt; config.json / plan.json are untouched.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
     }
   ],
   "verification": {

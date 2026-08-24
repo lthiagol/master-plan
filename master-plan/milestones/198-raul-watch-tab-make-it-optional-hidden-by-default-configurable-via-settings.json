@@ -1,0 +1,265 @@
+{
+  "milestone": {
+    "id": "198",
+    "title": "raul watch tab — make it optional, hidden by default, configurable via Settings",
+    "slug": "raul-watch-tab-make-it-optional-hidden-by-default-configurable-via-settings",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-20",
+    "updated": "2026-08-20",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-20T17:26:31.220060+00:00"
+  },
+  "intent": {
+    "outcome": "The Watch lane in the raul TUI is hidden by default. Users opt-in to see it via a Settings toggle. The toggle is persisted as a project-level UI config key, matches existing patterns (ui.hide_done), and behaves consistently with other UI settings (live update, doctor surface, test coverage)."
+  },
+  "problem": {
+    "description": "The Watch lane is unconditionally present in the raul TUI tab bar. Users who don't use the watch view (or want a quieter UI) have no per-project way to hide it. This is a visibility-only change: the Watch lane's behavior is unchanged; only its presence in the tab bar (and the navigation surface around it) is gated on a config toggle."
+  },
+  "scope": {
+    "in_scope": [
+      "New config key ui.show_watch_tab (bool, default false) in the mp config schema. Add the corresponding crate glue in crates/mp/src/config_cmd.rs alongside ui.hide_done.",
+      "New row in crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS after ui.hide_done: (\"ui\", \"ui.show_watch_tab\").",
+      "Filter the Watch lane out of compute_tab_bar_layout and Lane::ordered() consumers when ui.show_watch_tab is false. Single filter point so tab bar, hit-test, and prev/next navigation all see the same set.",
+      "Toggling the setting off while the active lane is Watch switches the active lane to Overview (live, no restart). Same fallback in the partial-commit reload path (M169 reload-keep pattern).",
+      "Surface the current ui.show_watch_tab value in `mp doctor` (UI section, no warning, just a value line).",
+      "Tests: extend crates/mp/tests/suites/config_ui_keys.rs with the new key; add a new TUI test that toggles the setting and asserts (a) Watch presence in TabBarLayout.visible, (b) active-lane fallback to Overview."
+    ],
+    "out_of_scope": [
+      "Hiding other lanes (Backlog, Bugfixes, etc.) — separate milestone if/when needed. This milestone gates only the Watch lane per the user's ask.",
+      "Per-user (vs per-project) preference scoping — same as ui.hide_done: project-level. Per-user would be a separate change touching the config read path.",
+      "Removing or remapping the existing `w` keybind for direct Watch jump — keep it registered, make it a no-op while the lane is hidden. The Settings tab is the opt-in path; the keybind is forward compat for when the user re-enables.",
+      "Changing the Watch lane's internal behavior (rendering, polling, agent integration) — this milestone is visibility-only. M197 covers the herdr-0.7.x realignment separately.",
+      "Renaming or moving the existing ui.hide_done key — out of scope, even though it sits next to the new key in the settings list."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ui.show_watch_tab is a valid config key, defaults to false, and round-trips through `mp config get` and `mp config set`.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "When ui.show_watch_tab is false (the default), the Watch lane is not present in TabBarLayout.visible for any terminal width — the lane is filtered out of compute_tab_bar_layout and Lane::ordered() consumers (tab bar, hit-test, prev/next navigation) all see the same filtered set.",
+      "verification": "new TUI test: open settings, confirm ui.show_watch_tab = false, assert Lane::Watch is not in TabBarLayout.visible across narrow/compact/wide layouts. Template: crates/raul/tests/m169_rev.rs",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "When ui.show_watch_tab is true, the Watch lane is present in TabBarLayout.visible in wide mode and behaves like the pre-milestone default (no behavior change to the lane itself).",
+      "verification": "same TUI test as AC-02 with ui.show_watch_tab staged to true; assert Lane::Watch appears at its original index in the visible set",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Toggling ui.show_watch_tab from true to false while the active lane is Watch switches the active lane to Overview (live, no restart). The same fallback is applied in the partial-commit reload path (M169).",
+      "verification": "TUI test: set active lane to Watch, stage ui.show_watch_tab = false, commit, assert active_lane == Lane::Overview. Mirror the reload-keeping pattern from m169_rev.rs::rev_med_reload_keeping_preserves_listed_keys",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "mp doctor surfaces the current ui.show_watch_tab value in the UI section. No regression in existing UI settings tests (m169_rev, tui_settings_automation, m168_settings_grouped). Consumer-surface leak guard clean — no internal milestone IDs, lesson codes, or repo-internal pointers leak into the new setting's help text or UI label.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/doctor|ui_settings|settings_/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|m169_rev|m168_settings/)' && make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Settings key name",
+      "choice": "ui.show_watch_tab (flat boolean)",
+      "rationale": "Matches the existing ui.* boolean pattern (ui.hide_done, ui.icons, ui.color, ui.theme). A sub-namespace like ui.tabs.watch.enabled is over-engineered for one toggle. If a second per-tab toggle ever ships, we migrate to ui.tabs.<lane>.enabled then — a future-friendly default."
+    },
+    {
+      "area": "Default value",
+      "choice": "false (Watch lane hidden)",
+      "rationale": "Per user requirement. Quiet-by-default is the right posture for a new optional UI surface; opt-in is one toggle away in Settings."
+    },
+    {
+      "area": "Active lane fallback when toggled off while on Watch",
+      "choice": "Switch active lane to Overview",
+      "rationale": "Overview is the default landing lane and is always visible, so it preserves a sane state regardless of which other lanes are also hidden. Other fallbacks (Path, Milestones) are project-context-specific and could land the user in an unexpected lane."
+    },
+    {
+      "area": "Filter location",
+      "choice": "In compute_tab_bar_layout (and any Lane::ordered() consumer that drives tab navigation / hit-test)",
+      "rationale": "A single filter point ensures the tab bar, the hit-test areas, and the prev/next navigation actions all see the same filtered set — otherwise tab clicks, keyboard nav, and the rendered bar could disagree. The Lane enum itself stays unchanged so we don't churn the type or break the `Lane::Watch` pattern matches elsewhere (the lane still exists; it's just filtered out of the user-visible tab surface)."
+    },
+    {
+      "area": "Cross-reference with M197 (mp doctor surface)",
+      "choice": "The `ui.show_watch_tab` toggle (this milestone, M198) is independent of the watch capability check (M197). `mp doctor` will surface both: a watch-capability readiness line (harness config + herdr CLI shape, per M197) and a `ui.show_watch_tab` value line. They are deliberately named distinctly so a user reading the doctor output can tell capability from preference. The M198 toggle does not affect the M197 capability check, and the M197 capability check does not affect whether the M198 toggle is meaningful.",
+      "rationale": "The M198 visibility toggle is a user preference (do I want to see the watch tab?). The M197 readiness check is a capability check (can mp watch spawn right now?). Hiding one behind the other would be misleading: a user who disabled the tab can still successfully run `mp watch` even when doctor shows the M198 line as \"false\". A user who enabled the tab still sees capability issues. The two are orthogonal by design."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "When the Watch lane is hidden, what should the `w` keybind (if any) for direct jump do?",
+      "status": "resolved",
+      "answer": "No-op. The Settings tab is the opt-in path; surprise-toggle-and-jump would violate the 'opt-in only' contract. The keybind stays registered so the user doesn't lose muscle memory when they re-enable the lane."
+    },
+    {
+      "id": "Q-02",
+      "question": "Should `mp doctor` emit a warning when ui.show_watch_tab is true (e.g., 'watch is enabled — this drives background polling, be aware')?",
+      "status": "resolved",
+      "answer": "No warning, just surface the value. Doctor warnings are for misconfigurations (broken paths, version mismatches, missing preconditions), not for user preferences. A future 'ui.usage' surface could carry preference-level hints; not this milestone."
+    },
+    {
+      "id": "Q-03",
+      "question": "Flat key name (ui.show_watch_tab) vs sub-namespace (ui.tabs.watch.enabled)?",
+      "status": "resolved",
+      "answer": "Flat for now, matching the existing ui.* boolean style. If a second per-tab toggle ever ships, migrate to ui.tabs.<lane>.enabled with a config-migrate command — same pattern as any other future config rename."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Config schema + Settings UI entry",
+      "goal": "Add the ui.show_watch_tab config key (bool, default false) in mp's config schema with the same pattern as ui.hide_done. Add a new row in crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS right after ui.hide_done. Surface the value in mp doctor's UI section (read-only, no warning).",
+      "rollback": "Revert the config_cmd.rs changes (remove the show_watch_tab arm). Revert the SETTINGS_KEYS row addition. Revert the doctor surface addition. No data migration needed — the new key has no historical values to preserve."
+    },
+    {
+      "id": "WP2",
+      "name": "Filter Watch lane in tab bar + active-lane fallback",
+      "goal": "Filter the Watch lane out of compute_tab_bar_layout (and any Lane::ordered() consumer that drives tab navigation / hit-test) when ui.show_watch_tab is false. Single filter point so the rendered tab bar, hit-test areas, and prev/next navigation all see the same set. When the user toggles the setting off while the active lane is Watch, switch active lane to Overview (live, no restart). Mirror the same fallback in the partial-commit reload path (M169 reload-keep pattern). The w keybind stays registered but is a no-op when the lane is hidden.",
+      "rollback": "Revert the view_state.rs / lanes.rs filter changes. Revert the active-lane fallback in the toggle handler and the reload path. The w keybind remains a no-op (forward compat — the previous behavior would be a click on a hidden tab, which never rendered)."
+    },
+    {
+      "id": "WP3",
+      "name": "Tests, doctor, and consumer-surface lint",
+      "goal": "Extend crates/mp/tests/suites/config_ui_keys.rs with a ui.show_watch_tab row (default false; set/get round-trip). Add a new TUI test in crates/raul/tests/ that opens the settings tab, toggles ui.show_watch_tab in both directions, and asserts (a) Watch presence in TabBarLayout.visible across narrow/compact/wide, (b) active-lane fallback to Overview. Run the full verification matrix in AC-05 (no regression in m169_rev, tui_settings_automation, m168_settings_grouped, plus consumer-surface-lint clean).",
+      "rollback": "Restore the original config_ui_keys.rs if WP3's changes are isolated. Revert the new TUI test file. No other test files are touched by WP3, so the rollback is file-level only."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add the ui.show_watch_tab key to mp's config schema and the config_cmd.rs get/set arms, following the ui.hide_done pattern. Add a default (false) so a fresh config returns false.",
+      "files": [
+        "crates/mp/src/config_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys/)'",
+      "done_when": "ui.show_watch_tab is a recognized config key; mp config get ui.show_watch_tab returns false on a fresh config; mp config set ui.show_watch_tab true round-trips",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add (\"ui\", \"ui.show_watch_tab\") to crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS right after ui.hide_done. Surface the current value in mp doctor's UI section (read-only, no warning).",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/mp/src/doctor_cmd.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/doctor|settings_/)'",
+      "done_when": "Settings tab shows ui.show_watch_tab in the ui section; doctor surfaces the current value",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Filter the Watch lane out of compute_tab_bar_layout (and any Lane::ordered() consumer that drives tab navigation / hit-test) when ui.show_watch_tab is false. Single filter point so the rendered tab bar, hit-test areas, and prev/next navigation all see the same set.",
+      "files": [
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/lanes.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|tab_bar|lane/)'",
+      "done_when": "With ui.show_watch_tab = false, Lane::Watch is not in TabBarLayout.visible across narrow/compact/wide; with true, it is in wide mode",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "When ui.show_watch_tab transitions to false while the active lane is Watch, switch the active lane to Overview. Apply the same fallback in the partial-commit reload path (M169 reload-keep pattern: if the kept key changes the visible set and the active lane disappears, fall back to Overview).",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/m169_rev|tui_settings/)'",
+      "done_when": "Toggling off while on Watch switches active_lane to Overview; same behavior in the reload-keep path",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Add a new TUI test in crates/raul/tests/ that opens the settings tab, toggles ui.show_watch_tab to true and asserts Lane::Watch appears in TabBarLayout.visible (wide mode), then toggles to false and asserts it disappears; the active-lane fallback to Overview is covered as part of the toggle-off path. Template: crates/raul/tests/m169_rev.rs.",
+      "files": [
+        "crates/raul/tests/"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/m198_watch_tab|watch_tab/)'",
+      "done_when": "New test file passes; asserts hold in both directions",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
