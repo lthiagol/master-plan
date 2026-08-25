@@ -59,14 +59,6 @@ jobs:
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git" \
             homebrew-tap
 
-      - name: Debug verify token
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          echo "token_length=${#HOMEBREW_TAP_TOKEN}"
-          echo "token_prefix=${HOMEBREW_TAP_TOKEN:0:13}"
-          echo "whoami_status=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $HOMEBREW_TAP_TOKEN" https://api.github.com/user)"
-
       - name: Bump master-plan-dev formula
         working-directory: homebrew-tap
         env:
