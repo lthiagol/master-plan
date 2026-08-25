@@ -59,6 +59,31 @@ jobs:
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git" \
             homebrew-tap
 
+      - name: Debug: verify HOMEBREW_TAP_TOKEN
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        # Diagnostic step — print first 13 chars of the secret
+        # (the public `github_pat_` prefix + 3 user-identifying
+        # chars) so we can verify which token the workflow is
+        # reading without leaking the secret value to the logs.
+        # If the prefix shows `github_pat_11AAA` (or similar),
+        # the secret is the fine-grained PAT. If it's empty
+        # or a different prefix, the secret is stale or
+        # misconfigured.
+        run: |
+          TOKEN="$HOMEBREW_TAP_TOKEN"
+          LEN=${#TOKEN}
+          PREFIX="${TOKEN:0:13}"
+          echo "token_length=$LEN"
+          echo "token_prefix=$PREFIX"
+          # Sanity: hit the API with the secret value and
+          # report the HTTP status. If 200, the token works;
+          # if 401, the secret is stale.
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/user)
+          echo "whoami_http_status=$HTTP"
+
       - name: Bump master-plan-dev formula
         working-directory: homebrew-tap
         env:
