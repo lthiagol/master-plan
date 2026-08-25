@@ -40,12 +40,24 @@ jobs:
           echo "date=${DATE}"       >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
-        with:
-          repository: lthiagol/homebrew-tap
-          ref: stable
-          path: homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        # F-tap-1 (2026-08-25 dev-tap-update failure): the prior
+        # implementation used `actions/checkout@v4` with
+        # `ref: stable`, which generated the refspec
+        # `+refs/heads/stable*:refs/remotes/origin/stable*` and
+        # failed with "could not read Username for
+        # 'https://github.com'" on the fetch. The auth header
+        # was set correctly but the refspec glob didn't match
+        # reliably across runner images. Switch to a plain
+        # `git clone --depth 1 --branch stable` with the token
+        # embedded in the URL — explicit, well-tested, and
+        # independent of actions/checkout v4's refspec magic.
+        run: |
+          rm -rf homebrew-tap
+          git clone --depth 1 --branch stable \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git" \
+            homebrew-tap
 
       - name: Bump master-plan-dev formula
         working-directory: homebrew-tap
