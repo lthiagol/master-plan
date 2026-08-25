@@ -107,14 +107,33 @@ pub enum Commands {
         profile: Option<String>,
         #[arg(long)]
         from_repo: bool,
-        #[arg(long)]
+        /// M194: extends to the root `AGENTS.md` too. The
+        /// combination `--force --merge-root-agents` is
+        /// rejected by clap (mutually exclusive — destructive
+        /// vs. additive intent).
+        #[arg(long, conflicts_with = "merge_root_agents")]
         force: bool,
+        /// M194: append the root-AGENTS snippet to an existing
+        /// root `AGENTS.md` instead of warning. Mutually
+        /// exclusive with `--force`.
+        #[arg(long, conflicts_with = "force")]
+        merge_root_agents: bool,
         #[arg(long)]
         with_cursor_skill: bool,
         #[arg(long)]
         with_opencode_skill: bool,
         #[arg(long)]
         skip_root_agents: bool,
+        /// M194: rewrite `master-plan/AGENTS.md` from the current
+        /// binary's embedded template. Skips confirmation when
+        /// `--yes` is also passed. Scope is AGENTS.md only —
+        /// `config.json` / `plan.json` drift is a separate
+        /// doctor check (Q-02 resolution).
+        #[arg(long)]
+        refresh: bool,
+        /// M194: skip the confirmation prompt for `--refresh`.
+        #[arg(long, requires = "refresh")]
+        yes: bool,
     },
     Install {
         #[arg(long, default_value = "opencode", value_delimiter = ',')]

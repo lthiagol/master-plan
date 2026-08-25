@@ -41,7 +41,8 @@ the remediation loop.
 
 > **Pick the smallest artifact first.** One-line bug → `mp track add bugfix …`,
 > not a milestone. Prefer track / idea / backlog over a full milestone when the
-> work is small; see the toolkit `docs/agent-guide/core-principles.md`.
+> work is small; see the toolkit
+> [`docs/agent-guide/core-principles.md`](~/.agents/master-plan/docs/agent-guide/core-principles.md).
 
 | Goal | Approach |
 |------|----------|
@@ -53,5 +54,7 @@ the remediation loop.
 | See status | `mp status` |
 
 Full instructions: [master-plan/AGENTS.md](master-plan/AGENTS.md).
-Command reference: toolkit `docs/mp/commands.md`.
-Agent workflows: toolkit `docs/agent-guide/`.
+Command reference: toolkit
+[`docs/mp/commands.md`](~/.agents/master-plan/docs/mp/commands.md).
+Agent workflows: toolkit
+[`docs/agent-guide/`](~/.agents/master-plan/docs/agent-guide/).

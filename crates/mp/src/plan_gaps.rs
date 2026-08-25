@@ -281,7 +281,7 @@ pub fn decompose_milestone(
     if gaps.ready {
         next_commands = vec![
             format!("mp milestone set-status {norm} in-progress"),
-            format!("mp next --format json"),
+            "mp next --format json".to_string(),
         ];
     }
 

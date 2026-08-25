@@ -14,6 +14,9 @@ mod init_json;
 #[path = "suites/init_plan_dir.rs"]
 mod init_plan_dir;
 
+#[path = "suites/init_refresh.rs"]
+mod init_refresh;
+
 #[path = "suites/init_root_agents.rs"]
 mod init_root_agents;
 
