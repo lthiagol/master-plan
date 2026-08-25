@@ -43,7 +43,7 @@ fn render_to_string(width: u16, height: u16) -> String {
 
 fn render_with_active(active: Lane, width: u16, height: u16) -> String {
     let mut app = App::new();
-    app.select_lane(active.clone());
+    app.select_lane(active);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -412,43 +412,50 @@ fn s4_footer_reflects_content_focus_with_tab_label() {
 
 #[test]
 fn s4_help_overlay_documents_tab_bar_keys_not_sidebar_keys() {
+    // M199: the help overlay is now grouped under `Per-lane` and
+    // `Global` headings. The legacy `Tab bar focused` /
+    // `Content focused` / `Detail actions` / `Milestones / Backlog /
+    // Ideas` section labels are gone, along with their prose
+    // ("Navigate sidebar lanes", "Page Up/Wheel: scroll list").
+    // Tab-bar keys (Previous lane, Next lane) now live in the
+    // Global group (universal bindings, identical on every tab);
+    // the jump-to-lane-1..N row was retired with the M167 focus
+    // toggle and is no longer surfaced in help.
     let mut app = App::new();
     app.toggle_help();
     app.load_milestones(vec![]); // ensure content lane has data, helps render quickly
     let output = render_full(STD_W, STD_H, &mut app);
-    // Help overlay must NOT advertise the dead sidebar bindings as tab-bar binds.
     let lower = output.to_ascii_lowercase();
+
+    // M199: dead sidebar copy stays gone.
     assert!(
         !lower.contains("resize sidebar"),
         "help must not document `[/] resize sidebar`; help output:\n{output}"
     );
     assert!(
-        !output.contains("↑/k  Move up"),
-        "help must not show the legacy `↑/k  Move up` row; help output:\n{output}"
-    );
-    // M124 (M91 ER-1): the legacy "Navigate sidebar lanes" copy must be
-    // gone — the help now lists the canonical key set with Page Up/Down
-    // and mouse-wheel rows.
-    assert!(
         !lower.contains("sidebar lanes"),
         "help must not contain the legacy 'sidebar lanes' navigation copy; help output:\n{output}"
     );
+
+    // M199: the new overlay groups are surfaced. Both Per-lane
+    // and Global headings must appear; the Global group must
+    // include the tab-bar bindings (Previous lane, Next lane)
+    // and the universal selection / move keys.
     assert!(
-        output.contains("Page Up") || output.contains("Page up") || output.contains("PgUp"),
-        "help must document Page Up/Down (M124/M91 ER-1); help output:\n{output}"
+        output.contains("Per-lane") && output.contains("Global"),
+        "help must show M199 group headings; help output:\n{output}"
     );
     assert!(
-        output.contains("Wheel") || output.contains("wheel"),
-        "help must document mouse-wheel scrolling (M124/M91 ER-1); help output:\n{output}"
-    );
-    // Help MUST document the new tab-bar binds.
-    assert!(
-        output.contains("Tab bar focused") && output.contains("Previous lane"),
-        "help must show the new tab-bar section; help output:\n{output}"
+        output.contains("Previous lane"),
+        "help must document Previous lane (M199 global group); help output:\n{output}"
     );
     assert!(
-        output.contains(&format!("1..{}", Lane::ordered().len())),
-        "help must document 1..N jump keys (N follows lane count); help output:\n{output}"
+        output.contains("Next lane"),
+        "help must document Next lane (M199 global group); help output:\n{output}"
+    );
+    assert!(
+        output.contains("Select / drill in"),
+        "help must document the Enter binding in the global group; help output:\n{output}"
     );
 }
 
@@ -463,7 +470,7 @@ fn s4_tab_toggles_focus_through_dispatch() {
     use crossterm::event::KeyCode;
     use raul::tui::action::Action;
     let app = App::new();
-    let before = app.active_lane.clone();
+    let before = app.active_lane;
     let action = raul::tui::modes::normal::handle_key(
         KeyEvent::new(KeyCode::Tab, crossterm::event::KeyModifiers::NONE),
         &app,

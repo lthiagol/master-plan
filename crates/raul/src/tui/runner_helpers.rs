@@ -506,7 +506,7 @@ pub fn persist_sort_rebind_choice(runner: &MpRunner, app: &mut App) -> Result<()
         app.cancel_sort_rebind();
         return Ok(());
     };
-    let lane = app.active_lane.clone();
+    let lane = app.active_lane;
     let lane_key = match_lane_label(&lane);
     let value = key.label();
     let config_key = format!("sort.{lane_key}");

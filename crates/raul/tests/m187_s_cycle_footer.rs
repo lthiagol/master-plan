@@ -121,7 +121,12 @@ fn title_sort_is_alphabetical_case_insensitive() {
     assert_eq!(titles, vec!["Alpha", "beta", "gamma"]);
 }
 
-/// #1 + #2: footer layout — per-tab on top, globals on bottom, both centered.
+/// #1 + #2: footer layout — M199 flip puts globals on top, per-tab
+/// on bottom, both centered. The per-tab row is sourced from
+/// `Keybinds::footer_per_tab`, so it now carries the lane-specific
+/// filter / search / hide-done / sort / cycle / annotate tokens
+/// (the lane-conditional items that the M187 globals row claimed
+/// but didn't actually fire on every tab).
 #[test]
 fn footer_flips_lines_and_centers() {
     let mut app = App::new();
@@ -137,20 +142,20 @@ fn footer_flips_lines_and_centers() {
         .unwrap();
     let buf = terminal.backend().buffer();
     let h = buf.area().height;
-    let mut per_tab_row = String::new();
     let mut globals_row = String::new();
+    let mut per_tab_row = String::new();
     for x in 0..buf.area().width {
-        per_tab_row.push_str(buf[(x, h - 2)].symbol());
-        globals_row.push_str(buf[(x, h - 1)].symbol());
+        globals_row.push_str(buf[(x, h - 2)].symbol());
+        per_tab_row.push_str(buf[(x, h - 1)].symbol());
     }
-    // Per-tab on top, globals on bottom.
-    assert!(
-        per_tab_row.contains(":move") && per_tab_row.contains(":select"),
-        "per-tab (top) must carry list keys; got {per_tab_row:?}"
-    );
+    // M199: globals on top (h-2), per-tab on bottom (h-1).
     assert!(
         globals_row.contains(":quit") && globals_row.contains(":help"),
-        "globals (bottom) must carry quit/help; got {globals_row:?}"
+        "globals (top) must carry quit/help; got {globals_row:?}"
+    );
+    assert!(
+        per_tab_row.contains(":filter") && per_tab_row.contains(":search"),
+        "per-tab (bottom) must carry lane-specific list keys (filter/search); got {per_tab_row:?}"
     );
 
     // Centering: globals line must not start at column 0 (some leading

@@ -30,7 +30,7 @@ fn all_lanes_are_selectable() {
 
     let mut app = App::new();
     for lane in &lanes {
-        app.select_lane(lane.clone());
+        app.select_lane(*lane);
         assert_eq!(app.active_lane, *lane);
         assert_eq!(app.content, ContentState::List);
     }

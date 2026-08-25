@@ -130,7 +130,7 @@ fn lifecycle_filter_flash_on_non_milestones() {
     let r = MpRunner::new().unwrap();
     for lane in [Lane::Backlog, Lane::Ideas, Lane::Path, Lane::Settings] {
         let mut app = App::new();
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         apply_action(&mut app, &r, Action::OpenLifecycleFilter).unwrap();
         assert!(
             app.flash_message.is_some(),

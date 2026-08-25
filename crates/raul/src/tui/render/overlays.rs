@@ -226,110 +226,80 @@ pub(super) fn render_co_approval(frame: &mut Frame, app: &App, view: &ViewState,
 }
 
 pub(super) fn render_help_overlay(frame: &mut Frame, app: &App, overlay_area: Rect) {
-    // M138: the help overlay is generated from `app.keybinds` — the same
-    // struct the dispatcher resolves against — so the legend can never drift
-    // from the actual bindings, and a user rebind shows up here for free.
-    // Section headers are static labels; every *key* comes from the bindings.
+    // M199: the help overlay mirrors the footer's two-row split —
+    // Per-lane (active lane's keys) shown first per Q-03
+    // (contextual-first), then Global (the six universal bindings).
+    // Both groups are generated from `app.keybinds` so the legend
+    // can never drift from the actual dispatcher.
     let accent = Style::default()
         .fg(app.effective_palette().accent)
         .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(app.effective_palette().dim);
 
-    // Look up an action's formatted keys by its help label.
-    let entries = app.keybinds.help_entries();
-    let k = |label: &str| -> String {
-        entries
-            .iter()
-            .find(|e| e.label == label)
-            .map(|e| e.keys_display())
-            .unwrap_or_default()
-    };
+    let (global, per_lane) = app
+        .keybinds
+        .help_entries_grouped(app.active_lane, app.content);
 
-    let mut help_lines: Vec<Line> = vec![
-        Line::from(vec![Span::styled(" Keyboard Shortcuts ", accent)]),
-        Line::from(""),
-        Line::from(vec![Span::styled(" Tab bar focused", accent)]),
-        Line::from(format!(
-            "  Previous lane {}    Next lane {}",
-            k("Previous lane"),
-            k("Next lane")
-        )),
-        Line::from(format!(
-            "  Jump to lane 1..{}    Focus content {}",
-            crate::tui::app::Lane::ordered().len(),
-            k("Focus content")
-        )),
-        Line::from(format!("  Toggle tab focus {}", k("Toggle tab focus"))),
-        Line::from(""),
-        Line::from(vec![Span::styled(" Content focused", accent)]),
-        Line::from(format!(
-            "  Move up {}    Move down {}",
-            k("Move up"),
-            k("Move down")
-        )),
-        Line::from(format!(
-            "  Page up {} / Page down {}    Wheel: scroll list",
-            k("Page up"),
-            k("Page down")
-        )),
-        Line::from(format!(
-            "  Select / drill in {}    Go back {}",
-            k("Select / drill in"),
-            k("Go back")
-        )),
-        Line::from(format!(
-            "  Toggle filter (annotations) {}   Toggle hide-done {}   Help {}",
-            k("Toggle filter (annotations; lowercase f)"),
-            k("Toggle hide-done"),
-            k("Help")
-        )),
-        Line::from(""),
-        // M185 F-01 + M186 F-01: Milestones/Backlog/Ideas section.
-        Line::from(vec![Span::styled(" Milestones / Backlog / Ideas", accent)]),
-        Line::from(format!(
-            "  Lifecycle filter {} (capital F)   Grooming preset {}",
-            k("Lifecycle filter (Milestones; capital F)"),
-            k("Grooming preset (Milestones)")
-        )),
-        Line::from(format!(
-            "  Search {}   Cycle sort {}",
-            k("Search (Milestones/Backlog/Ideas)"),
-            k("Cycle sort key (Milestones/Backlog/Ideas)")
-        )),
-        Line::from(
-            "  Note: lowercase f toggles annotation open-only; capital F opens lifecycle filter."
-                .to_string(),
-        ),
-        Line::from(""),
-        Line::from(vec![Span::styled(" Detail actions", accent)]),
-        Line::from(format!(
-            "  Create annotation {}   Resolve {}   Reopen {}",
-            k("Create annotation"),
-            k("Resolve annotation"),
-            k("Reopen annotation")
-        )),
-        Line::from(format!(
-            "  Approve {}   Review menu {}   Quit {}",
-            k("Approve / request"),
-            k("Review menu"),
-            k("Quit")
-        )),
-    ];
-
+    // "Last action details" is a separate concern from the keyboard
+    // legend — when the dispatcher set `last_action_error`, the
+    // overlay surfaces the message text instead. (Preserved from
+    // pre-M199 behavior.)
     if let Some(ref err) = app.last_action_error {
-        help_lines = vec![
+        let mut help_lines: Vec<Line> = vec![
             Line::from(vec![Span::styled(" Last action details ", accent)]),
             Line::from(""),
         ];
         for raw_line in err.lines() {
             help_lines.push(Line::from(format!("  {raw_line}")));
         }
+        let paragraph = Paragraph::new(help_lines)
+            .block(Block::default().borders(Borders::ALL).title(" Help "))
+            .style(Style::default().fg(app.effective_palette().foreground))
+            .wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(paragraph, overlay_area);
+        return;
     }
 
-    // M135 F-03: overlay_area is the pre-computed `view.overlay_rect`
-    // (single source of truth from `compute_view`).
-    // M167: drop the DarkGray backdrop and `BorderType::Double` so the
-    // Help overlay blends with the rest of the TUI chrome (milestone
-    // detail + standard panels use plain borders, no fill).
+    let lane_label = app.active_lane.label();
+    let mut help_lines: Vec<Line> = vec![
+        Line::from(vec![Span::styled(" Keyboard Shortcuts ", accent)]),
+        Line::from(""),
+        // Per-lane group first per Q-03. When the active lane has
+        // no per-tab keys (Path, Watch), show a single placeholder
+        // line so the section is still visually present and the
+        // user learns the empty state is normal.
+        Line::from(vec![Span::styled(
+            format!(" Per-lane ({lane_label})"),
+            accent,
+        )]),
+    ];
+    if per_lane.is_empty() {
+        help_lines.push(Line::from(Span::styled(
+            "  (no lane-specific keys — see Global)",
+            dim,
+        )));
+    } else {
+        // Render the per-lane group as one line per entry — the
+        // overlay is small and one-line-per-entry keeps the keys
+        // scannable. The label is human-readable; the keys come
+        // from `Keybinds::footer_per_tab` so the overlay and the
+        // footer can never drift.
+        for (label, keys) in &per_lane {
+            help_lines.push(Line::from(format!("  {} {}", keys.join(", "), label)));
+        }
+    }
+    help_lines.push(Line::from(""));
+    help_lines.push(Line::from(vec![Span::styled(" Global", accent)]));
+    // Render the global group one entry per line, mirroring the
+    // per-lane layout for visual consistency.
+    for entry in &global {
+        help_lines.push(Line::from(format!(
+            "  {} {}",
+            entry.keys_display(),
+            entry.label
+        )));
+    }
+
     let paragraph = Paragraph::new(help_lines)
         .block(Block::default().borders(Borders::ALL).title(" Help "))
         .style(Style::default().fg(app.effective_palette().foreground))
@@ -776,7 +746,7 @@ pub(super) fn render_sort_rebind_overlay(frame: &mut Frame, app: &App, overlay_a
         return;
     }
     let palette = app.effective_palette();
-    let current_for_lane = app.lane_sort_key(app.active_lane.clone());
+    let current_for_lane = app.lane_sort_key(app.active_lane);
     let mut items: Vec<ListItem> = Vec::new();
     for (i, k) in keys.iter().enumerate() {
         let is_active_sort = *k == current_for_lane;

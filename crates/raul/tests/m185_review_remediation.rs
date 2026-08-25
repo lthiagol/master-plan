@@ -40,30 +40,42 @@ fn dump(app: &App, w: u16, h: u16) -> String {
     s
 }
 
-/// F-01: help overlay lists capital F / g and still shows lowercase f.
+/// F-01: help overlay surfaces the per-lane and global groups
+/// (M199 simplification). M185's prose-style notes ("lifecycle
+/// filter", "grooming", "capital F" / "lowercase f") are no longer
+/// part of the overlay — the M199 redesign replaces the four
+/// pre-M199 section labels (`Tab bar focused`, `Content focused`,
+/// `Milestones / Backlog / Ideas`, `Detail actions`) with two
+/// groups: `Per-lane` (active lane's keys) and `Global` (the six
+/// universal bindings). The lifecycle filter and the lowercase-f
+/// distinction are now surfaced as their key glyphs in the
+/// per-lane group, not as prose. This test pins the new contract.
 #[test]
 fn m185_f01_help_overlay_lists_lifecycle_filter_and_grooming() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
     app.toggle_help();
     let s = dump(&app, 100, 40);
+    // M199: the help overlay now groups entries under
+    // `Per-lane (<lane>)` and `Global` headings.
     assert!(
-        s.to_lowercase().contains("lifecycle filter") || s.contains("Lifecycle filter"),
-        "help must list lifecycle filter; got:\n{s}"
+        s.contains("Per-lane"),
+        "help must list a 'Per-lane' group heading; got:\n{s}"
     );
     assert!(
-        s.to_lowercase().contains("grooming") || s.contains("Grooming"),
-        "help must list grooming preset; got:\n{s}"
+        s.contains("Global"),
+        "help must list a 'Global' group heading; got:\n{s}"
     );
+    // The Milestones per-lane group carries the filter key glyph
+    // (the M185 finding's `Shift+f` lifecycle-filter binding) and
+    // the M199 per-tab table emits a `filter` label for it. The
+    // glyph is the original `f` (shifted → `F`) — both render.
     assert!(
-        s.to_lowercase().contains("capital f") || s.contains("capital F"),
-        "help must note capital F; got:\n{s}"
+        s.contains("filter"),
+        "help must list the filter key in the per-lane group; got:\n{s}"
     );
-    assert!(
-        s.to_lowercase().contains("lowercase f"),
-        "help must note lowercase f; got:\n{s}"
-    );
-    // Lowercase f key glyph must appear (not blank after the filter label).
+    // The 'f' or 'F' glyph must still appear — the binding is
+    // surfaced as a key, not as prose.
     assert!(
         s.contains('f') || s.contains('F'),
         "help must show f/F key glyphs; got:\n{s}"

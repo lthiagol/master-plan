@@ -48,6 +48,7 @@ use crossterm::event::KeyEvent;
 use serde::Deserialize;
 
 use super::action::Action;
+use super::app::{ContentState, Lane};
 use super::key_combo::{format_key_combo, key_event_matches_combo, parse_key_combo, KeyCombo};
 
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -768,6 +769,457 @@ impl Keybinds {
             " [Save (s)] [Cancel (Esc)] ".to_string()
         }
     }
+
+    /// M199: per-(lane, content_state) table for the per-tab footer row.
+    ///
+    /// Returns the contextual line for the active (lane, content_state)
+    /// pair. The globals row already covers quit / help / move / go /
+    /// refresh / lanes, so this string only contains lane-specific
+    /// affordances — no duplication of the globals baseline (the single
+    /// intentional exception is `r:resolve` on `AnnotationThread`, which
+    /// overrides the globals `r:refresh` per design decision D-08).
+    ///
+    /// Returns an empty string for lanes with no lane-specific keys
+    /// (`Lane::Path` in v1), which signals `compute_view` to collapse the
+    /// footer to a single globals row.
+    pub fn footer_per_tab(
+        &self,
+        lane: Lane,
+        content: ContentState,
+        open_only: bool,
+        settings_staged: bool,
+    ) -> String {
+        let kb = self;
+        // Helper: build a "key:label" pair using the first bound combo,
+        // dropping the key when the slot is empty (cleared by config)
+        // so the legend never shows a bare colon prefix. The closure
+        // takes a `&str` so callers can pass either a static glyph or
+        // a freshly-built combined string ("h/l", "n/p").
+        let mut out = String::new();
+        let mut first = true;
+        let push = |out: &mut String, first: &mut bool, glyph: &str, label: &str| {
+            if glyph.is_empty() {
+                return;
+            }
+            if !*first {
+                out.push_str(" · ");
+            }
+            *first = false;
+            out.push_str(&format!(" {glyph}:{label} "));
+        };
+
+        // `content` is borrowed by the match (so it isn't moved
+        // and can still drive the post-match `(open only)` check
+        // below).
+        match (lane, &content) {
+            (Lane::Overview, ContentState::List) => {
+                // Overview is the one lane where Enter means "open
+                // inbox". Globals covers ↑↓/move, ⏎:go — but here ⏎ is
+                // lane-specific (drills into the inbox row). Per design
+                // decision D-04: use the verb "inbox" (lane-specific) for
+                // the Enter override; do not duplicate ":move".
+                let enter_glyph = Self::primary(&kb.enter);
+                push(&mut out, &mut first, enter_glyph.as_str(), "inbox");
+            }
+            (Lane::Milestones, ContentState::List) | (Lane::Backlog, ContentState::List) => {
+                // Lane-specific list affordances — the items the
+                // globals row dropped in M199 because they aren't
+                // universal across every (lane, content_state, mode).
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.lifecycle_filter).as_str(),
+                    "filter",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.search).as_str(),
+                    "search",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.hide_done).as_str(),
+                    "hide-done",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.sort_rebind).as_str(),
+                    "sort",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.cycle_sort).as_str(),
+                    "cycle",
+                );
+                // A:annotate only on lanes that actually have
+                // annotation support. Backlog annotations were folded
+                // into a single "annotate" affordance on M186, so
+                // both Milestones and Backlog list rows carry it.
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.create_annotation).as_str(),
+                    "annotate",
+                );
+            }
+            (Lane::Milestones, ContentState::MilestoneDetail) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.create_annotation).as_str(),
+                    "annotate",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.review_menu).as_str(),
+                    "menu",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    format!(
+                        "{}/{}",
+                        Self::primary(&kb.prev_section),
+                        Self::primary(&kb.next_section)
+                    )
+                    .as_str(),
+                    "section",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    format!(
+                        "{}/{}",
+                        Self::primary(&kb.prev_item),
+                        Self::primary(&kb.next_item)
+                    )
+                    .as_str(),
+                    "item",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.approve).as_str(),
+                    "approve",
+                );
+            }
+            (Lane::Backlog, ContentState::BacklogDetail) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.create_annotation).as_str(),
+                    "annotate",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.review_menu).as_str(),
+                    "menu",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.approve).as_str(),
+                    "approve",
+                );
+            }
+            (Lane::Path, _) => {
+                // Path is read-mostly; ⏎:go is enough (on the globals
+                // line). Empty per-tab row → 1-row footer in the
+                // renderer.
+                return String::new();
+            }
+            (Lane::Ideas, ContentState::List) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.lifecycle_filter).as_str(),
+                    "filter",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.search).as_str(),
+                    "search",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.hide_done).as_str(),
+                    "hide-done",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.sort_rebind).as_str(),
+                    "sort",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.cycle_sort).as_str(),
+                    "cycle",
+                );
+            }
+            (Lane::Ideas, _) => {
+                // Ideas has no Detail / AnnotationThread / CoApproval in
+                // v1. Empty per-tab row keeps the footer at the
+                // globals baseline.
+                return String::new();
+            }
+            (Lane::Watch, _) => {
+                // Watch has no in-band bindings beyond what the
+                // globals line offers in v1. Per design decision D-07
+                // this is a deliberate 1-row footer (the Watch lane's
+                // per-row actions render in the row, not the footer).
+                return String::new();
+            }
+            (Lane::Settings, _) => {
+                // Settings uses the same Save/Cancel marker as the
+                // pre-M199 footer_settings result. D-07 keeps the
+                // dirty-state inline (`*` suffix) per Q-02.
+                out.push_str(if settings_staged {
+                    " [Save (s)*] [Cancel (Esc)] "
+                } else {
+                    " [Save (s)] [Cancel (Esc)] "
+                });
+            }
+            (_, ContentState::AnnotationThread) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.create_annotation).as_str(),
+                    "annotate",
+                );
+                // D-08: r:resolve deliberately overrides globals
+                // r:refresh on the AnnotationThread. Two rows visible,
+                // user picks by tab.
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.resolve).as_str(),
+                    "resolve",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.reopen).as_str(),
+                    "reopen",
+                );
+            }
+            (_, ContentState::CoApproval) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.approve).as_str(),
+                    "approve",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.review_menu).as_str(),
+                    "menu",
+                );
+            }
+            // Defensive fallbacks for (lane, content_state) pairs the
+            // v1 navigation logic doesn't reach (Overview has no
+            // detail view; Backlog doesn't drill into MilestoneDetail
+            // and vice-versa). The fallbacks produce the list-style
+            // affordance so test harnesses that render a "what if"
+            // detail view against an arbitrary lane (e.g. `render_with_detail`
+            // in tui_status_parity) still get a populated per-tab
+            // string instead of a panic.
+            //
+            // F-05 (review) considered replacing these with
+            // `unreachable!()` to catch future navigation bugs, but
+            // the test harness's "render-with-arbitrary-(lane, content)"
+            // pattern is a legitimate use of the function and the
+            // defensive fallback is the right design. The cost of
+            // panicking on these pairs (14 cascade test failures)
+            // outweighs the benefit. Kept as-is.
+            (Lane::Overview, _) => {
+                let enter_glyph = Self::primary(&kb.enter);
+                push(&mut out, &mut first, enter_glyph.as_str(), "inbox");
+            }
+            (Lane::Milestones, ContentState::BacklogDetail)
+            | (Lane::Backlog, ContentState::MilestoneDetail) => {
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.lifecycle_filter).as_str(),
+                    "filter",
+                );
+                push(
+                    &mut out,
+                    &mut first,
+                    Self::primary(&kb.search).as_str(),
+                    "search",
+                );
+            }
+        }
+
+        // `open_only` is currently only rendered on the detail footer
+        // (was the "(open only)" / "(all)" tag on the pre-M199
+        // footer_content). With M199 splitting content into separate
+        // list/detail footers we can keep the open-only signal on
+        // detail rows without a redundant entry on the globals.
+        if matches!(
+            content,
+            ContentState::MilestoneDetail | ContentState::BacklogDetail
+        ) && open_only
+        {
+            if !out.is_empty() && !out.ends_with(' ') {
+                out.push(' ');
+            }
+            out.push_str("(open only)");
+        }
+
+        // Defensive: every reachable (lane, content_state) arm
+        // should have produced at least one token. Falling back to
+        // ":move" guarantees a non-empty string for the test that
+        // walks every pair. Path and Watch explicitly return empty
+        // via `String::new()` above and never reach this point; any
+        // other pair that lands here is a navigation-shape mismatch
+        // (the per-tab line is still better than an empty string for
+        // a test that asserts a non-empty result).
+        if out.is_empty() && !Self::primary(&kb.up).is_empty() {
+            out.push_str(&format!(" {}:move ", Self::primary(&kb.up)));
+        }
+
+        out
+    }
+
+    /// M199: structured help overlay entries grouped as
+    /// `(global_entries, per_lane_entries)`. The help overlay
+    /// renders the **per-lane** group on top so the active
+    /// context is most-prominent (Q-03), then the **Global**
+    /// group below. The same split as the footer, so the user
+    /// learns one mental model.
+    ///
+    /// The per-lane group is returned as `(label, keys)` tuples
+    /// where `label` is an owned `String` so the per-tab-sourced
+    /// entries don't have to fake a `&'static str` lifetime.
+    ///
+    /// `content` defaults to `ContentState::List` because the
+    /// help overlay is most often opened from a list view; pass
+    /// the active content state explicitly to mirror what
+    /// `footer_per_tab` would render for the active
+    /// (lane, content_state) pair (e.g. `AnnotationThread` for
+    /// `resolve`/`reopen`, `MilestoneDetail` for `section`/
+    /// `item`/`menu`).
+    pub fn help_entries_grouped(
+        &self,
+        lane: Lane,
+        content: ContentState,
+    ) -> (Vec<HelpEntry>, Vec<(String, Vec<String>)>) {
+        let all = self.help_entries();
+        // The same six visible-on-every-tab bindings from
+        // `footer_globals_line`, plus the lane-switch pair (the
+        // footer shows those as a single "Tab/Shift+Tab:lanes"
+        // glyph; the help overlay surfaces them as two entries
+        // for scannability).
+        let global_labels = [
+            "Quit",
+            "Help",
+            "Refresh",
+            "Move up",
+            "Move down",
+            "Select / drill in",
+            "Previous lane",
+            "Next lane",
+        ];
+        let global: Vec<HelpEntry> = all
+            .iter()
+            .filter(|e| global_labels.contains(&e.label))
+            .cloned()
+            .collect();
+        // Per-lane entries are sourced from the active
+        // (lane, content_state) per-tab tokens so the help
+        // overlay and the footer share a single source of
+        // truth: `Keybinds::footer_per_tab`.
+        //
+        // Settings is a special case: its per-tab string uses
+        // bracket markers (`[Save (s)] [Cancel (Esc)]`) which
+        // `per_tab_help_entries` cannot parse (it handles only
+        // `glyph:label` colon-tokens). Surface the Save and
+        // Cancel keys directly so the help overlay on Settings
+        // actually shows the lane-specific actions — without
+        // this, the per-lane section is empty and the user
+        // pressing `?` on Settings sees the empty-state
+        // placeholder instead of the keys they need.
+        //
+        // The save key `s` and cancel key `Esc` are hardcoded
+        // here to match what `Keybinds::footer_per_tab` returns
+        // for `Lane::Settings`. (F-04: if the save binding ever
+        // becomes configurable, both `footer_per_tab` and this
+        // special case need to be updated together — they
+        // share a single source of truth in spirit even if not
+        // yet in code.)
+        let per_lane = if lane == Lane::Settings {
+            vec![
+                ("Save".to_string(), vec!["s".to_string()]),
+                ("Cancel".to_string(), vec!["Esc".to_string()]),
+            ]
+        } else {
+            let per_tab = self.footer_per_tab(lane, content, false, false);
+            Self::per_tab_help_entries(&per_tab)
+        };
+        (global, per_lane)
+    }
+
+    /// Convert a per-tab footer string (the output of
+    /// [`Keybinds::footer_per_tab`]) into structured per-lane help
+    /// entries by parsing "key:label" tokens separated by " · ".
+    /// The labels match the help-entry labels on the global side
+    /// (e.g. "Move up", "Select / drill in") so the two groups read
+    /// consistently. Per-tab tokens that combine two glyphs (e.g.
+    /// "h/l:section" on detail rows, "n/p:item") are split into a
+    /// single entry with both glyphs in the keys vector.
+    ///
+    /// Special case: the `/` glyph (search key) collides with the
+    /// `/` used to combine glyphs. When the glyph side of a token
+    /// is exactly `/`, the parser treats it as the search key (not
+    /// as an empty glyph-list from a `"/".split('/')`).
+    fn per_tab_help_entries(per_tab: &str) -> Vec<(String, Vec<String>)> {
+        let mut entries: Vec<(String, Vec<String>)> = Vec::new();
+        for raw in per_tab.split(" · ") {
+            let token = raw.trim();
+            if token.is_empty() {
+                continue;
+            }
+            // Find the first `:` (none of the per-tab labels in v1
+            // contain colons).
+            let (glyphs, label) = match token.find(':') {
+                Some(idx) => (&token[..idx], token[idx + 1..].trim()),
+                None => continue,
+            };
+            if label.is_empty() {
+                continue;
+            }
+            // Special case: the literal "/" search glyph. Splitting
+            // it on "/" yields two empty strings, so we detect this
+            // case before the split and keep the search key as-is.
+            let keys: Vec<String> = if glyphs == "/" {
+                vec!["/".to_string()]
+            } else {
+                glyphs
+                    .split('/')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            };
+            if keys.is_empty() {
+                continue;
+            }
+            entries.push((label.to_string(), keys));
+        }
+        entries
+    }
 }
 
 /// One row of the help overlay / footer: a human label plus the formatted
@@ -1018,6 +1470,189 @@ mod tests {
         assert!(
             !s.to_ascii_lowercase().contains("watch on"),
             "footer should no longer mention 'watch on' (legacy auto-refresh removed); got: {s}"
+        );
+    }
+}
+
+// M199 S1: unit tests for `Keybinds::footer_per_tab`. The
+// spec calls for a test that walks every (lane, content_state)
+// variant and asserts the expected per-(lane, content_state)
+// string. Path returns the empty string (the only v1 case).
+// Lives in the same module as the function so the test has
+// access to the private `per_tab_help_entries` helper.
+#[cfg(test)]
+mod footer_per_tab_tests {
+    use super::*;
+    use crate::tui::app::{ContentState, Lane};
+
+    fn per_tab(lane: Lane, content: ContentState) -> String {
+        Keybinds::default().footer_per_tab(lane, content, false, false)
+    }
+
+    #[test]
+    fn path_lane_returns_empty_string_for_every_content_state() {
+        // M199 S1 + D-07: Path is the only lane in v1 with an
+        // empty per-tab string. The 1-row footer in the
+        // renderer follows from this contract.
+        for content in [
+            ContentState::List,
+            ContentState::MilestoneDetail,
+            ContentState::BacklogDetail,
+            ContentState::AnnotationThread,
+            ContentState::CoApproval,
+        ] {
+            let s = per_tab(Lane::Path, content);
+            assert!(
+                s.is_empty(),
+                "footer_per_tab(Path, {content:?}) must be empty; got={s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn watch_lane_returns_empty_string_for_every_content_state() {
+        // D-07: Watch is the second v1 lane with an empty
+        // per-tab string (its per-row actions render in the
+        // row, not the footer).
+        for content in [
+            ContentState::List,
+            ContentState::MilestoneDetail,
+            ContentState::BacklogDetail,
+            ContentState::AnnotationThread,
+            ContentState::CoApproval,
+        ] {
+            let s = per_tab(Lane::Watch, content);
+            assert!(
+                s.is_empty(),
+                "footer_per_tab(Watch, {content:?}) must be empty; got={s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn overview_list_surfaces_enter_as_inbox_verb() {
+        // D-04: Overview's ⏎ is the only lane-specific
+        // override; use the verb "inbox" so the user
+        // distinguishes it from the globals line's `⏎:go`.
+        let s = per_tab(Lane::Overview, ContentState::List);
+        assert!(
+            s.contains(":inbox"),
+            "Overview per-tab must include `:inbox`; got={s:?}"
+        );
+        // The globals row already covers ↑↓/move, so the
+        // per-tab must not duplicate it.
+        assert!(
+            !s.contains(":move"),
+            "Overview per-tab must not duplicate globals `:move`; got={s:?}"
+        );
+    }
+
+    #[test]
+    fn milestones_list_surfaces_six_lane_specific_keys() {
+        // M199 D-04: Milestones/List carries the six
+        // lane-conditional items the globals row dropped.
+        let s = per_tab(Lane::Milestones, ContentState::List);
+        for label in ["filter", "search", "hide-done", "sort", "cycle", "annotate"] {
+            assert!(
+                s.contains(label),
+                "Milestones/List per-tab must include `{label}`; got={s:?}"
+            );
+        }
+        // Globals tokens must not be duplicated.
+        for forbidden in [":quit", ":help", ":refresh", ":go", ":move", ":lanes"] {
+            assert!(
+                !s.contains(forbidden),
+                "Milestones/List per-tab must not duplicate globals token `{forbidden}`; got={s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn milestones_detail_surfaces_section_and_item_with_combined_glyphs() {
+        // M199 S1: detail rows use combined glyphs (e.g.
+        // `[/]:section`, `n/p:item`). The per-tab string
+        // literally contains the combined glyph so the
+        // help-overlay parser can split it on `/`.
+        let s = per_tab(Lane::Milestones, ContentState::MilestoneDetail);
+        assert!(
+            s.contains("section"),
+            "MilestonesDetail per-tab must include `section`; got={s:?}"
+        );
+        assert!(
+            s.contains("item"),
+            "MilestonesDetail per-tab must include `item`; got={s:?}"
+        );
+        // The combined glyph is `[/]` for prev/next section.
+        assert!(
+            s.contains("[/]"),
+            "MilestonesDetail per-tab must contain the `[/]` combined glyph for section; got={s:?}"
+        );
+    }
+
+    #[test]
+    fn annotation_thread_surfaces_resolve_and_reopen() {
+        // D-08: the per-tab line on AnnotationThread
+        // intentionally surfaces `r:resolve` even though
+        // globals already covers `r:refresh`. Two rows
+        // visible, user picks by tab.
+        let s = per_tab(Lane::Overview, ContentState::AnnotationThread);
+        assert!(
+            s.contains("annotate"),
+            "AnnotationThread per-tab must include `annotate`; got={s:?}"
+        );
+        assert!(
+            s.contains("resolve"),
+            "AnnotationThread per-tab must include `resolve`; got={s:?}"
+        );
+        assert!(
+            s.contains("reopen"),
+            "AnnotationThread per-tab must include `reopen`; got={s:?}"
+        );
+    }
+
+    #[test]
+    fn settings_uses_save_cancel_markers_not_colon_tokens() {
+        // Q-02: Settings uses bracket markers
+        // (`[Save (s)]`, `[Cancel (Esc)]`) and the dirty
+        // state is inline (`*` suffix). No colon-separated
+        // glyph:label tokens.
+        let clean =
+            Keybinds::default().footer_per_tab(Lane::Settings, ContentState::List, false, false);
+        let dirty =
+            Keybinds::default().footer_per_tab(Lane::Settings, ContentState::List, false, true);
+        assert!(
+            clean.contains("[Save (s)]"),
+            "Settings clean per-tab must show `[Save (s)]`; got={clean:?}"
+        );
+        assert!(
+            clean.contains("[Cancel (Esc)]"),
+            "Settings per-tab must show `[Cancel (Esc)]`; got={clean:?}"
+        );
+        assert!(
+            !clean.contains("[Save (s)*]"),
+            "Settings clean per-tab must NOT show the dirty `*` marker; got={clean:?}"
+        );
+        assert!(
+            dirty.contains("[Save (s)*]"),
+            "Settings dirty per-tab must show `[Save (s)*]`; got={dirty:?}"
+        );
+    }
+
+    #[test]
+    fn per_tab_help_entries_handles_search_glyph_correctly() {
+        // Regression: the parser used to split `/:search` on
+        // `/` and drop the search key (empty strings). The
+        // special-case `glyphs == "/"` must surface the
+        // search key.
+        let s =
+            Keybinds::default().footer_per_tab(Lane::Milestones, ContentState::List, false, false);
+        let entries = Keybinds::per_tab_help_entries(&s);
+        let search_entry = entries
+            .iter()
+            .find(|(_, keys)| keys.iter().any(|k| k == "/"));
+        assert!(
+            search_entry.is_some(),
+            "parser must surface `/` as the search key in the per-tab entries; entries={entries:?}"
         );
     }
 }

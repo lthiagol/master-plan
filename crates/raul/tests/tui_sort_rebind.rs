@@ -106,7 +106,7 @@ fn tui_sort_rebind_unsupported_lane_rejects_open() {
     let unsupported = [Lane::Path, Lane::Overview, Lane::Settings];
     for lane in &unsupported {
         let mut app = App::new();
-        app.select_lane(lane.clone());
+        app.select_lane(*lane);
         app.open_sort_rebind();
         assert!(
             !app.sort_rebind_open(),

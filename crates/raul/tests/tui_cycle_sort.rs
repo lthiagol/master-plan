@@ -30,9 +30,9 @@ fn o_is_noop_on_overview_path_watch_settings() {
     let mut app = App::new();
     let r = MpRunner::new().expect("mp");
     for lane in [Lane::Overview, Lane::Path, Lane::Watch, Lane::Settings] {
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
         // sort key on these lanes is always Id (no sort menu).
-        assert_eq!(app.lane_sort_key(lane.clone()), SortKey::Id);
+        assert_eq!(app.lane_sort_key(lane), SortKey::Id);
     }
 }

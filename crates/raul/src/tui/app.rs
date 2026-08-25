@@ -22,7 +22,7 @@ pub struct PreflightGate {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Lane {
     Overview,
     Milestones,
@@ -250,7 +250,7 @@ pub struct DetailMeasurementCache {
     pub max_scroll: u16,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentState {
     List,
     MilestoneDetail,
@@ -1108,7 +1108,7 @@ impl App {
     /// Overview / Settings) leave the menu closed — `open_sort_rebind`
     /// is a no-op there.
     pub fn open_sort_rebind(&mut self) {
-        let keys = sort_keys_for(self.active_lane.clone());
+        let keys = sort_keys_for(self.active_lane);
         if keys.is_empty() {
             // Lanes that don't surface a sort menu: don't even open
             // an empty menu. `sort_rebind_open()` stays `false`.
@@ -1118,7 +1118,7 @@ impl App {
         // Default the highlight to the lane's current sort key, so
         // the user sees their existing choice highlighted when they
         // open the menu.
-        let current = self.lane_sort_key(self.active_lane.clone());
+        let current = self.lane_sort_key(self.active_lane);
         self.sort_rebind_index = self
             .sort_rebind_menu
             .as_ref()
@@ -1153,7 +1153,7 @@ impl App {
     pub fn confirm_sort_rebind(&mut self) {
         if let Some(keys) = self.sort_rebind_menu.as_ref() {
             if let Some(k) = keys.get(self.sort_rebind_index) {
-                self.lane_sort_key.insert(self.active_lane.clone(), *k);
+                self.lane_sort_key.insert(self.active_lane, *k);
             }
         }
         // M182 S5 (external review F-06): after a sort rebind, the
@@ -1312,7 +1312,7 @@ impl App {
             // term so visible_milestones/visible_backlog narrow as the
             // user types. Commit freezes this; Cancel restores `prior`.
             self.lane_search
-                .insert(self.active_lane.clone(), state.buffer.clone());
+                .insert(self.active_lane, state.buffer.clone());
             self.selected_index = 0;
             self.touch();
         }
@@ -1322,7 +1322,7 @@ impl App {
         if let Mode::SearchInput(state) = &mut self.active_mode {
             if state.buffer.pop().is_some() {
                 self.lane_search
-                    .insert(self.active_lane.clone(), state.buffer.clone());
+                    .insert(self.active_lane, state.buffer.clone());
                 self.selected_index = 0;
                 self.touch();
             }
@@ -1331,8 +1331,7 @@ impl App {
 
     pub fn search_commit(&mut self) {
         if let Mode::SearchInput(state) = std::mem::replace(&mut self.active_mode, Mode::Normal) {
-            self.lane_search
-                .insert(self.active_lane.clone(), state.buffer);
+            self.lane_search.insert(self.active_lane, state.buffer);
             self.selected_index = 0;
             self.touch();
         }
@@ -1344,8 +1343,7 @@ impl App {
             if state.prior.is_empty() {
                 self.lane_search.remove(&self.active_lane);
             } else {
-                self.lane_search
-                    .insert(self.active_lane.clone(), state.prior);
+                self.lane_search.insert(self.active_lane, state.prior);
             }
             self.touch();
         }
@@ -1357,12 +1355,12 @@ impl App {
     /// Id→Status→Priority→Id. Lanes without a sort menu are a no-op
     /// (the action layer also gates this).
     pub fn cycle_sort_next(&mut self) {
-        let lane = self.active_lane.clone();
-        let keys = sort_keys_for(lane.clone());
+        let lane = self.active_lane;
+        let keys = sort_keys_for(lane);
         if keys.is_empty() {
             return;
         }
-        let cur = self.lane_sort_key(lane.clone());
+        let cur = self.lane_sort_key(lane);
         let next = keys
             .iter()
             .cycle()
@@ -1405,7 +1403,7 @@ impl App {
         // client-side on the cached full list (no extra mp round-
         // trip). Ties fall back to numeric-id compare so the order is
         // stable across binds.
-        let key = self.lane_sort_key(self.active_lane.clone());
+        let key = self.lane_sort_key(self.active_lane);
         match key {
             SortKey::Id => {
                 filtered.sort_by(|a, b| compare_milestone_ids(&a.id, &b.id));
@@ -1497,7 +1495,7 @@ impl App {
         // backlog rows sort by Id / Status / Priority (the per-lane key
         // set from `sort_keys_for`). Updated is not available (BacklogLine
         // has no timestamp).
-        let key = self.lane_sort_key(self.active_lane.clone());
+        let key = self.lane_sort_key(self.active_lane);
         match key {
             SortKey::Id => {
                 filtered.sort_by(|a, b| compare_milestone_ids(&a.id, &b.id));
@@ -1726,7 +1724,7 @@ impl App {
         let lanes = Lane::ordered();
         if let Some(pos) = lanes.iter().position(|l| *l == self.active_lane) {
             let next_pos = if pos == 0 { lanes.len() - 1 } else { pos - 1 };
-            self.select_lane(lanes[next_pos].clone());
+            self.select_lane(lanes[next_pos]);
         }
     }
 
@@ -1736,7 +1734,7 @@ impl App {
         let lanes = Lane::ordered();
         if let Some(pos) = lanes.iter().position(|l| *l == self.active_lane) {
             let next_pos = (pos + 1) % lanes.len();
-            self.select_lane(lanes[next_pos].clone());
+            self.select_lane(lanes[next_pos]);
         }
     }
 }

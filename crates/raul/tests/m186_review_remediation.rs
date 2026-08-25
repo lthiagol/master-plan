@@ -50,24 +50,41 @@ fn dump(app: &App, w: u16, h: u16) -> String {
     s
 }
 
-/// F-01: help overlay lists / (search) and o (cycle sort).
+/// F-01: help overlay lists the per-lane and global groups
+/// (M199 simplification). The M186 section labels (Search, Cycle
+/// sort) are no longer prose; the keys are surfaced as their
+/// glyph + label in the per-lane group. This test pins the new
+/// M199 contract.
 #[test]
 fn m186_f01_help_overlay_lists_search_and_cycle() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
     app.toggle_help();
     let s = dump(&app, 110, 44);
+    // M199 groups: Per-lane + Global.
     assert!(
-        s.contains("Search") || s.contains("search"),
-        "help must list search; got:\n{s}"
+        s.contains("Per-lane"),
+        "help must list a 'Per-lane' group heading; got:\n{s}"
     );
     assert!(
-        s.contains("Cycle sort") || s.contains("cycle sort"),
-        "help must list cycle sort; got:\n{s}"
+        s.contains("Global"),
+        "help must list a 'Global' group heading; got:\n{s}"
     );
-    // Search label should not be empty after the colon — i.e. the key
-    // glyph "/" must appear in the help overlay.
-    assert!(s.contains('/'), "help must show '/' key; got:\n{s}");
+    // The Milestones per-lane group surfaces the search key as
+    // "/ search" and the cycle-sort key as "o cycle" per the M199
+    // per-tab table.
+    assert!(
+        s.contains("search"),
+        "help must list the search key in the per-lane group; got:\n{s}"
+    );
+    assert!(
+        s.contains("cycle"),
+        "help must list the cycle key in the per-lane group; got:\n{s}"
+    );
+    // Key glyphs must still appear (the M199 render surfaces them
+    // as the leading text on each per-lane line, not in prose).
+    assert!(s.contains('/'), "help must show '/' key glyph; got:\n{s}");
+    assert!(s.contains('o'), "help must show 'o' key glyph; got:\n{s}");
 }
 
 /// F-02: lane switch cancels Mode::SearchInput; per-lane buffer preserved.

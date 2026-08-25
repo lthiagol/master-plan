@@ -154,8 +154,9 @@ fn m183_f05_empty_keybind_skips_colon_token() {
     app.keybinds.quit.clear();
     app.keybinds.help.clear();
     let (buf, view) = draw(&app, 140, 24);
-    // M187: globals moved to the bottom row of footer_area.
-    let globals = row(&buf, view.footer_area.y + 1);
+    // M199: globals moved to the *top* row of footer_area (h-2);
+    // per-tab is on the bottom row (h-1).
+    let globals = row(&buf, view.footer_area.y);
     assert!(
         !globals.contains(":quit"),
         "cleared quit must not render ':quit'; got {globals:?}"
@@ -164,7 +165,9 @@ fn m183_f05_empty_keybind_skips_colon_token() {
         !globals.contains(":help"),
         "cleared help must not render ':help'; got {globals:?}"
     );
-    // Remaining live keys still present.
+    // Remaining live keys still present — M199's six-key globals line
+    // includes refresh as the last token, so the assertion below
+    // covers both the pre-M199 and post-M199 renders.
     assert!(
         globals.contains(":refresh") || globals.contains("refresh"),
         "refresh should remain; got {globals:?}"

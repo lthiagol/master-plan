@@ -208,7 +208,7 @@ fn lane_cache_atomic_count_zero_on_cache_hit() {
     // First visit: miss → fetch → put.
     if cache.get(&lane).is_none() {
         let count = calls.fetch_add(1, Ordering::SeqCst) + 1;
-        cache.put(lane.clone(), serde_json::json!({"count": count}));
+        cache.put(lane, serde_json::json!({"count": count}));
     }
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 

@@ -341,7 +341,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         Action::JumpLane(idx) => {
             let lanes = Lane::ordered();
             if let Some(lane) = lanes.get(idx) {
-                app.select_lane(lane.clone());
+                app.select_lane(*lane);
                 load_data_for_lane(runner, app)?;
             }
         }

@@ -16,30 +16,37 @@ fn render_dir() -> PathBuf {
 
 #[test]
 fn footer_is_generated_from_keybinds() {
-    // chrome.rs::footer_for must delegate to the keybinds footer methods
-    // rather than returning hardcoded legend strings. M167 removed the
-    // tab-bar / content focus split, so chrome no longer calls
-    // `kb.footer_tab_bar()`; only the content-pane footer builder is
-    // dispatched today.
+    // chrome.rs::footer_for must delegate to the keybinds footer
+    // methods rather than returning hardcoded legend strings. M199
+    // consolidated the four pre-M199 footer methods
+    // (`footer_overview` / `footer_list` / `footer_content` /
+    // `footer_settings`) into a single per-(lane, content_state)
+    // table: `Keybinds::footer_per_tab`. The renderer now routes
+    // every non-modal footer through that single source of truth.
     let content = fs::read_to_string(render_dir().join("chrome.rs")).unwrap();
     assert!(
-        content.contains("kb.footer_content("),
-        "footer_for must build its content-pane text from app.keybinds"
+        content.contains("footer_per_tab("),
+        "footer_for must build its per-tab text from app.keybinds.footer_per_tab()"
     );
 
     // No hardcoded key-legend fragment should survive in the renderer.
+    // (`:?` is mentioned in M199's design-decision comments, so we
+    // don't pin the substring `?:help` — only the hardcoded
+    // rendering surfaces.)
     let forbidden = [
         "hl:lanes",
         "1-7:jump",
         "↑↓:inbox",
         "↑↓:move",
         "↑↓:scroll",
-        "?:help",
+        "footer_overview()",
+        "footer_list()",
+        "footer_content(",
     ];
     for pat in &forbidden {
         assert!(
             !content.contains(pat),
-            "chrome.rs must not hardcode key legend '{pat}' (AC-05)"
+            "chrome.rs must not hardcode key legend '{pat}' (post-M199)"
         );
     }
 }
@@ -52,9 +59,12 @@ fn help_overlay_is_generated_from_keybinds() {
         content.contains("fn render_help_overlay"),
         "render_help_overlay function must exist"
     );
+    // M199: the help overlay routes through
+    // `app.keybinds.help_entries_grouped(active_lane)` so the
+    // overlay and the footer share a single source of truth.
     assert!(
-        content.contains("app.keybinds.help_entries()"),
-        "help overlay must be generated from app.keybinds.help_entries()"
+        content.contains("help_entries_grouped("),
+        "help overlay must be generated from app.keybinds.help_entries_grouped()"
     );
 
     // The pre-M138 hardcoded key legends (a literal key glued to a label)

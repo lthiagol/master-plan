@@ -130,7 +130,7 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
     let header_style = Style::default()
         .fg(app.effective_palette().accent)
         .add_modifier(Modifier::BOLD);
-    let active_sort = app.lane_sort_key(app.active_lane.clone());
+    let active_sort = app.lane_sort_key(app.active_lane);
     let header = Row::new(vec![
         header_cell("ID", active_sort == SortKey::Id, header_style),
         header_cell("Title", active_sort == SortKey::Title, header_style),
@@ -282,7 +282,7 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
     let header_style = Style::default()
         .fg(app.effective_palette().accent)
         .add_modifier(Modifier::BOLD);
-    let active_sort = app.lane_sort_key(app.active_lane.clone());
+    let active_sort = app.lane_sort_key(app.active_lane);
     let header = Row::new(vec![
         Cell::new(Span::styled(String::new(), header_style)),
         header_cell("ID", active_sort == SortKey::Id, header_style),

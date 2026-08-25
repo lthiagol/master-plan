@@ -264,9 +264,8 @@ fn m182_s5_bind_is_per_lane_not_global() {
     app.lane_sort_key
         .insert(Lane::Milestones, SortKey::Priority);
     for lane in [Lane::Backlog, Lane::Ideas] {
-        let lane = lane.clone();
         assert_eq!(
-            app.lane_sort_key(lane.clone()),
+            app.lane_sort_key(lane),
             SortKey::Id,
             "lane {lane:?} should not be affected by Milestones→Priority bind"
         );

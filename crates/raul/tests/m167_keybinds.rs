@@ -19,7 +19,7 @@ fn key(code: KeyCode) -> KeyEvent {
 #[test]
 fn tab_advances_active_lane() {
     let app = App::new();
-    let before = app.active_lane.clone();
+    let before = app.active_lane;
     let action = modes::normal::handle_key(key(KeyCode::Tab), &app);
     assert_eq!(
         action,
@@ -56,7 +56,7 @@ fn arrows_move_list_selection_in_all_lanes() {
         Lane::Settings,
     ] {
         let mut app = App::new();
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         let up = modes::normal::handle_key(key(KeyCode::Up), &app);
         let dn = modes::normal::handle_key(key(KeyCode::Down), &app);
         let k = modes::normal::handle_key(key(KeyCode::Char('k')), &app);

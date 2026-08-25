@@ -58,7 +58,7 @@ fn section_nav_is_noop_outside_milestone_detail() {
     // some of these keys; this test pins the AC's specific cases.
     for content in [ContentState::List, ContentState::BacklogDetail] {
         let mut app = App::new();
-        app.content = content.clone();
+        app.content = content;
         for kc in [
             KeyCode::Char(']'),
             KeyCode::Char('['),

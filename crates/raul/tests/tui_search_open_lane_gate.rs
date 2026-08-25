@@ -19,7 +19,7 @@ fn slash_is_noop_on_path_overview_watch_settings() {
     let mut app = App::new();
     let r = MpRunner::new().expect("mp");
     for lane in [Lane::Path, Lane::Overview, Lane::Watch, Lane::Settings] {
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         app.active_mode = Mode::Normal;
         apply_action(&mut app, &r, Action::OpenSearch).unwrap();
         assert_eq!(app.active_mode, Mode::Normal, "lane {lane:?} must no-op");
@@ -31,7 +31,7 @@ fn slash_opens_on_backlog_and_ideas() {
     let mut app = App::new();
     let r = MpRunner::new().expect("mp");
     for lane in [Lane::Backlog, Lane::Ideas] {
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         apply_action(&mut app, &r, Action::OpenSearch).unwrap();
         assert!(
             matches!(app.active_mode, Mode::SearchInput(_)),

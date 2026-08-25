@@ -768,7 +768,7 @@ pub fn handle_mouse(
                 for hit in &view.tab_hit_areas {
                     let r = hit.rect;
                     if x >= r.x && x < r.x.saturating_add(r.width) {
-                        app.select_lane(hit.id.clone());
+                        app.select_lane(hit.id);
                         load_data_for_lane(runner, app)?;
                         return Ok(());
                     }

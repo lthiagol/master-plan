@@ -33,7 +33,7 @@ fn grooming_preset_noop_on_other_lanes() {
         Lane::Watch,
         Lane::Settings,
     ] {
-        app.select_lane(lane.clone());
+        app.select_lane(lane);
         app.milestone_filter.clear();
         apply_action(&mut app, &r, Action::ApplyGroomingPreset).unwrap();
         assert!(app.milestone_filter.is_empty(), "lane {lane:?} must no-op");

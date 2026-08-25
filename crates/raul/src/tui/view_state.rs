@@ -554,13 +554,23 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
         return view;
     }
 
-    // Top-level layout: row 0 = header, row 1 = main, last two rows =
-    // footer (M183: globals + per-tab). Still one `footer_area` Rect;
-    // chrome splits it at paint time. Mirrors render()'s outer split.
+    // Top-level layout: row 0 = header, row 1 = main, last rows = footer.
+    // M199: footer height is conditional on the active
+    // (lane, content_state) — Path and Watch have empty per-tab
+    // strings so the footer is 1 row (globals only); every other
+    // lane reserves 2 rows (globals on h-2, per-tab on h-1).
+    // `compute_view` is the single source of truth for
+    // `footer_area.height`; `render_footer` reads it back without
+    // re-deriving the count.
+    let settings_staged = app.settings.as_ref().is_some_and(|s| s.has_staged_edits());
+    let per_tab_text =
+        app.keybinds
+            .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged);
+    let footer_height = if per_tab_text.is_empty() { 1u16 } else { 2u16 };
     let outer = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(0),
-        Constraint::Length(2),
+        Constraint::Length(footer_height),
     ])
     .split(area);
     let header_area = outer[0];
@@ -1301,7 +1311,7 @@ mod tests {
     use crate::tui::runner::tab_hit_test_for_layout;
 
     fn lane_at(idx: usize) -> Lane {
-        Lane::ordered()[idx].clone()
+        Lane::ordered()[idx]
     }
 
     fn narrow_overflow_layout(active_idx: usize) -> TabBarLayout {
