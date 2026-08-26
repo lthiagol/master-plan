@@ -47,15 +47,17 @@ jobs:
         # `ref: stable`, which generated the refspec
         # `+refs/heads/stable*:refs/remotes/origin/stable*` and
         # failed with "could not read Username for
-        # 'https://github.com'" on the fetch. The auth header
-        # was set correctly but the refspec glob didn't match
-        # reliably across runner images. Switch to a plain
-        # `git clone --depth 1 --branch stable` with the token
-        # embedded in the URL — explicit, well-tested, and
-        # independent of actions/checkout v4's refspec magic.
+        # 'https://github.com'" on the fetch. Switched to a
+        # plain `git clone --depth 1 --branch main` with the
+        # token embedded in the URL.
+        # F-tap-2 (2026-08-25): homebrew-tap's default branch
+        # was renamed `stable` -> `main` to match modern
+        # conventions and unblock `brew update` (Homebrew's
+        # default fetch expects `main`). Workflow updated to
+        # track `main` everywhere.
         run: |
           rm -rf homebrew-tap
-          git clone --depth 1 --branch stable \
+          git clone --depth 1 --branch main \
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git" \
             homebrew-tap
 
@@ -87,7 +89,7 @@ jobs:
           git commit -m "master-plan-dev: bump to ${VERSION} (commit ${SHORT_SHA})"
           git push -u origin "$BRANCH" --force
 
-      - name: Open PR against homebrew-tap:stable
+      - name: Open PR against homebrew-tap:main
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -102,6 +104,6 @@ jobs:
           * master-plan-dev.rb -> ${VERSION} (tracks commit ${COMMIT:0:7})
           * SHA256: ${SHA}
 
-          This PR targets stable. CI runs brew audit + style.
+          This PR targets main. CI runs brew audit + style.
           PRBODY
-          gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan-dev: bump to ${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
+          gh pr create --repo lthiagol/homebrew-tap --base main --head "$BRANCH" --title "master-plan-dev: bump to ${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"

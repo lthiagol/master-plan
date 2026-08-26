@@ -76,7 +76,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: lthiagol/homebrew-tap
-          ref: stable
+          ref: main
           path: homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
@@ -114,7 +114,7 @@ jobs:
           git commit -m "master-plan: bump to v${VERSION} (and master-plan-dev to ${VERSION}-dev.${DATE})"
           git push -u origin "$BRANCH" --force
 
-      - name: Open PR against homebrew-tap:stable
+      - name: Open PR against homebrew-tap:main
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -130,6 +130,6 @@ jobs:
           * master-plan-dev.rb -> v${VERSION}-dev.${DATE} (tracks the tagged commit ${COMMIT:0:7})
           * SHA256: ${SHA}
 
-          This PR targets stable. CI runs brew audit + style on the formulas.
+          This PR targets main. CI runs brew audit + style on the formulas.
           PRBODY
-          gh pr create --repo lthiagol/homebrew-tap --base stable --head "$BRANCH" --title "master-plan: bump to v${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
+          gh pr create --repo lthiagol/homebrew-tap --base main --head "$BRANCH" --title "master-plan: bump to v${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
