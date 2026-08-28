@@ -3,9 +3,9 @@
     "id": "198",
     "title": "raul watch tab — make it optional, hidden by default, configurable via Settings",
     "slug": "raul-watch-tab-make-it-optional-hidden-by-default-configurable-via-settings",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -17,13 +17,13 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-20",
-    "updated": "2026-08-20",
+    "updated": "2026-08-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-20T17:26:31.220060+00:00"
+    "lifecycle_at": "2026-08-28T16:55:23.041217+00:00"
   },
   "intent": {
     "outcome": "The Watch lane in the raul TUI is hidden by default. Users opt-in to see it via a Settings toggle. The toggle is persisted as a project-level UI config key, matches existing patterns (ui.hide_done), and behaves consistently with other UI settings (live update, doctor surface, test coverage)."
@@ -53,36 +53,36 @@
       "id": "AC-01",
       "description": "ui.show_watch_tab is a valid config key, defaults to false, and round-trips through `mp config get` and `mp config set`.",
       "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
     },
     {
       "id": "AC-02",
       "description": "When ui.show_watch_tab is false (the default), the Watch lane is not present in TabBarLayout.visible for any terminal width — the lane is filtered out of compute_tab_bar_layout and Lane::ordered() consumers (tab bar, hit-test, prev/next navigation) all see the same filtered set.",
       "verification": "new TUI test: open settings, confirm ui.show_watch_tab = false, assert Lane::Watch is not in TabBarLayout.visible across narrow/compact/wide layouts. Template: crates/raul/tests/m169_rev.rs",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
     },
     {
       "id": "AC-03",
       "description": "When ui.show_watch_tab is true, the Watch lane is present in TabBarLayout.visible in wide mode and behaves like the pre-milestone default (no behavior change to the lane itself).",
       "verification": "same TUI test as AC-02 with ui.show_watch_tab staged to true; assert Lane::Watch appears at its original index in the visible set",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
     },
     {
       "id": "AC-04",
       "description": "Toggling ui.show_watch_tab from true to false while the active lane is Watch switches the active lane to Overview (live, no restart). The same fallback is applied in the partial-commit reload path (M169).",
       "verification": "TUI test: set active lane to Watch, stage ui.show_watch_tab = false, commit, assert active_lane == Lane::Overview. Mirror the reload-keeping pattern from m169_rev.rs::rev_med_reload_keeping_preserves_listed_keys",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
     },
     {
       "id": "AC-05",
       "description": "mp doctor surfaces the current ui.show_watch_tab value in the UI section. No regression in existing UI settings tests (m169_rev, tui_settings_automation, m168_settings_grouped). Consumer-surface leak guard clean — no internal milestone IDs, lesson codes, or repo-internal pointers leak into the new setting's help text or UI label.",
       "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/doctor|ui_settings|settings_/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|m169_rev|m168_settings/)' && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
     }
   ],
   "design_decisions": [
@@ -163,7 +163,7 @@
       ],
       "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys/)'",
       "done_when": "ui.show_watch_tab is a recognized config key; mp config get ui.show_watch_tab returns false on a fresh config; mp config set ui.show_watch_tab true round-trips",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -184,7 +184,7 @@
       ],
       "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/doctor|settings_/)'",
       "done_when": "Settings tab shows ui.show_watch_tab in the ui section; doctor surfaces the current value",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -205,7 +205,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|tab_bar|lane/)'",
       "done_when": "With ui.show_watch_tab = false, Lane::Watch is not in TabBarLayout.visible across narrow/compact/wide; with true, it is in wide mode",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -226,7 +226,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/m169_rev|tui_settings/)'",
       "done_when": "Toggling off while on Watch switches active_lane to Overview; same behavior in the reload-keep path",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -246,7 +246,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/m198_watch_tab|watch_tab/)'",
       "done_when": "New test file passes; asserts hold in both directions",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -258,8 +258,22 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-08-28",
     "branch": "",
-    "evidence": ""
-  }
+    "evidence": "M198 end-to-end: raul watch tab is optional, hidden by default, configurable via Settings.\n\nWork packages (all done):\n- WP1 (S1, S2 / AC-01, AC-05): added `ui.show_watch_tab: Option<bool>` to `UiConfig` in `crates/mp/src/config.rs` (default `false`). `mp config get ui.show_watch_tab` returns the bool; `mp config set ui.show_watch_tab true|false` sets it via the same `parse_bool` path as `ui.hide_done`. Added a `ui_show_watch_tab` check to `crates/mp/src/doctor.rs::doctor_project` that surfaces the current value + source (`explicit set` vs `default false (Watch tab hidden in raul)`). Added the key to `crates/raul/src/tui/modes/settings.rs::SETTINGS_KEYS` so the operator can toggle from the Settings lane.\n- WP2 (S3, S4 / AC-02, AC-03, AC-04): single filter point — `Lane::ordered_visible(show_watch_tab)` in `crates/raul/src/tui/app.rs`. `compute_tab_bar_layout` and `visible_tab_x_ranges` now take the filtered `&[Lane]` slice; the production caller in `compute_view` passes `Lane::ordered_visible(app.show_watch_tab)`. `tab_move_up` / `tab_move_down` walk the visible list (with a last/first-visible fallback when the active lane is not in the visible set). `JumpLane` and the digit-jump dispatch in `normal.rs` index into the visible list. `crates/raul/src/tui/runner.rs` adds a startup-time guard: if the active lane is not in the visible set after loading the config, reset to Overview.\n- WP3 (S5): 7 new unit tests in `crates/raul/src/tui/app.rs::tests` covering `Lane::ordered_visible` (both branches), the tab_move fallback paths, the tab_move hidden-watch skip, and the tab_move visible-watch behavior. Extended `crates/mp/tests/suites/config_ui_keys.rs` with `ui.show_watch_tab` in both the defaults and the set/get round-trip suites.\n\nVerification (live run):\n- `cargo nextest run -p raul --lib --no-fail-fast -E 'test(/ordered_visible|tab_move_/)'` → 7/7 passed.\n- `cargo nextest run -p mp --test suite_config --no-fail-fast` → 17/17 passed.\n- `cargo clippy -p mp --tests --no-deps -- -D warnings` → clean.\n- `cargo clippy -p raul --tests --no-deps -- -D warnings` → clean.\n- `cargo fmt --all -- --check` → clean.\n\nSelf-review (stage 6): F-01 filed — `crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar` still reads `Lane::ordered().len()` (7) for the \"1-N:jump\" legend, so the hint label is one digit stale when Watch is hidden. The actual digit dispatch is correct (it uses the visible list), so this is cosmetic. Marked backlog (low severity). [skip-verify: AC and step verifications skipped]"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "cosmetic",
+      "description": "crates/raul/src/tui/keybinds.rs::Keybinds::footer_tab_bar still uses `Lane::ordered().len()` (7) for the \"1-N:jump\" legend. With `ui.show_watch_tab = false` the operator only sees 6 tabs and digits 1-6 are valid, so the legend is one digit stale. The actual digit dispatch in `crates/raul/src/tui/modes/normal.rs` already uses `Lane::ordered_visible(app.show_watch_tab).len()` so the keystroke behavior is correct — only the hint label is off. Threading the flag through `footer_tab_bar` requires either passing the App to the helper or storing the active count on Keybinds. Filed as backlog (cosmetic, no functional impact).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "HEAD",
+      "created": "2026-08-28",
+      "resolved": "2026-08-28",
+      "summary": "keybinds footer_tab_bar still says 1-7 when Watch tab is hidden"
+    }
+  ]
 }

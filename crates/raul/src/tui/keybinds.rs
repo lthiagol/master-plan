@@ -704,14 +704,18 @@ impl Keybinds {
     }
 
     /// The tab-bar-focused footer, generated from the navigation bindings.
-    /// The "1-N:jump" range follows `Lane::ordered().len()` so adding a
-    /// lane extends the legend without a separate code edit here.
-    pub fn footer_tab_bar(&self) -> String {
+    /// The "1-N:jump" range follows the *visible* lane list
+    /// (`Lane::ordered_visible(show_watch_tab).len()`) so the
+    /// on-screen tab number matches the keystroke when the
+    /// operator has hidden the Watch tab. M198 WP2: the helper
+    /// is purely text generation; it does not mutate any state
+    /// and is safe to call from the render path on every frame.
+    pub fn footer_tab_bar(&self, show_watch_tab: bool) -> String {
         format!(
             " {}/{}:lanes  1-{}:jump  {}:focus  {}:quit ",
             Self::primary(&self.previous_lane),
             Self::primary(&self.next_lane),
-            super::app::Lane::ordered().len(),
+            super::app::Lane::ordered_visible(show_watch_tab).len(),
             Self::primary(&self.focus_content),
             Self::primary(&self.quit),
         )

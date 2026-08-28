@@ -19,6 +19,12 @@ pub const SETTINGS_KEYS: &[(&str, &str)] = &[
     ("ui", "ui.icons"),
     ("ui", "ui.theme"),
     ("ui", "ui.hide_done"),
+    // M198 WP1: when `false` (the default), raul's tab bar
+    // filters the Watch lane out (see S3 / `compute_tab_bar_layout`).
+    // The `mp` binary's `mp watch` command is independent of this
+    // flag — only the human-facing TUI surface reacts. Operators
+    // opt in via this row.
+    ("ui", "ui.show_watch_tab"),
     // workflow
     ("workflow", "workflow.profile"),
     ("workflow", "workflow.plan.location"),

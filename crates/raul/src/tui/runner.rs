@@ -388,6 +388,23 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // that toggle the flag mid-session need a restart for the
     // indicator to flip (acceptable for the human surface).
     app.review_hunk_enabled = ui_config.review_hunk_enabled;
+    // M198: same pattern as `review_hunk_enabled` — read
+    // `ui.show_watch_tab` once at startup and pin it on App.
+    // When `false` (the default), the Watch lane is filtered
+    // out of the tab bar, the hit-test areas, and the
+    // prev/next navigation. Mid-session flips need a restart,
+    // which the spec accepts: the toggle is a setup-time
+    // decision, not a hot key.
+    app.show_watch_tab = ui_config.show_watch_tab;
+    // M198 S4 / AC-04: if the operator toggled Watch off while
+    // the active lane was Watch (stale state, e.g. an old
+    // `state.json` or a mid-session reload), fall back to
+    // Overview. The check uses the *visible* list so it is
+    // the same set the tab bar / hit-test / prev-next
+    // navigation all see — single filter point.
+    if !Lane::ordered_visible(app.show_watch_tab).contains(&app.active_lane) {
+        app.active_lane = Lane::Overview;
+    }
     app.keybinds = crate::tui::keybinds::Keybinds::load(runner);
 
     // M143: prime the LaneCache with the live plan-dir mtime so external
@@ -706,7 +723,8 @@ pub fn tab_hit_test(x: u16, compact: bool) -> Option<usize> {
     // active. The active-lane argument is therefore irrelevant here; any
     // lane (we use `Lane::Overview` for concreteness) produces the same
     // answer. See `compute_tab_bar_layout` for the wide-mode contract.
-    let layout = view_state::compute_tab_bar_layout(u16::MAX, compact, &Lane::Overview);
+    let layout =
+        view_state::compute_tab_bar_layout(u16::MAX, compact, &Lane::Overview, &Lane::ordered());
     tab_hit_test_for_layout(x, &layout)
 }
 
@@ -715,7 +733,12 @@ pub fn tab_hit_test(x: u16, compact: bool) -> Option<usize> {
 /// contract; the mouse path no longer calls it directly — it reads
 /// from the pre-computed `ViewState` instead (M135).
 pub fn tab_hit_test_for_layout(x: u16, layout: &view_state::TabBarLayout) -> Option<usize> {
-    for &(lane_idx, start_x, end_x) in &view_state::visible_tab_x_ranges(layout) {
+    // M198: the helper preserves the legacy "all 7 lanes" contract
+    // because it is only called from the pre-existing tui_tab_bar
+    // tests that pin the non-overflow wiring. Production mouse
+    // dispatch reads from the pre-computed ViewState instead
+    // (M135), which already sees the filtered list.
+    for &(lane_idx, start_x, end_x) in &view_state::visible_tab_x_ranges(layout, &Lane::ordered()) {
         if (x as u32) >= start_x as u32 && (x as u32) < end_x as u32 {
             return Some(lane_idx);
         }

@@ -372,6 +372,28 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     };
     checks.push(auto_set_check);
 
+    // M198 WP1 / AC-05: surface the current `ui.show_watch_tab`
+    // value in the UI section. The check is informational —
+    // `ok=true` regardless of the value, because both `true` and
+    // `false` are valid operator choices. The message names the
+    // effective value plus the source (`explicit set` vs
+    // `default false`) so the operator can see whether the
+    // Watch tab will appear in their next `raul` session.
+    let show_watch = cfg.ui.show_watch_tab.unwrap_or(false);
+    checks.push(DoctorCheck {
+        name: "ui_show_watch_tab".to_string(),
+        ok: true,
+        message: format!(
+            "ui.show_watch_tab = {} ({})",
+            show_watch,
+            if cfg.ui.show_watch_tab.is_some() {
+                "explicit set"
+            } else {
+                "default false (Watch tab hidden in raul)"
+            }
+        ),
+    });
+
     report.ok = report.ok && project_ok;
     report.detected = Some(DoctorDetected {
         brownfield_likely: brownfield::detect_brownfield_likely(&ctx.project_root),

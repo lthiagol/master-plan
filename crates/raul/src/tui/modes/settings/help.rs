@@ -36,6 +36,17 @@ pub const HELP: &[(&str, &[&str])] = &[
             "Toggle the bottom-right `h` key in any list lane to flip at runtime.",
         ],
     ),
+    // M198 WP1: when `false` (the default), raul's tab bar
+    // filters the Watch lane out. Setting this to `true` opts
+    // the operator in to the TUI Watch surface; restart raul
+    // for the change to take effect.
+    (
+        "ui.show_watch_tab",
+        &[
+            "Show the Watch lane in raul's tab bar (default false).",
+            "Independent of `mp watch` — the CLI always works.",
+        ],
+    ),
     // workflow
     (
         "workflow.profile",

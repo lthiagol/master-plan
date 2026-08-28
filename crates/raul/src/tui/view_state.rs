@@ -131,8 +131,17 @@ pub struct TabBarLayout {
 /// `pub(super)` per M135 S4 — the layout machinery is no longer
 /// `pub` from any cross-module surface. Tests live in `#[cfg(test)]
 /// mod tests` inside this module.
-pub(super) fn compute_tab_bar_layout(width: u16, compact: bool, active: &Lane) -> TabBarLayout {
-    let lanes = Lane::ordered();
+pub(super) fn compute_tab_bar_layout(
+    width: u16,
+    compact: bool,
+    active: &Lane,
+    lanes: &[Lane],
+) -> TabBarLayout {
+    // M198 WP2 / AC-04: the caller passes the filtered lane list
+    // (`Lane::ordered_visible(app.show_watch_tab)`) so the layout
+    // and the hit-test areas see the same set. The function
+    // itself is pure; tests pass `&Lane::ordered()` for the
+    // full-list case.
     let total = lanes.len();
 
     let total_width: usize = lanes
@@ -286,8 +295,13 @@ pub(super) fn compute_tab_bar_layout(width: u16, compact: bool, active: &Lane) -
 /// `pub(super)` per M135 S4 — the layout machinery is no longer
 /// `pub` from any cross-module surface. Tests live in `#[cfg(test)]
 /// mod tests` inside this module.
-pub(super) fn visible_tab_x_ranges(layout: &TabBarLayout) -> Vec<(usize, u16, u16)> {
-    let lanes = Lane::ordered();
+pub(super) fn visible_tab_x_ranges(
+    layout: &TabBarLayout,
+    lanes: &[Lane],
+) -> Vec<(usize, u16, u16)> {
+    // M198 WP2 / AC-04: same shape as `compute_tab_bar_layout` —
+    // caller passes the filtered lane list so the hit areas
+    // agree with the renderer's visible set.
     let ellipsis_w = " \u{2026} ".chars().count();
     let indicator_w = INDICATOR_WIDTH;
 
@@ -587,9 +601,14 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
     // hit areas agree with the renderer's `render_tab_bar` by
     // construction (M105 S1 / B-39 / M124 follow-up).
     let compact = tab_bar_area.width < 60;
-    let tab_layout = compute_tab_bar_layout(tab_bar_area.width, compact, &app.active_lane);
-    let lanes = Lane::ordered();
-    for (lane_idx, start_x, end_x) in visible_tab_x_ranges(&tab_layout) {
+    // M198 WP2 / AC-04: pass the filtered lane list (Watch
+    // omitted when `ui.show_watch_tab` is `false`) to both
+    // `compute_tab_bar_layout` and `visible_tab_x_ranges` so
+    // the layout, the hit-test areas, and the prev/next
+    // navigation all see the same set. Single filter point.
+    let lanes = Lane::ordered_visible(app.show_watch_tab);
+    let tab_layout = compute_tab_bar_layout(tab_bar_area.width, compact, &app.active_lane, &lanes);
+    for (lane_idx, start_x, end_x) in visible_tab_x_ranges(&tab_layout, &lanes) {
         if let Some(lane) = lanes.get(lane_idx).cloned() {
             view.tab_hit_areas.push(TabHitArea {
                 id: lane,
@@ -1315,7 +1334,7 @@ mod tests {
     }
 
     fn narrow_overflow_layout(active_idx: usize) -> TabBarLayout {
-        let layout = compute_tab_bar_layout(16, true, &lane_at(active_idx));
+        let layout = compute_tab_bar_layout(16, true, &lane_at(active_idx), &Lane::ordered());
         assert!(
             layout.overflowed,
             "test premise: width=16 must overflow the compact-mode bar; \
@@ -1326,7 +1345,7 @@ mod tests {
     }
 
     fn wide_compact_layout(active_idx: usize) -> TabBarLayout {
-        let layout = compute_tab_bar_layout(50, true, &lane_at(active_idx));
+        let layout = compute_tab_bar_layout(50, true, &lane_at(active_idx), &Lane::ordered());
         assert!(
             !layout.overflowed,
             "test premise: width=50 must not overflow the compact-mode bar"
@@ -1337,7 +1356,7 @@ mod tests {
     fn wide_full_layout(active_idx: usize) -> TabBarLayout {
         // M184: 7 lanes still need headroom past 80 cols for full
         // labels. 110 is a safe upper bound for the test premise.
-        let layout = compute_tab_bar_layout(110, false, &lane_at(active_idx));
+        let layout = compute_tab_bar_layout(110, false, &lane_at(active_idx), &Lane::ordered());
         assert!(
             !layout.overflowed,
             "test premise: width=110 must not overflow the full-mode bar"
@@ -1351,7 +1370,7 @@ mod tests {
     #[test]
     fn overflow_hit_test_selects_visible_only() {
         let layout = narrow_overflow_layout(1);
-        let ranges = visible_tab_x_ranges(&layout);
+        let ranges = visible_tab_x_ranges(&layout, &Lane::ordered());
 
         // Sanity: the active lane is always visible, even under overflow.
         assert!(
@@ -1456,11 +1475,12 @@ mod tests {
 
         for active_idx in 0..Lane::ordered().len() {
             for &width in &[10u16, 14, 18, 20, 25, 30] {
-                let layout = compute_tab_bar_layout(width, true, &lane_at(active_idx));
+                let layout =
+                    compute_tab_bar_layout(width, true, &lane_at(active_idx), &Lane::ordered());
                 if !layout.overflowed {
                     continue;
                 }
-                let hit = visible_tab_x_ranges(&layout);
+                let hit = visible_tab_x_ranges(&layout, &Lane::ordered());
                 let render = render_tab_ranges(&layout);
                 assert_eq!(
                     hit, render,
@@ -1518,7 +1538,8 @@ mod tests {
         // which tab they're on.
         for active_idx in 0..Lane::ordered().len() {
             for &width in &[10u16, 14, 18, 25, 30, 40] {
-                let layout = compute_tab_bar_layout(width, true, &lane_at(active_idx));
+                let layout =
+                    compute_tab_bar_layout(width, true, &lane_at(active_idx), &Lane::ordered());
                 if layout.overflowed {
                     assert!(
                         layout.visible.contains(&active_idx),
@@ -1561,7 +1582,7 @@ mod tests {
         let layout = wide_full_layout(0);
         assert!(!layout.overflowed);
 
-        let ranges = visible_tab_x_ranges(&layout);
+        let ranges = visible_tab_x_ranges(&layout, &Lane::ordered());
         // Lane widths we care about: ranges[i] = (idx, start_x, end_x).
         let by_idx: std::collections::HashMap<usize, (u16, u16)> = ranges
             .iter()
@@ -1597,8 +1618,8 @@ mod tests {
         for w in 1u16..=5 {
             for lane in [Lane::Overview, Lane::Milestones] {
                 for compact in [false, true] {
-                    let layout = compute_tab_bar_layout(w, compact, &lane);
-                    let ranges = visible_tab_x_ranges(&layout);
+                    let layout = compute_tab_bar_layout(w, compact, &lane, &Lane::ordered());
+                    let ranges = visible_tab_x_ranges(&layout, &Lane::ordered());
                     let last_end = ranges
                         .iter()
                         .map(|(_, _, end)| *end as usize)
@@ -1624,7 +1645,7 @@ mod tests {
 
     #[test]
     fn layout_at_width_5_still_renders_active_lane() {
-        let layout = compute_tab_bar_layout(5, true, &Lane::Overview);
+        let layout = compute_tab_bar_layout(5, true, &Lane::Overview, &Lane::ordered());
         assert!(
             layout.visible.contains(&0),
             "active lane Overview must be visible at width=5; got visible={:?}",
@@ -1634,7 +1655,7 @@ mod tests {
 
     #[test]
     fn layout_at_width_1_renders_nothing() {
-        let layout = compute_tab_bar_layout(1, true, &Lane::Overview);
+        let layout = compute_tab_bar_layout(1, true, &Lane::Overview, &Lane::ordered());
         assert!(
             layout.visible.is_empty(),
             "width=1 must yield no visible lanes, got {:?}",
@@ -1644,7 +1665,7 @@ mod tests {
 
     #[test]
     fn wide_width_with_fitting_active_keeps_indicator_logic() {
-        let layout = compute_tab_bar_layout(16, false, &Lane::Milestones);
+        let layout = compute_tab_bar_layout(16, false, &Lane::Milestones, &Lane::ordered());
         let lanes = Lane::ordered();
         let milestones_idx = lanes.iter().position(|l| *l == Lane::Milestones).unwrap();
         assert!(
@@ -1660,7 +1681,7 @@ mod tests {
         // ' │ ' / ' │ ' separators for 13 cells total. active_label_w + 1
         // = 14; widths < 14 fire the new branch.
         for w in 6u16..=13 {
-            let layout = compute_tab_bar_layout(w, false, &Lane::Milestones);
+            let layout = compute_tab_bar_layout(w, false, &Lane::Milestones, &Lane::ordered());
             assert!(
                 layout.visible.is_empty(),
                 "width={w} + Milestones must yield empty visible (tab text=13 > w); got {:?}",
@@ -1674,7 +1695,7 @@ mod tests {
         let lanes = Lane::ordered();
         for w in 6u16..=16 {
             for lane in [Lane::Overview, Lane::Milestones] {
-                let layout = compute_tab_bar_layout(w, false, &lane);
+                let layout = compute_tab_bar_layout(w, false, &lane, &Lane::ordered());
                 let active_idx = lanes.iter().position(|l| l == &lane).unwrap_or(0);
                 if layout.visible.is_empty() {
                     continue;

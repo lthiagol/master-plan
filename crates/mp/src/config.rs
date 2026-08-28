@@ -378,6 +378,14 @@ pub struct UiConfig {
     pub icons: Option<String>,
     pub theme: Option<String>,
     pub hide_done: Option<bool>,
+    /// M198 WP1: when true, raul's tab bar includes a Watch lane.
+    /// Default `false` so the operator has to opt in to the
+    /// `mp watch` TUI surface (the agent side stays untouched —
+    /// the `mp` binary's `mp watch` command is independent of
+    /// this flag). Stored as `Option<bool>` so we can tell
+    /// "never set" from "explicitly set to false"; the operator
+    /// default is `false`.
+    pub show_watch_tab: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

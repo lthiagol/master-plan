@@ -216,6 +216,27 @@ impl Lane {
         ]
     }
 
+    /// M198 WP2 / AC-04: single filter point for the Watch lane.
+    /// When `show_watch_tab` is `false` (the default), the Watch
+    /// lane is omitted from the returned list. Every consumer
+    /// that drives the tab bar, hit-test areas, or prev/next
+    /// navigation should use this — *not* [`Lane::ordered`] —
+    /// so the rendered tab bar, the hit areas, and the
+    /// prev/next navigation all see the same set. The full
+    /// [`Lane::ordered`] list is still used by tests that
+    /// exercise the wiring without caring about the operator's
+    /// preference.
+    pub fn ordered_visible(show_watch_tab: bool) -> Vec<Lane> {
+        if show_watch_tab {
+            Self::ordered()
+        } else {
+            Self::ordered()
+                .into_iter()
+                .filter(|l| !matches!(l, Lane::Watch))
+                .collect()
+        }
+    }
+
     pub fn label(&self) -> &'static str {
         crate::lanes::lane_label(self)
     }
@@ -445,6 +466,14 @@ pub struct App {
     /// on (N anchored)" indicator. Loaded once via `UiConfig::load`;
     /// restart raul to pick up mid-session flag changes.
     pub review_hunk_enabled: bool,
+    /// M198: the `ui.show_watch_tab` flag read from mp's project
+    /// config. When `false` (the default), the Watch lane is
+    /// filtered out of the tab bar, the hit-test areas, and the
+    /// prev/next navigation. Loaded once via `UiConfig::load`;
+    /// restart raul to pick up mid-session flag changes.
+    /// Independent of `mp watch` — the `mp` binary's `mp watch`
+    /// command always works regardless of this flag.
+    pub show_watch_tab: bool,
     pub quitting: bool,
     /// M172 S5: sort rebind inline menu. `None` = menu closed;
     /// `Some(keys)` = menu open with the listed available keys.
@@ -592,6 +621,7 @@ impl App {
             milestone_filter: std::collections::BTreeSet::new(),
             lane_search: std::collections::HashMap::new(),
             review_hunk_enabled: false,
+            show_watch_tab: false,
             quitting: false,
             active_mode: Mode::Normal,
             approval_blocked: false,
@@ -1721,20 +1751,47 @@ impl App {
     /// `pos == 0`; the M167/M140 era tests pinned the clamp behavior
     /// and the AC text was aspirational until now.
     pub fn tab_move_up(&mut self) {
-        let lanes = Lane::ordered();
+        // M198 WP2 / AC-04: prev/next navigation walks the
+        // *visible* lane set (Watch omitted when the config
+        // says so), so the operator's keys never land on a
+        // hidden tab. When the active lane is not in the
+        // visible set (a stale config flipped Watch off
+        // mid-session), fall back to the last visible lane.
+        let lanes = Lane::ordered_visible(self.show_watch_tab);
+        if lanes.is_empty() {
+            return;
+        }
         if let Some(pos) = lanes.iter().position(|l| *l == self.active_lane) {
             let next_pos = if pos == 0 { lanes.len() - 1 } else { pos - 1 };
             self.select_lane(lanes[next_pos]);
+        } else {
+            // Active lane not in the visible set (e.g. operator
+            // toggled the flag off). Land on the last visible
+            // lane so the next `tab_move_up` keystroke has a
+            // sensible starting point.
+            self.select_lane(lanes[lanes.len() - 1]);
         }
     }
 
-    /// Tab / Shift+Tab next lane — wraps from the last lane (Settings)
-    /// to the first (Overview).
+    /// Tab / Shift+Tab next lane — wraps from the last visible
+    /// lane (Settings when Watch is shown, Ideas when Watch is
+    /// hidden) to the first (Overview).
     pub fn tab_move_down(&mut self) {
-        let lanes = Lane::ordered();
+        // Same filtering rationale as `tab_move_up`. The
+        // fallback to Overview when the active lane is not in
+        // the visible set pairs with the S4 hot-reload
+        // handling (the runner's config reload falls back to
+        // Overview on toggle-off; this function is the manual
+        // key path).
+        let lanes = Lane::ordered_visible(self.show_watch_tab);
+        if lanes.is_empty() {
+            return;
+        }
         if let Some(pos) = lanes.iter().position(|l| *l == self.active_lane) {
             let next_pos = (pos + 1) % lanes.len();
             self.select_lane(lanes[next_pos]);
+        } else {
+            self.select_lane(lanes[0]);
         }
     }
 }
@@ -2062,5 +2119,100 @@ mod tests {
         assert_eq!(app.active_lane, Lane::Backlog);
         assert_eq!(app.content, ContentState::List);
         assert!(app.open_only); // other fields preserved
+    }
+
+    // ---- M198: ui.show_watch_tab filter -------------------------------
+
+    /// M198: when `show_watch_tab` is `true`, `ordered_visible`
+    /// returns the full lane set — same as `ordered()`.
+    #[test]
+    fn ordered_visible_returns_full_list_when_flag_is_true() {
+        assert_eq!(Lane::ordered_visible(true), Lane::ordered());
+        assert!(Lane::ordered_visible(true).contains(&Lane::Watch));
+    }
+
+    /// M198: when `show_watch_tab` is `false` (the default),
+    /// `ordered_visible` filters the Watch lane out. This is the
+    /// single filter point the spec calls for; every consumer
+    /// (tab bar, hit-test, prev/next, digit-jump) reads from
+    /// this list so the rendered tab number and the keystroke
+    /// can never disagree.
+    #[test]
+    fn ordered_visible_filters_watch_when_flag_is_false() {
+        let visible = Lane::ordered_visible(false);
+        assert_eq!(visible.len(), Lane::ordered().len() - 1);
+        assert!(!visible.contains(&Lane::Watch));
+        // The relative order of the remaining lanes is preserved.
+        let full_without_watch: Vec<Lane> = Lane::ordered()
+            .into_iter()
+            .filter(|l| !matches!(l, Lane::Watch))
+            .collect();
+        assert_eq!(visible, full_without_watch);
+    }
+
+    /// M198: when Watch is hidden and Watch is the active lane,
+    /// `tab_move_up` falls back to the last visible lane so the
+    /// next keystroke has a sensible starting point. Pairs with
+    /// the S4 startup-time fallback in the runner.
+    #[test]
+    fn tab_move_up_falls_back_when_active_lane_was_filtered() {
+        let mut app = App::new();
+        app.show_watch_tab = false;
+        app.active_lane = Lane::Watch; // stale state
+        app.tab_move_up();
+        // Fallback: last visible lane (Settings, since Watch is
+        // the only filter).
+        assert_eq!(app.active_lane, Lane::Settings);
+    }
+
+    /// M198: same scenario as above, for `tab_move_down` — falls
+    /// back to the first visible lane (Overview) when Watch is
+    /// hidden and Watch was the active lane.
+    #[test]
+    fn tab_move_down_falls_back_when_active_lane_was_filtered() {
+        let mut app = App::new();
+        app.show_watch_tab = false;
+        app.active_lane = Lane::Watch;
+        app.tab_move_down();
+        assert_eq!(app.active_lane, Lane::Overview);
+    }
+
+    /// M198: when Watch is visible, `tab_move_up` from Watch
+    /// moves to Ideas (the previous lane in the full ordered
+    /// list) — same as the pre-M198 contract. The filter is a
+    /// no-op when the flag is true.
+    #[test]
+    fn tab_move_up_wraps_within_visible_list_when_watch_is_shown() {
+        let mut app = App::new();
+        app.show_watch_tab = true;
+        app.active_lane = Lane::Watch;
+        app.tab_move_up();
+        assert_eq!(app.active_lane, Lane::Ideas);
+    }
+
+    /// M198: when Watch is hidden, `tab_move_down` from Ideas
+    /// (the lane just before where Watch would be) lands on
+    /// Settings, not Watch. The operator's `Tab` key never
+    /// lands on a hidden tab.
+    #[test]
+    fn tab_move_down_skips_hidden_watch_lane() {
+        let mut app = App::new();
+        app.show_watch_tab = false;
+        app.active_lane = Lane::Ideas;
+        app.tab_move_down();
+        // Without the filter this would land on Watch; with
+        // the filter it lands on Settings.
+        assert_eq!(app.active_lane, Lane::Settings);
+    }
+
+    /// M198: with Watch visible, `tab_move_down` from Ideas
+    /// does land on Watch (pre-M198 behavior).
+    #[test]
+    fn tab_move_down_lands_on_watch_when_visible() {
+        let mut app = App::new();
+        app.show_watch_tab = true;
+        app.active_lane = Lane::Ideas;
+        app.tab_move_down();
+        assert_eq!(app.active_lane, Lane::Watch);
     }
 }

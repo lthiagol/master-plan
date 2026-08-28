@@ -36,6 +36,15 @@ pub struct UiConfig {
     /// is read-only on mp config — the flag is loaded once at startup
     /// via `UiConfig::load` and never written back.
     pub review_hunk_enabled: bool,
+    /// M198: the `ui.show_watch_tab` flag read from mp's project
+    /// config. When true, raul's tab bar includes the Watch lane;
+    /// when false (the default), the Watch lane is filtered out of
+    /// the tab bar, the hit-test areas, and the prev/next
+    /// navigation. Loaded once at startup; restart raul to pick
+    /// up mid-session changes. Independent of `mp watch` — the
+    /// `mp` binary's `mp watch` command always works regardless
+    /// of this flag.
+    pub show_watch_tab: bool,
 }
 
 impl Default for UiConfig {
@@ -46,6 +55,7 @@ impl Default for UiConfig {
             theme: Palette::DEFAULT_NAME.to_string(),
             hide_done: false,
             review_hunk_enabled: false,
+            show_watch_tab: false,
         }
     }
 }
@@ -82,6 +92,15 @@ impl UiConfig {
         // section means the indicator is hidden.
         if let Some(h) = data["config"]["review"]["hunk"].as_bool() {
             cfg.review_hunk_enabled = h;
+        }
+        // M198: read `ui.show_watch_tab`. The default is `false`
+        // (the Watch lane is hidden); the operator opts in by
+        // `mp config set ui.show_watch_tab true` (either from the
+        // raul Settings lane or the CLI). An absent value keeps
+        // the default so a stale config never accidentally
+        // re-enables the tab.
+        if let Some(s) = ui["show_watch_tab"].as_bool() {
+            cfg.show_watch_tab = s;
         }
         cfg
     }

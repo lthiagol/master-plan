@@ -228,7 +228,17 @@ fn help_reflects_overridden_binding() {
 #[test]
 fn footers_are_generated_and_nonempty() {
     let kb = Keybinds::default();
-    assert!(kb.footer_tab_bar().contains(":quit"));
+    // M198: `footer_tab_bar` takes the show_watch_tab flag so
+    // the "1-N:jump" range matches the visible lane list. With
+    // Watch visible the legend is "1-7"; with Watch hidden it
+    // drops to "1-6". Both variants must end in ":quit".
+    assert!(kb.footer_tab_bar(true).contains(":quit"));
+    assert!(kb.footer_tab_bar(false).contains(":quit"));
+    // The jump range tracks the visible list, not the full
+    // registry — pinning the contract here so a future
+    // lane-add does not silently drift the legend.
+    assert!(kb.footer_tab_bar(true).contains("1-7:jump"));
+    assert!(kb.footer_tab_bar(false).contains("1-6:jump"));
     assert!(kb.footer_overview().contains(":help"));
     // M187: footer_list was trimmed — quit/help/hide-done now live only
     // on the globals line. The lane-specific actions remain.

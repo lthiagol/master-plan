@@ -12,6 +12,11 @@ fn ui_defaults_when_unset() {
     assert_eq!(get(&env, "ui.icons"), json!("unicode"));
     assert_eq!(get(&env, "ui.theme"), json!("mocha"));
     assert_eq!(get(&env, "ui.hide_done"), Value::Bool(false));
+    // M198 WP1: the Watch tab is hidden by default. The
+    // operator opts in via `mp config set ui.show_watch_tab
+    // true`. The doctor + raul surfaces read this flag to
+    // filter the Watch lane out of the tab bar.
+    assert_eq!(get(&env, "ui.show_watch_tab"), Value::Bool(false));
 }
 
 #[test]
@@ -28,6 +33,12 @@ fn ui_set_get_roundtrips() {
 
     env.run(&["config", "set", "ui.hide_done", "true"]);
     assert_eq!(get(&env, "ui.hide_done"), Value::Bool(true));
+
+    // M198: same round-trip contract as `ui.hide_done`.
+    env.run(&["config", "set", "ui.show_watch_tab", "true"]);
+    assert_eq!(get(&env, "ui.show_watch_tab"), Value::Bool(true));
+    env.run(&["config", "set", "ui.show_watch_tab", "false"]);
+    assert_eq!(get(&env, "ui.show_watch_tab"), Value::Bool(false));
 }
 
 #[test]

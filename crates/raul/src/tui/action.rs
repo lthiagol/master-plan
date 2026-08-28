@@ -339,7 +339,14 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             load_data_for_lane(runner, app)?;
         }
         Action::JumpLane(idx) => {
-            let lanes = Lane::ordered();
+            // M198: digit keys 1..=N follow the *visible* lane
+            // list (Watch omitted when `ui.show_watch_tab` is
+            // `false`) so the on-screen tab number matches the
+            // key. A stale idx (e.g. the operator toggled the
+            // flag off between digit press and dispatch) is
+            // silently ignored — the S4 fallback handles the
+            // case where Watch *was* the active lane.
+            let lanes = Lane::ordered_visible(app.show_watch_tab);
             if let Some(lane) = lanes.get(idx) {
                 app.select_lane(*lane);
                 load_data_for_lane(runner, app)?;
