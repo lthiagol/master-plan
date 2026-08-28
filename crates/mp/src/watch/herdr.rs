@@ -289,11 +289,14 @@ impl std::error::Error for SpawnFailure {}
 /// should map the failure to `RunOutcome::SpawnFailed`).
 ///
 /// Returns the first `SpawnFailure` found while walking the
-/// error chain. The `Send + Sync + 'static` bound matches
-/// `anyhow::Error::downcast_ref` — `SpawnFailure` derives neither
-/// `Send` nor `Sync`, so callers should not expect to cross
-/// thread boundaries with one. (mp watch is single-threaded, so
-/// this is not a constraint in practice.)
+/// error chain. `anyhow::Error::downcast_ref` only inspects the
+/// top of the error chain, so the call site must keep the
+/// `SpawnFailure` as the root error (i.e. construct with
+/// `anyhow::Error::new(failure)` and not `anyhow!(...)` or
+/// `bail!(...)`, which would wrap it). External review F-03
+/// clarified that [`SpawnFailure`] is auto-`Send + Sync` (all
+/// fields are `String` / `Vec<String>` / `Option<i32>`); the
+/// earlier "derives neither" comment was wrong.
 pub fn extract_spawn_failure(err: &anyhow::Error) -> Option<SpawnFailure> {
     err.downcast_ref::<SpawnFailure>().cloned()
 }

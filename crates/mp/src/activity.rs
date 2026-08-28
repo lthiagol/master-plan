@@ -344,6 +344,22 @@ pub fn watch_stopped_event(pid: u32) -> ActivityEvent {
     ActivityEvent::now("watch-stopped", "", format!("mp watch stopped (pid {pid})"))
 }
 
+/// M197 F-04: the lazy auto-set fallback fired during an
+/// `mp watch` invocation. The `harness` is the single installed
+/// harness that `try_lazy_auto_set` chose; both
+/// `agent.runner.harness` and `agent.coordinator.harness` were
+/// previously unset and are now set to `harness` (the change is
+/// also persisted to `config.json`). Emitted so the activity
+/// feed captures the auto-set path symmetrically with the
+/// explicit `mp init` path.
+pub fn lazy_auto_set_event(harness: &str) -> ActivityEvent {
+    ActivityEvent::now(
+        "lazy-auto-set",
+        "",
+        format!("lazy auto-set: agent.runner.harness and agent.coordinator.harness = {harness}"),
+    )
+}
+
 /// M180 S5: watch run reached a terminal outcome. Maps the
 /// M178 `RunOutcome` variants onto the 5-state Overview watch
 /// summary (M180 `watch-summary-derivation` design decision).

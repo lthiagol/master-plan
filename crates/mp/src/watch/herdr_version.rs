@@ -33,7 +33,15 @@ use serde::Serialize;
 /// the single source of truth for the spawn-shape contract; if
 /// herdr ever renames `--kind` to `--harness` (or moves
 /// `--pane` to a workspace-level flag), this is the place to
-/// update and bump the version floor.
+/// update AND bump [`REQUIRED_HERDR_VERSION_FLOOR`] in
+/// lockstep.
+///
+/// F-05: the two constants are not co-versioned by a compiler
+/// assertion (Rust cannot tie a `&[&str]` to a `&str` for
+/// ordering), so a future flag change must update both at once.
+/// The unit test `expected_flags_and_version_floor_are_paired`
+/// pins the current pairing; if you add / remove a flag, bump
+/// the version floor and update the test's expected tuple.
 pub const EXPECTED_START_FLAGS: &[&str] = &["--kind", "--pane"];
 
 /// The herdr version that introduced the current shape. The
@@ -42,6 +50,10 @@ pub const EXPECTED_START_FLAGS: &[&str] = &["--kind", "--pane"];
 /// shape check (does `agent start --help` list the expected
 /// flags?) is the actual capability test, because the version
 /// string is only a proxy.
+///
+/// F-05: this floor tracks [`EXPECTED_START_FLAGS`]. A change
+/// to the flag set must bump this constant and update the
+/// `expected_flags_and_version_floor_are_paired` test.
 pub const REQUIRED_HERDR_VERSION_FLOOR: &str = "0.7.0";
 
 /// The verdict from probing the herdr CLI. `compatible=true` is
@@ -348,6 +360,20 @@ mod tests {
         // changing the order or removing a flag is a breaking
         // change to the wp2 realignment.
         assert_eq!(EXPECTED_START_FLAGS, &["--kind", "--pane"]);
+    }
+
+    #[test]
+    fn expected_flags_and_version_floor_are_paired() {
+        // F-05: pin the (flag-set, version-floor) pairing as a
+        // single tuple. Adding / removing an EXPECTED_START_FLAGS
+        // entry without bumping REQUIRED_HERDR_VERSION_FLOOR
+        // would let the version check say "AtOrAbove" while the
+        // shape check fails (misleading). The expected tuple
+        // below is the only place that names the pair; update
+        // it when you change either side.
+        let expected_pair: (&[&str], &str) = (EXPECTED_START_FLAGS, REQUIRED_HERDR_VERSION_FLOOR);
+        let snapshot: (&[&str], &str) = (&["--kind", "--pane"], "0.7.0");
+        assert_eq!(expected_pair, snapshot);
     }
 
     #[test]

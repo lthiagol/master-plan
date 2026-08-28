@@ -82,16 +82,22 @@ pub(crate) fn cmd_watch(
     // "harness not set" message — the operator resolves the
     // ambiguity by hand via `mp config set`.
     let auto_set_decision = try_lazy_auto_set(&mut cfg);
-    if matches!(
-        auto_set_decision,
-        crate::harness::AutoSetDecision::AutoSet { .. }
-    ) {
+    if let crate::harness::AutoSetDecision::AutoSet { harness } = &auto_set_decision {
         if let Err(e) = store::write_config(ctx, &cfg) {
             // Non-fatal: a config-write failure here just means a
             // follow-up `mp watch` will re-run the auto-set. Log
             // and continue.
             eprintln!("warning: failed to persist auto-set harness config: {e:#}");
         }
+        // M197 F-04: emit a structured activity event so the
+        // activity feed captures the auto-set path symmetrically
+        // with the explicit `mp init` path. Best-effort: a write
+        // failure here is non-fatal (the persisted config is the
+        // source of truth; the activity event is audit-only).
+        let _ = crate::activity::append_event_best_effort(
+            ctx,
+            crate::activity::lazy_auto_set_event(harness),
+        );
     }
     let preconditions = check_preconditions(&cfg, &log_path);
 

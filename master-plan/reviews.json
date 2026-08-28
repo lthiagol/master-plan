@@ -1932,6 +1932,52 @@
       "author": "agent:runner",
       "body": "Remediation commit d0a723a: fixed F-15 (fire_watch_tick now calls lane_cache.check_and_update_mtime(mp_dir) before load_dashboard on Overview lane — mirrors the guard load_data_for_lane applies on lane switches; external plan-dir edits now invalidate the cached snapshot and the reload branch actually fires). Backlog: F-14 medium (AC-05 watch reload+rearm branch untested end-to-end — F-07 unit test deliberately avoids the load_dashboard branch; integration test needed), F-16..F-21 low (stale doc: mode.rs Settings variant 'no-op stub until M140 lands', keybinds.rs '1..8' cap, config.rs:250-251 references deleted commands::milestones::list/spec modules, path_tree_model.rs 'M157 emitters in flight'; UX gap: '0' digit jumps to lane 0 undocumented; test gap: sentinel test for invalid-value/multi-positional/colour-vs-color). All 430 raul tests pass.",
       "created_at": "2026-07-13T12:04:28.323521+00:00"
+    },
+    {
+      "id": "C-14",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "External review verdict for M197: ok on substance, 4 new low-severity findings filed (F-02 docs, F-03 maintainability, F-04 maintainability, F-05 maintainability). Architecture: harness/auto.rs is a clean pure module with a single AutoSetDecision enum reused across store::init_plan_inner, watch::try_lazy_auto_set, and doctor::doctor_project. check_harnesses routes through the same is_harness_fully_installed helper as auto-set, so 'what is installed' cannot drift between surfaces. The herdr version + shape gate (herdr_version.rs) is well-scoped: EXPECTED_START_FLAGS is the authoritative contract, REQUIRED_HERDR_VERSION_FLOOR is informational. SpawnFailure carries command/argv/exit_code/stdout/stderr and extract_spawn_failure unwraps it from anyhow; sequencer halts on SpawnFailed (no retry of a known-bad launch) and forwards RunOutcome verbatim. execution.rs WatchReadiness parity is clean - one canonical precondition function powers execution check, watch start, and milestone handoff. Tests: cargo nextest run -p mp --lib -> 376/376; watch_herdr_start 15/15, watch_spawn_diagnostics/watch_log_prompt_source/watch_execution/watch_sequential/watch_preconditions combined 63/63, watch_non_dry_run 9/9 (F-01 test now passes). cargo clippy -p mp --tests --no-deps -- -D warnings clean; cargo fmt --all -- --check clean. Filed 4 findings (all non-blocking docs/maintainability polish). Verdict: ok. Note: mp reviews pass refused because the milestone is still in remediation; the runner should complete remediation (close F-02..F-05) and then the pass will be recordable.",
+      "created_at": "2026-08-28T16:09:55.893312+00:00"
+    },
+    {
+      "id": "C-15",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "F-02: Plan-zone evidence for F-01 is stale. F-01 (watch_non_dry_run fixture parser) is recorded as 'status: fixed, fixed_in: HEAD, resolved: 2026-08-28' in the milestone findings, but the step-6 self-review text inside the milestone JSON still says 'Marked backlog (low severity) for the next dogfood pass.' A reader who only reads the step evidence will think F-01 is open. Fix: update the step-6 self-review text to reflect the close-out (e.g., 'F-01 filed + fixed in this milestone; test now passes; closed as fixed.')",
+      "finding_id": "F-02",
+      "created_at": "2026-08-28T16:09:56.803561+00:00"
+    },
+    {
+      "id": "C-16",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "F-03: crates/mp/src/watch/herdr.rs:283-298 - the comment on extract_spawn_failure says 'SpawnFailure derives neither Send nor Sync, so callers should not expect to cross thread boundaries with one.' This is incorrect: all fields (String, Vec<String>, Option<i32>) are Send+Sync, so the type is auto-Send+Sync by default. The comment is misleading. Either (a) remove the comment if no thread-crossing concern exists, or (b) add an explicit negative impl (impl !Send for SpawnFailure {} via PhantomData) if the intent is to opt out. Current code has neither. mp watch is single-threaded today, so this is latent, not active.",
+      "finding_id": "F-03",
+      "created_at": "2026-08-28T16:09:57.748593+00:00"
+    },
+    {
+      "id": "C-17",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "F-04: crates/mp/src/commands/watch.rs:84-95 - try_lazy_auto_set persists a config change when AutoSet fires, but the only audit trail is the persisted config.json. There is no activity.json event for the lazy auto-set. Operators checking activity.json cannot see the lazy fallback firing. Fix: emit a 'lazy_auto_set' activity event when try_lazy_auto_set transitions to AutoSet so the activity feed captures the auto-set path symmetrically with the explicit mp init path.",
+      "finding_id": "F-04",
+      "created_at": "2026-08-28T16:09:58.581098+00:00"
+    },
+    {
+      "id": "C-18",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "F-05: crates/mp/src/watch/herdr_version.rs:45 - REQUIRED_HERDR_VERSION_FLOOR is documented as informational, the actual capability test is EXPECTED_START_FLAGS. This is correct. But the constant is never updated when EXPECTED_START_FLAGS changes; if herdr 0.8.x renames --kind to --harness, the shape check will fail (good) and the version check will say 'AtOrAbove' (misleading). Fix: add a doc-test or unit test asserting version-floor bumps when EXPECTED_START_FLAGS changes, or an inline comment in EXPECTED_START_FLAGS flagging it as a breaking-change contract.",
+      "finding_id": "F-05",
+      "created_at": "2026-08-28T16:09:59.536233+00:00"
+    },
+    {
+      "id": "C-19",
+      "milestone_id": "197",
+      "author": "external-reviewer (mavis)",
+      "body": "Follow-up external review (round 2): 4 new low-severity findings (F-02 docs, F-03 maintainability, F-04 maintainability, F-05 maintainability) — all 4 applied. Code: F-03 rewrote extract_spawn_failure doc-comment to drop the misleading 'derives neither Send nor Sync' claim (SpawnFailure IS auto-Send+Sync); F-04 added activity::lazy_auto_set_event and wired it into try_lazy_auto_set in commands/watch.rs; F-05 added co-versioning test expected_flags_and_version_floor_are_paired + tightened EXPECTED_START_FLAGS / REQUIRED_HERDR_VERSION_FLOOR doc-comments. Plan: F-02 updated all 5 ACs (AC-01..AC-05) via mp milestone ac update to reflect the F-01 close-out + the new F-02..F-05 close-out summary. All 4 findings resolved. Verification: cargo nextest run -p mp --lib -> 377/377 (was 376, +1 for the new co-versioning test); watch_herdr_start 15/15; watch_spawn_diagnostics + watch_preconditions + watch_sequential combined 46/46; cargo clippy -p mp --tests --no-deps -- -D warnings clean; cargo fmt --all -- --check clean; mp validate clean for M197. Verdict: ok.",
+      "created_at": "2026-08-28T16:20:27.894183+00:00"
     }
   ],
   "handoffs": [
