@@ -51,7 +51,17 @@ fn fixture() -> (TempDir, MpRunner) {
 }
 
 fn open_settings_lane(app: &mut App, runner: &MpRunner) {
-    let idx = Lane::ordered()
+    // M198: Settings is always in the visible list (it's a
+    // control surface, not a domain lane), but its *index* in
+    // the visible list depends on `ui.show_watch_tab`. The
+    // M169-rev tests exercise the full 7-lane tab order (Tab
+    // wraps from Settings → Watch → Settings per AC-01), so
+    // pin `show_watch_tab = true` for the duration of these
+    // tests. The M198 spec is orthogonal — it filters Watch
+    // out of the default surface; the M169-rev tests assert
+    // the wrap behaviour assuming Watch is visible.
+    app.show_watch_tab = true;
+    let idx = Lane::ordered_visible(true)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();
@@ -325,6 +335,10 @@ fn rev_low_shift_tab_on_overview_wraps_to_settings() {
 fn rev_low_tab_cycles_through_all_lanes_in_order() {
     let mut app = App::new();
     // M184: 7 lanes. Tab still wraps from Settings back to Overview.
+    // M198: pin `show_watch_tab = true` so the visible list is
+    // the full 7-lane registry (the test is about the M184 wrap
+    // contract, not the M198 filter).
+    app.show_watch_tab = true;
     let expected = [
         Lane::Milestones,
         Lane::Path,
