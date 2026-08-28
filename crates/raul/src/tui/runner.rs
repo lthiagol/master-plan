@@ -401,10 +401,10 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // `state.json` or a mid-session reload), fall back to
     // Overview. The check uses the *visible* list so it is
     // the same set the tab bar / hit-test / prev-next
-    // navigation all see — single filter point.
-    if !Lane::ordered_visible(app.show_watch_tab).contains(&app.active_lane) {
-        app.active_lane = Lane::Overview;
-    }
+    // navigation all see — single filter point. F-05: this
+    // is now a method on `App` so the same code path is
+    // unit-testable from `app.rs::tests`.
+    app.reconcile_active_lane_with_visible();
     app.keybinds = crate::tui::keybinds::Keybinds::load(runner);
 
     // M143: prime the LaneCache with the live plan-dir mtime so external
@@ -716,29 +716,43 @@ fn dispatch_key(app: &App, key: crossterm::event::KeyEvent) -> Vec<Action> {
 /// The function stays `pub` for the existing tests, but it now
 /// imports from `view_state` (the layout machinery moved out of
 /// `render`).
-pub fn tab_hit_test(x: u16, compact: bool) -> Option<usize> {
+pub fn tab_hit_test(x: u16, compact: bool, lanes: &[Lane]) -> Option<usize> {
     // Force the wide-mode layout (no overflow): `u16::MAX` is wider than
     // any real terminal, so `compute_tab_bar_layout` skips the overflow
     // path and returns `visible = 0..total` regardless of which lane is
     // active. The active-lane argument is therefore irrelevant here; any
     // lane (we use `Lane::Overview` for concreteness) produces the same
     // answer. See `compute_tab_bar_layout` for the wide-mode contract.
-    let layout =
-        view_state::compute_tab_bar_layout(u16::MAX, compact, &Lane::Overview, &Lane::ordered());
-    tab_hit_test_for_layout(x, &layout)
+    //
+    // F-02: the helper now threads the filtered `&[Lane]` through to
+    // both `compute_tab_bar_layout` and `tab_hit_test_for_layout` so
+    // it goes through the M198 single-filter-point design. The
+    // pre-existing tui_tab_bar tests pass `&Lane::ordered()` (the
+    // historical 7-lane contract they pin); callers that want the
+    // "Watch hidden" shape pass `&Lane::ordered_visible(false)`.
+    let layout = view_state::compute_tab_bar_layout(u16::MAX, compact, &Lane::Overview, lanes);
+    tab_hit_test_for_layout(x, &layout, lanes)
 }
 
 /// M105 S1 (B-39): wide-mode hit test helper. Kept `pub` for the
 /// pre-existing `tui_tab_bar.rs` tests that pin the non-overflow
 /// contract; the mouse path no longer calls it directly — it reads
 /// from the pre-computed `ViewState` instead (M135).
-pub fn tab_hit_test_for_layout(x: u16, layout: &view_state::TabBarLayout) -> Option<usize> {
-    // M198: the helper preserves the legacy "all 7 lanes" contract
-    // because it is only called from the pre-existing tui_tab_bar
-    // tests that pin the non-overflow wiring. Production mouse
-    // dispatch reads from the pre-computed ViewState instead
-    // (M135), which already sees the filtered list.
-    for &(lane_idx, start_x, end_x) in &view_state::visible_tab_x_ranges(layout, &Lane::ordered()) {
+///
+/// F-02: the helper takes a `&[Lane]` argument so the hit-test
+/// areas agree with the renderer's filtered list. Pass the same
+/// `&[Lane]` slice that was used to build the `layout`; for the
+/// pre-M198 7-lane tests that is `&Lane::ordered()`, for the
+/// post-M198 "Watch hidden" tests it is
+/// `&Lane::ordered_visible(false)`. Production mouse dispatch
+/// reads the filtered list from the pre-computed `ViewState`
+/// instead (M135).
+pub fn tab_hit_test_for_layout(
+    x: u16,
+    layout: &view_state::TabBarLayout,
+    lanes: &[Lane],
+) -> Option<usize> {
+    for &(lane_idx, start_x, end_x) in &view_state::visible_tab_x_ranges(layout, lanes) {
         if (x as u32) >= start_x as u32 && (x as u32) < end_x as u32 {
             return Some(lane_idx);
         }

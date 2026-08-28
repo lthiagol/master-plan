@@ -379,12 +379,20 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     // effective value plus the source (`explicit set` vs
     // `default false`) so the operator can see whether the
     // Watch tab will appear in their next `raul` session.
+    //
+    // F-04: include a "restart raul to take effect" hint so
+    // the operator who toggles the flag and expects the tab
+    // bar to flip on the next frame is told once, in the
+    // doctor output, that the change requires a restart.
+    // The Settings tab help text already says this, but the
+    // operator who lands in doctor first (e.g. via CI / a
+    // debugging flow) will see it here too.
     let show_watch = cfg.ui.show_watch_tab.unwrap_or(false);
     checks.push(DoctorCheck {
         name: "ui_show_watch_tab".to_string(),
         ok: true,
         message: format!(
-            "ui.show_watch_tab = {} ({})",
+            "ui.show_watch_tab = {} ({}) — restart raul to take effect",
             show_watch,
             if cfg.ui.show_watch_tab.is_some() {
                 "explicit set"

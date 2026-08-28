@@ -342,10 +342,19 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // M198: digit keys 1..=N follow the *visible* lane
             // list (Watch omitted when `ui.show_watch_tab` is
             // `false`) so the on-screen tab number matches the
-            // key. A stale idx (e.g. the operator toggled the
-            // flag off between digit press and dispatch) is
-            // silently ignored — the S4 fallback handles the
-            // case where Watch *was* the active lane.
+            // key. F-03: the `lanes.get(idx)` is a defensive
+            // bounds check — `Action::JumpLane` is a public
+            // enum variant that any caller (the digit dispatch
+            // in `modes/normal.rs`, future programmatic
+            // dispatchers, tests) can construct. The digit
+            // dispatch itself always computes the index from
+            // the same `Lane::ordered_visible(app.show_watch_tab)`
+            // at the same call site, so a stale index from the
+            // digit path is impossible; this guard is for other
+            // callers. The S4 startup-time fallback
+            // (`runner.rs`) handles the case where Watch *was*
+            // the active lane and the operator toggled the
+            // flag off in config.
             let lanes = Lane::ordered_visible(app.show_watch_tab);
             if let Some(lane) = lanes.get(idx) {
                 app.select_lane(*lane);

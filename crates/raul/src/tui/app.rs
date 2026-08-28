@@ -1794,6 +1794,21 @@ impl App {
             self.select_lane(lanes[0]);
         }
     }
+
+    /// M198 S4 / AC-04 + F-05: if the active lane is not in the
+    /// *visible* lane set (e.g. an old `state.json` named
+    /// `Lane::Watch` as active but the operator's config now
+    /// has `ui.show_watch_tab = false`), reset to `Overview`.
+    /// Overview is the default landing lane and is always
+    /// visible, so it preserves a sane state regardless of
+    /// which other lanes are also hidden. Called once at
+    /// startup by the runner after `show_watch_tab` is loaded
+    /// from `UiConfig`.
+    pub fn reconcile_active_lane_with_visible(&mut self) {
+        if !Lane::ordered_visible(self.show_watch_tab).contains(&self.active_lane) {
+            self.active_lane = Lane::Overview;
+        }
+    }
 }
 
 /// Terminal backlog statuses hidden by `hide_done` (`h` on the Backlog tab).
@@ -2214,5 +2229,46 @@ mod tests {
         app.active_lane = Lane::Ideas;
         app.tab_move_down();
         assert_eq!(app.active_lane, Lane::Watch);
+    }
+
+    /// M198 S4 / AC-04 + F-05: when the active lane is not in
+    /// the visible set (Watch hidden, active lane was Watch),
+    /// `reconcile_active_lane_with_visible` falls back to
+    /// Overview. This is the startup-time guard the runner
+    /// calls after loading `UiConfig`; the unit test pins the
+    /// same code path that the integration TUI test would.
+    #[test]
+    fn reconcile_active_lane_falls_back_when_watch_is_hidden() {
+        let mut app = App::new();
+        app.show_watch_tab = false;
+        app.active_lane = Lane::Watch; // stale state
+        app.reconcile_active_lane_with_visible();
+        assert_eq!(app.active_lane, Lane::Overview);
+    }
+
+    /// M198 S4 / AC-04 + F-05: when the active lane IS in
+    /// the visible set, the guard is a no-op. The Watch lane
+    /// stays active when `ui.show_watch_tab = true`.
+    #[test]
+    fn reconcile_active_lane_preserves_when_watch_is_visible() {
+        let mut app = App::new();
+        app.show_watch_tab = true;
+        app.active_lane = Lane::Watch;
+        app.reconcile_active_lane_with_visible();
+        assert_eq!(app.active_lane, Lane::Watch);
+    }
+
+    /// M198 S4 / AC-04 + F-05: a lane that is always visible
+    /// (e.g. Milestones) is preserved regardless of the
+    /// Watch flag. This pins the "Overview is the fallback,
+    /// not the only valid result" semantics — the guard only
+    /// fires when the active lane is genuinely hidden.
+    #[test]
+    fn reconcile_active_lane_preserves_visible_lane_regardless_of_watch() {
+        let mut app = App::new();
+        app.show_watch_tab = false;
+        app.active_lane = Lane::Milestones;
+        app.reconcile_active_lane_with_visible();
+        assert_eq!(app.active_lane, Lane::Milestones);
     }
 }

@@ -3,8 +3,8 @@
     "id": "198",
     "title": "raul watch tab — make it optional, hidden by default, configurable via Settings",
     "slug": "raul-watch-tab-make-it-optional-hidden-by-default-configurable-via-settings",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -15,7 +15,7 @@
     "effort": "S",
     "risk": "low",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-08-20",
     "updated": "2026-08-28",
     "blocked_at": "",
@@ -23,7 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-28T16:55:23.041217+00:00"
+    "lifecycle_at": "2026-08-28T17:37:31.346757+00:00"
   },
   "intent": {
     "outcome": "The Watch lane in the raul TUI is hidden by default. Users opt-in to see it via a Settings toggle. The toggle is persisted as a project-level UI config key, matches existing patterns (ui.hide_done), and behaves consistently with other UI settings (live update, doctor surface, test coverage)."
@@ -274,6 +274,54 @@
       "created": "2026-08-28",
       "resolved": "2026-08-28",
       "summary": "keybinds footer_tab_bar still says 1-7 when Watch tab is hidden"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/raul/src/tui/runner.rs:733-740 — tab_hit_test_for_layout preserves the legacy 'all 7 lanes' contract by passing &Lane::ordered() to visible_tab_x_ranges, bypassing the M198 single-filter-point design. The justification comment is honest ('only called from pre-existing tui_tab_bar tests that pin the non-overflow wiring; production mouse dispatch reads from the pre-computed ViewState'), but the principle is broken: if a new test or caller uses this helper expecting M198-correctness, they will get the wrong behavior. Confirmed via grep: tab_hit_test_for_layout is called only from crates/raul/src/tui/view_state.rs::tests and crates/raul/tests/tui_tab_bar.rs. Fix: thread the filtered list through tab_hit_test_for_layout(layout, lanes) and update the tui_tab_bar test calls to pass &Lane::ordered_visible(true) (Watch visible is the historical default, matching the legacy 7-lane tests). The view_state::tests callers should also pass a list — either &Lane::ordered() (legacy 7-lane test) or &Lane::ordered_visible(true) (explicit 'Watch visible' case). Low severity because the production mouse dispatch already goes through ViewState and is unaffected.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-08-28",
+      "resolved": "2026-08-28",
+      "summary": "tab_hit_test_for_layout bypasses the single-filter-point"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "crates/raul/src/tui/action.rs:339-348 — the comment on the Action::JumpLane(idx) handler says 'A stale idx (e.g. the operator toggled the flag off between digit press and dispatch) is silently ignored — the S4 fallback handles the case where Watch *was* the active lane.' This scenario is impossible in the current architecture: the digit dispatch in crates/raul/src/tui/modes/normal.rs:112-127 computes max_idx = Lane::ordered_visible(app.show_watch_tab).len() at the same call site that constructs Action::JumpLane(d - 1), so the index is always in-range when the action is constructed. The lanes.get(idx) bounds check is still correct (defensive for any other caller of Action::JumpLane, including future programmatic dispatchers and tests), but the comment misleads future readers about the actual race condition. Fix: rewrite the comment to say something like 'defensive bounds check: Action::JumpLane is a public enum variant; any other caller may pass an out-of-range index, which is silently ignored rather than panicking, so the UI layer does not need to pre-validate.'",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-08-28",
+      "resolved": "2026-08-28",
+      "summary": "Action::JumpLane comment misdescribes a stale-idx scenario"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "maintainability",
+      "description": "M198 design choice (per the milestone design_decisions + the spec scope) is that show_watch_tab is read once at startup and pinned on App; mid-session flips require a restart. The intent is documented in three places: crates/raul/src/config.rs:38-46 (field doc), crates/raul/src/tui/runner.rs:391-396 (load + pin), and crates/raul/src/tui/modes/settings/help.rs:46-47 (operator-facing help). The operator who toggles ui.show_watch_tab in Settings (or via ) and expects the tab bar to flip on the next frame will be confused — there is no in-app hint that the change requires a restart, and the doctor's 'explicit set' line doesn't say 'restart required.' Fix (small, doc-only): add a one-line hint to the doctor::ui_show_watch_tab check (e.g., 'restart raul to take effect') so the operator sees it once and never has to dig into help.rs. Alternative: add a toast / inline hint in the Settings lane when the value changes. Low severity because the help text already says 'restart raul for the change to take effect' — this is a discoverability improvement, not a bug.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-08-28",
+      "resolved": "2026-08-28",
+      "summary": "show_watch_tab is loaded once at startup; mid-session flips need restart"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "category": "docs",
+      "description": "crates/raul/src/tui/runner.rs:400-405 — the AC-04 fallback (if !Lane::ordered_visible(app.show_watch_tab).contains(&app.active_lane) { app.active_lane = Lane::Overview; }) is in run_tui_inner, which is not unit-testable. The verification command in the AC-04 metadata is 'TUI test: set active lane to Watch, stage ui.show_watch_tab = false, commit, assert active_lane == Lane::Overview. Mirror the reload-keeping pattern from m169_rev.rs::rev_med_reload_keeping_preserves_listed_keys' — pointing at the M169 integration-test template. The M198 commit folded the F-01 fix into the same commit but did not add a TUI integration test for AC-04's startup-fallback path. The unit tests in app.rs::tests cover the tab_move fallback paths, but the runner's startup-time guard is a different code path with a different trigger (config reload / fresh process start vs. user pressing Tab). Fix: add an integration test in crates/raul/tests/ that boots a raul TUI with ui.show_watch_tab=false and active_lane=Watch in state.json, then asserts the active_lane is reset to Overview. Low severity because the existing tab_move unit tests cover the same fallback logic with the same visible-set semantics, and the AC-04 test would be a near-duplicate.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-08-28",
+      "resolved": "2026-08-28",
+      "summary": "No integration test covers the runner startup guard"
     }
   ]
 }

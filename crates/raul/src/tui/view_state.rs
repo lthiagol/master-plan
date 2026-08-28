@@ -1398,7 +1398,7 @@ mod tests {
         if layout.has_left_indicator {
             for x in 0u16..INDICATOR_WIDTH as u16 {
                 assert_eq!(
-                    tab_hit_test_for_layout(x, &layout),
+                    tab_hit_test_for_layout(x, &layout, &Lane::ordered()),
                     None,
                     "click x={x} landed on left indicator; must be None (got hit on hidden tab)"
                 );
@@ -1410,7 +1410,7 @@ mod tests {
             // lives in the trailing `INDICATOR_WIDTH` cells.
             for x in (layout_total.saturating_sub(INDICATOR_WIDTH as u16)..layout_total).rev() {
                 assert_eq!(
-                    tab_hit_test_for_layout(x, &layout),
+                    tab_hit_test_for_layout(x, &layout, &Lane::ordered()),
                     None,
                     "click x={x} landed on right indicator; must be None"
                 );
@@ -1422,7 +1422,7 @@ mod tests {
             let ellipsis_start = INDICATOR_WIDTH as u16;
             for x in ellipsis_start..(ellipsis_start + ellipsis_w) {
                 assert_eq!(
-                    tab_hit_test_for_layout(x, &layout),
+                    tab_hit_test_for_layout(x, &layout, &Lane::ordered()),
                     None,
                     "click x={x} landed on left ellipsis; must be None"
                 );
@@ -1497,7 +1497,7 @@ mod tests {
         let layout = narrow_overflow_layout(2);
         for x in [20u16, 21, 30, 100, u16::MAX] {
             assert_eq!(
-                tab_hit_test_for_layout(x, &layout),
+                tab_hit_test_for_layout(x, &layout, &Lane::ordered()),
                 None,
                 "click x={x} is outside the rendered bar; must be None"
             );
@@ -1519,7 +1519,7 @@ mod tests {
         );
 
         for x in 0u16..20 {
-            if let Some(idx) = tab_hit_test_for_layout(x, &layout) {
+            if let Some(idx) = tab_hit_test_for_layout(x, &layout, &Lane::ordered()) {
                 assert!(
                     layout.visible.contains(&idx),
                     "click x={x} resolved to hidden lane idx={idx}; \
@@ -1565,10 +1565,19 @@ mod tests {
             (0..Lane::ordered().len()).collect::<Vec<_>>()
         );
 
-        assert_eq!(tab_hit_test_for_layout(0, &layout), None);
-        assert_eq!(tab_hit_test_for_layout(1, &layout), Some(0));
-        assert_eq!(tab_hit_test_for_layout(3, &layout), Some(0));
-        assert_eq!(tab_hit_test_for_layout(200, &layout), None);
+        assert_eq!(tab_hit_test_for_layout(0, &layout, &Lane::ordered()), None);
+        assert_eq!(
+            tab_hit_test_for_layout(1, &layout, &Lane::ordered()),
+            Some(0)
+        );
+        assert_eq!(
+            tab_hit_test_for_layout(3, &layout, &Lane::ordered()),
+            Some(0)
+        );
+        assert_eq!(
+            tab_hit_test_for_layout(200, &layout, &Lane::ordered()),
+            None
+        );
     }
 
     #[test]
@@ -1590,24 +1599,33 @@ mod tests {
             .collect();
 
         // Click immediately before the bar's left margin returns None.
-        assert_eq!(tab_hit_test_for_layout(0, &layout), None);
+        assert_eq!(tab_hit_test_for_layout(0, &layout, &Lane::ordered()), None);
         // First-lane interior returns idx=0 (Overview).
-        assert_eq!(tab_hit_test_for_layout(1, &layout), Some(0));
+        assert_eq!(
+            tab_hit_test_for_layout(1, &layout, &Lane::ordered()),
+            Some(0)
+        );
         // First-lane trailing space still maps to Overview.
         let (_, e0) = by_idx[&0];
         assert_eq!(
-            tab_hit_test_for_layout(e0.saturating_sub(1), &layout),
+            tab_hit_test_for_layout(e0.saturating_sub(1), &layout, &Lane::ordered()),
             Some(0)
         );
         // Click in the third lane (idx=2 = Path) picks Path.
         let (s2, e2) = by_idx[&2];
-        assert_eq!(tab_hit_test_for_layout(s2, &layout), Some(2));
         assert_eq!(
-            tab_hit_test_for_layout(e2.saturating_sub(1), &layout),
+            tab_hit_test_for_layout(s2, &layout, &Lane::ordered()),
+            Some(2)
+        );
+        assert_eq!(
+            tab_hit_test_for_layout(e2.saturating_sub(1), &layout, &Lane::ordered()),
             Some(2)
         );
         // After the bar ends, every click is None.
-        assert_eq!(tab_hit_test_for_layout(200, &layout), None);
+        assert_eq!(
+            tab_hit_test_for_layout(200, &layout, &Lane::ordered()),
+            None
+        );
     }
 
     // ---- M115 / M124: narrow-width budget (originally

@@ -1839,6 +1839,14 @@
       "reviewed_at": "2026-08-25",
       "notes": "",
       "milestone_completed_at": "2026-08-25"
+    },
+    {
+      "milestone_id": "198",
+      "verdict": "ok",
+      "reviewer": "external-reviewer (mavis)",
+      "reviewed_at": "2026-08-28",
+      "notes": "External review of M198 (raul watch tab — optional, hidden by default, configurable via Settings). Architecture: single-filter-point design is well-executed — Lane::ordered_visible(show_watch_tab) is the canonical helper, and every consumer (tab bar compute, hit-test, prev/next navigation, digit dispatch, JumpLane, footer_tab_bar) reads from the same filtered list. The compute_tab_bar_layout / visible_tab_x_ranges signature change (taking lanes: &[Lane]) is a clean threading. Startup guard in runner.rs (fall back to Overview if active_lane not in visible set) is a thoughtful edge case. doctor::doctor_project surfaces the value + source correctly. Action::JumpLane defensive bounds check is correct. Tests: cargo nextest run -p raul --lib -E 'test(/ordered_visible|tab_move_/)' -> 7/7 passed; raul full lib -> 197/197 passed; raul --test keybinds -> 12/12 passed (incl. the F-01 fix to footer_tab_bar asserts both '1-7:jump' and '1-6:jump'); mp --test suite_config -> 17/17 passed. cargo clippy -p raul --tests --no-deps -- -D warnings clean; -p mp clean; cargo fmt --all -- --check clean. Filed 4 new low-severity findings (F-02..F-05) — all docs/maintainability polish, not correctness. The M198 design is sound, the F-01 self-finding was caught and fixed before the commit landed, and the verification commands in the commit body all pass. Verdict: ok.",
+      "milestone_completed_at": "2026-08-28"
     }
   ],
   "comments": [

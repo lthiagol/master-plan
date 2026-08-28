@@ -617,9 +617,12 @@ use raul::tui::runner::tab_hit_test;
 fn s5_tab_hit_test_first_tab_full_labels() {
     // Full labels at wide widths. After 1 leading space the first tab
     // (" Overview ") occupies cols 1..11 inclusive (length 10).
-    assert_eq!(tab_hit_test(1, false), Some(0));
-    assert_eq!(tab_hit_test(2, false), Some(0)); // inside Overview label
-    assert_eq!(tab_hit_test(10, false), Some(0)); // last col of first tab
+    // F-02: pin the legacy 7-lane contract (Watch visible) — these
+    // tests predate M198.
+    let lanes = &Lane::ordered();
+    assert_eq!(tab_hit_test(1, false, lanes), Some(0));
+    assert_eq!(tab_hit_test(2, false, lanes), Some(0)); // inside Overview label
+    assert_eq!(tab_hit_test(10, false, lanes), Some(0)); // last col of first tab
 }
 
 #[test]
@@ -631,28 +634,30 @@ fn s5_tab_hit_test_full_labels_third_tab_is_path() {
     // hardcoded col 25 because the format added a leading space
     // before `│` (which shifted every subsequent lane right by
     // one column).
-    let lanes = Lane::ordered();
+    let lanes = &Lane::ordered();
     assert_eq!(lanes[2], Lane::Path);
-    assert_eq!(tab_hit_test(24, false), Some(2)); // first col of Path
-    assert_eq!(tab_hit_test(27, false), Some(2)); // inside Path label
-    assert_eq!(tab_hit_test(30, false), Some(2)); // last col of Path
+    assert_eq!(tab_hit_test(24, false, lanes), Some(2)); // first col of Path
+    assert_eq!(tab_hit_test(27, false, lanes), Some(2)); // inside Path label
+    assert_eq!(tab_hit_test(30, false, lanes), Some(2)); // last col of Path
 }
 
 #[test]
 fn s5_tab_hit_test_compact_labels_narrow_mode() {
     // Narrow widths use compact_label(). " Ov " (1 leading + label + 1 trailing)
     // occupies cols 1..4. First tab is still lane 0 (Overview).
-    assert_eq!(tab_hit_test(1, true), Some(0));
-    assert_eq!(tab_hit_test(3, true), Some(0));
+    let lanes = &Lane::ordered();
+    assert_eq!(tab_hit_test(1, true, lanes), Some(0));
+    assert_eq!(tab_hit_test(3, true, lanes), Some(0));
 }
 
 #[test]
 fn s5_tab_hit_test_past_all_tabs_returns_none() {
     // x past the right edge of the bar — well past 7 lanes at full label.
-    assert_eq!(tab_hit_test(200, false), None);
-    assert_eq!(tab_hit_test(200, true), None);
-    assert_eq!(tab_hit_test(0, true), None); // col 0 is leading space
-    assert_eq!(tab_hit_test(0, false), None);
+    let lanes = &Lane::ordered();
+    assert_eq!(tab_hit_test(200, false, lanes), None);
+    assert_eq!(tab_hit_test(200, true, lanes), None);
+    assert_eq!(tab_hit_test(0, true, lanes), None); // col 0 is leading space
+    assert_eq!(tab_hit_test(0, false, lanes), None);
 }
 
 #[test]
@@ -661,11 +666,11 @@ fn s5_click_on_tab_bar_row_selects_that_lane() {
     // the invariants via the helper tab_hit_test: any x within a tab's
     // column-span returns Some(idx). The actual mouse→lane wiring is
     // integrated through this helper (see handle_mouse row-1 branch).
-    let lanes = Lane::ordered();
+    let lanes = &Lane::ordered();
     // Iterate every lane; for each one pick a representative x inside it.
     let probe_xs: Vec<u16> = vec![5, 25, 50, 70, 95, 120, 140];
     for (i, &x) in probe_xs.iter().enumerate() {
-        if let Some(idx) = tab_hit_test(x, false) {
+        if let Some(idx) = tab_hit_test(x, false, lanes) {
             // idx should be < lanes.len().
             assert!(idx < lanes.len(), "idx {idx} out of range");
             // And the tab we hit corresponds to its label.
