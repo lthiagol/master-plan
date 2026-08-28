@@ -48,27 +48,72 @@ for part in parts:
 out.buffer.write(b'\n')
 out.flush()
 PYEOF
-case "$2" in
-  list)
+# M197 WP2: the spawn shape is now `pane split --cwd <PATH>`
+# followed by `agent start <NAME> --kind <KIND> --pane <PANE_ID>`.
+# The fake must handle:
+#   - `agent start --help` (probed by the herdr_cli_shape gate) —
+#     print a help text that lists --kind and --pane so the gate
+#     is green.
+#   - `pane split --help` (also probed) — print non-empty help.
+#   - `pane split --cwd <PATH>` — print a pane id.
+#   - `agent start <NAME> --kind K --pane ID` — print a pane id.
+#   - `agent list --format json` — print an empty agent list.
+# The dispatch routes on $1 / $2 / $3.
+case "$1:$2:$3" in
+  agent:start:--help)
+    cat <<'HELP'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID> [OPTIONS]
+
+Options:
+  --kind <KIND>  Harness kind (opencode, pi, cursor, ...)
+  --pane <ID>    Existing pane id
+  --timeout <MS> Wait for readiness
+HELP
+    ;;
+  pane:split:--help)
+    cat <<'HELP'
+Usage: herdr pane split [OPTIONS] [PANE_ID]
+
+Options:
+  --pane <ID>   Pane to split
+  --cwd <PATH>  Working directory
+  --direction   Split direction
+HELP
+    ;;
+  pane:split:*)
+    # pane split --cwd <PATH> (or with any 3rd arg). M197: return
+    # a fresh pane id so the next `agent start --pane <id>` call
+    # can address the new pane. A hostile herdr could fail; the
+    # fake always succeeds.
+    echo '{{"pane_id":"%test-pane","status":"created"}}'
+    ;;
+  agent:list:*)
     echo '{{"agents":[]}}'
     ;;
-  start)
+  agent:start:*)
+    # Real spawn. The 0.7.x shape is
+    #   agent start <NAME> --kind <KIND> --pane <PANE_ID>
+    # We don't validate the args; just return a pane id.
     echo '{{"pane_id":"%test-pane","status":"started"}}'
     ;;
-  wait)
+  agent:wait:*)
     echo '{{"status":"idle"}}'
     ;;
-  read)
+  agent:read:*)
     echo ""
     ;;
-  send)
+  agent:send:*)
+    exit 0
+    ;;
+  pane:send-keys:*)
     exit 0
     ;;
   *)
-    case "$2" in
-      send-keys) exit 0 ;;
-      *) echo ok ;;
-    esac
+    # Final fallback: still print something parseable so the
+    # preconditions and the watch driver don't bail. The real
+    # herdr is more opinionated; the fake just needs to keep
+    # the test fixture moving.
+    echo ok
     ;;
 esac
 "#,
@@ -189,6 +234,23 @@ fn non_dry_run_watch_spawns_herdr_pane_and_sends_prompt() {
         let tag = String::from_utf8_lossy(&log_bytes[pos..pos + tag_len]).into_owned();
         pos += tag_len;
         let mut parts: Vec<String> = Vec::new();
+        // Peek at the next byte: if it's the record terminator
+        // ('\n'), this record has no parts. Consume the '\n' and
+        // break. This is the only way to distinguish "no more
+        // parts" from "next record's tag length" — both are 4
+        // bytes that look like a length prefix. The pre-M197
+        // fixture got away without this peek because the legacy
+        // fake's records either had exactly one part or the
+        // `agent list` call (the only multi-part record) happened
+        // to be parseable by accident; the M197 wp2 realignment
+        // produces enough multi-part records (`pane split`,
+        // `agent start --help`, the real `agent start` with
+        // `--kind` / `--pane`) to expose the misalign.
+        if pos < log_bytes.len() && log_bytes[pos] == b'\n' {
+            pos += 1;
+            records.push((tag, parts));
+            continue;
+        }
         loop {
             if pos + 4 > log_bytes.len() {
                 break;
@@ -196,6 +258,10 @@ fn non_dry_run_watch_spawns_herdr_pane_and_sends_prompt() {
             let part_len = u32::from_be_bytes(log_bytes[pos..pos + 4].try_into().unwrap()) as usize;
             pos += 4;
             if pos + part_len > log_bytes.len() {
+                // Malformed record (part extends past end of log).
+                // Rewind so the outer loop at least has a chance
+                // to recover at the next record boundary.
+                pos -= 4;
                 break;
             }
             let part = String::from_utf8_lossy(&log_bytes[pos..pos + part_len]).into_owned();
@@ -211,9 +277,19 @@ fn non_dry_run_watch_spawns_herdr_pane_and_sends_prompt() {
     }
     let start_record = records
         .iter()
-        .find(|(t, p)| t == "agent" && p.first().map(|s| s.as_str()) == Some("start"))
+        // M197: the herdr_cli_shape precondition probes
+        // `herdr agent start --help` before the real spawn, so the
+        // first `agent start` record in the log is the help probe
+        // (parts = ["start", "--help"]). Skip help probes and find
+        // the real spawn record (parts[1] is the role label).
+        .filter(|(t, p)| {
+            t == "agent"
+                && p.first().map(|s| s.as_str()) == Some("start")
+                && p.get(1).map(|s| s.as_str()) != Some("--help")
+        })
         .map(|(_, p)| p)
-        .expect("agent start record should be in the log");
+        .next()
+        .expect("real agent start record (with role label) should be in the log");
     assert!(
         start_record.iter().any(|p| p == "role-runner-1"),
         "agent start should include role-runner-1 label; got {start_record:?}"

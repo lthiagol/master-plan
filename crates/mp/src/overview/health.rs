@@ -190,6 +190,12 @@ fn derive_watch_state(ctx: &PlanContext) -> &'static str {
         return match outcome {
             Completed => "complete",
             PartialFailure | Skipped { .. } | Exhausted { .. } => "failed",
+            // M197 WP3 / AC-04: a spawn failure is a distinct
+            // terminal kind — different from a lifecycle failure
+            // (no agent work happened) and from a skip (no skip
+            // decision was made). Raul's summary badge surfaces
+            // "spawn failed" as its own row.
+            SpawnFailed { .. } => "spawn-failed",
             GracefullyStopped => "stopped",
         };
     }

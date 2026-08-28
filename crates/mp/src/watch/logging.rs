@@ -32,6 +32,22 @@ pub struct WatchLogEntry<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pane: Option<&'a str>,
     pub message: String,
+    // M197 WP3 / AC-04: spawn diagnostics. The spawn_error event
+    // carries the full argv, stdout, stderr, and exit code so
+    // operators can diagnose a launch failure without rerunning
+    // the watch command with extra logging. These fields are
+    // None for every non-spawn event; serde omits them via the
+    // `Option` guards above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub argv: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
 }
 
 impl<'a> WatchLogEntry<'a> {
@@ -45,6 +61,11 @@ impl<'a> WatchLogEntry<'a> {
             role: None,
             pane: None,
             message: message.into(),
+            command: None,
+            argv: None,
+            exit_code: None,
+            stdout: None,
+            stderr: None,
         }
     }
 
@@ -60,6 +81,30 @@ impl<'a> WatchLogEntry<'a> {
 
     pub fn pane(mut self, pane: &'a str) -> Self {
         self.pane = Some(pane);
+        self
+    }
+
+    /// M197 WP3 / AC-04: structured spawn diagnostics. Sets the
+    /// `command` / `argv` / `exit_code` / `stdout` / `stderr`
+    /// fields on a `spawn_error` entry. The `command` is the
+    /// short subcommand tag (`"pane split"` or `"agent start"`)
+    /// and `argv` is the full argv the herdr layer would have
+    /// run. Capturing both lets an operator distinguish between
+    /// "pane split failed" and "agent start failed" without
+    /// re-reading the watch log by hand.
+    pub fn spawn_error(
+        mut self,
+        command: &'a str,
+        argv: Vec<String>,
+        exit_code: Option<i32>,
+        stdout: impl Into<String>,
+        stderr: impl Into<String>,
+    ) -> Self {
+        self.command = Some(command);
+        self.argv = Some(argv);
+        self.exit_code = exit_code;
+        self.stdout = Some(stdout.into());
+        self.stderr = Some(stderr.into());
         self
     }
 }
@@ -257,6 +302,67 @@ mod tests {
         );
         assert!(!s.contains("role"));
         assert!(!s.contains("pane"));
+        // M197 WP3 / AC-04: spawn-diagnostics fields are also
+        // optional and must be omitted when None. Otherwise a
+        // non-spawn event would carry `"argv": null, "exit_code":
+        // null, "stdout": null, "stderr": null` and clutter
+        // downstream parsers.
+        assert!(
+            !s.contains("command"),
+            "non-spawn entry should omit command: {s}"
+        );
+        assert!(!s.contains("argv"), "non-spawn entry should omit argv: {s}");
+        assert!(
+            !s.contains("exit_code"),
+            "non-spawn entry should omit exit_code: {s}"
+        );
+        assert!(
+            !s.contains("stdout"),
+            "non-spawn entry should omit stdout: {s}"
+        );
+        assert!(
+            !s.contains("stderr"),
+            "non-spawn entry should omit stderr: {s}"
+        );
+    }
+
+    #[test]
+    fn spawn_error_entry_carries_diagnostic_fields() {
+        // M197 WP3 / AC-04: the spawn_error event carries the
+        // command, full argv, exit code, stdout, and stderr so an
+        // operator can diagnose a launch failure from the log
+        // alone. Each field is a separate JSON property, not a
+        // stringified blob, so `jq` can grep / project them.
+        let e = WatchLogEntry::new("spawn_error", "herdr agent start failed")
+            .role("runner")
+            .spawn_error(
+                "agent start",
+                vec![
+                    "agent".into(),
+                    "start".into(),
+                    "role-runner-1".into(),
+                    "--kind".into(),
+                    "opencode".into(),
+                    "--pane".into(),
+                    "%7".into(),
+                ],
+                Some(1),
+                "stdout text\n",
+                "herdr: workspace full\n",
+            );
+        let s = serde_json::to_string(&e).unwrap();
+        assert!(s.contains("\"kind\":\"spawn_error\""), "{s}");
+        assert!(s.contains("\"command\":\"agent start\""), "{s}");
+        assert!(s.contains("\"exit_code\":1"), "{s}");
+        assert!(s.contains("\"stdout\":\"stdout text\\n\""), "{s}");
+        assert!(s.contains("\"stderr\":\"herdr: workspace full\\n\""), "{s}");
+        // argv is a JSON array, not a stringified blob.
+        assert!(s.contains("\"argv\":["), "{s}");
+        assert!(s.contains("\"--kind\""), "{s}");
+        assert!(s.contains("\"opencode\""), "{s}");
+        assert!(s.contains("\"--pane\""), "{s}");
+        assert!(s.contains("\"%7\""), "{s}");
+        assert!(s.contains("\"role\":\"runner\""), "{s}");
     }
 
     #[test]

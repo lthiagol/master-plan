@@ -33,9 +33,10 @@ use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::store;
 use crate::watch::{
-    build_start_args, check_preconditions, default_log_path, next_stage, pane_label_for,
-    resolve_harness_argv, run_milestones, which_herdr, PreconditionReport, PromptStage, Role,
-    SequencerReport, SystemDriveOps, WatchLogEntry, WatchLogger, DEFAULT_PANE_N,
+    build_pane_split_args, build_start_args, check_preconditions, default_log_path, next_stage,
+    pane_label_for, resolve_harness_kind, run_milestones, try_lazy_auto_set, which_herdr,
+    PreconditionReport, PromptStage, Role, SequencerReport, SystemDriveOps, WatchLogEntry,
+    WatchLogger, DEFAULT_PANE_N,
 };
 
 /// Maximum state-machine iterations per milestone before giving up
@@ -65,10 +66,33 @@ pub(crate) fn cmd_watch(
     detach: bool,
     format: Fmt,
 ) -> Result<()> {
-    let cfg = store::load_config(ctx);
+    let mut cfg = store::load_config(ctx);
     let log_path = log_file
         .clone()
         .unwrap_or_else(|| default_log_path(&ctx.plan_dir));
+
+    // M197 WP1 / AC-01: lazy auto-set fallback. When the user runs
+    // `mp watch` against a project that never went through
+    // `mp init` (or whose harness skill was installed after init),
+    // auto-fill the agent role harnesses from the single installed
+    // harness. The decision is persisted to config.json so a
+    // subsequent `mp doctor` reflects the auto-set. On ambiguity
+    // (multiple installed harnesses) the config is left untouched
+    // and the precondition check below will fail with the existing
+    // "harness not set" message — the operator resolves the
+    // ambiguity by hand via `mp config set`.
+    let auto_set_decision = try_lazy_auto_set(&mut cfg);
+    if matches!(
+        auto_set_decision,
+        crate::harness::AutoSetDecision::AutoSet { .. }
+    ) {
+        if let Err(e) = store::write_config(ctx, &cfg) {
+            // Non-fatal: a config-write failure here just means a
+            // follow-up `mp watch` will re-run the auto-set. Log
+            // and continue.
+            eprintln!("warning: failed to persist auto-set harness config: {e:#}");
+        }
+    }
     let preconditions = check_preconditions(&cfg, &log_path);
 
     if dry_run {
@@ -796,21 +820,26 @@ fn resolve_one(
             Role::Runner => cfg.runner_config(),
             Role::Coordinator => cfg.coordinator_config(),
         };
-        // The herdr start argv that ensure_pane would invoke on first
-        // spawn. (Subsequent milestones reuse the pane; the dry-run
-        // shows the spawn command for the first milestone only, but
-        // for clarity we render it on every milestone that would
-        // trigger this role — the preview is "what herdr command
-        // shape applies here", not "how many spawns happen".)
-        if let Ok(argv) = resolve_harness_argv(rc) {
-            let label = pane_label_for(role, DEFAULT_PANE_N);
-            let full = build_start_args(&label, project_root, &argv);
-            entry.herdr_commands.push(HerdrPreview {
-                role: role.label(),
-                label,
-                argv: full,
-            });
-        }
+        // The herdr argv that ensure_pane would invoke on first
+        // spawn. M197 WP2 / AC-03: the dry-run shows the new
+        // 0.7.x two-step shape — `pane split --cwd <PATH>` to
+        // create the pane, then `agent start <NAME> --kind
+        // <KIND> --pane <PANE_ID>` to start the agent inside it.
+        // The pane id is a placeholder (herdr creates the real
+        // one on the wire); the dry-run is about argv shape, not
+        // the synthesized pane id.
+        let label = pane_label_for(role, DEFAULT_PANE_N);
+        let kind = resolve_harness_kind(rc);
+        entry.herdr_commands.push(HerdrPreview {
+            role: role.label(),
+            label: label.clone(),
+            argv: build_pane_split_args(project_root),
+        });
+        entry.herdr_commands.push(HerdrPreview {
+            role: role.label(),
+            label,
+            argv: build_start_args(&pane_label_for(role, DEFAULT_PANE_N), &kind, "%pane-id%"),
+        });
 
         // Don't preview a prompt for in-progress milestones — the
         // state machine polls rather than re-prompting (S7

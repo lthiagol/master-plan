@@ -362,6 +362,12 @@ pub fn watch_outcome_event(
         crate::watch::RunOutcome::Skipped { .. } => ("watch-skipped", "skipped"),
         crate::watch::RunOutcome::Exhausted { .. } => ("watch-exhausted", "exhausted"),
         crate::watch::RunOutcome::GracefullyStopped => ("watch-stopped", "gracefully-stopped"),
+        // M197 WP3 / AC-04: a verified spawn failure gets its
+        // own activity tag. The argv + exit code is in the v2
+        // control-plane state, so the activity entry just
+        // needs a distinct type so dashboards can filter
+        // "spawn failure" apart from "partial failure".
+        crate::watch::RunOutcome::SpawnFailed { .. } => ("watch-spawn-failed", "spawn-failed"),
     };
     ActivityEvent::now(r#type, "", format!("mp watch {label} ({ids})"))
 }

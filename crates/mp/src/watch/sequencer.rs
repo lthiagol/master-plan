@@ -42,13 +42,16 @@ pub struct MilestoneOutcome {
 /// milestone reached `Complete`. Skipped milestones are surfaced
 /// explicitly so callers can decide whether to treat a skip as
 /// failure (the CLI sets a non-zero exit when any milestone was
-/// skipped per AC-07).
+/// skipped per AC-07). M197: `any_spawn_failed` is the new
+/// terminal-failure signal — a `pane split` or `agent start`
+/// call exited non-zero, so the run halted without retry.
 #[derive(Debug, Clone, Serialize)]
 pub struct SequencerReport {
     pub outcomes: Vec<MilestoneOutcome>,
     pub all_complete: bool,
     pub any_skipped: bool,
     pub any_exhausted: bool,
+    pub any_spawn_failed: bool,
 }
 
 /// Drive each milestone id in order through a shared ops instance.
@@ -61,6 +64,17 @@ pub struct SequencerReport {
 /// its iteration cap, gets flagged, and is NOT followed by a
 /// half-finished attempt at M(i+1). The `any_exhausted` flag in the
 /// report signals the CLI to exit non-zero.
+///
+/// M197 WP3 / AC-04: a verified spawn failure (`pane split` or
+/// `agent start` exit non-zero) also halts the loop. The
+/// state machine has already emitted a structured `spawn_error`
+/// log entry with the full argv / stdout / stderr / exit code;
+/// the sequencer's job is to translate that into a
+/// `RunOutcome::SpawnFailed` so the v2 control-plane state and
+/// `mp watch status` carry the same diagnostic the operator
+/// already saw in the log. A `spawn-failed` run never retries —
+/// retrying a known-bad launch would just pin the herdr pane in
+/// a stale state and waste the operator's time.
 pub fn run_milestones(
     ops: &mut SystemDriveOps,
     ids: &[String],
@@ -70,17 +84,43 @@ pub fn run_milestones(
     let mut all_complete = true;
     let mut any_skipped = false;
     let mut any_exhausted = false;
+    let mut any_spawn_failed = false;
 
     for id in ids {
         // Swap the active milestone id onto the shared ops. The pane
         // cache is NOT reset between milestones — that is the AC-04
         // pane-reuse contract.
         ops.set_active_milestone(id.clone())?;
-        let outcome = drive_milestone(ops, max_iterations_per_milestone)?;
+        let outcome = match drive_milestone(ops, max_iterations_per_milestone) {
+            Ok(o) => o,
+            Err(err) => {
+                // Translate a SpawnFailure into a
+                // `DriveOutcome::SpawnFailed` so the normal outcome
+                // arm below records it consistently. Any other
+                // error is re-raised unchanged.
+                if let Some(failure) = crate::watch::herdr::extract_spawn_failure(&err) {
+                    let run_outcome = RunOutcome::SpawnFailed {
+                        command: failure.command,
+                        argv: failure.argv,
+                        exit_code: failure.exit_code,
+                        stderr: failure.stderr,
+                    };
+                    DriveOutcome::SpawnFailed {
+                        run_outcome: Box::new(run_outcome),
+                    }
+                } else {
+                    return Err(err);
+                }
+            }
+        };
         // M152 S4: Shutdown halts the loop just like MaxIterationsExhausted.
+        // M197 WP3: SpawnFailed halts the loop too (no retry of a
+        // known-bad launch).
         let halt = matches!(
             outcome,
-            DriveOutcome::MaxIterationsExhausted { .. } | DriveOutcome::Shutdown
+            DriveOutcome::MaxIterationsExhausted { .. }
+                | DriveOutcome::Shutdown
+                | DriveOutcome::SpawnFailed { .. }
         );
         let is_complete = outcome == DriveOutcome::Complete;
         if !is_complete {
@@ -92,6 +132,9 @@ pub fn run_milestones(
         if matches!(outcome, DriveOutcome::MaxIterationsExhausted { .. }) {
             any_exhausted = true;
         }
+        if matches!(outcome, DriveOutcome::SpawnFailed { .. }) {
+            any_spawn_failed = true;
+        }
         outcomes.push(MilestoneOutcome {
             id: id.clone(),
             outcome: outcome.clone(),
@@ -102,6 +145,7 @@ pub fn run_milestones(
         //   DriveOutcome::Skipped { reason } ⇒ RunOutcome::Skipped { reason }
         //   DriveOutcome::MaxIterationsExhausted { n } ⇒ RunOutcome::Exhausted { n }
         //   DriveOutcome::Shutdown ⇒ RunOutcome::GracefullyStopped
+        //   DriveOutcome::SpawnFailed { run_outcome } ⇒ carried through verbatim
         let run_outcome = match &outcome {
             DriveOutcome::Complete => RunOutcome::Completed,
             DriveOutcome::Skipped { reason } => RunOutcome::Skipped {
@@ -111,13 +155,15 @@ pub fn run_milestones(
                 iterations: *iterations,
             },
             DriveOutcome::Shutdown => RunOutcome::GracefullyStopped,
+            DriveOutcome::SpawnFailed { run_outcome } => *run_outcome.clone(),
         };
         ops.record_milestone_outcome(id.clone(), run_outcome)?;
         // Halt on exhaustion: a runaway milestone should NOT march
         // forward to M(i+1). Skipped milestones continue (a blocked
         // dep on M(i) doesn't justify halting M(i+1)). Shutdown halts
         // so the cli layer can perform cleanup before exit (state
-        // file flush + flash note).
+        // file flush + flash note). SpawnFailed halts to avoid
+        // re-launching a known-bad herdr pane.
         if halt {
             break;
         }
@@ -141,7 +187,17 @@ pub fn run_milestones(
         let shutdown = outcomes
             .iter()
             .any(|item| matches!(item.outcome, DriveOutcome::Shutdown));
-        let aggregate = if shutdown {
+        // M197: a spawn failure takes precedence over every other
+        // aggregate shape. The single SpawnFailed outcome is
+        // forwarded verbatim (its argv + stderr payload is the
+        // diagnostic the operator needs).
+        let spawn_failed_outcome = outcomes.iter().find_map(|item| match &item.outcome {
+            DriveOutcome::SpawnFailed { run_outcome } => Some(*run_outcome.clone()),
+            _ => None,
+        });
+        let aggregate = if let Some(outcome) = spawn_failed_outcome {
+            outcome
+        } else if shutdown {
             RunOutcome::GracefullyStopped
         } else if completed == outcomes.len() {
             RunOutcome::Completed
@@ -176,6 +232,7 @@ pub fn run_milestones(
         all_complete,
         any_skipped,
         any_exhausted,
+        any_spawn_failed,
     })
 }
 
@@ -228,6 +285,7 @@ mod tests {
             all_complete: false,
             any_skipped: true,
             any_exhausted: true,
+            any_spawn_failed: false,
         };
         assert!(!report.all_complete);
         assert!(report.any_skipped);
@@ -251,6 +309,7 @@ mod tests {
             all_complete: true,
             any_skipped: false,
             any_exhausted: false,
+            any_spawn_failed: false,
         };
         assert!(report.all_complete);
         assert!(!report.any_skipped);
@@ -271,6 +330,7 @@ mod tests {
             all_complete: false,
             any_skipped: false,
             any_exhausted: true,
+            any_spawn_failed: false,
         };
         assert!(!report.all_complete);
         assert!(report.any_exhausted);

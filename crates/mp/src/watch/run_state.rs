@@ -87,6 +87,22 @@ pub enum RunOutcome {
     Exhausted { iterations: usize },
     /// SIGINT / SIGTERM surfaced during graceful shutdown.
     GracefullyStopped,
+    /// M197 WP3 / AC-04: a `pane split` or `agent start` call
+    /// failed with a verified exit code. The sequencer halts on
+    /// this kind — retrying a known-bad launch would just waste
+    /// the operator's time and pin the herdr pane in a stale
+    /// state. Distinct from `PartialFailure` (which is a
+    /// lifecycle-level failure) and from `Skipped` (which is a
+    /// pre-execution decision). The `command` / `argv` / `exit_code`
+    /// fields are the same payload the `spawn_error` watch log
+    /// entry carries, so the operator sees the same diagnostic
+    /// in the run summary and the watch log.
+    SpawnFailed {
+        command: String,
+        argv: Vec<String>,
+        exit_code: Option<i32>,
+        stderr: String,
+    },
 }
 
 impl RunOutcome {
@@ -101,6 +117,7 @@ impl RunOutcome {
             RunOutcome::Skipped { .. } => "skipped",
             RunOutcome::Exhausted { .. } => "exhausted",
             RunOutcome::GracefullyStopped => "gracefully-stopped",
+            RunOutcome::SpawnFailed { .. } => "spawn-failed",
         }
     }
 }

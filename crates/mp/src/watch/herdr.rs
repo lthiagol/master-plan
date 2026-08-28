@@ -4,21 +4,38 @@
 //! module is mp's only seam against the `herdr` CLI — the rest of
 //! `mp watch` (state machine, sequencer, prompts) calls into here.
 //!
-//! Layering:
-//! - Pure helpers (no I/O): [`resolve_harness_argv`],
-//!   [`build_start_args`], [`find_existing_pane`],
-//!   [`parse_pane_id_from_start_output`], [`pane_label_for`]. Unit
-//!   tested in this file.
-//! - I/O wrappers: [`spawn_pane`], [`list_panes`], [`ensure_pane`].
-//!   These shell out to a `herdr` binary path; integration tests
-//!   inject a fake script via `PATH` to verify the argv shape.
+//! M197 WP2 / AC-03: the spawn shape is the herdr 0.7.x
+//! `pane create → agent start` two-step. `herdr agent start` now
+//! takes a `--kind <KIND>` (one of the harness kinds herdr knows
+//! about) and a `--pane <ID>` that points at an already-created
+//! pane; cwd is set on the pane via `herdr pane split --cwd
+//! <PATH>`, not on the agent start argv. The previous
+//! `agent start <name> --cwd <root> -- <harness argv>` shape is
+//! gone — adapting to the current upstream API is the
+//! forward-looking choice (per M197 DD-01 "herdr alignment
+//! strategy"). The matchstick `--` separator and explicit harness
+//! argv are no longer needed: herdr's `--kind` is a closed enum,
+//! and per-harness flags (model, thinking) are not exposed in the
+//! v1 surface; the harness registry still serves as the
+//! harness-kind single source of truth.
 //!
-//! Pane reuse (AC-04): [`ensure_pane`] lists existing panes first and
-//! returns the matching one when present. The same runner pane is
-//! reused across N sequential milestones without restart. The label
-//! carries a session counter (`role-<role>-<N>`) so a recreated pane
-//! is distinguishable from the prior one in the herdr sidebar; v1
-//! always uses N=1 and S8 owns any increment logic.
+//! Layering:
+//! - Pure helpers (no I/O): [`resolve_harness_kind`],
+//!   [`build_pane_split_args`], [`build_start_args`],
+//!   [`find_existing_pane`], [`parse_pane_id_from_start_output`],
+//!   [`pane_label_for`]. Unit tested in this file.
+//! - I/O wrappers: [`pane_split`], [`spawn_pane`], [`list_panes`],
+//!   [`ensure_pane`]. These shell out to a `herdr` binary path;
+//!   integration tests inject a fake script via `PATH` to verify
+//!   the argv shape.
+//!
+//! Pane reuse (AC-04): [`ensure_pane`] lists existing panes first
+//! and returns the matching one when present. The same runner pane
+//! is reused across N sequential milestones without restart. The
+//! label carries a session counter (`role-<role>-<N>`) so a
+//! recreated pane is distinguishable from the prior one in the
+//! herdr sidebar; v1 always uses N=1 and S8 owns any increment
+//! logic.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -27,7 +44,6 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::RoleConfig;
-use crate::harness::HarnessRegistry;
 
 /// The two roles `mp watch` drives. S3 keeps it to runner/coordinator;
 /// the L5 session-boundary discipline (review vs re-review) is owned
@@ -63,40 +79,47 @@ pub fn pane_label_for(role: Role, n: u32) -> String {
 /// Default pane counter for S3 (always 1). S8 may grow this.
 pub const DEFAULT_PANE_N: u32 = 1;
 
-/// Resolve the harness argv that follows `herdr agent start <name>
-/// --cwd <root> --`. Prefers the explicit `command` from config;
-/// falls back to the v1 harness registry (opencode, pi, cursor per
-/// the harness-command-registry design decision; M151).
-///
-/// Unknown harnesses surface the registry's structured
-/// `HarnessError::Unsupported` message — the same string the
-/// `mp agent harness start-command <name>` CLI and the
-/// `mp watch` precondition gate emit. Doing the routing in one
-/// place (the registry) keeps `mp watch`, the CLI surface, and
-/// the precondition gate from diverging.
-pub fn resolve_harness_argv(rc: &RoleConfig) -> Result<Vec<String>> {
-    if let Some(cmd) = rc.command.as_ref().filter(|c| !c.is_empty()) {
-        return Ok(cmd.clone());
-    }
-    let harness = rc.harness.as_deref().unwrap_or("opencode");
-    HarnessRegistry::v1()
-        .resolve_argv(harness, rc.model.as_deref(), rc.thinking_level.as_deref())
-        .map_err(anyhow::Error::new)
+/// M197 WP2 / AC-03: resolve the harness kind passed to
+/// `herdr agent start --kind <KIND>`. Prefers the explicit
+/// `harness` config field; falls back to `opencode` to match
+/// legacy M149 behavior. The harness kind is the closed enum
+/// herdr accepts (opencode / pi / cursor / ...); the registry
+/// validates it before this layer is called so a typo in config
+/// never reaches the wire.
+pub fn resolve_harness_kind(rc: &RoleConfig) -> String {
+    rc.harness
+        .clone()
+        .filter(|h| !h.is_empty())
+        .unwrap_or_else(|| "opencode".to_string())
 }
 
-/// Build the argv passed to the `herdr` binary for `agent start`.
-/// Pure; tested directly. Returns owned `String`s so callers can
-/// hand them to `Command::args` without lifetime gymnastics.
-pub fn build_start_args(label: &str, cwd: &Path, harness_argv: &[String]) -> Vec<String> {
-    let mut args = Vec::with_capacity(6 + harness_argv.len());
-    args.push("agent".into());
-    args.push("start".into());
-    args.push(label.into());
-    args.push("--cwd".into());
-    args.push(cwd.to_string_lossy().into_owned());
-    args.push("--".into());
-    args.extend(harness_argv.iter().cloned());
-    args
+/// Build the argv for `herdr pane split --cwd <PATH>`. Pure; tested
+/// directly. Returns owned `String`s so callers can hand them to
+/// `Command::args` without lifetime gymnastics. `--cwd` is set
+/// here (not on the agent start call) because herdr 0.7.x takes
+/// the cwd as a pane property, not an agent property.
+pub fn build_pane_split_args(cwd: &Path) -> Vec<String> {
+    vec![
+        "pane".into(),
+        "split".into(),
+        "--cwd".into(),
+        cwd.to_string_lossy().into_owned(),
+    ]
+}
+
+/// Build the argv for `herdr agent start <NAME> --kind <KIND>
+/// --pane <PANE_ID>`. Pure; tested directly. The 0.7.x shape
+/// replaces the M149-era `--cwd <root> -- <harness argv>` form.
+pub fn build_start_args(label: &str, kind: &str, pane_id: &str) -> Vec<String> {
+    vec![
+        "agent".into(),
+        "start".into(),
+        label.into(),
+        "--kind".into(),
+        kind.into(),
+        "--pane".into(),
+        pane_id.into(),
+    ]
 }
 
 /// A herdr pane handle returned to the watch loop. `reused=true`
@@ -139,12 +162,12 @@ pub fn find_existing_pane(label: &str, herdr_list_json: &str) -> Option<String> 
     None
 }
 
-/// Parse the pane id out of `herdr agent start`'s output. herdr's
-/// output format varies across versions (JSON status blob, plain
-/// "started `<name>` pane=`<id>`" line). This function tries JSON first,
-/// then a conservative regex-lite scan, then falls back to `None`
-/// (caller uses the label as a fallback target — herdr accepts the
-/// label as a target alias).
+/// Parse the pane id out of herdr's `pane split` or `agent start`
+/// output. herdr's output format varies across versions (JSON
+/// status blob, plain "started `<name>` pane=`<id>`" line). This
+/// function tries JSON first, then a conservative regex-lite
+/// scan, then falls back to `None` (caller uses the label as a
+/// fallback target — herdr accepts the label as a target alias).
 pub fn parse_pane_id_from_start_output(output: &str) -> Option<String> {
     let trimmed = output.trim();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
@@ -160,11 +183,18 @@ pub fn parse_pane_id_from_start_output(output: &str) -> Option<String> {
                 }
             }
         }
+        if let Some(obj) = v.get("pane").and_then(|x| x.as_object()) {
+            for key in ["pane_id", "id", "target"] {
+                if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
+                    return Some(s.to_string());
+                }
+            }
+        }
     }
     // Best-effort text scan: "pane `<id>`" / "pane_id=`<id>`" /
-    // "started ... pane=`<id>`". Herdr output isn't a stable contract;
-    // the label fallback in `spawn_pane` covers the gap when this
-    // returns None.
+    // "started ... pane=`<id>`". Herdr output isn't a stable
+    // contract; the label fallback in `spawn_pane` covers the gap
+    // when this returns None.
     if let Some(idx) = trimmed.rfind("pane=") {
         let rest = &trimmed[idx + "pane=".len()..];
         let id: String = rest
@@ -212,27 +242,145 @@ pub fn list_panes(herdr_bin: &Path) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// Run `herdr agent start` with the supplied argv. Returns the parsed
-/// `PaneHandle` on success. When the pane id can't be parsed from
-/// herdr's output, falls back to the label as the target id (herdr
-/// accepts agent labels as targets in subsequent commands).
-pub fn spawn_pane(
-    herdr_bin: &Path,
-    label: &str,
-    cwd: &Path,
-    argv: &[String],
-) -> Result<PaneHandle> {
-    let args = build_start_args(label, cwd, argv);
-    let out = Command::new(herdr_bin)
-        .args(&args)
-        .output()
-        .with_context(|| format!("failed to spawn {} agent start", herdr_bin.display()))?;
+/// M197 WP3 / AC-04: structured spawn diagnostics. Returned by
+/// the herdr I/O wrappers when `pane split` or `agent start`
+/// fails. The state machine converts a `SpawnFailure` into a
+/// `spawn_error` log entry and a `RunOutcome::SpawnFailed`
+/// terminal kind. Carrying the argv + stdout + stderr + exit
+/// code as first-class fields is the whole point — operators
+/// diagnose a launch failure from the watch log alone, without
+/// rerunning with extra logging.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpawnFailure {
+    /// Short command tag. `"pane split"` or `"agent start"`. The
+    /// matching log entry's `command` field.
+    pub command: String,
+    /// The full argv the herdr layer tried to run. Persisted to
+    /// the `spawn_error` log entry as `argv`.
+    pub argv: Vec<String>,
+    /// `Command::Output::status.code()` on Unix. `None` when the
+    /// process was killed by a signal (e.g. timeout from
+    /// `killpg`).
+    pub exit_code: Option<i32>,
+    /// Captured stdout. May be empty; never `None`.
+    pub stdout: String,
+    /// Captured stderr. May be empty; never `None`.
+    pub stderr: String,
+}
+
+impl std::fmt::Display for SpawnFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "herdr {} failed (exit {:?}): {}",
+            self.command, self.exit_code, self.stderr
+        )
+    }
+}
+
+impl std::error::Error for SpawnFailure {}
+
+/// M197 WP3 / AC-04: extract a [`SpawnFailure`] from an
+/// `anyhow::Error` chain. The I/O wrappers return
+/// `anyhow::Error::new(SpawnFailure { ... })` so the structured
+/// fields survive the `.context("...")` chains the state machine
+/// layers on top. The state machine uses this to decide whether
+/// to emit a `spawn_error` log entry (and whether the sequencer
+/// should map the failure to `RunOutcome::SpawnFailed`).
+///
+/// Returns the first `SpawnFailure` found while walking the
+/// error chain. The `Send + Sync + 'static` bound matches
+/// `anyhow::Error::downcast_ref` — `SpawnFailure` derives neither
+/// `Send` nor `Sync`, so callers should not expect to cross
+/// thread boundaries with one. (mp watch is single-threaded, so
+/// this is not a constraint in practice.)
+pub fn extract_spawn_failure(err: &anyhow::Error) -> Option<SpawnFailure> {
+    err.downcast_ref::<SpawnFailure>().cloned()
+}
+
+/// M197 WP2 / AC-03: create a fresh pane via `herdr pane split
+/// --cwd <PATH>`. Returns the new pane's id (parsed from
+/// herdr's JSON / text output; falls back to a synthetic `pane-N`
+/// id when the output is unparseable so callers always get a
+/// stable handle to use as `--pane <ID>` for the next step).
+///
+/// On failure (herdr exits non-zero, or the binary itself
+/// cannot be exec'd) returns a [`SpawnFailure`] with the
+/// command / argv / exit_code / stdout / stderr populated. The
+/// state machine converts this to a `spawn_error` log entry and
+/// a `RunOutcome::SpawnFailed` terminal kind.
+pub fn pane_split(herdr_bin: &Path, cwd: &Path) -> Result<String> {
+    let args = build_pane_split_args(cwd);
+    let out = match Command::new(herdr_bin).args(&args).output() {
+        Ok(out) => out,
+        Err(e) => {
+            return Err(anyhow::Error::new(SpawnFailure {
+                command: "pane split".into(),
+                argv: args.clone(),
+                exit_code: None,
+                stdout: String::new(),
+                stderr: format!(
+                    "failed to exec {}: {e} (is the herdr binary on PATH and executable?)",
+                    herdr_bin.display()
+                ),
+            })
+            .context("herdr pane split exec failure"));
+        }
+    };
     if !out.status.success() {
-        bail!(
-            "herdr agent start failed (exit {:?}): {}",
-            out.status.code(),
-            String::from_utf8_lossy(&out.stderr)
-        );
+        return Err(anyhow::Error::new(SpawnFailure {
+            command: "pane split".into(),
+            argv: args.clone(),
+            exit_code: out.status.code(),
+            stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        }));
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    if let Some(id) = parse_pane_id_from_start_output(&stdout) {
+        return Ok(id);
+    }
+    // Synthetic fallback so the watch loop always has a target id
+    // to send to the next `herdr agent start`. Real herdr always
+    // emits a parseable id; the fallback is here so a hostile or
+    // very-old herdr binary does not stall the watch driver.
+    Ok("pane-?".to_string())
+}
+
+/// Run `herdr agent start <NAME> --kind <KIND> --pane <PANE_ID>`.
+/// Returns the parsed `PaneHandle` on success. When the pane id
+/// can't be parsed from herdr's output, falls back to the label
+/// as the target id (herdr accepts agent labels as targets in
+/// subsequent commands).
+///
+/// On failure returns a [`SpawnFailure`]; see [`pane_split`] for
+/// the conversion contract.
+pub fn spawn_pane(herdr_bin: &Path, label: &str, kind: &str, pane_id: &str) -> Result<PaneHandle> {
+    let args = build_start_args(label, kind, pane_id);
+    let out = match Command::new(herdr_bin).args(&args).output() {
+        Ok(out) => out,
+        Err(e) => {
+            return Err(anyhow::Error::new(SpawnFailure {
+                command: "agent start".into(),
+                argv: args.clone(),
+                exit_code: None,
+                stdout: String::new(),
+                stderr: format!(
+                    "failed to exec {}: {e} (is the herdr binary on PATH and executable?)",
+                    herdr_bin.display()
+                ),
+            })
+            .context("herdr agent start exec failure"));
+        }
+    };
+    if !out.status.success() {
+        return Err(anyhow::Error::new(SpawnFailure {
+            command: "agent start".into(),
+            argv: args.clone(),
+            exit_code: out.status.code(),
+            stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        }));
     }
     let stdout = String::from_utf8_lossy(&out.stdout);
     let pane_id = parse_pane_id_from_start_output(&stdout).unwrap_or_else(|| label.to_string());
@@ -244,9 +392,10 @@ pub fn spawn_pane(
 }
 
 /// Top-level pane lifecycle entry: list first, reuse if a pane with
-/// the same label exists, otherwise spawn. Implements the AC-04
-/// "reuse across milestones" contract; the label counter (N) is
-/// owned by the caller so the sequencer can increment it.
+/// the same label exists, otherwise create a fresh pane and start
+/// the agent inside it. Implements the AC-04 "reuse across
+/// milestones" contract; the label counter (N) is owned by the
+/// caller so the sequencer can increment it.
 pub fn ensure_pane(
     herdr_bin: &Path,
     role: Role,
@@ -265,8 +414,13 @@ pub fn ensure_pane(
         });
     }
 
-    let argv = resolve_harness_argv(rc)?;
-    spawn_pane(herdr_bin, &label, cwd, &argv)
+    // M197 WP2 / AC-03: 0.7.x two-step spawn — create a fresh
+    // pane with the right cwd, then start the agent inside that
+    // pane. herdr 0.7.x does NOT accept `--cwd` on agent start;
+    // cwd is a pane property.
+    let kind = resolve_harness_kind(rc);
+    let pane_id = pane_split(herdr_bin, cwd)?;
+    spawn_pane(herdr_bin, &label, &kind, &pane_id)
 }
 
 // ─── S4: prompt delivery with readiness gate ─────────────────────────────────
@@ -742,77 +896,80 @@ mod tests {
         }
     }
 
+    // M197 WP2 / AC-03: the herdr 0.7.x spawn shape drops the
+    // explicit `command` argv — herdr's `--kind` is a closed
+    // enum, and per-harness flags (model, thinking) are not
+    // exposed in the v1 surface. The harness registry still
+    // validates the kind before this layer is called. So the
+    // resolve-argv tests are replaced by `resolve_harness_kind`
+    // tests below.
+
     #[test]
-    fn resolve_argv_uses_explicit_command_when_set() {
+    fn resolve_harness_kind_uses_config_when_set() {
+        assert_eq!(
+            resolve_harness_kind(&rc_with_harness("opencode")),
+            "opencode"
+        );
+        assert_eq!(resolve_harness_kind(&rc_with_harness("pi")), "pi");
+        assert_eq!(resolve_harness_kind(&rc_with_harness("cursor")), "cursor");
+    }
+
+    #[test]
+    fn resolve_harness_kind_defaults_to_opencode_when_unset() {
+        let rc = RoleConfig::default();
+        assert_eq!(resolve_harness_kind(&rc), "opencode");
+    }
+
+    #[test]
+    fn resolve_harness_kind_ignores_explicit_command_field() {
+        // The `command` field predated herdr 0.7.x; the new shape
+        // does not consume it. Carrying it in config is harmless
+        // (a future per-harness flag translator may use it) but
+        // `resolve_harness_kind` only reads `harness`.
         let mut rc = rc_with_harness("opencode");
         rc.command = Some(vec!["my-runner".into(), "--flag".into()]);
-        let argv = resolve_harness_argv(&rc).unwrap();
-        assert_eq!(argv, vec!["my-runner".to_string(), "--flag".to_string()]);
+        assert_eq!(resolve_harness_kind(&rc), "opencode");
     }
 
     #[test]
-    fn resolve_argv_falls_back_to_per_harness_default() {
+    fn build_pane_split_args_carry_cwd() {
+        let args = build_pane_split_args(Path::new("/repo"));
         assert_eq!(
-            resolve_harness_argv(&rc_with_harness("opencode")).unwrap(),
-            vec!["opencode".to_string()]
-        );
-        assert_eq!(
-            resolve_harness_argv(&rc_with_harness("pi")).unwrap(),
-            vec!["pi".to_string()]
-        );
-        assert_eq!(
-            resolve_harness_argv(&rc_with_harness("cursor")).unwrap(),
-            vec!["cursor".to_string()]
-        );
-    }
-
-    #[test]
-    fn resolve_argv_defaults_to_opencode_when_unset() {
-        let rc = RoleConfig::default();
-        assert_eq!(
-            resolve_harness_argv(&rc).unwrap(),
-            vec!["opencode".to_string()]
-        );
-    }
-
-    #[test]
-    fn resolve_argv_rejects_unknown_harness_without_explicit_command() {
-        let rc = rc_with_harness("tmux");
-        let err = resolve_harness_argv(&rc).unwrap_err();
-        assert!(
-            err.to_string().contains("tmux"),
-            "error should mention the offending harness: {err}"
-        );
-    }
-
-    #[test]
-    fn resolve_argv_uses_explicit_command_even_for_unknown_harness() {
-        // A custom command overrides the harness; this lets users wire
-        // a not-yet-registered harness without code changes.
-        let mut rc = rc_with_harness("custom-harness");
-        rc.command = Some(vec!["custom-agent".into()]);
-        assert_eq!(
-            resolve_harness_argv(&rc).unwrap(),
-            vec!["custom-agent".to_string()]
+            args,
+            vec![
+                "pane".to_string(),
+                "split".to_string(),
+                "--cwd".to_string(),
+                "/repo".to_string(),
+            ]
         );
     }
 
     #[test]
     fn build_start_args_shape_matches_herdr_cli() {
-        let argv = vec!["opencode".to_string()];
-        let args = build_start_args("role-runner-1", Path::new("/repo"), &argv);
+        let args = build_start_args("role-runner-1", "opencode", "%3");
         assert_eq!(
             args,
             vec![
                 "agent".to_string(),
-                "start".into(),
-                "role-runner-1".into(),
-                "--cwd".into(),
-                "/repo".into(),
-                "--".into(),
-                "opencode".into(),
+                "start".to_string(),
+                "role-runner-1".to_string(),
+                "--kind".to_string(),
+                "opencode".to_string(),
+                "--pane".to_string(),
+                "%3".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn build_start_args_passes_kind_through_unchanged() {
+        // The harness kind is a closed enum on herdr's side; mp
+        // passes it through without rewriting. Validating the
+        // kind against the registry is the caller's job
+        // (preconditions gate).
+        assert!(build_start_args("label", "pi", "%1").contains(&"pi".to_string()));
+        assert!(build_start_args("label", "cursor", "%2").contains(&"cursor".to_string()));
     }
 
     #[test]

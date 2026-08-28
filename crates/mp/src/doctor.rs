@@ -180,9 +180,11 @@ fn check_harnesses() -> Vec<HarnessEntry> {
             // harness's global_skill_dir. The harness is considered
             // "skill_installed" if the three CPD base skills all
             // landed, and "spec_grill_installed" if spec-grill landed.
-            let skill_installed = ["mp-flow", "mp-runner", "mp-coordinator"]
-                .iter()
-                .all(|s| skill_dir.join(s).join("SKILL.md").is_file());
+            // M197 WP1 / AC-01: route through the shared
+            // `is_harness_fully_installed` helper so the
+            // doctor surface and the auto-set logic cannot drift on
+            // what "installed" means.
+            let skill_installed = harness::is_harness_fully_installed(&h);
             let spec_grill_installed = skill_dir.join("spec-grill").join("SKILL.md").is_file();
             let convention_file_installed = harness::convention_path(&h).is_file();
             HarnessEntry {
@@ -282,6 +284,20 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
         });
     }
 
+    // M197 WP3 / AC-04: herdr CLI version + shape gate. Doctor
+    // surfaces the same verdict the watch preconditions use so
+    // the operator can see the install state without running
+    // `mp watch` first. The check is `ok=false` when herdr is
+    // missing or its `agent start` does not list both `--kind`
+    // and `--pane`; the message carries the actionable upgrade
+    // hint.
+    let herdr_shape = crate::watch::detect_herdr_cli_default();
+    checks.push(DoctorCheck {
+        name: "herdr_cli_shape".to_string(),
+        ok: herdr_shape.compatible,
+        message: herdr_shape.message.clone(),
+    });
+
     let in_repo = cfg.workflow.plan.in_repo.unwrap_or(true);
     if !in_repo {
         let gitignore = ctx.project_root.join(".gitignore");
@@ -302,6 +318,60 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     }
 
     let project_ok = checks.iter().all(|c| c.ok);
+
+    // M197 WP1 / AC-01: surface the harness auto-set decision in
+    // `mp doctor` so the operator always sees the install state.
+    // The check is informational — it is `ok=true` even when the
+    // auto-set is "noop" or "ambiguous", because the real readiness
+    // gate lives in `mp watch` preconditions. The doctor line
+    // exists so the operator can see at a glance what `mp init` or
+    // the lazy fallback on first `mp watch` *would* do.
+    let installed = harness::detect_installed_harnesses();
+    let decision = harness::auto_set_target(
+        cfg.agent.runner.harness.as_deref(),
+        cfg.agent.coordinator.harness.as_deref(),
+        &installed,
+    );
+    let auto_set_check = match &decision {
+        harness::AutoSetDecision::NoOp => {
+            let r = cfg.agent.runner.harness.as_deref();
+            let c = cfg.agent.coordinator.harness.as_deref();
+            if r.is_some() || c.is_some() {
+                DoctorCheck {
+                    name: "harness_auto_set".to_string(),
+                    ok: true,
+                    message: format!(
+                        "agent harness already set: runner={} coordinator={}",
+                        r.unwrap_or("(unset)"),
+                        c.unwrap_or("(unset)")
+                    ),
+                }
+            } else {
+                DoctorCheck {
+                    name: "harness_auto_set".to_string(),
+                    ok: true,
+                    message: "no fully-installed harness detected; mp watch will refuse until one is configured (set [agent.runner].harness)".to_string(),
+                }
+            }
+        }
+        harness::AutoSetDecision::AutoSet { harness } => DoctorCheck {
+            name: "harness_auto_set".to_string(),
+            ok: true,
+            message: format!(
+                "single installed harness detected: {harness}. mp init / first mp watch will auto-set agent.runner.harness and agent.coordinator.harness to '{harness}'."
+            ),
+        },
+        harness::AutoSetDecision::Ambiguous { installed } => DoctorCheck {
+            name: "harness_auto_set".to_string(),
+            ok: true,
+            message: format!(
+                "multiple installed harnesses detected: [{}]. Set [agent.runner].harness and [agent.coordinator].harness explicitly to disambiguate; mp will not auto-pick.",
+                installed.join(", ")
+            ),
+        },
+    };
+    checks.push(auto_set_check);
+
     report.ok = report.ok && project_ok;
     report.detected = Some(DoctorDetected {
         brownfield_likely: brownfield::detect_brownfield_likely(&ctx.project_root),

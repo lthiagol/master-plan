@@ -24,6 +24,7 @@
 pub mod bridge;
 pub mod classification;
 pub mod herdr;
+pub mod herdr_version;
 pub mod logging;
 pub mod preconditions;
 pub mod prompts;
@@ -42,14 +43,18 @@ pub use bridge::{
     STAGE_DONE_AGENT, STAGE_DONE_SENTINEL, STAGE_DONE_SOURCE,
 };
 pub use herdr::{
-    build_start_args, deliver_prompt, lifecycle_advanced_past, read_agent_status,
-    read_lifecycle_via_mp, read_output, send_prompt, wait_for_lifecycle, wait_for_lifecycle_with,
-    wait_for_readiness, wait_for_readiness_with,
+    build_pane_split_args, build_start_args, deliver_prompt, lifecycle_advanced_past,
+    read_agent_status, read_lifecycle_via_mp, read_output, send_prompt, wait_for_lifecycle,
+    wait_for_lifecycle_with, wait_for_readiness, wait_for_readiness_with,
 };
 pub use herdr::{
     ensure_pane, find_existing_pane, list_panes, pane_label_for, parse_pane_id_from_start_output,
-    resolve_harness_argv, spawn_pane, which_herdr, LifecycleTarget, PaneHandle, ReadinessOptions,
+    resolve_harness_kind, spawn_pane, which_herdr, LifecycleTarget, PaneHandle, ReadinessOptions,
     Role, WaitOptions, WaitOutcome, DEFAULT_PANE_N,
+};
+pub use herdr_version::{
+    detect_herdr_cli, detect_herdr_cli_default, HerdrCliShape, VersionFloor, EXPECTED_START_FLAGS,
+    REQUIRED_HERDR_VERSION_FLOOR,
 };
 
 /// M178 S5/S7 alias for [`herdr::which_herdr`]. The `status` /
@@ -66,7 +71,7 @@ pub fn resolve_herdr_binary() -> std::io::Result<std::path::PathBuf> {
 }
 pub use logging::{rfc3339_now, WatchLogEntry, WatchLogger};
 pub use preconditions::{
-    check_preconditions, default_log_path, PreconditionCheck, PreconditionReport,
+    check_preconditions, default_log_path, try_lazy_auto_set, PreconditionCheck, PreconditionReport,
 };
 pub use prompts::{
     all_stages, build_prompt, build_prompt_full, build_prompt_with, build_prompt_with_request,

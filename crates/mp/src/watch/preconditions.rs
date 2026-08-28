@@ -26,6 +26,7 @@ use serde::Serialize;
 
 use crate::config::ProjectConfig;
 use crate::doctor::command_on_path;
+use crate::harness::AutoSetDecision;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PreconditionCheck {
@@ -60,8 +61,9 @@ pub fn default_log_path(plan_dir: &Path) -> std::path::PathBuf {
 /// (the watch command) decide how to surface failures (exit code,
 /// JSON, human message).
 pub fn check_preconditions(cfg: &ProjectConfig, log_path: &Path) -> PreconditionReport {
-    let checks = vec![
+    let mut checks = vec![
         check_herdr_on_path(),
+        check_herdr_cli_shape(),
         check_role_config("runner_config_present", "agent.runner", cfg.runner_config()),
         check_role_config(
             "coordinator_config_present",
@@ -71,8 +73,97 @@ pub fn check_preconditions(cfg: &ProjectConfig, log_path: &Path) -> Precondition
         check_log_path_writable(log_path),
     ];
 
+    // M197 WP1 / AC-01: surface the harness auto-set decision in
+    // the precondition report. The check is `ok=true` even when no
+    // action is taken — the role-config-present checks above are
+    // the real gate. This line exists so the operator always sees
+    // the harness auto-set state in `mp watch`'s JSON output.
+    checks.push(check_harness_auto_set(cfg));
+
     let ok = checks.iter().all(|c| c.ok);
     PreconditionReport { ok, checks }
+}
+
+/// M197 WP3 / AC-04: herdr CLI version + shape gate. The check
+/// shells out to `herdr --version` and `herdr agent start --help`
+/// to confirm the install exposes the `--kind` / `--pane` flags
+/// the wp2 realignment relies on. When herdr is missing or
+/// shape-incompatible, this check is the precondition that
+/// surfaces the upgrade message — without it, the spawn would
+/// fail later in `pane_split` / `spawn_pane` with a less
+/// actionable error.
+fn check_herdr_cli_shape() -> PreconditionCheck {
+    let shape = crate::watch::detect_herdr_cli_default();
+    PreconditionCheck {
+        name: "herdr_cli_shape".to_string(),
+        ok: shape.compatible,
+        message: shape.message,
+    }
+}
+
+/// M197 WP1 / AC-01: precondition check that surfaces the harness
+/// auto-set decision. The `ok` flag is `true` unconditionally; the
+/// message carries the actual decision (auto-set, no-op, or
+/// ambiguous). The real failure is upstream in
+/// `runner_config_present` / `coordinator_config_present`.
+fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
+    let installed = crate::harness::detect_installed_harnesses();
+    let decision = crate::harness::auto_set_target(
+        cfg.agent.runner.harness.as_deref(),
+        cfg.agent.coordinator.harness.as_deref(),
+        &installed,
+    );
+    let message = match decision {
+        AutoSetDecision::NoOp => {
+            if cfg.agent.runner.harness.is_some() || cfg.agent.coordinator.harness.is_some() {
+                format!(
+                    "harness auto-set: noop (runner={}, coordinator={} already configured)",
+                    cfg.agent.runner.harness.as_deref().unwrap_or("(unset)"),
+                    cfg.agent.coordinator.harness.as_deref().unwrap_or("(unset)")
+                )
+            } else {
+                "harness auto-set: noop (no fully-installed harness detected; mp watch preconditions will surface the missing config below)".to_string()
+            }
+        }
+        AutoSetDecision::AutoSet { harness } => format!(
+            "harness auto-set: would set runner + coordinator to '{harness}' (single installed harness)"
+        ),
+        AutoSetDecision::Ambiguous { installed } => format!(
+            "harness auto-set: ambiguous — multiple installed harnesses [{}]; set [agent.runner].harness and [agent.coordinator].harness explicitly",
+            installed.join(", ")
+        ),
+    };
+    PreconditionCheck {
+        name: "harness_auto_set".to_string(),
+        ok: true,
+        message,
+    }
+}
+
+/// M197 WP1 / AC-01: lazy auto-set fallback. Called by the watch
+/// command before `check_preconditions` so a project that never
+/// went through `mp init` (or whose harness was installed *after*
+/// init) still gets a sensible default. Mutates `cfg` in place when
+/// the decision is [`AutoSetDecision::AutoSet`]; leaves it alone
+/// otherwise. The caller is responsible for persisting the mutated
+/// config (the watch command calls
+/// [`crate::store::write_config`] after a successful fallback).
+///
+/// Returns the decision so the caller can log it (e.g. a
+/// `harness_auto_set` entry in `watch.log`) and surface it in
+/// stdout / JSON output.
+pub fn try_lazy_auto_set(cfg: &mut ProjectConfig) -> AutoSetDecision {
+    let installed = crate::harness::detect_installed_harnesses();
+    let decision = crate::harness::auto_set_target(
+        cfg.agent.runner.harness.as_deref(),
+        cfg.agent.coordinator.harness.as_deref(),
+        &installed,
+    );
+    if let AutoSetDecision::AutoSet { ref harness } = decision {
+        cfg.agent.runner.harness = Some(harness.clone());
+        cfg.agent.coordinator.harness = Some(harness.clone());
+    }
+    decision
 }
 
 fn check_herdr_on_path() -> PreconditionCheck {

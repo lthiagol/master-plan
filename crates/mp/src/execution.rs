@@ -21,6 +21,37 @@ pub struct ExecutionCheckReport {
     pub validate_ok: bool,
     pub can_handoff: bool,
     pub warnings: Vec<String>,
+    /// M197 WP4 / AC-05: `mp watch` readiness surfaced here so
+    /// `mp execution check`, `mp watch start`, and
+    /// `mp milestone handoff` all answer the same go/no-go
+    /// question. `ok` is true when every precondition
+    /// (herdr_on_path, herdr_cli_shape, runner_config_present,
+    /// coordinator_config_present, log_path_writable,
+    /// harness_auto_set) is green. `checks` mirrors the
+    /// per-line precondition report for callers that want
+    /// the granular answer.
+    pub watch_readiness: WatchReadiness,
+}
+
+/// M197 WP4 / AC-05: a structured view of the
+/// `mp watch` precondition report. Embedded in
+/// [`ExecutionCheckReport`] so the `execution check` JSON
+/// carries the same diagnostic operators see from
+/// `mp watch start` and `mp milestone handoff`.
+#[derive(Debug, Serialize)]
+pub struct WatchReadiness {
+    pub ok: bool,
+    pub checks: Vec<WatchReadinessCheck>,
+}
+
+/// One line of the `mp watch` precondition report, exposed via
+/// `execution check` so dashboards / CI / the human `raul`
+/// summary can render the same data without re-running watch.
+#[derive(Debug, Serialize)]
+pub struct WatchReadinessCheck {
+    pub name: String,
+    pub ok: bool,
+    pub message: String,
 }
 
 pub fn execution_check(ctx: &PlanContext) -> Result<ExecutionCheckReport> {
@@ -75,7 +106,60 @@ pub fn execution_check_with(
         }
     }
 
-    let can_handoff = validate_ok && (!execution_ready_milestones.is_empty() || track_pending > 0);
+    // M197 WP4 / AC-05: fold the `mp watch` precondition
+    // report into the execution-check JSON. The same go/no-go
+    // verdict `mp watch start` and `mp milestone handoff` use
+    // is the verdict `execution check` returns — one source of
+    // truth, one operator-facing answer. The watch preconditions
+    // are a pure function over the loaded config + log path; we
+    // call them here so the verdict cannot drift between
+    // surfaces.
+    let cfg = store::load_config(ctx);
+    let log_path = crate::watch::default_log_path(&ctx.plan_dir);
+    let pre = crate::watch::check_preconditions(&cfg, &log_path);
+    let watch_readiness = WatchReadiness {
+        ok: pre.ok,
+        checks: pre
+            .checks
+            .iter()
+            .map(|c| WatchReadinessCheck {
+                name: c.name.clone(),
+                ok: c.ok,
+                message: c.message.clone(),
+            })
+            .collect(),
+    };
+
+    // M197: `can_handoff` now ALSO requires watch readiness
+    // when the project is in autonomous mode — handing off
+    // to a runner that cannot spawn is a setup for a
+    // guaranteed `RunOutcome::SpawnFailed` and wastes the
+    // operator's first attempt. The verdict is a `Warning`
+    // (surfaced via `warnings`) when the watch readiness
+    // fails, but `can_handoff` is false. Planning mode
+    // (i.e. `mp watch` will not be invoked immediately)
+    // is exempt — the operator is handoff-blocking for
+    // review, not execution.
+    let watch_ready = pre.ok;
+    let mode = plan.execution.mode.as_str();
+    let watch_required = mode == "autonomous";
+    let can_handoff = validate_ok
+        && (!execution_ready_milestones.is_empty() || track_pending > 0)
+        && (!watch_required || watch_ready);
+
+    let mut warnings = warnings;
+    if watch_required && !watch_ready {
+        let failed: Vec<String> = pre
+            .checks
+            .iter()
+            .filter(|c| !c.ok)
+            .map(|c| c.name.clone())
+            .collect();
+        warnings.push(format!(
+            "watch readiness not green: [{}] — fix before handing off to autonomous execution",
+            failed.join(", ")
+        ));
+    }
 
     Ok(ExecutionCheckReport {
         ok: true,
@@ -87,6 +171,7 @@ pub fn execution_check_with(
         validate_ok,
         can_handoff,
         warnings,
+        watch_readiness,
     })
 }
 
@@ -188,6 +273,12 @@ pub fn execution_status(ctx: &PlanContext) -> Result<serde_json::Value> {
         "autonomous_allowed": plan.execution.mode == "autonomous",
         "planning_status": plan.project.planning_status,
         "validate_ok": check.validate_ok,
+        // M197 WP4 / AC-05: same `mp watch` readiness the
+        // execution-check JSON carries, so `mp execution status`
+        // is a one-stop shop for the operator. The shape is
+        // identical to `execution_check.watch_readiness`.
+        "watch_readiness": check.watch_readiness,
+        "can_handoff": check.can_handoff,
     }))
 }
 

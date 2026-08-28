@@ -5,8 +5,12 @@ use std::path::PathBuf;
 // each one resolves to. The skill-install descriptors below keep the
 // install-skill layout (where to deploy `.opencoderules`/skills)
 // separate; `registry::HarnessRegistry` owns the *launch* surface.
+pub mod auto;
 pub mod registry;
 
+pub use auto::{
+    auto_set_target, detect_installed_harnesses, is_harness_fully_installed, AutoSetDecision,
+};
 pub use registry::{HarnessEntry, HarnessError, HarnessRegistry, SUPPORTED_NAMES};
 
 #[derive(Debug, Clone, serde::Serialize)]

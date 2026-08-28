@@ -94,6 +94,20 @@ pub enum DriveOutcome {
     /// milestone. Distinct from `MaxIterationsExhausted` because
     /// shutdown is an expected termination, not a runaway.
     Shutdown,
+    /// M197 WP3 / AC-04: a `pane split` or `agent start` call
+    /// failed with a verified non-zero exit. The sequencer
+    /// halts on this kind — retrying a known-bad launch
+    /// would just pin the herdr pane in a stale state and
+    /// waste the operator's time. The `run_outcome` payload
+    /// is the same `RunOutcome::SpawnFailed` the sequencer
+    /// forwards to the v2 control-plane state, so `mp watch
+    /// status` shows the operator a single, consistent
+    /// diagnostic in both the JSON output and the run
+    /// summary.
+    SpawnFailed {
+        #[serde(rename = "run_outcome")]
+        run_outcome: Box<RunOutcome>,
+    },
 }
 
 /// Skip verdict for AC-07. Centralizes the readiness definition so
@@ -798,22 +812,54 @@ impl DriveOps for SystemDriveOps {
             Role::Coordinator => &self.coordinator_config,
         };
         self.log_event("ensure_pane", format!("{} spawning new pane", role.label()));
-        let handle = ensure_pane(
+        match ensure_pane(
             &self.herdr_bin,
             role,
             crate::watch::DEFAULT_PANE_N,
             rc,
             self.project_root.as_path(),
-        )?;
-        self.pane_cache.insert(role, handle.clone());
-        // M178 S2: record the pane id in the v2 control-plane state
-        // so `mp watch output` (S7) can address it without scanning
-        // the legacy v1 panes array.
-        self.transition(crate::watch::WatchTransition::PaneObserved {
-            role,
-            pane_id: handle.pane_id.clone(),
-        })?;
-        Ok(handle)
+        ) {
+            Ok(handle) => {
+                self.pane_cache.insert(role, handle.clone());
+                // M178 S2: record the pane id in the v2 control-plane state
+                // so `mp watch output` (S7) can address it without scanning
+                // the legacy v1 panes array.
+                self.transition(crate::watch::WatchTransition::PaneObserved {
+                    role,
+                    pane_id: handle.pane_id.clone(),
+                })?;
+                Ok(handle)
+            }
+            Err(err) => {
+                // M197 WP3 / AC-04: emit a structured spawn_error
+                // log entry so the operator can see the full argv
+                // + stdout + stderr + exit code from a single log
+                // line. The state machine re-raises the error so
+                // the sequencer can convert it to
+                // `RunOutcome::SpawnFailed` and stop the run.
+                if let Some(failure) = crate::watch::herdr::extract_spawn_failure(&err) {
+                    let entry = crate::watch::WatchLogEntry::new(
+                        "spawn_error",
+                        format!(
+                            "herdr {} failed (exit {:?}): {}",
+                            failure.command, failure.exit_code, failure.stderr
+                        ),
+                    )
+                    .role(role.label())
+                    .spawn_error(
+                        &failure.command,
+                        failure.argv.clone(),
+                        failure.exit_code,
+                        failure.stdout.clone(),
+                        failure.stderr.clone(),
+                    );
+                    if let Some(logger) = self.logger.as_ref() {
+                        let _ = logger.log(&entry);
+                    }
+                }
+                Err(err)
+            }
+        }
     }
 
     fn send_prompt_to(&mut self, pane: &PaneHandle, text: &str) -> Result<()> {
