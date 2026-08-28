@@ -1,0 +1,37 @@
+{
+  "challenge": {
+    "id": "CH-200-01",
+    "milestone_id": "200",
+    "scope": "plan",
+    "status": "closed",
+    "created": "2026-08-28",
+    "closed": "2026-08-28",
+    "summary": ""
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "major",
+      "category": "gap",
+      "title": "User-facing error and warning text references M200 changelog",
+      "description": "AC-01 says the deprecation error from `mp config set keybinds.focus_content ...` should be \"a clear deprecation message pointing to the M200 changelog\". S3 echoes it. The warning text is user-facing (shown in the terminal). \"M200 changelog\" is an internal milestone ID. Reword to point to the changelog generically.",
+      "target": "acceptance_criteria[AC-01] / step[S3] / design_decisions[\"Migration...\"]",
+      "status": "resolved",
+      "resolution": "AC-01 and S2 (the deprecation warning step) no longer reference M200. The user-facing text now says 'project CHANGELOG' generically. The internal design-decision rationale that mentioned M198 was already internal-only and required no change.",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-02",
+      "severity": "minor",
+      "category": "gap",
+      "title": "Step S1/S2 do not explicitly enumerate the tests and helpers that reference `Keybinds.focus_content`",
+      "description": "S1 removes the `focus_content` field from `Keybinds`; S2 removes the dispatch arm. Both steps mention the source change but do not call out the call-sites that will fail to compile after the field is removed. Known call-sites that need updating: (1) `keybind_default_label` in `crates/raul/src/tui/modes/settings.rs` has a `\"focus_content\" => ...` match arm; (2) any test in `crates/raul/src/tui/keybinds.rs::tests` that constructs a `Keybinds` literal with `focus_content: vec![...]`; (3) any other test or fixture under `crates/raul/tests/` that references the field. Either add the call-sites to S1/S2 or rely on the compiler to surface them at execution time (acceptable, but the AC-06 verification should explicitly run a build to confirm no compile break).",
+      "target": "step[S1] / step[S2] / acceptance_criteria[AC-06]",
+      "status": "resolved",
+      "resolution": "S1 step action updated to enumerate the test call-sites that need to drop the focus_content field: the keybind_default_label match arm in crates/raul/src/tui/modes/settings.rs and any test in keybinds.rs::tests or crates/raul/tests/ that constructs a Keybinds literal with the field. The compiler will surface every other call-site; AC-06 already requires a clean build.",
+      "action": "no-change",
+      "action_ref": ""
+    }
+  ]
+}

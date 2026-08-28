@@ -1,0 +1,573 @@
+{
+  "milestone": {
+    "id": "201",
+    "title": "raul Settings 2.0 — typed config schema, inline editors, description card with defaults",
+    "slug": "raul-settings-2-0-typed-config-schema-inline-editors-description-card-with-defaults",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "200"
+    ],
+    "effort": "M",
+    "risk": "medium",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-28",
+    "updated": "2026-08-28",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-28T17:53:22.475643+00:00"
+  },
+  "intent": {
+    "outcome": "The raul Settings lane shows all 46 settings in a framed list with a framed description card under it. Each setting displays Type / Default / Value / Description. Booleans toggle in place, choices cycle in place, strings / paths / integers edit in-row with a caret, keybinds use a typed-string editor with KeyCombo::parse validation. The centered popup modal is gone for the common case. Settings 2.0 unblocks a more discoverable, typed, modern configuration surface for raul."
+  },
+  "problem": {
+    "description": "The current Settings lane (M140 / M168) has a flat `key = value` list, an unanchored 3-row prose block at the top, and a centered popup modal for every edit. The renderer has no schema — types, defaults, and allowed values are implicit in the JSON config; the help text in `crates/raul/src/tui/modes/settings/help.rs` is the only source of per-key prose and has drifted from the typed `Keybinds::default()` impl on ~12 of 28 keybinds. The user has no separation between 'what the key does' and 'what value is set right now' on the same screen. The modal-heavy flow breaks the visual continuity with the rest of the TUI (milestone list, backlog list, milestone detail), which all use the same bordered-block-with-accent-title vocabulary."
+  },
+  "scope": {
+    "in_scope": [
+      "New `mp config schema` subcommand that emits a JSON document with one entry per recognized config key (46 keys across ui, workflow, git, next, agent, keybinds). Each entry: {key, type, default, allowed?, description}. `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is present only for `choice` (e.g. ui.theme allowed: [mocha, latte, frappe, macchiato, dracula]). `description` is the user-facing one-liner from the key_descriptions block below. Deterministic ordering (sorted by key, then section).",
+      "New `SettingsSchema` data structure in `crates/raul/src/tui/mode.rs` (or a new `crates/raul/src/tui/modes/settings/schema.rs`) that holds the per-key metadata. `SettingsState` reads the schema once on lane open and caches it. No re-fetch on every redraw.",
+      "Reworked `render_settings_lane` in `crates/raul/src/tui/render/overlays.rs`:\n  - Bordered list at the top, with section headers (ui, workflow, git, next, agent, keybinds) styled like the milestone list's indent column. Cursor on a Key row (REVERSED).\n  - Framed description card UNDER the list (not above). Border in accent color. Title is the focused key. Body shows `Type / Default / Value / Description` as a BOLD-label grid, plus a hint footer (e.g. 'Enter: edit · ←/→: cycle · s: save · Esc: back to list').\n  - Replaces the current 3-row un-bordered prose block and the centered popup for the common case.\n  - The keybind capture modal (if shipped in a follow-up) is the only remaining modal; everything else edits inline.",
+      "Per-type inline editors, all on the row, all in the same visual block:\n  - `bool`: Space toggles in place. No editor. The description card hint changes to 'Space: toggle · s: save · Esc: back'.\n  - `choice`: ← / → cycles through `allowed` values. The value cell renders `‹ current ›  (was previous)` while cycling. No editor. Hint: '←/→: cycle · s: save · Esc: revert'.\n  - `string` / `path` / `integer`: Enter drops the value cell into a caret-edit state, in-row. Backspace deletes; arrow keys move; Enter commits; Esc reverts. Invalid values (e.g. integer parse failure) show a red error line in the description card area, Enter retries, Esc reverts.\n  - `keybind`: typed-string editor with `KeyCombo::parse` validation. Same in-row caret as strings. Invalid combos (e.g. 'asdf') show the parse error in the description card area, Enter retries, Esc reverts. Valid combos commit on Enter.",
+      "Bake the 46 per-key descriptions from the planning-session sign-off into the schema (see `key_descriptions` below). Descriptions are user-facing: no `crates/...` pointers, no internal milestone IDs, no lesson codes. Defaults in the description card come from the typed `Default` impls in `crates/mp/src/config.rs` and `crates/raul/src/tui/keybinds.rs`; no echo in the prose.",
+      "Tests: per-type editor unit tests (Bool toggle, Choice cycle, String/Path/Integer commit + revert, Keybind typed-string commit + invalid-retry), a TUI snapshot test for the framed list + framed description card layout, a golden `mp config schema` fixture under `tests/fixtures/golden/`, a CLI scenario test that asserts the schema output is deterministic and includes all 46 keys. Consumer-surface lint clean (no internal IDs leak into descriptions or the schema JSON).",
+      "Update the `crates/raul/src/tui/modes/settings/help.rs` file: delete it (or replace with a thin re-export from the new schema doc) once M201 ships. Until then, it is no longer read by the renderer.",
+      "46 per-key descriptions for the schema (Type / Default / Allowed / Description). Sign-off recorded in the planning session on 2026-08-28. The full table is encoded as a JSON array at the end of this scope bullet, in a delimiter-wrapped block the executor can extract and bake into `crates/mp/src/config_docs.rs`:\n\n<<<KEY_DESCRIPTIONS_JSON>>>\n[{\"key\": \"ui.color\", \"type\": \"bool\", \"default\": true, \"description\": \"Whether the TUI uses ANSI colors for status, decisions, and read paths. Turn off for terminals that render colors poorly or for screenshot-friendly output.\"}, {\"key\": \"ui.icons\", \"type\": \"choice\", \"default\": \"unicode\", \"allowed\": [\"none\", \"ascii\", \"unicode\"], \"description\": \"Glyph set for lane and status indicators. `unicode` is the rich default; pick `ascii` for plain terminals or `none` for log-friendly output. Restart raul to apply.\"}, {\"key\": \"ui.theme\", \"type\": \"choice\", \"default\": \"mocha\", \"allowed\": [\"mocha\", \"macchiato\", \"frappe\", \"latte\", \"dracula\"], \"description\": \"Color palette. Each theme re-tints the whole TUI; restart raul to apply. `latte` is the light option.\"}, {\"key\": \"ui.hide_done\", \"type\": \"bool\", \"default\": false, \"description\": \"Hide completed items in list lanes. You can flip this at runtime with `h` in any list lane — this setting is the persistent default.\"}, {\"key\": \"ui.show_watch_tab\", \"type\": \"bool\", \"default\": false, \"description\": \"Show the Watch lane in raul's tab bar. Off by default so operators opt in explicitly. Independent of the `mp watch` CLI, which always works. Restart raul to apply.\"}, {\"key\": \"workflow.profile\", \"type\": \"choice\", \"default\": \"full\", \"allowed\": [\"full\", \"hybrid\", \"session\"], \"description\": \"Profile that selects which gates and artifacts apply at plan time. `full` enforces every gate; `hybrid` and `session` are lighter presets for non-canonical projects.\"}, {\"key\": \"workflow.plan.location\", \"type\": \"path\", \"default\": \"./master-plan\", \"description\": \"Directory where the plan is stored. Only meaningful when `workflow.plan.in_repo` is `false` — `in_repo = true` always uses `master-plan/` next to `Cargo.toml`. Changing this requires re-running `mp init`.\"}, {\"key\": \"workflow.plan.in_repo\", \"type\": \"bool\", \"default\": true, \"description\": \"Store the plan under the project root (`./master-plan`) instead of `$MP_HOME`. Turn off to share one plan across multiple projects on the same machine.\"}, {\"key\": \"workflow.gates.strictness\", \"type\": \"choice\", \"default\": \"relaxed\", \"allowed\": [\"relaxed\", \"full\"], \"description\": \"Gate enforcement level. `full` is the production-strict setting; `relaxed` skips selected gates and is the default. Flip to `full` before shipping.\"}, {\"key\": \"workflow.steps.code_review\", \"type\": \"bool\", \"default\": false, \"description\": \"Insert an optional code-review step between execution and verification. Off by default; turn on for milestones that warrant a second pass.\"}, {\"key\": \"git.auto_commit\", \"type\": \"bool\", \"default\": false, \"description\": \"Auto-commit on milestone close. When off, `mp` stages changes but leaves the commit to you.\"}, {\"key\": \"git.commit_on_milestone_complete\", \"type\": \"bool\", \"default\": false, \"description\": \"Auto-commit when a milestone reaches `complete`. When both this and `git.auto_commit` are on, `auto_commit` wins.\"}, {\"key\": \"git.auto_push\", \"type\": \"bool\", \"default\": false, \"description\": \"Auto-push after auto-commit. Requires `git.auto_commit` to be on. Off by default; turn on for solo projects without a manual review step.\"}, {\"key\": \"next.prefer\", \"type\": \"choice\", \"default\": \"milestone\", \"allowed\": [\"milestone\", \"track\"], \"description\": \"Forward lane when both are eligible. `milestone` opens the Milestones lane; `track` opens the Tracks lane. Pick whichever matches your workflow.\"}, {\"key\": \"agent.automation.commit_after_execute\", \"type\": \"bool\", \"default\": false, \"description\": \"Commit after an agent executes a milestone. The runner skill reads this at the execute→verify hand-off. Off by default so you control commits.\"}, {\"key\": \"agent.automation.push_after_review\", \"type\": \"bool\", \"default\": false, \"description\": \"Push after `mp reviews pass`. The coordinator skill reads this at the review→remediate hand-off. Off by default; turn on for solo projects or self-hosted runners.\"}, {\"key\": \"agent.automation.branch_strategy\", \"type\": \"choice\", \"default\": \"current\", \"allowed\": [\"per-milestone\", \"current\", \"none\"], \"description\": \"Branch naming for executor branches. `per-milestone` cuts `feature/m{id}-{slug}` per milestone; `current` works on whatever branch the agent is on; `none` records only. Change only if your CI has a stricter policy.\"}, {\"key\": \"agent.automation.auto_remediate\", \"type\": \"choice\", \"default\": \"none\", \"allowed\": [\"none\", \"low\", \"medium\", \"high\", \"all\"], \"description\": \"Auto-fix review findings at or above a severity threshold. `none` records only; `low`/`medium`/`high` remediate matching findings; `all` is an alias for `low`. Off by default — opt in only if you trust the auto-fix surface.\"}, {\"key\": \"keybinds.quit\", \"type\": \"keybind\", \"default\": [\"q\", \"Q\"], \"description\": \"Quit raul.\"}, {\"key\": \"keybinds.up\", \"type\": \"keybind\", \"default\": [\"Up\", \"k\"], \"description\": \"One row up in any list.\"}, {\"key\": \"keybinds.down\", \"type\": \"keybind\", \"default\": [\"Down\", \"j\"], \"description\": \"One row down in any list.\"}, {\"key\": \"keybinds.page_up\", \"type\": \"keybind\", \"default\": [\"PageUp\"], \"description\": \"One page up in any scrollable pane.\"}, {\"key\": \"keybinds.page_down\", \"type\": \"keybind\", \"default\": [\"PageDown\"], \"description\": \"One page down in any scrollable pane.\"}, {\"key\": \"keybinds.enter\", \"type\": \"keybind\", \"default\": [\"Enter\"], \"description\": \"Drill-in or confirm. In the Settings lane, opens the field editor for the focused key.\"}, {\"key\": \"keybinds.escape\", \"type\": \"keybind\", \"default\": [\"Esc\"], \"description\": \"Back or cancel. In the Settings lane, closes the active edit or the lane itself.\"}, {\"key\": \"keybinds.help\", \"type\": \"keybind\", \"default\": [\"?\"], \"description\": \"Open the help overlay. Available in any lane.\"}, {\"key\": \"keybinds.filter\", \"type\": \"keybind\", \"default\": [\"f\"], \"description\": \"Open the lifecycle filter on the Milestones lane.\"}, {\"key\": \"keybinds.hide_done\", \"type\": \"keybind\", \"default\": [\"h\"], \"description\": \"Toggle the `hide_done` flag in any list lane at runtime. No-op on the Settings lane.\"}, {\"key\": \"keybinds.create_annotation\", \"type\": \"keybind\", \"default\": [\"A\"], \"description\": \"Create an annotation thread on the focused item.\"}, {\"key\": \"keybinds.resolve\", \"type\": \"keybind\", \"default\": [\"r\"], \"description\": \"Resolve the focused annotation. Only acts when an annotation is focused.\"}, {\"key\": \"keybinds.reopen\", \"type\": \"keybind\", \"default\": [\"R\"], \"description\": \"Reopen a resolved annotation.\"}, {\"key\": \"keybinds.approve\", \"type\": \"keybind\", \"default\": [\"p\"], \"description\": \"Approve a milestone from the review menu. Greyed out when the preflight gate is closed.\"}, {\"key\": \"keybinds.review_menu\", \"type\": \"keybind\", \"default\": [\"m\"], \"description\": \"Open the review-action menu on a focused milestone.\"}, {\"key\": \"keybinds.open_settings\", \"type\": \"keybind\", \"default\": [\"Ctrl-O\"], \"description\": \"Open the Settings lane from any other lane.\"}, {\"key\": \"keybinds.previous_lane\", \"type\": \"keybind\", \"default\": [\"Left\", \"BackTab\"], \"description\": \"Move focus to the previous lane in the tab bar.\"}, {\"key\": \"keybinds.next_lane\", \"type\": \"keybind\", \"default\": [\"Right\", \"Tab\"], \"description\": \"Move focus to the next lane in the tab bar.\"}, {\"key\": \"keybinds.focus_content\", \"type\": \"keybind\", \"default\": [\"Enter\"], \"description\": \"Move focus from the lane list to its content/detail pane and back. (TUI-internal action; not user-rebindable.)\"}, {\"key\": \"keybinds.refresh\", \"type\": \"keybind\", \"default\": [\"Ctrl-R\"], \"description\": \"Re-pull state from `mp` for the active lane. Use after external changes.\"}, {\"key\": \"keybinds.next_section\", \"type\": \"keybind\", \"default\": [\"]\"], \"description\": \"Jump to the next section when drilled into a MilestoneDetail.\"}, {\"key\": \"keybinds.prev_section\", \"type\": \"keybind\", \"default\": [\"[\"], \"description\": \"Jump to the previous section when drilled into a MilestoneDetail.\"}, {\"key\": \"keybinds.next_item\", \"type\": \"keybind\", \"default\": [\"n\"], \"description\": \"Step to the next item across sections in a drilled-in MilestoneDetail.\"}, {\"key\": \"keybinds.prev_item\", \"type\": \"keybind\", \"default\": [\"p\"], \"description\": \"Step to the previous item across sections in a drilled-in MilestoneDetail.\"}, {\"key\": \"keybinds.lifecycle_filter\", \"type\": \"keybind\", \"default\": [\"F\"], \"description\": \"Open the lifecycle filter modal on the Milestones lane.\"}, {\"key\": \"keybinds.grooming_preset\", \"type\": \"keybind\", \"default\": [\"g\"], \"description\": \"Apply the Grooming preset to the Milestones lane filter.\"}, {\"key\": \"keybinds.search\", \"type\": \"keybind\", \"default\": [\"/\"], \"description\": \"Open the live substring search overlay. Matches against id and title, case-insensitive.\"}, {\"key\": \"keybinds.cycle_sort\", \"type\": \"keybind\", \"default\": [\"o\"], \"description\": \"Cycle the sort key for the active lane. Persists per lane across sessions.\"}]\n<<<END_KEY_DESCRIPTIONS_JSON>>>"
+    ],
+    "out_of_scope": [
+      "Keybind capture mode (press-the-combo modal). v1 ships the typed-string editor; capture mode is a polish follow-up. The user explicitly chose typed-string for v1 in the planning session.",
+      "Search / filter on the settings list. Operators with 46 rows don't need it; can be added later if the list grows.",
+      "Per-user (vs per-project) preference scoping. Same as the rest of the config: project-level. Per-user would touch the config read path and is a separate change.",
+      "Change to the persisted config format. The TOML shape stays the same; the schema is read-only metadata for the TUI.",
+      "Change to `mp config get / set / unset` semantics. Existing CLI behavior is preserved (AC-06).",
+      "New config keys. The 46 settings are the full set; no additions in this milestone.",
+      "Theme / palette additions. `ui.theme` accepts the existing 5 themes (mocha, latte, frappe, macchiato, dracula); no new palette work.",
+      "A migration / shim for users whose config has drifted help-text defaults. Existing overrides win, just like M200.",
+      "Markdown rendering inside the description card. Per the planning session, structured BOLD-label fields are sufficient; markdown rendering is reserved for longer-form prose (e.g. milestone detail) and adds no value here."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp config schema` emits a JSON document with a top-level `$schema_version: 1` field and a `keys` array of 46 entries, one per recognized config key, sorted by key. Each entry has {key, type, default, allowed?, description}. `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is present only for `choice` entries. `description` is the user-facing one-liner from the planning session sign-off (no internal `crates/...` pointers, no milestone IDs, no lesson codes). The JSON is deterministic across runs. Forward-compat contract: additive changes bump the minor version (e.g. `1.1`); breaking changes (renamed fields, removed types) bump the major (e.g. `2.0`).",
+      "verification": "new CLI scenario: `mp config schema` against an empty project config, golden-compare stdout to `tests/fixtures/golden/mp-config-schema.{stdout,exit}.txt`; `make test-scenarios`",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "The Settings lane renders the new layout: bordered list at the top (with section headers and a REVERSED cursor on the focused key), framed description card UNDER the list with the key name in the title and a BOLD-label `Type / Default / Value / Description` body. Replaces the current 3-row un-bordered prose block. No centered modal in the default state.",
+      "verification": "new TUI snapshot test in `crates/raul/tests/` — render the Settings lane with `app.settings` populated, assert the framed-list + framed-description-card layout at 80×24, 120×40, and 200×60. Template: the `m169_rev.rs` snapshot pattern.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Each type's inline editor works without opening a modal:\n  - `bool` (e.g. `git.auto_commit`): Space toggles in place; no editor; the value cell flips immediately.\n  - `choice` (e.g. `ui.theme`): ← / → cycles through `allowed`; the value cell renders `‹ current ›` while cycling; no editor.\n  - `string` / `path` / `integer`: Enter drops the value cell into a caret-edit state; Backspace deletes; Enter commits; Esc reverts.\n  - `keybind` (e.g. `keybinds.refresh`): typed-string with `KeyCombo::parse` validation; Enter commits valid combos; invalid combos show an error in the description card area, Enter retries, Esc reverts.",
+      "verification": "new TUI unit tests in `crates/raul/src/tui/modes/settings.rs::tests` (or a new `crates/raul/src/tui/modes/settings/editor.rs`) — one test per type covering toggle/cycle/caret-edit/commit/revert/retry paths. `cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor|settings_inline/)'`",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "The 46 per-key descriptions baked into the schema are user-facing. No `crates/...` references, no internal milestone IDs (M\\d+), no lesson codes (L\\d+), no repo-internal doc pointers. Consumer-surface lint (`make consumer-surface-lint`) is clean.",
+      "verification": "`make consumer-surface-lint` (CI gate) and a manual spot-check of the 46 descriptions for any internal pointer",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Defaults in the description card come from the typed `Default` impls in `crates/mp/src/config.rs` and `crates/raul/src/tui/keybinds.rs::Keybinds::default()`. A change to a typed default (e.g. flipping `Keybinds::default().refresh` from `Ctrl-R` to `F5` in a test) shows up in the `mp config schema` output and in the rendered description card on the next lane open. No echo of defaults in the prose.",
+      "verification": "unit test that mutates a typed default, re-runs `mp config schema`, asserts the change. `cargo nextest run -p mp --no-fail-fast -E 'test(/config_schema/)'`",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Existing `mp config get / set / unset` behavior is unchanged. The new `mp config schema` subcommand is additive — no existing CLI subcommand's output, exit code, or behavior changes. Existing config tests pass.",
+      "verification": "`cargo nextest run -p mp --no-fail-fast -E 'test(/config_get|config_set|config_unset|config_validate|config_keys|config_ui_keys/)'` and a regression run of the existing `mp config show` golden",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "All existing Settings tests pass: `m169_rev`, `tui_settings_automation`, `m168_settings_grouped`, `m198_watch_tab`, the new `m200_keybind_deconflict` tests. `cargo clippy -p mp --tests --no-deps -- -D warnings` and `cargo clippy -p raul --tests --no-deps -- -D warnings` clean. `cargo fmt --all -- --check` clean. The legacy `crates/raul/src/tui/modes/settings/help.rs` is no longer read by the renderer (or is replaced by a thin re-export from the schema doc).",
+      "verification": "`cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|m169_rev|m168_settings|m198_watch|m200_keybind/)'` && `cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|config_ui_keys|config_schema/)'` && `cargo clippy -p mp --tests --no-deps -- -D warnings` && `cargo clippy -p raul --tests --no-deps -- -D warnings` && `cargo fmt --all -- --check`",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "When the installed `mp` is older than the version that ships `mp config schema`, the Settings 2.0 lane shows a clear, actionable error: \"Settings 2.0 requires mp 0.X.Y or later; run `mp --version` to check.\" The error replaces the framed list + framed description card layout (no half-rendered state). The lane is otherwise non-functional until mp is upgraded.",
+      "verification": "a TUI test that constructs an App with a mocked MpRunner that returns \"unknown subcommand\" for `mp config schema`; render the Settings lane; assert the error message is displayed in place of the framed list",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Schema source",
+      "choice": "New `mp config schema` subcommand (not `mp config show --schema` flag).",
+      "rationale": "The schema is a different shape than `config show` (which is the merged config object). A separate subcommand is the cleanest surface for a typed, machine-readable contract. The agent (and any future tooling) reads schema once and caches. The TUI consumes the same JSON."
+    },
+    {
+      "area": "Description card placement",
+      "choice": "Below the list (not above).",
+      "rationale": "Matches the milestone list + milestone detail pattern: the list is the index, the detail card is the focus. Above-the-list would compete with the list for the same first-glance eye path. Below matches what the user has been reading in the planning mockup."
+    },
+    {
+      "area": "Keybind editor (v1)",
+      "choice": "Typed-string with `KeyCombo::parse` validation, in-row.",
+      "rationale": "Smallest path to a single cohesive milestone. Capture mode (press-the-combo) is the right UX but adds a day of code+test and keeps one modal in the surface. The user picked typed-string for v1 in the planning session; capture mode is a polish follow-up."
+    },
+    {
+      "area": "Defaults source of truth",
+      "choice": "Typed `Default` impls in `crates/mp/src/config.rs` (for non-keybind) and `crates/raul/src/tui/keybinds.rs::Keybinds::default()` (for keybinds). No echo of defaults in the prose.",
+      "rationale": "Single source of truth. A change to the typed default shows up in the schema output automatically. Avoids the drift we just deconflicted in M200."
+    },
+    {
+      "area": "Where the 46 descriptions live in source",
+      "choice": "A const array in `crates/mp/src/config_docs.rs` (new file), keyed by the dotted key, with `{type, default, allowed?, description}` per entry. `mp config schema` reads it and merges with the typed default-impl fallback (typed wins on conflict, so the description array can omit `default` and still be correct).",
+      "rationale": "Descriptions are user-facing prose; they belong in `mp` (the consumer-facing crate) not `raul` (the TUI). A new file keeps the schema-source-of-truth together. The typed `Default` impls remain the runtime default; the description array is the prose. The schema command merges them at emit time."
+    },
+    {
+      "area": "Schema fetch on lane open",
+      "choice": "Read once on lane open and cache in `SettingsState`. No re-fetch on redraw; no re-fetch on key change.",
+      "rationale": "Schema is static for the lifetime of a project (no key added/removed at runtime). Caching is the right call for TUI redraw performance. A future 'reload schema' command (out of scope) is the path for picking up new keys after `mp` upgrades."
+    },
+    {
+      "area": "Inline editor state machine",
+      "choice": "Three states per row: `idle` (default), `editing` (caret in value cell), `invalid` (editing + parse error). The same `SettingsFocus` enum that already exists is extended; no new mode is added.",
+      "rationale": "The current `SettingsFocus::Editing` flag is the only mode-level signal needed. The per-type editor (Bool / Choice / String / Path / Integer / Keybind) lives on the row's `SettingsEdit` struct. One mode signal, six type-specific editors — keeps the dispatch flat."
+    },
+    {
+      "area": "Visual vocabulary continuity",
+      "choice": "Bordered blocks with accent border (description card) and neutral border (list). Same `Borders::ALL` + title pattern used by `render_backlog_detail` and the milestone detail card. `REVERSED` cursor for the focused row. No new color roles in the palette.",
+      "rationale": "No new visual vocabulary. The user explicitly asked for continuity with the rest of the TUI; this is the same `Block::default().borders(Borders::ALL).title(...)` + accent-border treatment the milestone list uses."
+    },
+    {
+      "area": "Minimum mp version for Settings 2.0",
+      "choice": "The Settings 2.0 lane requires mp >= 0.X.Y (the version that ships `mp config schema`). If the installed `mp` is older, the lane shows a clear error: \"Settings 2.0 requires mp 0.X.Y or later; run `mp --version` to check.\" The lane does not attempt to render the legacy settings surface on older mp — the reworked renderer depends on the schema.",
+      "rationale": "raul reads `mp config schema` on lane open. If the subcommand does not exist, the lane cannot render. A fallback to the pre-M201 surface is more code than the upgrade coupling warrants (raul already depends on recent mp for `mp config get` / `set` / `show` semantics). The error message is the user-facing path; the version floor is documented in the design decision and in the Settings lane release note."
+    },
+    {
+      "area": "Schema output versioning",
+      "choice": "The schema output includes a top-level `$schema_version: \"1.0\"` (semver string) field. Additive changes (new optional fields, new types, new keys) bump minor; breaking changes (renamed fields, removed fields, changed semantics) bump major. Consumers (raul, future tooling) can use the version to negotiate capability without re-reading the schema on every release.",
+      "rationale": "The schema is now a stable contract — raul parses it on lane open, and any future agent / IDE consumer will too. Without a version field, every change is a silent breaking change for any strict consumer. The semver discipline matches the rest of the projects interfaces (the `mp` CLI uses semver, the JSON config format is a separate compat contract)."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should `mp config schema` be a subcommand (recommended) or a `--schema` flag on `mp config show`?",
+      "status": "resolved",
+      "answer": "New subcommand. The schema is a different shape than 'config show' (which is the merged config object), and any future tooling (agents, validation harnesses, IDE integrations) benefits from a stable, machine-readable contract at a predictable path. 'mp config show --schema' would also work but mixes two output shapes in one subcommand. The schema subcommand wins on clarity."
+    },
+    {
+      "id": "Q-02",
+      "question": "Where exactly in `crates/mp/src/` do the 46 descriptions live? New file `config_docs.rs` (recommended) or an extension of `crates/mp/src/config.rs`?",
+      "status": "resolved",
+      "answer": "New file 'crates/mp/src/config_docs.rs'. The descriptions are user-facing prose; they belong in 'mp' (the consumer-facing crate) and are large enough (46 entries) to justify a dedicated file. The typed 'Default' impls in 'config.rs' remain the runtime default; 'config_docs.rs' is the prose source. The 'mp config schema' command merges them at emit time (typed wins on conflict)."
+    },
+    {
+      "id": "Q-03",
+      "question": "When the inline keybind editor gets an invalid combo, where exactly does the error render — under the row, in the description card, or both?",
+      "status": "resolved",
+      "answer": "Description card. The error line renders in the description card's hint footer area, replacing the per-type hint temporarily. The row itself stays in the 'editing' state with the caret in the value cell. This keeps the layout stable (the description card never grows a new region; it just swaps its hint for an error) and matches the rest of the TUI's pattern of 'errors live in the same place every time'."
+    },
+    {
+      "id": "Q-04",
+      "question": "For the typed-string keybind editor, do we accept any user-typed string that `KeyCombo::parse` can interpret (e.g. `Ctrl+S`, `+`, bare `Enter`) or do we restrict to a documented subset?",
+      "status": "resolved",
+      "answer": "Accept any user-typed string that 'KeyCombo::parse' can interpret, including multi-modifier combos like 'Ctrl+Shift+S'. We do not restrict to a documented subset; the typed impl in 'crates/raul/src/tui/key_combo.rs' is the authoritative grammar and the typed-string editor surfaces its parse errors verbatim. Documented key names like 'Enter', 'Esc', 'Up', 'PageUp', 'BackTab', 'Tab' are supported; the description card hint for keybind rows shows 'e.g. Ctrl+R, Enter, PageUp' as a prompt."
+    },
+    {
+      "id": "Q-05",
+      "question": "When the user toggles a Bool or cycles a Choice, is the change staged (committed on `s`) or live (committed immediately, with no staging)?",
+      "status": "resolved",
+      "answer": "Staged. Bool toggles and Choice cycles record into 'state.staged_edits' immediately (so the value cell updates visually), but the on-disk config only changes when the user presses 's' to save. The Esc revert path restores the pre-edit value. This matches the existing 's' saves the staged edits pattern in 'modes/settings.rs' and avoids surprise writes from a key press."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "mp config schema subcommand + 46-key docs file",
+      "goal": "New 'mp config schema' subcommand that emits a deterministic JSON document with one entry per recognized config key (46 keys across ui, workflow, git, next, agent, keybinds). Each entry: {key, type, default, allowed?, description}. New file 'crates/mp/src/config_docs.rs' carries the 46 per-key entries baked from the M201 spec. Typed Default impls are the runtime source for 'default'; the docs file is the prose source for 'description'. Merge at emit time, typed wins on conflict.",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "SettingsSchema + reworked renderer",
+      "goal": "New SettingsSchema struct in 'crates/raul/src/tui/mode.rs' (or a new 'crates/raul/src/tui/modes/settings/schema.rs'). Read once on lane open and cache in SettingsState. Rework 'render_settings_lane' to: (1) bordered list at top with section headers and a REVERSED cursor on the focused key, (2) framed description card UNDER the list with the key name in the title and a BOLD-label Type/Default/Value/Description body, (3) per-type hint footer.",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Per-type inline editors",
+      "goal": "Inline editors per type, all on the row, all in the same visual block (no centered modal for the common case). Bool: Space toggles in place. Choice: Left/Right cycles through allowed values with a 'current' indicator. String/Path/Integer: Enter drops the value cell into a caret-edit state; Backspace deletes; Enter commits; Esc reverts; invalid values show an error in the description card area, Enter retries. Keybind: typed-string editor with KeyCombo::parse validation, same in-row caret; invalid combos show parse error in the description card area. Stage on edit; save on 's'.",
+      "rollback": ""
+    },
+    {
+      "id": "WP4",
+      "name": "Tests, fixtures, and legacy help.rs removal",
+      "goal": "TUI snapshot test for the framed list + framed description card at 80x24, 120x40, and 200x60. Per-type editor unit tests for Bool / Choice / String / Path / Integer / Keybind. Golden 'mp config schema' fixture + CLI scenario under tests/scenarios/. Replace or delete 'crates/raul/src/tui/modes/settings/help.rs' (no longer read by the renderer). Consumer-surface lint clean (no internal milestone IDs, lesson codes, or repo-internal pointers in the descriptions or the schema JSON).",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add the `mp config schema` subcommand skeleton in `crates/mp/src/commands/config.rs` (or `crates/mp/src/config_cmd.rs` — follow the existing get/set file). New `Schema` struct in `crates/mp/src/config.rs` with fields {key, type, default, allowed?, description}. Wire the subcommand into `crates/mp/src/cli/config_cmd.rs` and the top-level `mp` clap surface. The subcommand emits JSON to stdout; nothing else.",
+      "files": [
+        "crates/mp/src/commands/config.rs",
+        "crates/mp/src/config_cmd.rs",
+        "crates/mp/src/cli/config_cmd.rs"
+      ],
+      "tests": "cargo build -p mp && mp config schema --help exits 0",
+      "done_when": "`mp config schema --help` lists the new subcommand; the subcommand is wired into the clap surface; no other behavior change",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Create `crates/mp/src/config_docs.rs` with the 46 per-key entries baked from the M201 spec. Each entry: {key, type, default, allowed?, description}. The full table is encoded at the end of the M201 scope.in_scope bullet (delimiter-wrapped `<<<KEY_DESCRIPTIONS_JSON>>>...<<<END_KEY_DESCRIPTIONS_JSON>>>` block) — extract the JSON array and bake it into a `pub const KEY_DESCRIPTIONS: &[(...)].` The `description` strings are user-facing prose; the `default` field is a fallback (typed impl wins at merge time).",
+      "files": [
+        "crates/mp/src/config_docs.rs"
+      ],
+      "tests": "cargo build -p mp && a unit test that asserts `KEY_DESCRIPTIONS.len() == 46` and every entry has a non-empty `description`",
+      "done_when": "`KEY_DESCRIPTIONS` has 46 entries; all 46 `description` strings are non-empty and free of `crates/...` references, internal milestone IDs, and lesson codes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Wire the typed `Default` impls into the schema emit. In `mp config schema`, for each key in `KEY_DESCRIPTIONS`, override the `default` field with the typed default from `crates/mp/src/config.rs` (for non-keybind keys) and `crates/raul/src/tui/keybinds.rs::Keybinds::default()` (for keybinds). The typed default is authoritative — the docs file is a fallback. Sort entries by `(section, key)` for determinism. Stable JSON key ordering within each entry (BTreeMap or sorted serializer).",
+      "files": [
+        "crates/mp/src/commands/config.rs",
+        "crates/mp/src/config.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "a unit test that flips a typed default in a controlled fixture, re-runs `mp config schema`, asserts the change shows up in the output",
+      "done_when": "`mp config schema` output reflects the live typed defaults; deterministic ordering; a change to a typed default appears in the next schema emit",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Add `SettingsSchema` struct in `crates/raul/src/tui/mode.rs` (or a new `crates/raul/src/tui/modes/settings/schema.rs`). Fields mirror the schema JSON: {Vec<SchemaEntry>} where SchemaEntry is {key, type, default, allowed?, description}. `SettingsState` gains a `schema: Option<SettingsSchema>` field. The lane-open path runs `mp config schema` once and caches the result.",
+      "files": [
+        "crates/raul/src/tui/mode.rs",
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo build -p raul && a unit test that constructs a SettingsState, populates the schema, and reads back entries",
+      "done_when": "SettingsSchema is a typed struct; SettingsState has a cached schema field; no per-redraw fetch",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Rework `render_settings_lane` in `crates/raul/src/tui/render/overlays.rs`. (1) Replace the flat `key = value` List with a bordered block at the top: section headers (ui, workflow, git, next, agent, keybinds) styled like the milestone list indent column; Key rows with the type badge in a small column; value cell shows the current value. (2) Below the list, add a framed description card with the focused key name in the title (accent border); body is a BOLD-label `Type / Default / Value / Description` grid; footer is a per-type hint line.",
+      "files": [
+        "crates/raul/src/tui/render/overlays.rs"
+      ],
+      "tests": "a TUI snapshot test renders the lane at 80x24, 120x40, 200x60 and asserts the framed-list + framed-description-card layout",
+      "done_when": "Both blocks render with the same bordered vocabulary as the milestone list; the description card rewrites as the cursor moves; no centered modal in the default state",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Bool editor. When the focused key has `type = bool` and the user presses Space, the value cell flips immediately and the change is staged in `state.staged_edits`. No editor opens. The description card hint shows `Space: toggle · s: save · Esc: back`.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_bool|settings_inline_bool/)`",
+      "done_when": "Bool keys toggle in place on Space; the change is staged; the value cell updates visually",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Choice editor. When the focused key has `type = choice` and the user presses Left or Right, the value cycles through `allowed` (wrapping). While cycling, the value cell renders `‹ current ›` (with a `‹` / `›` indicator). The change is staged on each press. No editor opens. The description card hint shows `←/→: cycle · s: save · Esc: revert`.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_choice|settings_inline_choice/)`",
+      "done_when": "Choice keys cycle on Left/Right; the value cell shows the current option; the change is staged",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "String / Path / Integer editor. When the focused key has `type = string`, `path`, or `integer` and the user presses Enter, the value cell drops into a caret-edit state. Backspace deletes the char before the caret; Left/Right move the caret; Enter commits; Esc reverts. Integer keys validate parse on commit; invalid values show `not a valid integer: <input>` in the description card hint footer, Enter retries, Esc reverts. The change is staged on commit.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_string|settings_editor_path|settings_editor_integer|settings_inline_(string|path|integer)/)`",
+      "done_when": "String/Path/Integer keys edit in-row; integer validates on commit; invalid values show in the description card hint",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Keybind editor. When the focused key has `type = keybind` and the user presses Enter, the value cell drops into a caret-edit state. The user types a combo string (e.g. `Ctrl+S`, `Enter`, `PageUp`); the editor calls `KeyCombo::parse` on Enter. Valid combos commit and stage; invalid combos show the parse error in the description card hint footer, Enter retries, Esc reverts. The description card hint shows `e.g. Ctrl+R, Enter, PageUp` as a prompt.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/key_combo.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_keybind|settings_inline_keybind|key_combo_parse/)`",
+      "done_when": "Keybind keys edit in-row; valid combos commit; invalid combos show the parse error; the typed-string editor handles every `KeyCombo::parse` case",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP4",
+      "order": 10,
+      "action": "Add a TUI snapshot test that renders the Settings lane with `app.settings` populated (use the `crates/raul/tests/m169_rev.rs` template). Assert the framed-list + framed-description-card layout at three terminal sizes: 80x24, 120x40, 200x60. Save the snapshots under `crates/raul/tests/snapshots/` or a `tests/snapshots/` sibling — match the existing convention.",
+      "files": [
+        "crates/raul/tests/",
+        "tests/snapshots/"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_layout|settings_snapshot/)`",
+      "done_when": "Three snapshots committed; the test passes against the new layout",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP4",
+      "order": 11,
+      "action": "Add per-type editor unit tests in `crates/raul/src/tui/modes/settings.rs::tests` (or `crates/raul/src/tui/modes/settings/editor.rs`). One test per type per outcome: toggle/cycle/caret-edit/commit/revert/retry/parse-error. Cover the state machine transitions in `SettingsFocus` (idle → editing → invalid → idle) and the staging in `state.staged_edits`.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor|settings_inline/)`",
+      "done_when": "All per-type editor tests pass; the state machine transitions are covered",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP4",
+      "order": 12,
+      "action": "Add a golden fixture under `tests/fixtures/golden/mp-config-schema.{stdout,exit}.txt` showing the `mp config schema` output for an empty project config. Add a CLI scenario under `tests/scenarios/` that runs `mp config schema` against the empty fixture and golden-asserts both stdout and exit code. Add a second scenario that runs `mp config schema` against a fixture with all 46 keys set, golden-asserts the output, and asserts the description for `keybinds.refresh` contains `Ctrl-R` (the M200 default).",
+      "files": [
+        "tests/fixtures/golden/",
+        "tests/scenarios/"
+      ],
+      "tests": "make test-scenarios",
+      "done_when": "Both golden scenarios pass; the schema output is deterministic across runs",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-05",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP4",
+      "order": 13,
+      "action": "Remove or replace `crates/raul/src/tui/modes/settings/help.rs`. The renderer no longer reads it (the schema is the source of prose). Either delete the file or replace it with a thin re-export that pulls descriptions from the schema. Update any tests that import from `help.rs`.",
+      "files": [
+        "crates/raul/src/tui/modes/settings/help.rs"
+      ],
+      "tests": "cargo build -p raul && cargo nextest run -p raul --no-fail-fast",
+      "done_when": "help.rs is gone (or is a re-export); no test references the old `help_for` API; the renderer reads descriptions only from the schema",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S14",
+      "work_package": "WP4",
+      "order": 14,
+      "action": "Run consumer-surface lint: `make consumer-surface-lint`. Verify no internal milestone IDs (M-NN), lesson codes (L-NN), or repo-internal pointers leak into the 46 descriptions, the `mp config schema` JSON output, or any new user-facing prose. Fix any leaks before declaring the milestone done.",
+      "files": [
+        "docs/",
+        "templates/",
+        "crates/mp/src/config_docs.rs"
+      ],
+      "tests": "make consumer-surface-lint",
+      "done_when": "Consumer-surface lint is clean; a CI run of `make lint` is green",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S15",
+      "work_package": "WP4",
+      "order": 15,
+      "action": "Run the existing mp config test suite to confirm no regression from the new `mp config schema` subcommand and the reworked TUI renderer. Verify `mp config get`, `mp config set`, `mp config unset`, and `mp config show` outputs, exit codes, and behavior are byte-for-byte unchanged. Verify `mp config validate` still passes on a clean fixture. Includes a regression run of the `mp config show` golden fixture and the existing config_keys / config_ui_keys / config_validate test suites. This step is a regression gate, not new functionality.",
+      "files": [
+        "crates/mp/tests/",
+        "tests/fixtures/golden/"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E \"test(/config_(get|set|unset|show|validate|keys|ui_keys)/)\"",
+      "done_when": "All existing mp config test suites pass; the `mp config show` golden is unchanged; `mp config schema` is the only new subcommand and is the only delta in the CLI surface",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S16",
+      "work_package": "WP4",
+      "order": 16,
+      "action": "Add a TUI test for the version-check error path. Construct an App with a mocked MpRunner that returns \"unknown subcommand\" (or equivalent) for `mp config schema`; render the Settings lane; assert the version-check error message is displayed in place of the framed list. The mocked MpRunner pattern already exists in `crates/raul/tests/` (see the M169 review-reload tests).",
+      "files": [
+        "crates/raul/tests/"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E \"test(/settings_version_check|settings_minimum_mp/)\"",
+      "done_when": "The TUI test passes; the error message text matches the AC; no half-rendered state when the schema command is unavailable",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

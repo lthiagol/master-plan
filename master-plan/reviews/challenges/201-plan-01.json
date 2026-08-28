@@ -1,0 +1,49 @@
+{
+  "challenge": {
+    "id": "CH-201-01",
+    "milestone_id": "201",
+    "scope": "plan",
+    "status": "closed",
+    "created": "2026-08-28",
+    "closed": "2026-08-28",
+    "summary": ""
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "major",
+      "category": "gap",
+      "title": "Two keybind descriptions leak M200 milestone ID",
+      "description": "46-description table includes two entries referencing M200 by ID, violating AC-04: (1) keybinds.focus_content description contains \"after M200 — see M200 release note\"; (2) keybinds.refresh description contains \"Default changed in M200 from r to Ctrl-R\". Both rendered to end users via `mp config schema`. Rewrite without the milestone ID.",
+      "target": "acceptance_criteria[AC-04] / scope.in_scope (key_descriptions block)",
+      "status": "resolved",
+      "resolution": "Fixed: the two keybind descriptions (keybinds.focus_content and keybinds.refresh) no longer reference M200 or the project changelog. The 46-description table was re-baked into the spec's scope.in_scope delimiter-wrapped block. Verified: zero M-digit matches across all 46 descriptions.",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-02",
+      "severity": "major",
+      "category": "gap",
+      "title": "No version pin or fallback when raul reads `mp config schema` from an older mp",
+      "description": "The Settings 2.0 lane reads the schema on lane open via `mp config schema`. If a user upgrades raul (M201) without upgrading mp, the schema subcommand does not exist on the older mp, and the lane fails to load (no fallback). The spec should either: (a) require a minimum mp version and surface a clear error in the Settings lane if the installed mp is too old; or (b) ship a fallback JSON schema in the raul binary that is used if `mp config schema` is unavailable. Pick (a) — simpler, and the upgrade coupling is already implicit because the renderer also reads `mp config get` / `mp config set` paths. State the minimum mp version in the design decisions and add an AC for the version-check error path.",
+      "target": "scope.in_scope (Settings schema cache) / design_decisions[\"Schema fetch on lane open\"]",
+      "status": "resolved",
+      "resolution": "Fixed: new design decision ('Minimum mp version for Settings 2.0') added. New AC-08 covers the version-check error path. New step S16 under WP4 adds the TUI test. Note: the actual minimum mp version is left as 0.X.Y; the executor replaces X.Y when the mp version that ships mp config schema is finalized.",
+      "action": "no-change",
+      "action_ref": ""
+    },
+    {
+      "id": "F-03",
+      "severity": "minor",
+      "category": "gap",
+      "title": "Schema output format has no explicit version field for forward compat",
+      "description": "`mp config schema` emits a JSON document that raul parses on lane open. The spec describes the per-entry shape (`{key, type, default, allowed?, description}`) but does not include a top-level version field. A future schema change (added fields, renamed fields) would silently break consumers that do strict shape checks. Add a top-level `$schema_version: 1` (or `version: 1`) field to the output and document the forward-compat contract: additive changes bump minor, breaking changes bump major. Mention this in AC-01 (the schema output is a stable contract).",
+      "target": "acceptance_criteria[AC-01] / design_decisions[\"Schema source\"]",
+      "status": "resolved",
+      "resolution": "Fixed: AC-01 updated to require a top-level $schema_version: 1 field. New design decision ('Schema output versioning') added with the forward-compat contract: additive changes bump minor, breaking changes bump major (semver). The exact initial version is left as 1.0; the executor picks the value but the contract is locked in the spec.",
+      "action": "no-change",
+      "action_ref": ""
+    }
+  ]
+}
