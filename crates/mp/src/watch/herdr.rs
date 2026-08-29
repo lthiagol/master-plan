@@ -135,15 +135,24 @@ pub fn build_start_args(label: &str, kind: &str, pane_id: &str, extras: &[String
 
 /// Look up the harness-specific extras (model / thinking flags) for
 /// the given `RoleConfig` via the [`HarnessRegistry`]. Returns an
-/// empty `Vec` when the harness is unset (caller defaults the kind)
-/// or when the role has no model / thinking configured. The returned
-/// flags are the tail of [`HarnessRegistry::resolve_argv`] after the
-/// command name (e.g. `["--model", "claude-opus-4"]`).
+/// empty `Vec` when the harness is unset (caller defaults the kind),
+/// when the role has no model / thinking configured, or when the
+/// registry reports an unknown harness. The returned flags are the
+/// tail of [`HarnessRegistry::resolve_argv`] after the command name
+/// (e.g. `["--model", "claude-opus-4"]`).
 ///
-/// Pure over the in-memory config + static registry — no I/O. Any
-/// registry error is logged at warn and treated as no-extras so the
-/// spawn path remains robust to a misconfigured harness name (the
-/// precondition gate is the authoritative validator).
+/// Pure over the in-memory config + static registry — no I/O. The
+/// unknown-harness fallback is intentional: the precondition gate
+/// (`runner_config_present` / `coordinator_config_present`) is the
+/// authoritative validator and rejects unknown harness ids at watch
+/// startup, so under the normal flow this code only sees v1 entries
+/// (opencode / pi / cursor). A hand-edited config can still smuggle
+/// an unknown id past the precondition gate, in which case the spawn
+/// will proceed WITHOUT the model / thinking flag — the operator
+/// would see `--kind <unknown>` in watch.log and the harness binary
+/// would run with its own defaults. The dry-run preview surfaces the
+/// same wire shape, so the mismatch is visible in the JSON output
+/// before a live spawn.
 pub fn harness_extra_flags(rc: &RoleConfig) -> Vec<String> {
     let Some(kind) = rc.harness.as_deref().filter(|h| !h.is_empty()) else {
         return Vec::new();
