@@ -130,25 +130,22 @@ pub fn execution_check_with(
             .collect(),
     };
 
-    // M197: `can_handoff` now ALSO requires watch readiness
-    // when the project is in autonomous mode — handing off
-    // to a runner that cannot spawn is a setup for a
-    // guaranteed `RunOutcome::SpawnFailed` and wastes the
-    // operator's first attempt. The verdict is a `Warning`
-    // (surfaced via `warnings`) when the watch readiness
-    // fails, but `can_handoff` is false. Planning mode
-    // (i.e. `mp watch` will not be invoked immediately)
-    // is exempt — the operator is handoff-blocking for
-    // review, not execution.
+    // M197 F-07: `can_handoff` now ALWAYS requires watch
+    // readiness. A handoff unconditionally flips the plan mode
+    // to `autonomous` (see `execution_handoff_impl`), so a
+    // planning-mode handoff IS the entry point for autonomous
+    // execution — there is no review-only handoff path. The
+    // earlier "planning mode is exempt" exemption re-opened
+    // Issue E (can_handoff:true / watch:red) by allowing a
+    // broken watch to clear the gate, after which the next
+    // `mp watch` would surface `RunOutcome::SpawnFailed`
+    // instead of failing fast at the handoff boundary.
     let watch_ready = pre.ok;
-    let mode = plan.execution.mode.as_str();
-    let watch_required = mode == "autonomous";
-    let can_handoff = validate_ok
-        && (!execution_ready_milestones.is_empty() || track_pending > 0)
-        && (!watch_required || watch_ready);
+    let can_handoff =
+        validate_ok && (!execution_ready_milestones.is_empty() || track_pending > 0) && watch_ready;
 
     let mut warnings = warnings;
-    if watch_required && !watch_ready {
+    if !watch_ready {
         let failed: Vec<String> = pre
             .checks
             .iter()

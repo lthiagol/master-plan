@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::Serialize;
 use serde_json::json;
 
 use crate::cli::OutputFormat as Fmt;
@@ -17,6 +18,18 @@ pub(crate) fn emit(format: Fmt, json_value: &impl serde::Serialize) -> Result<()
             // structured value, `Raw` falls back to pretty JSON (same path as `Json`).
             println!("{}", serde_json::to_string_pretty(json_value)?);
         }
+    }
+    Ok(())
+}
+
+/// Emit `report` on stdout, then exit with code 1 when `ok` is false.
+/// Single home for the "report first, then maybe fail" pattern shared by
+/// `config set`, `config set --dry-run`, `config validate`, and `doctor`
+/// (M197 F-11). Adding a new consumer means calling this helper.
+pub(crate) fn emit_and_exit_on_fail<T: Serialize>(format: Fmt, report: &T, ok: bool) -> Result<()> {
+    emit(format, report)?;
+    if !ok {
+        return Err(crate::ExitCode(1).into());
     }
     Ok(())
 }

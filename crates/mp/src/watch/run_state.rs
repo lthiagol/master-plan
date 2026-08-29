@@ -93,14 +93,19 @@ pub enum RunOutcome {
     /// the operator's time and pin the herdr pane in a stale
     /// state. Distinct from `PartialFailure` (which is a
     /// lifecycle-level failure) and from `Skipped` (which is a
-    /// pre-execution decision). The `command` / `argv` / `exit_code`
-    /// fields are the same payload the `spawn_error` watch log
-    /// entry carries, so the operator sees the same diagnostic
-    /// in the run summary and the watch log.
+    /// pre-execution decision). The `command` / `argv` / `exit_code` /
+    /// `stdout` / `stderr` fields are the same payload the
+    /// `spawn_error` watch log entry carries, so the operator sees the
+    /// same diagnostic in the run summary and the watch log
+    /// (M197 F-13: stdout was previously dropped here even though
+    /// `SpawnFailure` carries it — herdr sometimes writes the real
+    /// error reason to stdout and operators inspecting `mp watch
+    /// status` could not see it).
     SpawnFailed {
         command: String,
         argv: Vec<String>,
         exit_code: Option<i32>,
+        stdout: String,
         stderr: String,
     },
 }

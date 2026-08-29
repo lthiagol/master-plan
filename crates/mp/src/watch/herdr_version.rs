@@ -295,16 +295,6 @@ fn render_message(
     parts.join("; ")
 }
 
-#[allow(dead_code)]
-pub(crate) fn _herdr_version_default_floor() -> &'static str {
-    REQUIRED_HERDR_VERSION_FLOOR
-}
-
-#[allow(dead_code)]
-pub(crate) fn _expected_flags() -> Vec<String> {
-    EXPECTED_START_FLAGS.iter().map(|s| s.to_string()).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

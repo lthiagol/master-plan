@@ -1,24 +1,10 @@
 use anyhow::Result;
-use serde::Serialize;
 use serde_json::json;
 
 use crate::cli::{ConfigCmd, OutputFormat};
-use crate::commands::common::emit;
+use crate::commands::common::{emit, emit_and_exit_on_fail};
 use crate::config_cmd;
 use crate::paths::PlanContext;
-use crate::ExitCode;
-
-/// Emit `report` on stdout, then exit with code 1 when `report.ok` is false.
-/// Single home for the "report first, then maybe fail" pattern shared by
-/// `config set`, `config set --dry-run`, and `config validate` — adding
-/// a fourth consumer means changing this one helper.
-fn emit_and_exit_on_fail<T: Serialize>(format: OutputFormat, report: &T, ok: bool) -> Result<()> {
-    emit(format, report)?;
-    if !ok {
-        return Err(ExitCode(1).into());
-    }
-    Ok(())
-}
 
 pub(crate) fn cmd_config(ctx: &PlanContext, cmd: ConfigCmd, format: OutputFormat) -> Result<()> {
     let writes = matches!(&cmd, ConfigCmd::Set { dry_run: false, .. });

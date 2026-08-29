@@ -106,6 +106,66 @@ pub fn auto_set_target(
     }
 }
 
+/// M197 F-09: apply an [`AutoSetDecision`] to the two role-harness
+/// slots. Single source of truth shared by the `mp init` template
+/// path (which writes through raw `serde_json::Value` ops because the
+/// project is being bootstrapped from a profile JSON) and the lazy
+/// `try_lazy_auto_set` fallback (which writes through the typed
+/// [`ProjectConfig`] struct after `store::load_config`). Without
+/// this helper the two sites drift whenever a new
+/// [`crate::config::RoleConfig`] field is added (L6 + L9).
+///
+/// Mutates `runner` and `coordinator` in place when the decision is
+/// [`AutoSetDecision::AutoSet`]; leaves them alone otherwise.
+pub fn apply_auto_set_decision(
+    runner: &mut Option<String>,
+    coordinator: &mut Option<String>,
+    decision: &AutoSetDecision,
+) {
+    if let AutoSetDecision::AutoSet { harness } = decision {
+        *runner = Some(harness.clone());
+        *coordinator = Some(harness.clone());
+    }
+}
+
+/// M197 F-10: render the structured parts of an [`AutoSetDecision`]
+/// (the harness slot values, the installed list, or a "no harness"
+/// marker) as a short, surface-neutral label. Shared between
+/// `mp doctor` (DoctorCheck.message) and the `mp watch` precondition
+/// gate (PreconditionCheck.message) so the two surfaces cannot drift
+/// on what the decision actually carries — each surface wraps the
+/// label with its own sentence shape (the doctor surface writes
+/// a full sentence; the precondition surface writes a tagged
+/// `harness auto-set: …` line).
+pub fn decision_label(
+    runner: Option<&str>,
+    coordinator: Option<&str>,
+    decision: &AutoSetDecision,
+) -> String {
+    match decision {
+        AutoSetDecision::NoOp => {
+            if runner.is_some() || coordinator.is_some() {
+                format!(
+                    "runner={} coordinator={}",
+                    runner.unwrap_or("(unset)"),
+                    coordinator.unwrap_or("(unset)")
+                )
+            } else {
+                "no fully-installed harness detected".to_string()
+            }
+        }
+        AutoSetDecision::AutoSet { harness } => {
+            format!("would set runner + coordinator to '{harness}'")
+        }
+        AutoSetDecision::Ambiguous { installed } => {
+            format!(
+                "ambiguous — multiple installed harnesses [{}]",
+                installed.join(", ")
+            )
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +223,70 @@ mod tests {
         // `mp doctor` uses for `skill_installed`. Drift between the
         // two surfaces would silently change what "installed" means.
         assert_eq!(CPD_BASE_SKILLS, &["mp-flow", "mp-runner", "mp-coordinator"]);
+    }
+
+    #[test]
+    fn apply_auto_set_decision_writes_on_autoset_only() {
+        let mut runner = None;
+        let mut coord = None;
+        apply_auto_set_decision(
+            &mut runner,
+            &mut coord,
+            &AutoSetDecision::AutoSet {
+                harness: "opencode".into(),
+            },
+        );
+        assert_eq!(runner.as_deref(), Some("opencode"));
+        assert_eq!(coord.as_deref(), Some("opencode"));
+
+        // NoOp / Ambiguous must NOT mutate the slots — F-09.
+        let mut runner = Some("pi".into());
+        let mut coord = Some("pi".into());
+        apply_auto_set_decision(&mut runner, &mut coord, &AutoSetDecision::NoOp);
+        assert_eq!(runner.as_deref(), Some("pi"));
+        assert_eq!(coord.as_deref(), Some("pi"));
+
+        apply_auto_set_decision(
+            &mut runner,
+            &mut coord,
+            &AutoSetDecision::Ambiguous {
+                installed: vec!["opencode".into(), "pi".into()],
+            },
+        );
+        assert_eq!(runner.as_deref(), Some("pi"));
+        assert_eq!(coord.as_deref(), Some("pi"));
+    }
+
+    #[test]
+    fn decision_label_covers_all_three_variants() {
+        // F-10: every variant of `AutoSetDecision` renders a
+        // surface-neutral label so `mp doctor` and the `mp watch`
+        // precondition gate cannot drift their wording on the
+        // same decision.
+        let autoset = AutoSetDecision::AutoSet {
+            harness: "opencode".into(),
+        };
+        assert_eq!(
+            decision_label(None, None, &autoset),
+            "would set runner + coordinator to 'opencode'"
+        );
+
+        let noop = AutoSetDecision::NoOp;
+        assert_eq!(
+            decision_label(Some("pi"), Some("pi"), &noop),
+            "runner=pi coordinator=pi"
+        );
+        assert_eq!(
+            decision_label(None, None, &noop),
+            "no fully-installed harness detected"
+        );
+
+        let ambig = AutoSetDecision::Ambiguous {
+            installed: vec!["opencode".into(), "pi".into()],
+        };
+        assert_eq!(
+            decision_label(None, None, &ambig),
+            "ambiguous — multiple installed harnesses [opencode, pi]"
+        );
     }
 }

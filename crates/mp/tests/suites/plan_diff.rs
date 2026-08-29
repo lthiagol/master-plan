@@ -1,5 +1,7 @@
 //! mp plan diff and handoff show (M70).
 
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 use crate::common::lib_api;
@@ -95,7 +97,70 @@ fn create_milestone(env: &TestEnv, title: &str) -> String {
         .to_string()
 }
 
+/// M197 F-07: `execution handoff` now also requires watch readiness.
+/// Install a fake `herdr` on PATH (the precondition's
+/// `command_on_path("herdr")` + `herdr_cli_shape` probes both pass
+/// against the fake) and configure the harness slots so the
+/// `role_config_present` checks are green. The fake does NOT need to
+/// run `agent start --help` for real — the help text just has to
+/// list `--kind` and `--pane`.
+fn enable_watch_readiness_for_handoff(env: &TestEnv) {
+    let bin_dir = env.tmp.path().join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let fake_herdr = bin_dir.join("herdr");
+    fs::write(
+        &fake_herdr,
+        r#"#!/bin/sh
+case "$1:$2:$3" in
+  agent:start:--help)
+    cat <<'HELP'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID>
+
+Options:
+  --kind <KIND>  Harness kind
+  --pane <ID>    Existing pane id
+HELP
+    ;;
+  pane:split:--help)
+    echo "Usage: herdr pane split [OPTIONS]"
+    ;;
+  *)
+    echo ok
+    ;;
+esac
+"#,
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&fake_herdr).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_herdr, perms).unwrap();
+    }
+
+    assert!(
+        lib_api::run(env, &["config", "set", "agent.runner.harness", "opencode"])
+            .status
+            .success()
+    );
+    assert!(lib_api::run(
+        env,
+        &["config", "set", "agent.coordinator.harness", "opencode"]
+    )
+    .status
+    .success());
+
+    let prev_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut parts: Vec<PathBuf> = std::env::split_paths(&prev_path).collect();
+    parts.insert(0, bin_dir);
+    std::env::set_var("PATH", std::env::join_paths(parts).unwrap());
+    // NB: PATH override is process-global; the test process exits after
+    // each test so we do not restore here.
+}
+
 fn do_handoff(env: &TestEnv) {
+    enable_watch_readiness_for_handoff(env);
     let out = lib_api::run(env, &["execution", "handoff"]);
     assert!(
         out.status.success(),

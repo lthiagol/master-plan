@@ -157,8 +157,21 @@ fn dry_run_includes_herdr_start_argv_preview() {
         !cmds.is_empty(),
         "should preview at least one herdr command"
     );
-    let cmd = &cmds[0];
-    assert_eq!(cmd["role"].as_str(), Some("runner"));
+    // M197 WP2: the herdr spawn shape is now a two-step — `pane split
+    // --cwd <PATH>` followed by `agent start <NAME> --kind <KIND>
+    // --pane <ID>`. The runner agent command is the second entry;
+    // find it by argv rather than positional index so the test stays
+    // robust if the preview reorders.
+    let cmd = cmds
+        .iter()
+        .find(|c| {
+            c["role"] == "runner"
+                && c["argv"]
+                    .as_array()
+                    .map(|a| a.iter().any(|v| v.as_str() == Some("agent")))
+                    .unwrap_or(false)
+        })
+        .expect("runner agent start herdr command present");
     assert_eq!(cmd["label"].as_str(), Some("role-runner-1"));
     let argv = cmd["argv"].as_array().unwrap();
     let argv_str = serde_json::to_string(argv).unwrap();
@@ -190,10 +203,18 @@ fn dry_run_reflects_runner_model_in_argv() {
     let report = watch(&env, &["--dry-run", &id]);
     let entry = &report["milestones"][0];
     let cmds = entry["herdr_commands"].as_array().unwrap();
+    // M197 WP2: two-step spawn — find the agent start command by
+    // argv, not positional index.
     let cmd = cmds
         .iter()
-        .find(|c| c["role"] == "runner")
-        .expect("runner herdr command present");
+        .find(|c| {
+            c["role"] == "runner"
+                && c["argv"]
+                    .as_array()
+                    .map(|a| a.iter().any(|v| v.as_str() == Some("agent")))
+                    .unwrap_or(false)
+        })
+        .expect("runner agent start herdr command present");
     let argv_str = serde_json::to_string(&cmd["argv"]).unwrap();
     assert!(
         argv_str.contains("--model") && argv_str.contains("claude-opus-4"),

@@ -9,7 +9,8 @@ pub mod auto;
 pub mod registry;
 
 pub use auto::{
-    auto_set_target, detect_installed_harnesses, is_harness_fully_installed, AutoSetDecision,
+    apply_auto_set_decision, auto_set_target, decision_label, detect_installed_harnesses,
+    is_harness_fully_installed, AutoSetDecision,
 };
 pub use registry::{HarnessEntry, HarnessError, HarnessRegistry, SUPPORTED_NAMES};
 

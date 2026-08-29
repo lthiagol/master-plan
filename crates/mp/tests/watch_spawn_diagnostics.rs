@@ -84,6 +84,39 @@ fn extract_spawn_failure_returns_none_for_unrelated_errors() {
 }
 
 #[test]
+fn extract_spawn_failure_walks_context_wrapped_chain() {
+    // F-06 / L17 + L28: production `pane_split` and `spawn_pane`
+    // wrap the SpawnFailure in `.context("herdr … exec failure")`
+    // so the operator sees a contextual message. The earlier
+    // `downcast_ref`-only implementation silently returned None
+    // when the wrapper was layered on top, which masked the
+    // binary-missing failure mode behind a generic `stale`
+    // state — exactly the failure mode AC-02 / AC-04 promise to
+    // surface loudly. Pin the chain-walk contract here so a
+    // future refactor can't reintroduce the bug.
+    let failure = SpawnFailure {
+        command: "pane split".into(),
+        argv: build_pane_split_args(std::path::Path::new("/repo")),
+        exit_code: None,
+        stdout: String::new(),
+        stderr:
+            "failed to exec /usr/bin/herdr: not found (is the herdr binary on PATH and executable?)"
+                .into(),
+    };
+    let err: anyhow::Error =
+        anyhow::Error::new(failure.clone()).context("herdr pane split exec failure");
+    let extracted = extract_spawn_failure(&err)
+        .expect("SpawnFailure must survive .context() wrappers on the chain");
+    assert_eq!(extracted.command, "pane split");
+    assert_eq!(extracted.exit_code, None);
+    assert!(
+        extracted.stderr.contains("not found"),
+        "stderr must survive the wrapper: {:?}",
+        extracted.stderr
+    );
+}
+
+#[test]
 fn spawn_failure_display_message_mentions_command_and_exit() {
     let failure = SpawnFailure {
         command: "agent start".into(),

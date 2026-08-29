@@ -288,17 +288,21 @@ impl std::error::Error for SpawnFailure {}
 /// to emit a `spawn_error` log entry (and whether the sequencer
 /// should map the failure to `RunOutcome::SpawnFailed`).
 ///
-/// Returns the first `SpawnFailure` found while walking the
-/// error chain. `anyhow::Error::downcast_ref` only inspects the
-/// top of the error chain, so the call site must keep the
-/// `SpawnFailure` as the root error (i.e. construct with
-/// `anyhow::Error::new(failure)` and not `anyhow!(...)` or
-/// `bail!(...)`, which would wrap it). External review F-03
-/// clarified that [`SpawnFailure`] is auto-`Send + Sync` (all
-/// fields are `String` / `Vec<String>` / `Option<i32>`); the
-/// earlier "derives neither" comment was wrong.
+/// Walks the error chain via `anyhow::Error::chain` looking for
+/// the first error that downcasts to [`SpawnFailure`]. This makes
+/// the helper tolerant of `.context("...")` wrappers at the call
+/// site (the production `pane_split` / `spawn_pane` exec-failure
+/// arms use `.context()` to add operator-readable context; the
+/// earlier `downcast_ref`-only implementation silently returned
+/// `None` when the wrapper was layered on, which masked the
+/// binary-missing failure mode behind a generic `stale` state).
+///
+/// External review F-03 clarified that [`SpawnFailure`] is
+/// auto-`Send + Sync` (all fields are `String` / `Vec<String>` /
+/// `Option<i32>`).
 pub fn extract_spawn_failure(err: &anyhow::Error) -> Option<SpawnFailure> {
-    err.downcast_ref::<SpawnFailure>().cloned()
+    err.chain()
+        .find_map(|e| e.downcast_ref::<SpawnFailure>().cloned())
 }
 
 /// M197 WP2 / AC-03: create a fresh pane via `herdr pane split

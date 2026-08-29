@@ -42,16 +42,17 @@ pub struct MilestoneOutcome {
 /// milestone reached `Complete`. Skipped milestones are surfaced
 /// explicitly so callers can decide whether to treat a skip as
 /// failure (the CLI sets a non-zero exit when any milestone was
-/// skipped per AC-07). M197: `any_spawn_failed` is the new
-/// terminal-failure signal — a `pane split` or `agent start`
-/// call exited non-zero, so the run halted without retry.
+/// skipped per AC-07). A spawn failure (`pane split` / `agent
+/// start` non-zero exit) shows up as a `DriveOutcome::SpawnFailed`
+/// in `outcomes` — the CLI inspects the outcome list directly to
+/// detect the terminal-failure shape (F-12 dropped the now-redundant
+/// `any_spawn_failed` boolean that nothing read).
 #[derive(Debug, Clone, Serialize)]
 pub struct SequencerReport {
     pub outcomes: Vec<MilestoneOutcome>,
     pub all_complete: bool,
     pub any_skipped: bool,
     pub any_exhausted: bool,
-    pub any_spawn_failed: bool,
 }
 
 /// Drive each milestone id in order through a shared ops instance.
@@ -84,7 +85,6 @@ pub fn run_milestones(
     let mut all_complete = true;
     let mut any_skipped = false;
     let mut any_exhausted = false;
-    let mut any_spawn_failed = false;
 
     for id in ids {
         // Swap the active milestone id onto the shared ops. The pane
@@ -103,6 +103,7 @@ pub fn run_milestones(
                         command: failure.command,
                         argv: failure.argv,
                         exit_code: failure.exit_code,
+                        stdout: failure.stdout,
                         stderr: failure.stderr,
                     };
                     DriveOutcome::SpawnFailed {
@@ -131,9 +132,6 @@ pub fn run_milestones(
         }
         if matches!(outcome, DriveOutcome::MaxIterationsExhausted { .. }) {
             any_exhausted = true;
-        }
-        if matches!(outcome, DriveOutcome::SpawnFailed { .. }) {
-            any_spawn_failed = true;
         }
         outcomes.push(MilestoneOutcome {
             id: id.clone(),
@@ -232,7 +230,6 @@ pub fn run_milestones(
         all_complete,
         any_skipped,
         any_exhausted,
-        any_spawn_failed,
     })
 }
 
@@ -285,7 +282,6 @@ mod tests {
             all_complete: false,
             any_skipped: true,
             any_exhausted: true,
-            any_spawn_failed: false,
         };
         assert!(!report.all_complete);
         assert!(report.any_skipped);
@@ -309,7 +305,6 @@ mod tests {
             all_complete: true,
             any_skipped: false,
             any_exhausted: false,
-            any_spawn_failed: false,
         };
         assert!(report.all_complete);
         assert!(!report.any_skipped);
@@ -330,7 +325,6 @@ mod tests {
             all_complete: false,
             any_skipped: false,
             any_exhausted: true,
-            any_spawn_failed: false,
         };
         assert!(!report.all_complete);
         assert!(report.any_exhausted);

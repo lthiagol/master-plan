@@ -44,6 +44,14 @@ use crate::watch::{
 /// loops from spinning forever (review finding #5).
 const MAX_ITERATIONS_PER_MILESTONE: usize = 10;
 
+/// M197 F-14: dry-run argv preview placeholder for the pane id that
+/// the live spawn would inject from `pane_split`'s stdout. The
+/// literal sentinel shows up in operator-facing JSON; the named
+/// const keeps grep / docs references consistent (one source of
+/// truth instead of a string literal repeated across the preview
+/// builder).
+const DRY_RUN_PANE_ID_PLACEHOLDER: &str = "%pane-id%";
+
 /// M149 + M152 driver surface. Carries enough scalar arguments
 /// that the parameter list exceeds clippy's default cap; the
 /// `#[allow]` here matches the M149 precedent which routed the
@@ -844,7 +852,11 @@ fn resolve_one(
         entry.herdr_commands.push(HerdrPreview {
             role: role.label(),
             label,
-            argv: build_start_args(&pane_label_for(role, DEFAULT_PANE_N), &kind, "%pane-id%"),
+            argv: build_start_args(
+                &pane_label_for(role, DEFAULT_PANE_N),
+                &kind,
+                DRY_RUN_PANE_ID_PLACEHOLDER,
+            ),
         });
 
         // Don't preview a prompt for in-progress milestones — the

@@ -168,6 +168,18 @@ you can go from "found it" to "edit it" in two calls.
 | `execution check` | Are milestones execution-ready? Report blockers |
 | `execution handoff` / `handoff-show` / `pause` / `status` / `report` | Execution handoff + status surface |
 
+The `check` and `status` JSON both carry a `watch_readiness` block
+(structured mirror of `mp watch`'s precondition report — `herdr_on_path`,
+`herdr_cli_shape`, `runner_config_present`, `coordinator_config_present`,
+`log_path_writable`, `harness_auto_set`) and a top-level `can_handoff`
+boolean. `can_handoff` is true only when **all** of: validate is clean,
+at least one execution-ready milestone or track-pending work exists,
+**and** `watch_readiness.ok` is true. The two surfaces (`execution check`,
+`execution status`, `mp watch start`, `mp milestone handoff`) answer the
+same go/no-go question so the readiness signal cannot drift between
+them (M197 / DD-04). The `ui.show_watch_tab` value (M198) is a separate
+TUI preference and is reported under a distinct key.
+
 ### Reviews — `mp reviews …`
 
 | Command | Effect |

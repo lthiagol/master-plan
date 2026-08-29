@@ -3,8 +3,8 @@
     "id": "197",
     "title": "mp watch end-to-end against herdr 0.7.x — harness defaults, spawn API realignment, spawn diagnostics, watch readiness parity",
     "slug": "mp-watch-end-to-end-against-herdr-0-7-x-harness-defaults-spawn-api-realignment-spawn-diagnostics-watch-readiness-parity",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,13 +17,13 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-07-24",
-    "updated": "2026-08-28",
+    "updated": "2026-08-29",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-28T16:20:21.474022+00:00"
+    "lifecycle_at": "2026-08-29T10:49:37.923527+00:00"
   },
   "intent": {
     "outcome": "mp watch successfully drives a milestone execute → complete against the current stable herdr (0.7.x) end-to-end. Harness config has sensible defaults; herdr spawn API is realigned to current stable herdr; spawn failures are loud in log, status, and exit code; mp doctor and execution check reflect real watch readiness (harness config + herdr CLI compatibility)."
@@ -322,6 +322,206 @@
       "created": "2026-08-28",
       "resolved": "2026-08-28",
       "summary": "EXPECTED_START_FLAGS / version floor are not co-versioned"
+    },
+    {
+      "id": "F-06",
+      "severity": "high",
+      "category": "bug",
+      "description": ".context() wrappers on the exec-failure branches at herdr.rs:320-330 and 366-376 defeat extract_spawn_failure (herdr.rs:300-302): anyhow::Error::downcast_ref only inspects the top of the chain, but extract_spawn_failure's doc-comment (herdr.rs:283-299) explicitly forbids the call site from wrapping SpawnFailure. Result: when the herdr binary is missing or not executable (the very failure mode AC-02 / AC-04 promise to surface loudly), the state machine sees a generic 'herdr pane split exec failure' anyhow chain, extract_spawn_failure returns None, no spawn_error watch-log entry is emitted, and RunOutcome::SpawnFailed is never set — the run goes stale instead of terminal-spawn-failed. The unit test in crates/mp/tests/watch_spawn_diagnostics.rs:25-49 constructs the error with anyhow::Error::new(failure.clone()) (no .context()) so the test passes but does not exercise the production code path (L17 / L28). Fix: drop the .context() calls in both exec-failure branches, OR change extract_spawn_failure to walk err.chain() looking for SpawnFailure, AND add an integration test that drives the real Command::new path against a missing herdr binary.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/watch/herdr.rs",
+        "new_range": {
+          "start_line": 320,
+          "end_line": 320
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-07",
+      "severity": "high",
+      "category": "spec-gap",
+      "description": "can_handoff does not gate on watch readiness at handoff time, which reopens Issue E. execution.rs:144-148 sets watch_required = (mode == 'autonomous'), so a project currently in planning mode (the common case before the very first handoff) passes can_handoff even when watch readiness is red. execution_handoff_impl (line 217) then unconditionally flips plan.execution.mode = 'autonomous'. The in-code justification ('Planning mode is exempt — the operator is handoff-blocking for review, not execution', lines 138-142) is wrong: a planning-mode handoff IS the entry point for autonomous execution; it is not review-only. Spec requires Issue E closed ('mp execution check / handoff reports ready while watch preconditions are red' must not recur) and DD-04 requires a single readiness signal. Fix: drop the planning-mode exemption (gate can_handoff on watch_ready unconditionally), OR re-evaluate watch_required against the post-handoff mode inside execution_handoff_impl and bail! if red.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/execution.rs",
+        "new_range": {
+          "start_line": 144,
+          "end_line": 144
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "category": "dead-code",
+      "description": "Two #[allow(dead_code)] shim functions at herdr_version.rs:298-306 (_herdr_version_default_floor and _expected_flags) are the L13 dead-code-shim pattern called out in code-review-lessons.md L13 + L13 addendum: rg '_herdr_version_default_floor|_expected_flags' in the workspace shows zero call sites outside the shim definitions themselves. The constants they wrap (REQUIRED_HERDR_VERSION_FLOOR, EXPECTED_START_FLAGS) have ~21 references across herdr_version.rs + watch/mod.rs + tests. The shims exist solely to keep the dead_code lint quiet. Fix: delete both functions and the two #[allow(dead_code)] attributes.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/watch/herdr_version.rs",
+        "new_range": {
+          "start_line": 298,
+          "end_line": 298
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-09",
+      "severity": "medium",
+      "category": "drift-risk",
+      "description": "Two implementations of the harness-auto-set write path. init_plan_inner (store.rs:229-258) mutates the config via raw serde_json::Value pointer ops (cfg.pointer('/agent/runner/harness') / cfg.pointer_mut('/agent')), running before serde_json::to_string_pretty. try_lazy_auto_set (watch/preconditions.rs:155-167) mutates the typed ProjectConfig struct fields (cfg.agent.runner.harness = Some(...)) and persists via store::write_config. Two write mechanisms for the same semantic operation. Drift risk (L6 + L9): a future field added to RoleConfig (e.g. an 'enabled: bool' flag) will be picked up by one site and not the other. Fix: extract apply_auto_set(cfg: &mut serde_json::Value, decision: &AutoSetDecision) (or thread a borrowed path through ProjectConfig) and have both call sites consume the same helper. Add a regression test that asserts the two paths produce the same config shape on the same fixture.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/store.rs",
+        "new_range": {
+          "start_line": 229,
+          "end_line": 229
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-10",
+      "severity": "medium",
+      "category": "duplication",
+      "description": "Duplicated rendering of AutoSetDecision in two places. doctor.rs:335-372 and watch/preconditions.rs:116-135 both match on AutoSetDecision::{NoOp, AutoSet, Ambiguous} with the same nested NoOp sub-branching (the 'if r.is_some() || c.is_some()' split) and the same installed.join(', ') formatting. The two surfaces diverge in their human-readable text (DoctorCheck message vs PreconditionCheck message) but the underlying information carried is identical, and the NoOp/AutoSet/Ambiguous partition + the installed.join() format are duplicated verbatim. Drift risk: any future AutoSetDecision variant or message wording requires two coordinated edits (Duplicated Code smell). Fix: add decision_message(runner: Option<&str>, coord: Option<&str>, decision: &AutoSetDecision) -> String in harness/auto.rs; consume from both surfaces, letting each wrap with its own prefix if needed.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/doctor.rs",
+        "new_range": {
+          "start_line": 335,
+          "end_line": 335
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "category": "spec-gap",
+      "description": "mp doctor does not exit non-zero when the new herdr_cli_shape check fails. AC-02 verification specifies 'doctor against an incompatible herdr (or a stubbed older shape) prints the version-gate message and exits non-zero with no spawn attempt.' doctor.rs:285-292 correctly sets report.ok = false on herdr_cli_shape failure and the message is printed, but commands/doctor.rs:8-15 ignores report.ok and returns Ok(()) unconditionally. Other commands (commands/config.rs:15-21 emit_and_exit_on_fail) already implement the 'emit, then exit non-zero on !ok' pattern via crate::ExitCode. Fix: apply emit_and_exit_on_fail(format, &report, report.ok) to cmd_doctor (move the helper to commands/common.rs if it should be shared), and add a regression test that asserts the binary exits 1/2 against an incompatible herdr.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/doctor.rs",
+        "new_range": {
+          "start_line": 8,
+          "end_line": 8
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "category": "dead-code",
+      "description": "SequencerReport.any_spawn_failed is dead — set in 4 places (sequencer.rs:87, 136, 235, plus the three Result::Ok initializers at 288, 312, 333) but never read. rg any_spawn_failed across the workspace finds zero consumers outside sequencer.rs. The sequencer halts via the halt flag when a spawn fails, and the v2 control-plane state already carries RunOutcome::SpawnFailed, so the field is redundant. Fix: either consume it (set non-zero ExitCode and reflect in the JSON output) or remove the field.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/watch/sequencer.rs",
+        "new_range": {
+          "start_line": 54,
+          "end_line": 54
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "category": "missing-field",
+      "description": "RunOutcome::SpawnFailed drops SpawnFailure.stdout. SpawnFailure (herdr.rs:54-65) carries command + argv + exit_code + stdout + stderr; RunOutcome::SpawnFailed (run_state.rs:100-105) carries only command + argv + exit_code + stderr. The watch-log spawn_error entry still has stdout (via WatchLogEntry::spawn_error), so the operator sees stdout in watch.log but not in mp watch status. herdr sometimes writes the real error reason to stdout (e.g. 'agent start: pane <id> not found' vs the stderr hint). Fix: add stdout: String to RunOutcome::SpawnFailed and forward it from SpawnFailure (L12-style field omission); or document the explicit omission in the field's doc-comment if intentional.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/watch/run_state.rs",
+        "new_range": {
+          "start_line": 100,
+          "end_line": 100
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-14",
+      "severity": "low",
+      "category": "smell",
+      "description": "Literal \"%pane-id%\" placeholder leaks into operator-facing dry-run argv output at commands/watch.rs:847. The comment explains the sentinel but a literal string in operator-visible JSON is a Mysterious Name smell — a reader who grep's for 'pane-id' expects a real id. Fix: hoist into a const DRY_RUN_PANE_ID_PLACEHOLDER: &str = \"%pane-id%\" (or DRY_RUN_PANE_ID) and reference from the single call site; pair with a name-resolving helper if the sentinel must be substituted before display.",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/commands/watch.rs",
+        "new_range": {
+          "start_line": 847,
+          "end_line": 847
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-15",
+      "severity": "low",
+      "category": "scope-creep",
+      "description": "execution_status (execution.rs:280-281) adds watch_readiness and can_handoff keys that the spec does not list. Spec scope.in_scope names mp execution check and mp execution handoff as the readiness-fold surfaces; execution_status is not in scope. The fields are consistent with the 'single readiness signal' intent and harmless, but are net-additive with no documented consumer (rg watch_readiness / can_handoff in crates/raul finds zero reads today). Either document the addition in docs/mp/commands.md and the release notes, or fold execution_status into the spec scope retroactively (Q-04-style resolution).",
+      "status": "fixed",
+      "author": "external-reviewer (independent pass)",
+      "fixed_in": "HEAD",
+      "created": "2026-08-29",
+      "resolved": "2026-08-29",
+      "phase": "external",
+      "anchor": {
+        "path": "crates/mp/src/execution.rs",
+        "new_range": {
+          "start_line": 280,
+          "end_line": 280
+        },
+        "side": "new"
+      }
     }
   ]
 }

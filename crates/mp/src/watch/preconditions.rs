@@ -101,11 +101,16 @@ fn check_herdr_cli_shape() -> PreconditionCheck {
     }
 }
 
-/// M197 WP1 / AC-01: precondition check that surfaces the harness
-/// auto-set decision. The `ok` flag is `true` unconditionally; the
-/// message carries the actual decision (auto-set, no-op, or
+/// M197 WP1 / AC-01 / F-10: precondition check that surfaces the
+/// harness auto-set decision. The `ok` flag is `true` unconditionally;
+/// the message carries the actual decision (auto-set, no-op, or
 /// ambiguous). The real failure is upstream in
 /// `runner_config_present` / `coordinator_config_present`.
+///
+/// F-10: the structured parts of the decision come from
+/// [`crate::harness::decision_label`] (shared with `mp doctor`'s
+/// `harness_auto_set` DoctorCheck). This surface wraps the label
+/// in the precondition's tagged `harness auto-set: …` shape.
 fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
     let installed = crate::harness::detect_installed_harnesses();
     let decision = crate::harness::auto_set_target(
@@ -113,25 +118,27 @@ fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
         cfg.agent.coordinator.harness.as_deref(),
         &installed,
     );
+    let label = crate::harness::decision_label(
+        cfg.agent.runner.harness.as_deref(),
+        cfg.agent.coordinator.harness.as_deref(),
+        &decision,
+    );
     let message = match decision {
         AutoSetDecision::NoOp => {
             if cfg.agent.runner.harness.is_some() || cfg.agent.coordinator.harness.is_some() {
-                format!(
-                    "harness auto-set: noop (runner={}, coordinator={} already configured)",
-                    cfg.agent.runner.harness.as_deref().unwrap_or("(unset)"),
-                    cfg.agent.coordinator.harness.as_deref().unwrap_or("(unset)")
-                )
+                format!("harness auto-set: noop ({label} already configured)")
             } else {
-                "harness auto-set: noop (no fully-installed harness detected; mp watch preconditions will surface the missing config below)".to_string()
+                format!(
+                    "harness auto-set: noop ({label}; mp watch preconditions will surface the missing config below)"
+                )
             }
         }
-        AutoSetDecision::AutoSet { harness } => format!(
-            "harness auto-set: would set runner + coordinator to '{harness}' (single installed harness)"
-        ),
-        AutoSetDecision::Ambiguous { installed } => format!(
-            "harness auto-set: ambiguous — multiple installed harnesses [{}]; set [agent.runner].harness and [agent.coordinator].harness explicitly",
-            installed.join(", ")
-        ),
+        AutoSetDecision::AutoSet { .. } => {
+            format!("harness auto-set: {label} (single installed harness)")
+        }
+        AutoSetDecision::Ambiguous { .. } => {
+            format!("harness auto-set: {label}")
+        }
     };
     PreconditionCheck {
         name: "harness_auto_set".to_string(),
@@ -140,7 +147,7 @@ fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
     }
 }
 
-/// M197 WP1 / AC-01: lazy auto-set fallback. Called by the watch
+/// M197 WP1 / AC-01 / F-09: lazy auto-set fallback. Called by the watch
 /// command before `check_preconditions` so a project that never
 /// went through `mp init` (or whose harness was installed *after*
 /// init) still gets a sensible default. Mutates `cfg` in place when
@@ -152,17 +159,22 @@ fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
 /// Returns the decision so the caller can log it (e.g. a
 /// `harness_auto_set` entry in `watch.log`) and surface it in
 /// stdout / JSON output.
+///
+/// F-09: the apply step routes through
+/// [`crate::harness::apply_auto_set_decision`] so the init-time
+/// write path (which operates on raw `serde_json::Value` over the
+/// profile template) and this lazy fallback (which operates on
+/// the typed [`ProjectConfig`] struct) cannot drift their
+/// understanding of what "auto-set" means.
 pub fn try_lazy_auto_set(cfg: &mut ProjectConfig) -> AutoSetDecision {
     let installed = crate::harness::detect_installed_harnesses();
-    let decision = crate::harness::auto_set_target(
-        cfg.agent.runner.harness.as_deref(),
-        cfg.agent.coordinator.harness.as_deref(),
-        &installed,
-    );
-    if let AutoSetDecision::AutoSet { ref harness } = decision {
-        cfg.agent.runner.harness = Some(harness.clone());
-        cfg.agent.coordinator.harness = Some(harness.clone());
-    }
+    let mut runner_h = cfg.agent.runner.harness.clone();
+    let mut coord_h = cfg.agent.coordinator.harness.clone();
+    let decision =
+        crate::harness::auto_set_target(runner_h.as_deref(), coord_h.as_deref(), &installed);
+    crate::harness::apply_auto_set_decision(&mut runner_h, &mut coord_h, &decision);
+    cfg.agent.runner.harness = runner_h;
+    cfg.agent.coordinator.harness = coord_h;
     decision
 }
 

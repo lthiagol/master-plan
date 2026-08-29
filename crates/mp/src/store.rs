@@ -226,33 +226,45 @@ fn init_plan_inner(ctx: &PlanContext, profile: &str, location: &str) -> Result<V
     } else {
         bail!("config template missing workflow.plan object");
     }
-    // M197 WP1 / AC-01: harness auto-set on init. When exactly one
-    // harness has all three CPD base skills installed and both
-    // `[agent.runner].harness` and `[agent.coordinator].harness`
-    // are unset, auto-set both to that harness. On zero or many
-    // installed harnesses, do nothing here — the lazy fallback in
-    // `mp watch` preconditions handles the zero case at first spawn
-    // and the `mp doctor` surface handles the ambiguity case.
-    // The auto-set is silent on success and explicit on conflict
-    // (the `mp doctor` check surfaces the decision either way).
+    // M197 WP1 / AC-01 / F-09: harness auto-set on init. When exactly
+    // one harness has all three CPD base skills installed and both
+    // `[agent.runner].harness` and `[agent.coordinator].harness` are
+    // unset, auto-set both to that harness. On zero or many installed
+    // harnesses, do nothing here — the lazy fallback in `mp watch`
+    // preconditions handles the zero case at first spawn and the
+    // `mp doctor` surface handles the ambiguity case. The auto-set
+    // is silent on success and explicit on conflict (the `mp doctor`
+    // check surfaces the decision either way).
+    //
+    // F-09: the apply step goes through
+    // [`crate::harness::apply_auto_set_decision`] (single source of
+    // truth shared with the lazy fallback) so any new
+    // [`crate::config::RoleConfig`] field picked up by one site lands
+    // in the other automatically. The init path reads the harness
+    // slots out of the JSON Value (the template is bootstrapping from
+    // a profile JSON, not a typed ProjectConfig), then writes the
+    // decision back through the same helper the typed path uses.
     let installed = crate::harness::detect_installed_harnesses();
-    let runner_h = cfg
+    let mut runner_h = cfg
         .pointer("/agent/runner/harness")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let coord_h = cfg
+    let mut coord_h = cfg
         .pointer("/agent/coordinator/harness")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
     let decision =
         crate::harness::auto_set_target(runner_h.as_deref(), coord_h.as_deref(), &installed);
-    if let crate::harness::AutoSetDecision::AutoSet { harness } = decision {
+    crate::harness::apply_auto_set_decision(&mut runner_h, &mut coord_h, &decision);
+    if let crate::harness::AutoSetDecision::AutoSet { .. } = decision {
+        let runner_str = runner_h.expect("AutoSet sets runner harness");
+        let coord_str = coord_h.expect("AutoSet sets coordinator harness");
         if let Some(agent) = cfg.pointer_mut("/agent").and_then(|v| v.as_object_mut()) {
             if let Some(r) = agent.get_mut("runner").and_then(|v| v.as_object_mut()) {
-                r.insert("harness".into(), serde_json::Value::String(harness.clone()));
+                r.insert("harness".into(), serde_json::Value::String(runner_str));
             }
             if let Some(c) = agent.get_mut("coordinator").and_then(|v| v.as_object_mut()) {
-                c.insert("harness".into(), serde_json::Value::String(harness));
+                c.insert("harness".into(), serde_json::Value::String(coord_str));
             }
         }
     }

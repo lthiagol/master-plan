@@ -332,43 +332,34 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
         cfg.agent.coordinator.harness.as_deref(),
         &installed,
     );
-    let auto_set_check = match &decision {
+    // M197 F-10: render the decision via `decision_label` so the
+    // harness slot values + the NoOp/AutoSet/Ambiguous partition
+    // are sourced from one helper. The doctor surface wraps the
+    // label with its own sentence shape; the `mp watch`
+    // precondition gate does the same (see
+    // `watch::preconditions::check_harness_auto_set`).
+    let r = cfg.agent.runner.harness.as_deref();
+    let c = cfg.agent.coordinator.harness.as_deref();
+    let label = harness::decision_label(r, c, &decision);
+    let message = match &decision {
         harness::AutoSetDecision::NoOp => {
-            let r = cfg.agent.runner.harness.as_deref();
-            let c = cfg.agent.coordinator.harness.as_deref();
             if r.is_some() || c.is_some() {
-                DoctorCheck {
-                    name: "harness_auto_set".to_string(),
-                    ok: true,
-                    message: format!(
-                        "agent harness already set: runner={} coordinator={}",
-                        r.unwrap_or("(unset)"),
-                        c.unwrap_or("(unset)")
-                    ),
-                }
+                format!("agent harness already set: {label}")
             } else {
-                DoctorCheck {
-                    name: "harness_auto_set".to_string(),
-                    ok: true,
-                    message: "no fully-installed harness detected; mp watch will refuse until one is configured (set [agent.runner].harness)".to_string(),
-                }
+                format!("{label}; mp watch will refuse until one is configured (set [agent.runner].harness)")
             }
         }
-        harness::AutoSetDecision::AutoSet { harness } => DoctorCheck {
-            name: "harness_auto_set".to_string(),
-            ok: true,
-            message: format!(
-                "single installed harness detected: {harness}. mp init / first mp watch will auto-set agent.runner.harness and agent.coordinator.harness to '{harness}'."
-            ),
-        },
-        harness::AutoSetDecision::Ambiguous { installed } => DoctorCheck {
-            name: "harness_auto_set".to_string(),
-            ok: true,
-            message: format!(
-                "multiple installed harnesses detected: [{}]. Set [agent.runner].harness and [agent.coordinator].harness explicitly to disambiguate; mp will not auto-pick.",
-                installed.join(", ")
-            ),
-        },
+        harness::AutoSetDecision::AutoSet { harness } => format!(
+            "single installed harness detected: {harness}. mp init / first mp watch will auto-set agent.runner.harness and agent.coordinator.harness to '{harness}'."
+        ),
+        harness::AutoSetDecision::Ambiguous { .. } => format!(
+            "{label}. Set [agent.runner].harness and [agent.coordinator].harness explicitly to disambiguate; mp will not auto-pick."
+        ),
+    };
+    let auto_set_check = DoctorCheck {
+        name: "harness_auto_set".to_string(),
+        ok: true,
+        message,
     };
     checks.push(auto_set_check);
 

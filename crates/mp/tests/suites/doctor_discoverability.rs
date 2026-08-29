@@ -33,12 +33,22 @@ fn doctor_reports_mp_missing_when_path_stripped() {
         .args(["doctor", "--format", "json"])
         .output()
         .expect("doctor");
+    // M197 F-11 / AC-02: `mp doctor` now exits non-zero when the
+    // report is red so shell pipelines and CI detect the failure.
+    // The earlier behavior silently returned Ok(()) regardless of
+    // check status, which made this test (which intentionally
+    // strips PATH) pass on the wrong contract.
     assert!(
-        out.status.success(),
-        "{}",
+        !out.status.success(),
+        "doctor must exit non-zero when checks fail: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        json["ok"],
+        serde_json::Value::Bool(false),
+        "doctor report ok field must be false when checks fail"
+    );
     let checks = json["checks"].as_array().expect("checks");
     let mp_check = checks
         .iter()
