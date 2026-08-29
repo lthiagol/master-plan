@@ -148,12 +148,37 @@ pub struct MilestoneState {
 
 impl MilestoneState {
     pub fn from_meta(meta: &MilestoneMeta) -> Result<Self, String> {
-        // Prefer the same derivation readers use so legacy-shaped fixtures
-        // (serde default lifecycle=draft + populated spec/exec) transition
-        // from their effective phase, not the draft sentinel.
-        let lifecycle = effective_lifecycle(meta);
+        // M174 followup: derive the underlying phase, not the
+        // effective_lifecycle string. `effective_lifecycle` is the
+        // *display* surface and returns `"cancelled"` when the overlay
+        // is set (so the TUI Milestones lane shows "cancelled" instead
+        // of the underlying phase); `MilestonePhase::from_lifecycle`
+        // rejects `"cancelled"` because the overlay is orthogonal to
+        // the phase — see `MilestoneState`. Without this split,
+        // every transition against a cancelled milestone
+        // (migrate, unblock, block, …) panicked at
+        // `from_lifecycle("cancelled")`. We compute the phase from
+        // the lifecycle field + legacy spec/exec fallback, then read
+        // the overlay flags separately.
+        let phase_str = if !meta.lifecycle.is_empty() && meta.lifecycle != "draft" {
+            meta.lifecycle.clone()
+        } else if !meta.execution_status.is_empty() || !meta.spec_status.is_empty() {
+            // Legacy-shaped milestone (post-migration-window): derive
+            // the phase from the legacy spec/exec fields the same way
+            // `effective_lifecycle` does, but WITHOUT the cancelled
+            // overlay short-circuit.
+            let from_spec = legacy_spec_status_to_lifecycle(&meta.spec_status);
+            let from_exec = legacy_execution_status_to_lifecycle(&meta.execution_status);
+            // Pick the more-advanced value. `executed` wins over
+            // `approved`; `in-progress` wins over `approved` (the
+            // legacy max() mapping; M100 ER-7 handles the verified
+            // + in-progress edge).
+            legacy_max_phase(from_spec, from_exec)
+        } else {
+            "draft".to_string()
+        };
         Ok(Self {
-            phase: MilestonePhase::from_lifecycle(&lifecycle)?,
+            phase: MilestonePhase::from_lifecycle(&phase_str)?,
             overlays: MilestoneOverlays {
                 blocked: meta.blocked,
                 deferred: meta.deferred,
@@ -166,6 +191,35 @@ impl MilestoneState {
                 .map(MilestonePhase::from_lifecycle)
                 .transpose()?,
         })
+    }
+}
+
+/// Pick the more-advanced of two legacy-derived lifecycle strings.
+/// Mirrors the `max()` mapping in `effective_lifecycle` but operates
+/// on plain phase strings (no overlay short-circuit). Used by
+/// `MilestoneState::from_meta` for legacy-shaped milestones where
+/// `effective_lifecycle` would return `"cancelled"` (the overlay
+/// short-circuit) and confuse the phase parser.
+fn legacy_max_phase(a: &str, b: &str) -> String {
+    // The legacy ordering: draft < groomed < approved < in-progress <
+    // executed < reviewed < complete. Both strings are guaranteed to
+    // be valid phase strings (returned by `legacy_*_to_lifecycle`).
+    fn rank(s: &str) -> u8 {
+        match s {
+            "draft" => 0,
+            "groomed" => 1,
+            "approved" => 2,
+            "in-progress" => 3,
+            "executed" | "self-reviewed" => 4,
+            "reviewed" => 5,
+            "complete" => 6,
+            _ => 0,
+        }
+    }
+    if rank(b) > rank(a) {
+        b.to_string()
+    } else {
+        a.to_string()
     }
 }
 

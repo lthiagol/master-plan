@@ -6,6 +6,39 @@
   "not_ready": [],
   "track_pending": 1,
   "validate_ok": true,
-  "can_handoff": true,
-  "warnings": []
+  "can_handoff": false,
+  "warnings": [
+    "watch readiness not green: [runner_config_present, coordinator_config_present] — fix before handing off to autonomous execution"
+  ],
+  "watch_readiness": {
+    "ok": false,
+    "checks": [
+      {
+        "name": "herdr_on_path",
+        "ok": true
+      },
+      {
+        "name": "herdr_cli_shape",
+        "ok": true
+      },
+      {
+        "name": "runner_config_present",
+        "ok": false,
+        "message": "agent.runner.harness is not set — run `mp config set agent.runner.harness <opencode|pi|cursor>`"
+      },
+      {
+        "name": "coordinator_config_present",
+        "ok": false,
+        "message": "agent.coordinator.harness is not set — run `mp config set agent.coordinator.harness <opencode|pi|cursor>`"
+      },
+      {
+        "name": "log_path_writable",
+        "ok": true
+      },
+      {
+        "name": "harness_auto_set",
+        "ok": true
+      }
+    ]
+  }
 }

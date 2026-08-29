@@ -27,8 +27,29 @@ fn install_fake_herdr_with_existing_panes(dir: &Path) -> PathBuf {
     // reconciliation gate sees them and refuses to spawn a second
     // copy. start/send/etc. exist as no-ops so any *additional*
     // invocation after --force or --resume doesn't error out.
+    //
+    // M197 followup: also answer `agent start --help` and
+    // `pane split --help` with the 0.7.x flag list so the
+    // `herdr_cli_shape` precondition passes; otherwise the
+    // precondition gate fires *before* the double-spawn gate and
+    // the test never exercises the refusal path it was written to
+    // pin.
     let bin = dir.join("herdr");
     let body = r#"#!/bin/sh
+case "$1:$2:$3" in
+  agent:start:--help)
+    cat <<'HELP'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID>
+
+Options:
+  --kind <KIND>  Harness kind
+  --pane <ID>    Existing pane id
+HELP
+    ;;
+  pane:split:--help)
+    echo "Usage: herdr pane split [OPTIONS]"
+    ;;
+esac
 case "$2" in
   list)
     cat <<'JSON'

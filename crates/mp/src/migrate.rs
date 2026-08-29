@@ -218,7 +218,18 @@ pub fn migrate_milestone_to_lifecycle(mut m: MilestoneFile) -> MilestoneFile {
     // `legacy_execution_status_to_lifecycle`. Apply the rename here
     // before the MigrateRaw call so the on-disk write emits
     // `"executed"` not `"done"`.
-    let new_lc = if new_lc == "done" {
+    //
+    // M174 followup: `effective_lifecycle` returns `"cancelled"` when
+    // the cancelled overlay is set — `cancelled` is an orthogonal
+    // overlay, not a lifecycle phase (see `MilestoneState`). Migrate
+    // the underlying phase (derived from `spec_status` via
+    // `legacy_spec_status_to_lifecycle`) and let the cancelled overlay
+    // ride alongside; `apply_migrate_raw` rejects `"cancelled"`
+    // because `MilestonePhase::from_lifecycle` only knows the phase
+    // vocabulary, not the overlay vocabulary.
+    let new_lc = if new_lc == "cancelled" {
+        crate::model::legacy_spec_status_to_lifecycle(&m.milestone.spec_status)
+    } else if new_lc == "done" {
         "executed"
     } else {
         new_lc.as_str()

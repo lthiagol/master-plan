@@ -44,6 +44,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::RoleConfig;
+use crate::harness::HarnessRegistry;
 
 /// The two roles `mp watch` drives. S3 keeps it to runner/coordinator;
 /// the L5 session-boundary discipline (review vs re-review) is owned
@@ -108,10 +109,18 @@ pub fn build_pane_split_args(cwd: &Path) -> Vec<String> {
 }
 
 /// Build the argv for `herdr agent start <NAME> --kind <KIND>
-/// --pane <PANE_ID>`. Pure; tested directly. The 0.7.x shape
-/// replaces the M149-era `--cwd <root> -- <harness argv>` form.
-pub fn build_start_args(label: &str, kind: &str, pane_id: &str) -> Vec<String> {
-    vec![
+/// --pane <PANE_ID> [EXTRA...]`. Pure; tested directly. The 0.7.x
+/// shape replaces the M149-era `--cwd <root> -- <harness argv>`
+/// form, but `extras` (the harness-specific flags from
+/// [`crate::harness::HarnessRegistry::resolve_argv`] — e.g.
+/// `--model claude-opus-4` for an opencode harness) are still
+/// forwarded so the harness binary receives its per-kind config.
+/// herdr 0.7.x is a thin multiplexer over the harness argv and
+/// passes unknown flags through; the registry remains the single
+/// source of truth for the flag shape (`registry_is_the_single_source_for_supported_set`
+/// in `tests/watch_config.rs`).
+pub fn build_start_args(label: &str, kind: &str, pane_id: &str, extras: &[String]) -> Vec<String> {
+    let mut argv = vec![
         "agent".into(),
         "start".into(),
         label.into(),
@@ -119,7 +128,35 @@ pub fn build_start_args(label: &str, kind: &str, pane_id: &str) -> Vec<String> {
         kind.into(),
         "--pane".into(),
         pane_id.into(),
-    ]
+    ];
+    argv.extend(extras.iter().cloned());
+    argv
+}
+
+/// Look up the harness-specific extras (model / thinking flags) for
+/// the given `RoleConfig` via the [`HarnessRegistry`]. Returns an
+/// empty `Vec` when the harness is unset (caller defaults the kind)
+/// or when the role has no model / thinking configured. The returned
+/// flags are the tail of [`HarnessRegistry::resolve_argv`] after the
+/// command name (e.g. `["--model", "claude-opus-4"]`).
+///
+/// Pure over the in-memory config + static registry — no I/O. Any
+/// registry error is logged at warn and treated as no-extras so the
+/// spawn path remains robust to a misconfigured harness name (the
+/// precondition gate is the authoritative validator).
+pub fn harness_extra_flags(rc: &RoleConfig) -> Vec<String> {
+    let Some(kind) = rc.harness.as_deref().filter(|h| !h.is_empty()) else {
+        return Vec::new();
+    };
+    match HarnessRegistry::v1().resolve_argv(
+        kind,
+        rc.model.as_deref(),
+        rc.thinking_level.as_deref(),
+    ) {
+        Ok(argv) if argv.len() > 1 => argv.into_iter().skip(1).collect(),
+        Ok(_) => Vec::new(),
+        Err(_) => Vec::new(),
+    }
 }
 
 /// A herdr pane handle returned to the watch loop. `reused=true`
@@ -354,16 +391,27 @@ pub fn pane_split(herdr_bin: &Path, cwd: &Path) -> Result<String> {
     Ok("pane-?".to_string())
 }
 
-/// Run `herdr agent start <NAME> --kind <KIND> --pane <PANE_ID>`.
-/// Returns the parsed `PaneHandle` on success. When the pane id
-/// can't be parsed from herdr's output, falls back to the label
-/// as the target id (herdr accepts agent labels as targets in
-/// subsequent commands).
+/// Run `herdr agent start <NAME> --kind <KIND> --pane <PANE_ID>
+/// [EXTRA...]`. Returns the parsed `PaneHandle` on success. When
+/// the pane id can't be parsed from herdr's output, falls back to
+/// the label as the target id (herdr accepts agent labels as
+/// targets in subsequent commands).
+///
+/// `extras` is the harness-specific tail from
+/// [`crate::harness::HarnessRegistry::resolve_argv`] (e.g.
+/// `["--model", "claude-opus-4"]`); see [`ensure_pane`] for the
+/// production wiring.
 ///
 /// On failure returns a [`SpawnFailure`]; see [`pane_split`] for
 /// the conversion contract.
-pub fn spawn_pane(herdr_bin: &Path, label: &str, kind: &str, pane_id: &str) -> Result<PaneHandle> {
-    let args = build_start_args(label, kind, pane_id);
+pub fn spawn_pane(
+    herdr_bin: &Path,
+    label: &str,
+    kind: &str,
+    pane_id: &str,
+    extras: &[String],
+) -> Result<PaneHandle> {
+    let args = build_start_args(label, kind, pane_id, extras);
     let out = match Command::new(herdr_bin).args(&args).output() {
         Ok(out) => out,
         Err(e) => {
@@ -424,10 +472,17 @@ pub fn ensure_pane(
     // M197 WP2 / AC-03: 0.7.x two-step spawn — create a fresh
     // pane with the right cwd, then start the agent inside that
     // pane. herdr 0.7.x does NOT accept `--cwd` on agent start;
-    // cwd is a pane property.
+    // cwd is a pane property. The harness-specific flags
+    // (model / thinking level) are resolved via the
+    // [`HarnessRegistry`] and forwarded on the agent-start argv
+    // — the registry remains the single source of truth for the
+    // harness flag shape, even though the shape itself changed
+    // from the M149 `-- <harness argv>` form to the M197
+    // post-`--pane <id>` form.
     let kind = resolve_harness_kind(rc);
+    let extras = harness_extra_flags(rc);
     let pane_id = pane_split(herdr_bin, cwd)?;
-    spawn_pane(herdr_bin, &label, &kind, &pane_id)
+    spawn_pane(herdr_bin, &label, &kind, &pane_id, &extras)
 }
 
 // ─── S4: prompt delivery with readiness gate ─────────────────────────────────
@@ -954,7 +1009,7 @@ mod tests {
 
     #[test]
     fn build_start_args_shape_matches_herdr_cli() {
-        let args = build_start_args("role-runner-1", "opencode", "%3");
+        let args = build_start_args("role-runner-1", "opencode", "%3", &[]);
         assert_eq!(
             args,
             vec![
@@ -970,13 +1025,80 @@ mod tests {
     }
 
     #[test]
+    fn build_start_args_appends_extras_after_pane() {
+        // M197 followup: harness extras (model / thinking flags from
+        // `HarnessRegistry::resolve_argv`) land after `--pane <id>`
+        // so herdr forwards them through to the harness binary.
+        let args = build_start_args(
+            "label",
+            "opencode",
+            "%3",
+            &["--model".to_string(), "claude-opus-4".to_string()],
+        );
+        assert_eq!(
+            args,
+            vec![
+                "agent".to_string(),
+                "start".to_string(),
+                "label".to_string(),
+                "--kind".to_string(),
+                "opencode".to_string(),
+                "--pane".to_string(),
+                "%3".to_string(),
+                "--model".to_string(),
+                "claude-opus-4".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn build_start_args_passes_kind_through_unchanged() {
         // The harness kind is a closed enum on herdr's side; mp
         // passes it through without rewriting. Validating the
         // kind against the registry is the caller's job
         // (preconditions gate).
-        assert!(build_start_args("label", "pi", "%1").contains(&"pi".to_string()));
-        assert!(build_start_args("label", "cursor", "%2").contains(&"cursor".to_string()));
+        assert!(build_start_args("label", "pi", "%1", &[]).contains(&"pi".to_string()));
+        assert!(build_start_args("label", "cursor", "%2", &[]).contains(&"cursor".to_string()));
+    }
+
+    #[test]
+    fn harness_extra_flags_resolves_model_and_thinking_from_registry() {
+        // M197 followup: the registry's resolve_argv tail is the
+        // authoritative source for the harness flag shape. Pass
+        // through `--model` / `--thinking` when the role config
+        // sets them AND the harness entry declares the matching
+        // flag (opencode has `--model` only; cursor has both).
+        let rc = RoleConfig {
+            harness: Some("opencode".into()),
+            model: Some("claude-opus-4".into()),
+            ..Default::default()
+        };
+        let extras = harness_extra_flags(&rc);
+        assert!(extras.contains(&"--model".to_string()));
+        assert!(extras.contains(&"claude-opus-4".to_string()));
+
+        let rc = RoleConfig {
+            harness: Some("cursor".into()),
+            model: Some("claude-opus-4".into()),
+            thinking_level: Some("high".into()),
+            ..Default::default()
+        };
+        let extras = harness_extra_flags(&rc);
+        assert!(extras.contains(&"--model".to_string()));
+        assert!(extras.contains(&"claude-opus-4".to_string()));
+        assert!(extras.contains(&"--thinking".to_string()));
+        assert!(extras.contains(&"high".to_string()));
+
+        // No harness configured: empty (caller defaults the kind).
+        let rc = RoleConfig::default();
+        assert!(harness_extra_flags(&rc).is_empty());
+
+        // Harness configured but no model: empty tail.
+        let rc = RoleConfig {
+            harness: Some("opencode".into()),
+            ..Default::default()
+        };
+        assert!(harness_extra_flags(&rc).is_empty());
     }
 
     #[test]

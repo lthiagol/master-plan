@@ -35,6 +35,25 @@ use std::time::Duration;
 fn install_hanging_herdr(dir: &Path) -> PathBuf {
     let bin = dir.join("herdr");
     let body = r#"#!/bin/sh
+# M197 followup: answer `agent start --help` and `pane split --help`
+# so the herdr_cli_shape precondition (M197 WP3) passes — the
+# precondition gate fires BEFORE the watch loop starts, so without
+# these handlers the test never reaches the SIGINT path it was
+# written to pin.
+case "$1:$2:$3" in
+  agent:start:--help)
+    cat <<'HELP'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID>
+
+Options:
+  --kind <KIND>  Harness kind
+  --pane <ID>    Existing pane id
+HELP
+    ;;
+  pane:split:--help)
+    echo "Usage: herdr pane split [OPTIONS]"
+    ;;
+esac
 case "$2" in
   list) echo '{"agents":[]}' ;;
   start) echo '{"pane_id":"%N","status":"started"}' ;;

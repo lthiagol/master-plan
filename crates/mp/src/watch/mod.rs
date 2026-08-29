@@ -43,9 +43,9 @@ pub use bridge::{
     STAGE_DONE_AGENT, STAGE_DONE_SENTINEL, STAGE_DONE_SOURCE,
 };
 pub use herdr::{
-    build_pane_split_args, build_start_args, deliver_prompt, lifecycle_advanced_past,
-    read_agent_status, read_lifecycle_via_mp, read_output, send_prompt, wait_for_lifecycle,
-    wait_for_lifecycle_with, wait_for_readiness, wait_for_readiness_with,
+    build_pane_split_args, build_start_args, deliver_prompt, harness_extra_flags,
+    lifecycle_advanced_past, read_agent_status, read_lifecycle_via_mp, read_output, send_prompt,
+    wait_for_lifecycle, wait_for_lifecycle_with, wait_for_readiness, wait_for_readiness_with,
 };
 pub use herdr::{
     ensure_pane, find_existing_pane, list_panes, pane_label_for, parse_pane_id_from_start_output,

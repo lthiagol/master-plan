@@ -33,10 +33,10 @@ use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::store;
 use crate::watch::{
-    build_pane_split_args, build_start_args, check_preconditions, default_log_path, next_stage,
-    pane_label_for, resolve_harness_kind, run_milestones, try_lazy_auto_set, which_herdr,
-    PreconditionReport, PromptStage, Role, SequencerReport, SystemDriveOps, WatchLogEntry,
-    WatchLogger, DEFAULT_PANE_N,
+    build_pane_split_args, build_start_args, check_preconditions, default_log_path,
+    harness_extra_flags, next_stage, pane_label_for, resolve_harness_kind, run_milestones,
+    try_lazy_auto_set, which_herdr, PreconditionReport, PromptStage, Role, SequencerReport,
+    SystemDriveOps, WatchLogEntry, WatchLogger, DEFAULT_PANE_N,
 };
 
 /// Maximum state-machine iterations per milestone before giving up
@@ -844,6 +844,14 @@ fn resolve_one(
         // the synthesized pane id.
         let label = pane_label_for(role, DEFAULT_PANE_N);
         let kind = resolve_harness_kind(rc);
+        // M197 followup: forward the harness-specific extras
+        // (model / thinking flags from `HarnessRegistry::resolve_argv`)
+        // into the dry-run preview so the operator sees the
+        // harness argv herdr will forward. The dry-run is
+        // authoritative for the wire shape; live spawn threads
+        // the same extras through `ensure_pane` /
+        // `spawn_pane(extras)`.
+        let extras = harness_extra_flags(rc);
         entry.herdr_commands.push(HerdrPreview {
             role: role.label(),
             label: label.clone(),
@@ -856,6 +864,7 @@ fn resolve_one(
                 &pane_label_for(role, DEFAULT_PANE_N),
                 &kind,
                 DRY_RUN_PANE_ID_PLACEHOLDER,
+                &extras,
             ),
         });
 

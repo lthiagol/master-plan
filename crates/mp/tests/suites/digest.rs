@@ -43,6 +43,58 @@ fn seed_handoff_gate(env: &TestEnv) {
 }
 
 fn do_handoff(env: &TestEnv) {
+    // M197 F-07: `execution handoff` now also requires watch
+    // readiness. Install a fake `herdr` on PATH plus the harness
+    // config so the role_config_present + herdr_on_path +
+    // herdr_cli_shape preconditions all go green.
+    use std::fs;
+    use std::path::PathBuf;
+    let bin_dir = env.tmp.path().join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let fake_herdr = bin_dir.join("herdr");
+    fs::write(
+        &fake_herdr,
+        r#"#!/bin/sh
+case "$1:$2:$3" in
+  agent:start:--help)
+    cat <<'HELP'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID>
+
+Options:
+  --kind <KIND>  Harness kind
+  --pane <ID>    Existing pane id
+HELP
+    ;;
+  pane:split:--help)
+    echo "Usage: herdr pane split [OPTIONS]"
+    ;;
+  *)
+    echo ok
+    ;;
+esac
+"#,
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&fake_herdr).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_herdr, perms).unwrap();
+    }
+    assert!(env
+        .run(&["config", "set", "agent.runner.harness", "opencode"])
+        .status
+        .success());
+    assert!(env
+        .run(&["config", "set", "agent.coordinator.harness", "opencode"])
+        .status
+        .success());
+    let prev_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut parts: Vec<PathBuf> = std::env::split_paths(&prev_path).collect();
+    parts.insert(0, bin_dir);
+    std::env::set_var("PATH", std::env::join_paths(parts).unwrap());
+
     let out = env.run(&["execution", "handoff"]);
     assert!(
         out.status.success(),

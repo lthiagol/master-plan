@@ -51,7 +51,7 @@ fn spawn_failure_carries_command_argv_exit_stdout_stderr() {
 fn spawn_failure_for_agent_start_preserves_kind_and_pane() {
     let failure = SpawnFailure {
         command: "agent start".into(),
-        argv: build_start_args("role-runner-1", "opencode", "%7"),
+        argv: build_start_args("role-runner-1", "opencode", "%7", &[]),
         exit_code: Some(1),
         stdout: String::new(),
         stderr: "herdr: pane not found\n".into(),

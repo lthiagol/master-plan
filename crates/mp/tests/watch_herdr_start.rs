@@ -90,7 +90,7 @@ fn spawn_pane_invokes_herdr_agent_start_with_correct_argv() {
         harness: Some("opencode".into()),
         ..Default::default()
     });
-    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%new-pane-7").unwrap();
+    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%new-pane-7", &[]).unwrap();
     assert!(!handle.reused);
     assert_eq!(handle.pane_id, "%spawned-42");
 
@@ -222,7 +222,7 @@ fn spawn_pane_falls_back_to_label_when_output_unparseable() {
     );
 
     let kind = "opencode".to_string();
-    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%pane-id").unwrap();
+    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%pane-id", &[]).unwrap();
     assert_eq!(
         handle.pane_id, "role-runner-1",
         "label fallback when pane id can't be parsed"
@@ -303,7 +303,7 @@ fn spawn_pane_propagates_non_zero_exit_as_error() {
     fs::create_dir_all(&bin_dir).unwrap();
     let bin = install_custom_fake(&bin_dir, "herdr", r#"echo "boom" 1>&2; exit 1"#);
 
-    let err = spawn_pane(&bin, "role-runner-1", "opencode", "%pane-id").unwrap_err();
+    let err = spawn_pane(&bin, "role-runner-1", "opencode", "%pane-id", &[]).unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("failed") && msg.contains("boom"),
