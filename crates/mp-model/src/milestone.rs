@@ -166,14 +166,29 @@ impl MilestoneState {
             // Legacy-shaped milestone (post-migration-window): derive
             // the phase from the legacy spec/exec fields the same way
             // `effective_lifecycle` does, but WITHOUT the cancelled
-            // overlay short-circuit.
-            let from_spec = legacy_spec_status_to_lifecycle(&meta.spec_status);
-            let from_exec = legacy_execution_status_to_lifecycle(&meta.execution_status);
-            // Pick the more-advanced value. `executed` wins over
-            // `approved`; `in-progress` wins over `approved` (the
-            // legacy max() mapping; M100 ER-7 handles the verified
-            // + in-progress edge).
-            legacy_max_phase(from_spec, from_exec)
+            // overlay short-circuit (the overlay is orthogonal to the
+            // phase and is read separately below).
+            //
+            // M100 ER-7 / F-NEW-1: the in-progress short-circuit must
+            // run before the max() mapping — a verified spec on a
+            // still-running milestone is `in-progress`, not terminal.
+            // Without this guard, `legacy_max_phase` would pick
+            // "complete" (spec-side, rank 6) over "in-progress"
+            // (exec-side, rank 3) and every transition against such a
+            // milestone would see a wrong-phase current state.
+            if meta.execution_status == "in-progress" {
+                "in-progress".to_string()
+            } else {
+                let from_spec = legacy_spec_status_to_lifecycle(&meta.spec_status);
+                let from_exec = legacy_execution_status_to_lifecycle(&meta.execution_status);
+                // Pick the more-advanced value. `executed` wins over
+                // `approved`; `reviewed` wins over `executed` (the
+                // legacy max() mapping). The ER-7 case is handled by
+                // the short-circuit above; the `done` alias is folded
+                // into the same rank as `executed` by
+                // `legacy_execution_status_to_lifecycle`.
+                legacy_max_phase(from_spec, from_exec)
+            }
         } else {
             "draft".to_string()
         };
@@ -196,10 +211,12 @@ impl MilestoneState {
 
 /// Pick the more-advanced of two legacy-derived lifecycle strings.
 /// Mirrors the `max()` mapping in `effective_lifecycle` but operates
-/// on plain phase strings (no overlay short-circuit). Used by
-/// `MilestoneState::from_meta` for legacy-shaped milestones where
-/// `effective_lifecycle` would return `"cancelled"` (the overlay
-/// short-circuit) and confuse the phase parser.
+/// on plain phase strings (no overlay short-circuit and no ER-7
+/// short-circuit). Used by `MilestoneState::from_meta` for
+/// legacy-shaped milestones where `effective_lifecycle` would return
+/// `"cancelled"` (the overlay short-circuit) and confuse the phase
+/// parser; the ER-7 in-progress short-circuit runs at the call site,
+/// so this helper only sees the non-in-progress case.
 fn legacy_max_phase(a: &str, b: &str) -> String {
     // The legacy ordering: draft < groomed < approved < in-progress <
     // executed < reviewed < complete. Both strings are guaranteed to
@@ -2134,5 +2151,96 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(effective_lifecycle(&just_approved), "approved");
+    }
+
+    // ─── MilestoneState::from_meta coverage ────────────────────────────────
+    //
+    // The from_meta path is the single call site for
+    // `apply_transition`, which every state-machine mutation in
+    // the project flows through. Bugs here silently mis-route every
+    // transition against a legacy-shaped milestone. These tests
+    // pin the contract so a future refactor of either
+    // `effective_lifecycle` or the legacy fallback can't drift the
+    // two paths on the same fixture.
+
+    fn from_meta_phase(meta: &MilestoneMeta) -> MilestonePhase {
+        MilestoneState::from_meta(meta)
+            .expect("from_meta must succeed for well-formed fixture")
+            .phase
+    }
+
+    #[test]
+    fn from_meta_legacy_max_picks_more_advanced_of_two_legacy_fields() {
+        // Mirror of `effective_lifecycle_picks_most_advanced_of_two_legacy`:
+        // spec=ready + exec=planned → approved (the more-advanced of
+        // the two legacy-derived phase strings wins).
+        let meta = MilestoneMeta {
+            lifecycle: "draft".into(), // serde default sentinel
+            spec_status: "ready".into(),
+            execution_status: "planned".into(),
+            ..Default::default()
+        };
+        assert_eq!(from_meta_phase(&meta), MilestonePhase::Approved);
+    }
+
+    #[test]
+    fn from_meta_legacy_in_progress_short_circuit_overrides_verified_spec() {
+        // F-NEW-1: M100 ER-7 says exec=in-progress dominates; the
+        // pre-fix from_meta ranked complete (6) over in-progress
+        // (3) and silently reported Complete for a still-running
+        // milestone. Every transition that requires InProgress
+        // (Start / Reopen / EnterRemediation's pre-state guard)
+        // would have failed against this fixture.
+        let meta = MilestoneMeta {
+            lifecycle: "draft".into(),
+            spec_status: "verified".into(),
+            execution_status: "in-progress".into(),
+            ..Default::default()
+        };
+        assert_eq!(from_meta_phase(&meta), MilestonePhase::InProgress);
+    }
+
+    #[test]
+    fn from_meta_legacy_verified_with_done_exec_is_complete() {
+        // Companion to the ER-7 short-circuit test: when exec is
+        // `done` (not `in-progress`), the max() mapping applies and
+        // yields `complete` for spec=verified.
+        let meta = MilestoneMeta {
+            lifecycle: "draft".into(),
+            spec_status: "verified".into(),
+            execution_status: "done".into(),
+            ..Default::default()
+        };
+        assert_eq!(from_meta_phase(&meta), MilestonePhase::Complete);
+    }
+
+    #[test]
+    fn from_meta_cancelled_overlay_does_not_change_phase_derivation() {
+        // M174 fix: the cancelled overlay is orthogonal to the
+        // phase. A cancelled legacy milestone at spec=verified +
+        // exec=in-progress must still derive InProgress (ER-7
+        // short-circuit applies); the overlay is read separately
+        // and lands on `state.overlays.cancelled`, not on `phase`.
+        let meta = MilestoneMeta {
+            lifecycle: "draft".into(),
+            spec_status: "verified".into(),
+            execution_status: "in-progress".into(),
+            cancelled: true,
+            ..Default::default()
+        };
+        let state = MilestoneState::from_meta(&meta).unwrap();
+        assert_eq!(state.phase, MilestonePhase::InProgress);
+        assert!(state.overlays.cancelled);
+    }
+
+    #[test]
+    fn from_meta_empty_legacy_fields_starts_at_draft() {
+        // Brand-new milestone with no lifecycle + no legacy fields
+        // lands on draft. Without this pin, a regression in the
+        // `else` branch (e.g. accidentally treating an empty
+        // lifecycle as a real "draft" sentinel) would silently
+        // re-route planning-stage transitions.
+        let meta = MilestoneMeta::default();
+        assert_eq!(from_meta_phase(&meta), MilestonePhase::Draft);
     }
 }
