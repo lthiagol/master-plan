@@ -47,6 +47,9 @@ fn milestones_table_renders_lifecycle_column() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
 
     let output = render_to_string(&app, 120, 30);
@@ -79,6 +82,9 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -123,6 +129,9 @@ fn since_cell_falls_back_to_since_updated_when_lifecycle_at_none() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -163,6 +172,113 @@ fn row_color_follows_lifecycle_not_legacy_fields() {
     );
     assert_eq!(lifecycle_color("complete", p), p.success);
     assert_eq!(lifecycle_color("draft", p), p.dim);
+}
+
+#[test]
+fn cancelled_milestone_renders_badge_in_title_column() {
+    // M174 fix: the Milestones lane must surface the cancellation
+    // overlay in the title column so the operator sees the audit
+    // story without opening a separate `mp reviews` round-trip.
+    // The badge reads `[cancelled: <reason>]` when the
+    // `cancel_reason` is set, and `[cancelled]` when it isn't.
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use raul::tui::render;
+    use raul::tui::view_state;
+
+    let cancelled_with_reason = MilestoneSummary {
+        id: "174".into(),
+        title: "M169 review remediations".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: Some("2026-07-15T17:49:50Z".into()),
+        depends_on: vec![],
+        priority: "normal".to_string(),
+        updated: "2026-07-15".into(),
+        cancelled: true,
+        cancelled_at: Some("2026-07-15T00:00:00Z".into()),
+        cancel_reason: Some("Work shipped via M169-rev".into()),
+    };
+    let cancelled_no_reason = MilestoneSummary {
+        id: "175".into(),
+        title: "Dropped scope".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: Some("2026-07-15T17:49:50Z".into()),
+        depends_on: vec![],
+        priority: "normal".to_string(),
+        updated: "2026-07-15".into(),
+        cancelled: true,
+        cancelled_at: Some("2026-07-15T00:00:00Z".into()),
+        cancel_reason: None,
+    };
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    app.load_milestones(vec![cancelled_with_reason, cancelled_no_reason]);
+
+    let backend = TestBackend::new(160, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer().clone();
+    let flat: String = (0..buf.area().height)
+        .flat_map(|y| (0..buf.area().width).map(move |x| (x, y)))
+        .map(|(x, y)| buf[(x, y)].symbol().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    assert!(
+        flat.contains("[cancelled: Work shipped via M169-rev]"),
+        "cancelled milestone with reason should render `[cancelled: <reason>]` badge; got: {flat}"
+    );
+    assert!(
+        flat.contains("[cancelled]"),
+        "cancelled milestone without reason should render `[cancelled]` badge; got: {flat}"
+    );
+}
+
+#[test]
+fn non_cancelled_milestone_renders_no_cancellation_badge() {
+    // M174 fix: the cancellation badge is opt-in (only rendered
+    // when `cancelled: true`). Sanity check that the regular
+    // milestone title does not pick up the badge text.
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    app.load_milestones(vec![MilestoneSummary {
+        id: "01".into(),
+        title: "Setup".into(),
+        lifecycle: "draft".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "normal".to_string(),
+        updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+    }]);
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use raul::tui::render;
+    use raul::tui::view_state;
+    let backend = TestBackend::new(120, 12);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer().clone();
+    let flat: String = (0..buf.area().height)
+        .flat_map(|y| (0..buf.area().width).map(move |x| (x, y)))
+        .map(|(x, y)| buf[(x, y)].symbol().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    assert!(
+        !flat.contains("[cancelled"),
+        "non-cancelled milestone must not render a `[cancelled]` badge; got: {flat}"
+    );
 }
 
 fn now_iso() -> String {

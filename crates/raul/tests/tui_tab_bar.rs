@@ -704,6 +704,9 @@ fn s8_milestone_list_drill_opens_milestone_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     assert_eq!(app.content, ContentState::MilestoneDetail);
@@ -768,6 +771,9 @@ fn s8_overview_inbox_drill_resolves_to_target_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     let item = raul::tui::app::InboxLine {
         id: "M01".into(),
@@ -813,6 +819,9 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         raul::tui::app::MilestoneSummary {
             id: "20".into(),
@@ -822,6 +831,9 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app.hide_done = true;
@@ -998,6 +1010,12 @@ fn s7_page_down_advances_by_page_size_and_clamps() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         })
         .collect();
     app.load_milestones(items);
@@ -1026,6 +1044,12 @@ fn s7_page_up_recedes_by_page_size_and_clamps() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         })
         .collect();
     app.load_milestones(items);

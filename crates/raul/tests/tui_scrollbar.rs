@@ -119,6 +119,9 @@ fn ac01_view_state_reserves_gutter_on_milestones_list() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         });
     }
     app.load_milestones(ms);
@@ -171,6 +174,9 @@ fn ac01_view_state_reserves_gutter_on_detail_screens() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         });
     }
     app.load_milestones(ms);
@@ -201,6 +207,9 @@ fn ac01_view_state_reserves_gutter_on_annotation_thread() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         });
     }
     app.load_milestones(ms);
@@ -264,6 +273,9 @@ fn ac01_list_item_width_excludes_gutter() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         })
         .collect();
     app.load_milestones(ms);
@@ -512,6 +524,9 @@ fn integration_milestones_scroll_updates_scroll_rect() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         })
         .collect();
     app.load_milestones(ms);

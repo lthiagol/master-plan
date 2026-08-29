@@ -113,6 +113,9 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.select_lane(Lane::Milestones);
     app.lane_sort_key

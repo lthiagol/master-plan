@@ -79,6 +79,9 @@ fn enter_and_exit_milestone_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
 
     app.enter_milestone_detail(Some(0));
@@ -102,6 +105,9 @@ fn drill_to_annotation_thread_and_back() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_thread();
@@ -126,6 +132,9 @@ fn review_menu_does_not_change_content_state() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_review_menu();
@@ -249,6 +258,9 @@ mod render_tests {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         }]);
 
         let output = render_to_string(&app);

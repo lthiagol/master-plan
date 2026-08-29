@@ -396,6 +396,22 @@ pub struct MilestoneMeta {
     pub needs_regrooming: bool,
     #[serde(default)]
     pub cancelled: bool,
+    /// M174 fix: ISO-8601 timestamp the milestone was cancelled
+    /// (e.g. `2026-07-15T17:49:50+00:00`). Optional audit field;
+    /// `None` for milestones that were never cancelled or were
+    /// cancelled before this field landed. Surfaces in the
+    /// Milestones lane and the on-disk JSON so a reader can tell
+    /// *when* the cancellation happened without consulting the
+    /// dogfood log.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancelled_at: Option<String>,
+    /// M174 fix: free-text reason the milestone was cancelled
+    /// (e.g. `"work shipped via M169-rev with different design; see
+    /// dogfood log Entry 31"`). Same lifecycle as `cancelled_at` —
+    /// both are optional audit fields that travel with the
+    /// milestone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancel_reason: Option<String>,
     /// Optional deferred overlay (orthogonal).
     #[serde(default)]
     pub deferred: bool,
@@ -831,6 +847,8 @@ impl Default for MilestoneFile {
                 blocked: false,
                 needs_regrooming: false,
                 cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
                 deferred: false,
                 deferred_reason: String::new(),
                 depends_on: vec![],

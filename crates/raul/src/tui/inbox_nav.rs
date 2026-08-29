@@ -137,6 +137,9 @@ mod tests {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         }]);
         let item = InboxLine {
             id: "86".into(),
@@ -165,6 +168,9 @@ mod tests {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         }]);
         let item = InboxLine {
             id: "91".into(),

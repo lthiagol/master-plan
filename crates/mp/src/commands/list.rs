@@ -393,6 +393,16 @@ fn build_milestone_item(
         // which sorts to the bottom under ascending order.
         "priority": m.milestone.priority,
         "updated": m.milestone.updated,
+        // M174 fix: emit the cancellation overlay + audit fields so the
+        // TUI Milestones lane can show "cancelled (since YYYY-MM-DD: <reason>)"
+        // for milestones like M174 where the work shipped via a different
+        // design and the cancellation metadata matters. `cancelled` is
+        // the raw overlay flag; `cancelled_at` and `cancel_reason` are
+        // `None` for milestones that were never cancelled or predate
+        // the audit fields.
+        "cancelled": m.milestone.cancelled,
+        "cancelled_at": m.milestone.cancelled_at,
+        "cancel_reason": m.milestone.cancel_reason,
     });
     if let serde_json::Value::Object(ref mut map) = item {
         if include_steps {

@@ -25,7 +25,9 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-07-15T17:49:50.091619+00:00"
+    "lifecycle_at": "2026-07-15T17:49:50.091619+00:00",
+    "cancelled_at": "2026-07-15T00:00:00+00:00",
+    "cancel_reason": "Work shipped via M169-rev (Entry 31) with a different design. F-01 (Tab on Settings preserves staged edits) was replaced by the M169 AC-06 discard-on-leave + AC-01 wrap contract; F-02 (read coerced back from mp) was replaced by no longer mutating state.config from the staging path; F-03 (roll back on partial failure) was replaced by keeping the failed key staged for retry. F-04 (wrap) and F-05 (BTreeMap) match M174's AC text exactly. See crates/raul/tests/m169_rev.rs for the 14 regression tests that pin the shipped design."
   },
   "intent": {
     "outcome": "After this ships, the M169 review findings F-01..F-05 (Entry 30 in mp-dogfood-log.md) are all resolved. Pressing Tab or clicking the Settings tab while staged edits exist preserves them (no silent reload). The set_config_value / mp config set coercion surface produces the same on-disk type as the in-memory staged row (no string→bool flicker). apply_settings_save rolls back partial commits and surfaces a clear error on commit-time failure. AC-01 lane-nav wrap is implemented and tested. apply_settings_save iterates staged_edits in deterministic key order."

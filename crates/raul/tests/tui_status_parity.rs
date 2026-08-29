@@ -74,6 +74,9 @@ fn render_with_detail(detail: &Value) -> String {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(detail.clone());

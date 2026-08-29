@@ -25,6 +25,9 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M01".into(),
@@ -34,6 +37,12 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -43,6 +52,12 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
     ]);
     app
@@ -145,6 +160,12 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -154,6 +175,12 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-12".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -163,6 +190,9 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     let ids = visible_ids(&app);
@@ -187,6 +217,12 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-15".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M2".into(),
@@ -196,6 +232,12 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M1".into(),
@@ -205,6 +247,9 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -234,6 +279,12 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -243,6 +294,12 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-16".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -252,6 +309,9 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -285,6 +345,9 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -294,6 +357,12 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-11".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -303,6 +372,12 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-12".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M04".into(),
@@ -312,6 +387,12 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-13".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M05".into(),
@@ -321,6 +402,12 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-14".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -349,6 +436,9 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M01".into(),
@@ -358,6 +448,12 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -367,6 +463,12 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
+
+            cancelled: false,
+
+            cancelled_at: None,
+
+            cancel_reason: None,
         },
     ]);
     app.select_lane(Lane::Milestones);

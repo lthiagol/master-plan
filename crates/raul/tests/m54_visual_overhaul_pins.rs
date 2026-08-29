@@ -70,6 +70,9 @@ fn m54_ac03_terminal_width_drives_list_columns() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     for width in [80, 120, 160] {
         let backend = TestBackend::new(width, 30);
@@ -178,6 +181,9 @@ fn m54_ac09_milestone_detail_renders_lifecycle_palette() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({

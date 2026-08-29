@@ -199,6 +199,18 @@ fn parse_milestone_summaries(data: &serde_json::Value) -> Vec<MilestoneSummary> 
                     // bottom.
                     priority: m["priority"].as_str().unwrap_or("normal").to_string(),
                     updated: m["updated"].as_str().unwrap_or("").to_string(),
+                    // M174 fix: cancellation overlay + audit
+                    // fields. `cancelled` defaults to false for
+                    // pre-M174 milestones; the date / reason
+                    // strings are `None` for those and for
+                    // cancellations done before the audit fields
+                    // landed. The Milestones lane reads these to
+                    // render the `[cancelled YYYY-MM-DD: <reason>]`
+                    // badge for milestones like M174 where the
+                    // work shipped via a different design.
+                    cancelled: m["cancelled"].as_bool().unwrap_or(false),
+                    cancelled_at: m["cancelled_at"].as_str().map(String::from),
+                    cancel_reason: m["cancel_reason"].as_str().map(String::from),
                 })
                 .collect()
         })

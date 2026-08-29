@@ -312,7 +312,28 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
         let row_color = progress::status_row_color(&m.lifecycle, app.effective_palette());
         let depth = depths.get(i).copied().unwrap_or(0).min(4);
         let indent = " ".repeat(depth);
-        let title = truncate_for_col(&m.title, title_w);
+        // M174 fix: prefix cancelled milestones with a badge so the
+        // TUI Milestones lane surfaces the cancellation directly. The
+        // `cancel_reason` is appended when present (truncated to fit
+        // the column) so the operator gets the audit context without
+        // opening a separate `mp reviews` round-trip. `cancelled_at`
+        // stays in the `Since` column via the existing relative-time
+        // rendering when the lifecycle_at is the cancellation date.
+        let (title, title_style) = if m.cancelled {
+            let badge = match m.cancel_reason.as_deref() {
+                Some(reason) if !reason.is_empty() => {
+                    let snippet = truncate_for_col(reason, title_w.saturating_sub(20).max(8));
+                    format!("[cancelled: {}] {}", snippet, m.title)
+                }
+                _ => format!("[cancelled] {}", m.title),
+            };
+            (
+                truncate_for_col(&badge, title_w),
+                Style::default().fg(app.effective_palette().warn),
+            )
+        } else {
+            (truncate_for_col(&m.title, title_w), Style::default())
+        };
         let priority = if m.priority.is_empty() {
             "—".to_string()
         } else {
@@ -328,7 +349,7 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
         rows.push(Row::new(vec![
             Cell::from(indent),
             Cell::from(format!("M{}", m.id)),
-            Cell::from(title),
+            Cell::from(Span::styled(title, title_style)),
             Cell::from(Span::styled(priority, priority_style(&m.priority, app))),
             Cell::from(gauge),
             Cell::from(Span::styled(

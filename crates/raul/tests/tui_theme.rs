@@ -186,6 +186,9 @@ fn tui_render_respects_color_enabled_toggle() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
 
     let Color::Rgb(ar, ag, ab) = MOCHA.accent else {

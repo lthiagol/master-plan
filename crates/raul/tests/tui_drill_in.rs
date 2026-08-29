@@ -12,6 +12,9 @@ fn drill_into_milestone_from_list() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.enter_milestone_detail(Some(0));
     assert_eq!(app.content, ContentState::MilestoneDetail);
@@ -32,6 +35,9 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         raul::tui::app::MilestoneSummary {
             id: "42".into(),
@@ -41,6 +47,9 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         raul::tui::app::MilestoneSummary {
             id: "43".into(),
@@ -50,6 +59,9 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app.hide_done = true;

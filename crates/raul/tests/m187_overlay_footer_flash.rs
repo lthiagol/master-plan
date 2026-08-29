@@ -18,6 +18,9 @@ fn ms(id: &str) -> MilestoneSummary {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }
 }
 

@@ -35,6 +35,9 @@ fn chip_all_and_filtered() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "02".into(),
@@ -44,6 +47,9 @@ fn chip_all_and_filtered() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app.select_lane(Lane::Milestones);

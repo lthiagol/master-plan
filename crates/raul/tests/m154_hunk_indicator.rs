@@ -123,6 +123,9 @@ fn milestone_detail_hunk_indicator_when_review_hunk_enabled() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.review_hunk_enabled = true;
     load_detail(&mut app, detail_with_findings(findings_fixture()));
@@ -150,6 +153,9 @@ fn milestone_detail_hunk_indicator_hidden_when_review_hunk_disabled() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     // Explicit: do NOT enable hunk.
     app.review_hunk_enabled = false;
@@ -188,6 +194,9 @@ fn milestone_detail_hunk_indicator_counts_only_anchored_findings() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     app.review_hunk_enabled = true;
     let all_unanchored = serde_json::json!([

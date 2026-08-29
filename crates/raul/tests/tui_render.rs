@@ -41,6 +41,9 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         raul::tui::app::MilestoneSummary {
             id: "02".to_string(),
@@ -50,6 +53,9 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         raul::tui::app::MilestoneSummary {
             id: "03".to_string(),
@@ -59,6 +65,9 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]
 }

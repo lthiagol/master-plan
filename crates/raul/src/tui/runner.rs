@@ -1122,6 +1122,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1131,6 +1134,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1140,6 +1146,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
         ]);
         app
@@ -1313,6 +1322,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             })
             .collect();
         app.load_milestones(ms);

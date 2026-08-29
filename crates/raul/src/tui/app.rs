@@ -389,6 +389,23 @@ pub struct MilestoneSummary {
     /// option. Empty string means "unknown" — sinks to the bottom
     /// under ascending order.
     pub updated: String,
+    /// M174 fix: cancellation overlay flag from `mp list milestones`.
+    /// `true` for milestones like M174 where the work shipped via a
+    /// different design and the milestone was closed without
+    /// running the canonical stages. The Milestones lane renders a
+    /// "[cancelled]" badge next to the lifecycle cell when this is
+    /// set, paired with the `cancel_reason` for the audit story.
+    pub cancelled: bool,
+    /// M174 fix: ISO-8601 timestamp the milestone was cancelled
+    /// (e.g. `2026-07-15T17:49:50+00:00`). `None` for milestones
+    /// that were never cancelled or predate the audit fields.
+    /// Rendered as `(cancelled YYYY-MM-DD: <reason>)` in the
+    /// Milestones lane when set.
+    pub cancelled_at: Option<String>,
+    /// M174 fix: free-text reason the milestone was cancelled.
+    /// `None` for milestones that were never cancelled or predate
+    /// the audit fields.
+    pub cancel_reason: Option<String>,
 }
 
 impl MilestoneSummary {
@@ -410,6 +427,9 @@ impl MilestoneSummary {
             depends_on: Vec::new(),
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         }
     }
 }
@@ -1913,6 +1933,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1922,6 +1945,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1931,6 +1957,9 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
             },
         ]
     }

@@ -31,6 +31,9 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -40,6 +43,9 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     app
@@ -111,6 +117,9 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -120,6 +129,9 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(), // bumped
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     // Same priority → numeric-id tie-breaker → M01 < M02 still.
@@ -141,6 +153,9 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "low".into(), // dropped
             updated: "2026-07-15".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -150,6 +165,9 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     let _visible = app.visible_milestones();
@@ -233,6 +251,9 @@ fn m182_s5_choice_survives_simulated_restart() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -242,6 +263,9 @@ fn m182_s5_choice_survives_simulated_restart() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]);
     let output = render_milestones_lane_to_string(&app_session2);

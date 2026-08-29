@@ -45,6 +45,10 @@ fn parse_via_helper(data: &serde_json::Value) -> Vec<MilestoneSummary> {
                         .unwrap_or_default(),
                     priority: m["priority"].as_str().unwrap_or("normal").to_string(),
                     updated: m["updated"].as_str().unwrap_or("").to_string(),
+                    // M174 fix: cancellation overlay + audit fields
+                    cancelled: m["cancelled"].as_bool().unwrap_or(false),
+                    cancelled_at: m["cancelled_at"].as_str().map(String::from),
+                    cancel_reason: m["cancel_reason"].as_str().map(String::from),
                 })
                 .collect()
         })

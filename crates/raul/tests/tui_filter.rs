@@ -10,6 +10,9 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "02".into(),
@@ -19,6 +22,9 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "03".into(),
@@ -28,6 +34,9 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
         MilestoneSummary {
             id: "04".into(),
@@ -37,6 +46,9 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
         },
     ]
 }

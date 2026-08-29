@@ -53,6 +53,9 @@ fn lane_tab_bar_uses_ratatui_tabs_widget() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     // Use width=120 to ensure the bar uses full labels (not compact).
     let s = render_full(&app, 120, 24);
@@ -86,6 +89,9 @@ fn list_highlight_style_sole_painter_in_settings_review_annotation() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     // Manually set the active mode to ReviewMenu and check the
     // chrome (the test doesn't try to drive the dispatcher). The
@@ -123,6 +129,9 @@ fn table_highlight_style_sole_painter_in_milestones_backlog() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     // The render must not panic.
     let _ = render_full(&app, 120, 24);
@@ -142,6 +151,9 @@ fn help_settings_drop_floating_chrome() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
     }]);
     // Open Help and confirm it renders with plain border.
     app.active_mode = raul::tui::mode::Mode::Help;
