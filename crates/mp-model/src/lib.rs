@@ -125,6 +125,8 @@ mod tests {
                 blocked: false,
                 needs_regrooming: false,
                 cancelled: false,
+                cancelled_at: None,
+                cancel_reason: None,
                 deferred: false,
                 deferred_reason: String::new(),
                 depends_on: vec!["40".into()],

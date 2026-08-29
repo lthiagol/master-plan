@@ -648,6 +648,19 @@ pub fn effective_lifecycle_from_legacy(spec: &str, exec: &str) -> String {
 /// and at least one legacy field is set, the milestone is on the legacy shape
 /// and we derive the lifecycle from the legacy values.
 pub fn effective_lifecycle(meta: &MilestoneMeta) -> String {
+    // M174 fix: the cancellation overlay is terminal — once a
+    // milestone is cancelled, the lifecycle column should read
+    // `cancelled` regardless of where the milestone was when it
+    // was cancelled. Without this, a milestone cancelled at
+    // `lifecycle=approved` keeps showing `approved` in the TUI
+    // Milestones lane, which is misleading (a cancelled milestone
+    // is not approved; it was *closed* before it ran). The legacy
+    // max() mapping below still picks the right value for the
+    // pre-cancellation migration path; the overlay check here
+    // simply short-circuits before that.
+    if meta.cancelled {
+        return crate::milestone::LIFECYCLE_CANCELLED.to_string();
+    }
     // If lifecycle is set to something other than the default ("draft"), trust it.
     // The check below ("draft" + legacy fields) catches the case where the
     // milestone was migrated already (lifecycle="draft" means a real draft)
@@ -1725,6 +1738,8 @@ mod tests {
             blocked: false,
             needs_regrooming: false,
             cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
             deferred: false,
             deferred_reason: String::new(),
             depends_on: vec![],
@@ -2014,5 +2029,56 @@ mod tests {
         };
         let lc = effective_lifecycle(&meta);
         assert_eq!(lc, "in-progress", "M02 should resolve to in-progress");
+    }
+
+    #[test]
+    fn effective_lifecycle_cancelled_overlay_beats_lifecycle_field() {
+        // M174 fix: the cancellation overlay is terminal — once a
+        // milestone is cancelled, the lifecycle column should
+        // read `cancelled` regardless of where the milestone was
+        // when it was cancelled. Without this, M174 (cancelled
+        // at lifecycle=approved) would keep showing `approved` in
+        // the TUI Milestones lane, which is misleading.
+        let approved_then_cancelled = MilestoneMeta {
+            lifecycle: "approved".into(),
+            spec_status: "ready".into(),
+            execution_status: "cancelled".into(),
+            cancelled: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            effective_lifecycle(&approved_then_cancelled),
+            "cancelled",
+            "cancelled overlay must short-circuit before the max() mapping"
+        );
+
+        let executed_then_cancelled = MilestoneMeta {
+            lifecycle: "executed".into(),
+            spec_status: "implemented".into(),
+            execution_status: "done".into(),
+            cancelled: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            effective_lifecycle(&executed_then_cancelled),
+            "cancelled",
+            "even a milestone that reached executed must show cancelled once the overlay is set"
+        );
+    }
+
+    #[test]
+    fn effective_lifecycle_without_cancelled_keeps_legacy_mapping() {
+        // M174 fix negative case: when `cancelled: false`, the
+        // existing max(spec, exec) mapping must be unchanged.
+        // Pin the pre-M174 behavior so a future refactor can't
+        // accidentally regress the unrelated branches.
+        let just_approved = MilestoneMeta {
+            lifecycle: "approved".into(),
+            spec_status: "ready".into(),
+            execution_status: "planned".into(),
+            cancelled: false,
+            ..Default::default()
+        };
+        assert_eq!(effective_lifecycle(&just_approved), "approved");
     }
 }
