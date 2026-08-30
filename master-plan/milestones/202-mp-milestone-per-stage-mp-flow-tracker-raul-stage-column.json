@@ -1,0 +1,803 @@
+{
+  "milestone": {
+    "id": "202",
+    "title": "mp milestone per-stage mp-flow tracker + raul Stage column",
+    "slug": "mp-milestone-per-stage-mp-flow-tracker-raul-stage-column",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-29",
+    "updated": "2026-08-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-29T12:34:23.486694+00:00"
+  },
+  "intent": {
+    "outcome": "Every milestone carries a per-stage map of the 12 mp-flow stages. The raul Milestones list replaces the 8-cell lifecycle gauge with a single Stage column (`5/12 · Claim & execute`); the MilestoneDetail view gains a Stages checklist. Lifecycle writers auto-derive the canonical stage transitions; agents can override via `mp milestone stage set`. After this lands, a handoff agent can read `mp show milestone <id>` and know exactly which mp-flow stage the milestone is in."
+  },
+  "problem": {
+    "description": "Today the 8-state lifecycle (`draft → groomed → approved → in-progress → done → ... → complete`) and the 12-stage mp-flow (`Draft → Groom → Specify → Approve → Claim & execute → Self-review → Complete → External review → Remediate → Re-review → Document → Hand off`) describe different things, but the TUI only surfaces the 8-state lifecycle. The 8-cell gauge in the Milestones list conflates the two and answers \"what bucket is this in?\" instead of the operator question \"what step am I on?\". The detail header line shows only the lifecycle badge, so when a handoff agent picks up after a session ends it has to re-derive the mp-flow position from prose in the milestone spec. M185 introduced the gauge as a stopgap; this milestone replaces it with the mp-flow truth and makes per-stage state explicit on disk so future automation (resume, audit, dashboards) can rely on it."
+  },
+  "scope": {
+    "in_scope": [
+      "Add `flow_stages: BTreeMap<String, FlowStage>` + `FlowStage { status, at }` to `MilestoneMeta` in `crates/mp-model/src/milestone.rs`. Status values: `pending`, `in_progress`, `done`, `skipped`. `#[serde(default)]` so legacy JSON without the field loads fine.",
+      "Auto-derive stage transitions from the `MilestoneEvent` table: `Groom` → `draft` done + `groom` done; `Approve` → `specify` done + `approve` done; `Start` → `execute` in_progress; `FinishExecution` → `execute` done + `self-review` done (bundled per M148); `Complete` → `complete` done AND `external-review` in_progress (the milestone is now in the review queue); `EnterRemediation` → `external-review` done + `remediate` in_progress; `ExitRemediation` → `remediate` done + `re-review` done; `Cancel` → all non-done stages set to `skipped`. `mp reviews pass --verdict ok` (not a MilestoneEvent) sets `external-review` done.",
+      "New CLI surface `mp milestone stage list|set <id> <stage> <status>` — list returns the 12-stage map; `set` overrides an explicit stage without breaking the auto-derive contract for other stages. Status enum guard rejects values outside `pending|done|in_progress|skipped`.",
+      "`mp milestone bulk set-stage --ids … --stage … --status …` mirrors `bulk set-priority` / `bulk set-spec-status` (uses `--dry-run`, `--where`, reports succeeded/failed with exit code 2 on partial failure).",
+      "Late-stage auto-advance: `mp note add --milestone-id <id>` and `mp reviews finding resolve <id>` flip `flow_stages.document.status = \"done\"` for the associated milestone when its current lifecycle is `complete`. `flow_stages.hand-off` only flips via explicit `mp milestone stage set <id> hand-off done`.",
+      "Project `flow_stages` in `mp show milestone <id>` JSON and in the `mp list milestones` payload so downstream consumers (raul, future dashboards) don't need a second `mp` call per row.",
+      "TUI Milestones list: replace the 8-cell Gauge column with a Stage column rendering `<N>/12 · <Stage Label>` from `MilestoneSummary.flow_stages`. The lifecycle text column is removed (the Stage cell already carries position). Since + indent + priority columns unchanged.",
+      "TUI MilestoneDetail: insert a `Stages` section between Meta and G14. All 12 stages render as `✓/●/○/⊘ <label> [<timestamp or relative>]` in canonical mp-flow order. The current-stage row gets an indented sub-line `└─ lifecycle overlay: <cancelled|blocked|remediation>` only when the milestone's lifecycle overlay is non-empty. Detail header line replaces the lifecycle badge with the Stage cell (e.g. `5/12 · Claim & execute`).",
+      "TUI Dashboard lifecycle grid: replace the 9-bucket lifecycle rollup with a 12-bucket mp-flow rollup. Each bucket label includes its `N/12` ordinal marker. Pre-existing complete milestones roll up under `Complete` until their next transition — no code-side backfill per the migration decision.",
+      "Extend `MilestoneSummary` (in `crates/raul/src/tui/app.rs`) to carry `flow_stages` so list rendering doesn't need a second mp call per row.",
+      "Tests: unit (derivation table, status enum guard, CLI overrides, late-stage hooks, reviews-pass hook); TUI snapshot/golden for Stage column and Stages section; round-trip serde tests for the new field. `make test` and `make lint` clean."
+    ],
+    "out_of_scope": [
+      "Slice A (description field on milestones/backlog/ideas) — separate milestone later; this one stays focused on stage tracking.",
+      "Code-side backfill or migration of pre-existing milestone JSON files — `#[serde(default)]` only. Pre-existing milestones render an empty Stages section (all `○` with `(unknown)` timestamp) until their first lifecycle transition populates the field. The user manually pre-populates if needed.",
+      "Removing the underlying 8-state lifecycle from `MilestoneMeta` — lifecycle continues to drive overlay state, the path engine, and existing mp-status reports. The Milestones list Lifecycle text column and Gauge are removed in this milestone (replaced by the Stage cell). The Stage cell is additive to the data model, not to the list layout.",
+      "Backlog/Ideas list columns stay unchanged (no Stage column there — backlog items are not mp-flow participants).",
+      "Replacing the 12-stage ordering on disk — the canonical order lives in `templates/skills/mp-flow/stages.toml`; this milestone reads from the same source but does not modify the SKILL.md.",
+      "Review-loop counter (how many times stages 8→9→10 have iterated) — only the final state is recorded (`remediate: done`, `re-review: done`); iteration count is out of scope.",
+      "TUI Path tab visual enrichment — unchanged here; M206 owns the Path 2-line rework and depends on this milestone's flow_stages field.",
+      "Watch tab, Settings tab, Overview Health strip — unchanged.",
+      "Bulk-set helpers beyond `bulk set-stage` — operators needing bulk lifecycle changes already use `bulk set-spec-status`; stage-level bulk is the only new bulk surface.",
+      "Per-stage `blocked` status — the four-value enum (`pending/done/in_progress/skipped`) is enough for v1; if a future milestone needs stage-level blocking, add a fifth value then."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp show milestone <id>` JSON includes a `flow_stages` object keyed by all 12 mp-flow stage slugs (`draft`, `groom`, `specify`, `approve`, `execute`, `self-review`, `complete`, `external-review`, `remediate`, `re-review`, `document`, `hand-off`).",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp milestone groom <id>` (Draft → Groomed transition) results in `flow_stages.draft.status == \"done\"` and `flow_stages.groom.status == \"done\"` with `at` timestamps set on read.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/groom_marks_draft_and_groom_done/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp milestone approve <id>` results in `flow_stages.specify.status == \"done\"` and `flow_stages.approve.status == \"done\"`; `flow_stages.execute.status` stays `pending`.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/approve_marks_specify_and_approve_done/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp milestone start <id>` results in `flow_stages.execute.status == \"in_progress\"` with `at` timestamp set.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/start_marks_execute_in_progress/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "`mp milestone complete <id>` results in `flow_stages.execute.status == \"done\"`, `flow_stages.self-review.status == \"done\"` (bundled per M148), and `flow_stages.complete.status == \"done\"`. All three share a timestamp from the completion event.",
+      "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_execute_self_review_and_complete_done/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "`mp milestone stage set <id> external-review done` overrides the auto-derived value for that stage only. Subsequent `complete` lifecycle transitions update other stages but do NOT clobber the explicitly-set `external-review`.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "`mp milestone stage list <id>` prints all 12 stages as a CLI table with id, status, and `at` (or `—` when unset). Exit 0.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_list_prints_twelve_rows/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "`mp milestone stage set <id> <stage> bogus` (invalid status) exits non-zero with a precise error listing the allowed values; the milestone file is unchanged.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_set_rejects_invalid_status/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "`mp milestone cancel <id>` flips every non-`done` stage to `skipped` (distinct from `pending`). The lifecycle overlay also flips to `cancelled` per existing behavior.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/cancel_marks_remaining_stages_skipped/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "After a milestone reaches `complete`, the first `mp note add --milestone-id <id> ...` (or `mp reviews finding resolve <id>` associated with that milestone) flips `flow_stages.document.status == \"done\"` on read. Subsequent notes do not re-flip (idempotent).",
+      "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/note_add_after_complete_marks_document_done|reviews_finding_resolve_after_complete_marks_document_done/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-11",
+      "description": "`flow_stages.hand-off` flips to `done` ONLY via explicit `mp milestone stage set <id> hand-off done`. No other event (note add, finding resolve, git commit, archive) auto-advances it. Auto-advance attempts are recorded as no-ops.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/hand_off_only_advances_via_explicit_set|no_event_auto_advances_hand_off/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-12",
+      "description": "Pre-existing milestone JSON without a `flow_stages` field loads without error. The milestone renders in the TUI with an empty Stages section (all `○ pending (unknown)`) until its next lifecycle transition, which then populates the field via auto-derive. Round-trip serde test: legacy fixture → load → re-serialize → re-load → assert identical body.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/legacy_milestone_without_flow_stages_loads_round_trip/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-13",
+      "description": "raul Milestones list shows a Stage column with `<N>/12 · <Stage Label>` content (e.g. `5/12 · Claim & execute`). The 8-cell Gauge column is gone. The lifecycle text column is gone (the Stage cell carries position). Selected-row highlight still readable.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/stage_column_shows_n_over_twelve_and_label|gauge_column_is_gone|lifecycle_text_column_is_gone|selected_row_highlight_stays/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-14",
+      "description": "raul MilestoneDetail shows a Stages section listing all 12 mp-flow stages in canonical order with status icon (`✓ done`, `● in_progress`, `○ pending`, `⊘ skipped`) and per-stage timestamp (or relative `started Xh ago` for `in_progress`). The section sits between Meta and G14.",
+      "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/stages_section_renders_twelve_rows|stages_section_order_is_canonical|stages_section_sits_between_meta_and_g14|status_icons_match_enum|skipped_icon_for_cancelled_stages/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-15",
+      "description": "For a cancelled milestone, the Stages section shows all non-`done` stages with `⊘ skipped` and the current-stage row carries the sub-line `└─ lifecycle overlay: cancelled`. Same pattern for `remediation` and `blocked` overlays. Normal (no-overlay) milestones show no sub-line.",
+      "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/cancelled_overlay_subline_appears|blocked_overlay_subline_appears|remediation_overlay_subline_appears|no_overlay_no_subline/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-16",
+      "description": "raul Dashboard lifecycle grid rolls up milestones by their current mp-flow stage (12 buckets in canonical order) instead of by the 8-state lifecycle. Each bucket label includes its `<N>/12` ordinal marker. Title changes from `Lifecycle` to `Lifecycle (current mp-flow stage)` so the meaning shift is explicit.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E 'test(/grid_renders_twelve_buckets|grid_order_is_canonical_mp_flow|bucket_labels_include_n_over_twelve|title_includes_mp_flow_disambiguation/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-17",
+      "description": "`cargo fmt --all -- --check` exits 0. `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0. `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0. `cargo nextest run -p mp --no-fail-fast` exits 0. `cargo nextest run -p raul --no-fail-fast` exits 0. `mp validate` exits 0.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-18",
+      "description": "`mp milestone bulk set-stage --ids … --stage … --status …` mirrors bulk set-priority: --dry-run, --where, per-id succeeded/failed, exit 2 on partial failure. Cancelled milestones are skipped (no-op) and listed with reason cancelled.",
+      "verification": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled|bulk_set_stage_dry_run/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-19",
+      "description": "`mp milestone complete` also sets flow_stages.external-review to in_progress (the milestone is now in the review queue). `mp reviews pass --verdict ok` sets external-review to done. `EnterRemediation` sets external-review to done (review produced findings) and remediate to in_progress. Without this, stages 8-12 stay pending forever and the Stage column would lie.",
+      "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_external_review_in_progress|reviews_pass_marks_external_review_done|enter_remediation_marks_external_review_done/)'",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Stage source",
+      "choice": "Auto-derive from lifecycle transitions + CLI override",
+      "rationale": "Lifecycle transitions are the canonical events that produce stage progress. Wiring the auto-derive into the existing `MilestoneEvent` table keeps the state machine single-source. CLI override exists for stages the lifecycle can't observe (Self-review bundling, Document, Hand-off) and for explicit operator intent."
+    },
+    {
+      "area": "Gauge fate",
+      "choice": "Replace the gauge column with the Stage column",
+      "rationale": "The gauge was an mp-flow-shaped visualization of an 8-state value — exactly the conflation the milestone is fixing. Replacing it removes the redundancy and makes the Stage column the single visual signal."
+    },
+    {
+      "area": "Storage shape",
+      "choice": "BTreeMap<String, FlowStage> with FlowStage { status, at }",
+      "rationale": "Forward-compatible — adding a future stage is a serde-side change, not a model migration. Per-stage timestamps enable the relative-time display in the Stages section. Serde-default on the field keeps legacy JSON loadable."
+    },
+    {
+      "area": "Status enum",
+      "choice": "pending / done / in_progress / skipped",
+      "rationale": "Four values cover every reachable state. `skipped` is distinct from `pending` so cancelled milestones render visually different from \"not yet started\". A fifth `blocked` value can be added later if stage-level blocking becomes a requirement."
+    },
+    {
+      "area": "Stage cell content",
+      "choice": "<N>/12 · <Stage Label>",
+      "rationale": "Both the ordinal and the label matter — the label names the work, the ordinal anchors position. Single cell, no need to scroll the lifecycle column for context."
+    },
+    {
+      "area": "Self-review placement",
+      "choice": "Bundled into execute end-state (M148)",
+      "rationale": "M148 Option A removed the separate `self-reviewed` lifecycle state and folded self-review into the runner's pre-complete flow. The Stage cell mirrors that — `execute` and `self-review` flip `done` together at `FinishExecution`. No new event needed."
+    },
+    {
+      "area": "Late-stage advance",
+      "choice": "document auto / hand-off explicit",
+      "rationale": "`document` naturally follows the first post-complete note or finding resolution — auto-detect removes ceremony for the common path. `hand-off` is the ceremonial close-out; explicit signal prevents a stray commit from prematurely closing the milestone."
+    },
+    {
+      "area": "Migration",
+      "choice": "serde-default only — no code-side backfill",
+      "rationale": "The repo is dogfood-only and the user is the sole operator. Manually pre-populating (or letting the field fill on first transition) is acceptable. No `mp migrate` command needed; the dashboard rollup will show pre-existing complete milestones under `Complete` instead of `Hand off` until they get touched — acceptable per user confirmation."
+    },
+    {
+      "area": "Lifecycle text column",
+      "choice": "Removed from the Milestones list",
+      "rationale": "The Stage cell already conveys position. Two cells saying the same thing reduces horizontal budget for future columns (description, in slice A) without adding information."
+    },
+    {
+      "area": "Detail header line",
+      "choice": "Stage cell replaces the lifecycle badge; overlay sub-line under the current stage row",
+      "rationale": "Lean header for the 95% normal case; terminal-state signal (`cancelled` / `blocked` / `remediation`) lives as a sub-line under the current stage row in the Stages section. Avoids redundancy while preserving the signal where it matters."
+    },
+    {
+      "area": "Review-queue stage after complete",
+      "choice": "Complete sets external-review to in_progress. reviews pass sets it done. EnterRemediation also sets it done (findings were filed). Do not leave stages 8-12 pending after complete — the Stage column current-stage helper treats first non-done as current, but the detail checklist would show a hollow pending for the stage the operator is actually on.",
+      "rationale": "The original auto-derive table had no event for stage 8. After complete the operator is in the review queue; pretending otherwise makes the 12-stage tracker lie. There is no mp reviews claim command in the current CLI (AGENTS.md is stale), so complete and reviews pass are the observable edges."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "How does `mp note add` (or `mp reviews finding resolve`) associate with a milestone for the late-stage `document` auto-advance? Today `mp note add` has no required `milestone_id`; should the milestone CLI add one, or should the hook use a heuristic (most-recent `complete` milestone touched in the last N hours)?",
+      "status": "resolved",
+      "answer": "Add optional --milestone-id <id> flag to  (backwards-compatible; default empty). The late-stage  auto-advance hook reads --milestone-id when present; falls back to the existing heuristic-free behavior (no auto-advance) when absent. Updates AC-10 verification commands to cover the explicit-id path."
+    },
+    {
+      "id": "Q-02",
+      "question": "Does `mp milestone stage set` accept a stage key not in the canonical 12 (forward-compat), or reject with a precise error?",
+      "status": "resolved",
+      "answer": "Strict guard. mp milestone stage set rejects any stage key not in the canonical 12 (draft, groom, specify, approve, execute, self-review, complete, external-review, remediate, re-review, document, hand-off) with a precise error listing the allowed keys. Exit code 2. No on-disk mutation. Mirrors the existing set_lifecycle enum guard."
+    },
+    {
+      "id": "Q-03",
+      "question": "Should the bulk `set-stage` command auto-skip cancelled milestones (write to them is a no-op), or attempt the write and let the lifecycle guard reject it?",
+      "status": "resolved",
+      "answer": " auto-skips cancelled milestones — the write is a no-op for those targets. The bulk summary lists each skipped target with reason  in the per-id report. Exit code 0 if all non-cancelled targets succeeded; 2 on partial failure."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Model + serde",
+      "goal": "Add flow_stages BTreeMap String FlowStage plus FlowStage struct with status and at Option String to MilestoneMeta with serde default. Define the canonical 12 stage-key constant MP_FLOW_STAGE_KEYS in crates/mp-model. Verify legacy JSON without the field loads fine. Covers AC-12.",
+      "rollback": "Revert changes to crates/mp-model/src/milestone.rs: drop the FlowStage struct, the flow_stages field on MilestoneMeta, and the MP_FLOW_STAGE_KEYS constant. No data migration needed because legacy milestones load via serde default."
+    },
+    {
+      "id": "WP2",
+      "name": "Auto-derive hook",
+      "goal": "Add  mapping MilestoneEvent -> stage mutations. Wire it into the durable writers in crates/mp/src/milestone/spec.rs so every lifecycle transition auto-flips the corresponding mp-flow stages. Cover Groom/Approve/Start/FinishExecution/Complete/EnterRemediation/ExitRemediation/Cancel. Hand-off stays explicit-only.",
+      "rollback": "Remove the auto-derive calls from the transition writers in crates/mp/src/milestone/spec.rs. Stages revert to 'no-op on transition' (operators can still set them explicitly via )."
+    },
+    {
+      "id": "WP3",
+      "name": "CLI surface stage list set bulk",
+      "goal": "Add mp milestone stage list id (table of 12 stages with status and at) and mp milestone stage set id stage status (with strict 12-key and 4-value enum guard). Add mp milestone bulk set-stage with skip-cancelled behavior. Add optional --milestone-id flag to mp note add for late-stage association. Covers AC-06, AC-07, AC-08 plus Q-01 Q-02 Q-03.",
+      "rollback": "Remove the new MilestoneCmd::Stage variant in crates/mp/src/cli/milestone.rs and its handler in crates/mp/src/commands/milestone.rs. Revert the --milestone-id flag from crates/mp/src/cli/note.rs. Revert bulk set-stage extension in crates/mp/src/commands/milestone_bulk.rs."
+    },
+    {
+      "id": "WP4",
+      "name": "Late-stage hooks document and hand-off",
+      "goal": "Wire mp note add post-complete into document done and mp reviews finding resolve post-complete into document done. Verify hand-off stays explicit-only by negative test. Covers AC-10 and AC-11.",
+      "rollback": "Remove the post-complete hooks from crates/mp/src/commands/note.rs and crates/mp/src/commands/reviews.rs. Operators keep manual stage control only."
+    },
+    {
+      "id": "WP5",
+      "name": "Projection show and list JSON",
+      "goal": "Surface flow_stages in mp show milestone id JSON output and in the mp list milestones payload so downstream consumers do not need a second mp call per row. Covers AC-01.",
+      "rollback": "Revert crates/mp/src/commands/show.rs and crates/mp/src/commands/list.rs to drop the flow_stages projection."
+    },
+    {
+      "id": "WP6",
+      "name": "TUI list Stage column replaces gauge",
+      "goal": "Extend MilestoneSummary in crates/raul/src/tui/app.rs with flow_stages. Update parse_milestone_summaries in crates/raul/src/tui/runner_helpers.rs. Add progress::stage_cell_line helper. Replace the 8-cell Gauge column with the Stage column in render_milestones_table in crates/raul/src/tui/render/lane_lists.rs. Drop the lifecycle text column. Covers AC-13.",
+      "rollback": "Revert crates/raul/src/tui/app.rs MilestoneSummary field, runner_helpers.rs parser, lane_lists.rs render_milestones_table, and progress.rs stage_cell_line helper. The 8-cell gauge column and the lifecycle text column return."
+    },
+    {
+      "id": "WP7",
+      "name": "TUI detail Stages section",
+      "goal": "Add Stages section to render_milestone_detail in crates/raul/src/tui/render/milestone_detail.rs between Meta and G14. 12-row checklist in canonical mp-flow order with status icons and per-stage timestamp. Replace lifecycle badge in header line with Stage cell. Add overlay sub-line for cancelled, blocked, and remediation milestones. Covers AC-14 and AC-15.",
+      "rollback": "Revert the Stages section and overlay sub-line from milestone_detail.rs. Restore the lifecycle badge in the header line."
+    },
+    {
+      "id": "WP8",
+      "name": "TUI dashboard 12-bucket mp-flow grid",
+      "goal": "Replace the 9-bucket lifecycle grid in render_lifecycle_grid_lines in crates/raul/src/tui/render/dashboard_view.rs with a 12-bucket mp-flow grid. Each bucket label includes its ordinal N over 12 marker. Title changes from Lifecycle to Lifecycle (current mp-flow stage). Covers AC-16.",
+      "rollback": "Revert dashboard_view.rs render_lifecycle_grid_lines back to the 9-bucket lifecycle rollup and restore the original Lifecycle title."
+    },
+    {
+      "id": "WP9",
+      "name": "Final verification matrix",
+      "goal": "Run cargo fmt, cargo clippy, cargo nextest, mp validate. Confirm every ACs verification command exits 0 with non-prose evidence. Covers AC-17.",
+      "rollback": "N/A. Verification has no on-disk artifacts to revert."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add FlowStage struct with status String and at Option String fields to crates/mp-model/src/milestone.rs. Add flow_stages BTreeMap String FlowStage field to MilestoneMeta with serde default skip_serializing_if. Add MP_FLOW_STAGE_KEYS pub const slice of the canonical 12 stage slugs.",
+      "files": [
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --no-fail-fast",
+      "done_when": "MilestoneMeta has flow_stages BTreeMap with serde default; FlowStage struct compiles; MP_FLOW_STAGE_KEYS lists 12 slugs; cargo nextest run -p mp-model exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add unit tests in crates/mp/tests/lifecycle_setter_overlay.rs covering: a milestone JSON with no flow_stages field loads fine, round-trip serde preserves the field, and FlowStage serializes with the expected shape. Covers AC-12.",
+      "files": [
+        "crates/mp/tests/lifecycle_setter_overlay.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/legacy_milestone_without_flow_stages_loads_round_trip|flow_stage_serde_round_trip/)",
+      "done_when": "legacy_milestone_without_flow_stages_loads_round_trip and flow_stage_serde_round_trip tests pass; cargo nextest run exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Add apply_flow_stages_for_event in crates/mp-model/src/milestone.rs. Maps MilestoneEvent to stage mutations: Groom draft+groom done; Approve specify+approve done; Start execute in_progress; FinishExecution execute+self-review done; Complete complete done AND external-review in_progress (review queue); EnterRemediation external-review done + remediate in_progress; ExitRemediation remediate done + re-review done; Cancel remaining skipped. Hand-off never auto-advances. reviews pass is wired in the reviews command (not a MilestoneEvent) — see the WP2 reviews-pass hook step.",
+      "files": [
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp-model --no-fail-fast",
+      "done_when": "apply_flow_stages_for_event compiles and unit-tested against every MilestoneEvent variant; hand-off never appears in the mutation list",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-09",
+        "AC-11",
+        "AC-19"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Wire apply_flow_stages_for_event into the durable writers in crates/mp/src/milestone/spec.rs: every site that calls MilestoneEvent::Groom/Approve/Start/FinishExecution/Complete/EnterRemediation/ExitRemediation/Cancel also writes the corresponding stage mutations. Complete must set external-review in_progress. EnterRemediation must set external-review done. Use with_milestone_mut_unlocked. Set at to store::now_rfc3339().",
+      "files": [
+        "crates/mp/src/milestone/spec.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/groom_marks_draft_and_groom_done|approve_marks_specify_and_approve_done|start_marks_execute_in_progress|complete_marks_execute_self_review_and_complete_done|cancel_marks_remaining_stages_skipped/)",
+      "done_when": "All 5 named tests pass; on-disk milestone JSON has flow_stages populated with the expected statuses",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-09",
+        "AC-19"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Add MilestoneCmd::Stage variant to crates/mp/src/cli/milestone.rs with subcommands List id and Set id stage status. Add handler in crates/mp/src/commands/milestone.rs. The Set handler enforces strict 12-key guard (only the canonical 12 stage slugs accepted) and 4-value enum guard (only pending done in_progress skipped accepted). Exit code 2 on invalid input; no on-disk mutation.",
+      "files": [
+        "crates/mp/src/cli/milestone.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/stage_list_prints_twelve_rows|stage_set_rejects_invalid_status|stage_set_rejects_unknown_stage_key/)",
+      "done_when": "stage_list_prints_twelve_rows and stage_set_rejects_invalid_status tests pass; cargo nextest exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Add bulk set-stage support to crates/mp/src/commands/milestone_bulk.rs. Resolves targets via --ids and --where. Auto-skips cancelled milestones (write is a no-op for those targets; per-id report lists them with reason cancelled). Exit code 0 if all non-cancelled targets succeeded; 2 on partial failure. Supports --dry-run.",
+      "files": [
+        "crates/mp/src/commands/milestone_bulk.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled|bulk_set_stage_dry_run/)'",
+      "done_when": "bulk_set_stage_skips_cancelled and bulk_set_stage_dry_run tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-18"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 7,
+      "action": "Add explicit_stage_set_survives_subsequent_lifecycle_transition test in crates/mp/tests/lifecycle_setter_overlay.rs. Set external-review explicitly to done via stage set; then run a lifecycle transition (Complete); assert external-review stays done while other stages advance normally. Also add unit tests in the model layer that exercise the override guard.",
+      "files": [
+        "crates/mp/tests/lifecycle_setter_overlay.rs",
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)",
+      "done_when": "explicit_stage_set_survives_subsequent_lifecycle_transition test passes; cargo nextest exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Add --milestone-id id flag to crates/mp/src/cli/note.rs (NoteCmd::Add) and crates/mp/src/commands/note.rs handler. Optional (backwards-compatible; default empty). When present, the note is associated with the milestone for the late-stage document auto-advance hook (WP4). When absent, the hook does not fire for that note. The flag is exposed in mp note add --help with a one-line description.",
+      "files": [
+        "crates/mp/src/cli/note.rs",
+        "crates/mp/src/commands/note.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test note_add --no-fail-fast -E test(/note_add_accepts_milestone_id|note_add_without_milestone_id_still_works/)",
+      "done_when": "note_add_accepts_milestone_id and note_add_without_milestone_id_still_works tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP4",
+      "order": 9,
+      "action": "Wire mp note add post-complete document done hook in crates/mp/src/commands/note.rs. When a note is added with --milestone-id pointing at a milestone whose current lifecycle is complete, flip that milestones flow_stages.document to done idempotently. When absent or lifecycle is not complete, the hook does not fire (no-op). Add unit test in crates/mp/tests/lifecycle_complete_ceremony.rs.",
+      "files": [
+        "crates/mp/src/commands/note.rs",
+        "crates/mp/tests/lifecycle_complete_ceremony.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E test(/note_add_after_complete_marks_document_done/)",
+      "done_when": "note_add_after_complete_marks_document_done test passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP4",
+      "order": 10,
+      "action": "Wire mp reviews finding resolve post-complete document done hook in crates/mp/src/commands/reviews.rs. When a finding is resolved on a milestone whose current lifecycle is complete, flip that milestones flow_stages.document to done idempotently. Add unit test in crates/mp/tests/lifecycle_complete_ceremony.rs.",
+      "files": [
+        "crates/mp/src/commands/reviews.rs",
+        "crates/mp/tests/lifecycle_complete_ceremony.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E test(/reviews_finding_resolve_after_complete_marks_document_done/)",
+      "done_when": "reviews_finding_resolve_after_complete_marks_document_done test passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP4",
+      "order": 11,
+      "action": "Verify hand-off stays explicit-only. Add negative tests in crates/mp/tests/lifecycle_setter_overlay.rs that assert hand-off stays pending after: (a) mp note add post-complete, (b) mp reviews finding resolve post-complete, (c) mp milestone archive. Also assert hand-off can be set explicitly via mp milestone stage set id hand-off done. Covers AC-11.",
+      "files": [
+        "crates/mp/tests/lifecycle_setter_overlay.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/hand_off_only_advances_via_explicit_set|no_event_auto_advances_hand_off/)",
+      "done_when": "hand_off_only_advances_via_explicit_set and no_event_auto_advances_hand_off tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP5",
+      "order": 12,
+      "action": "Include flow_stages in the JSON output of mp show milestone id in crates/mp/src/commands/show.rs. The field renders as the BTreeMap serialized to JSON (object keyed by stage slug, value is {status, at?}). Covers AC-01.",
+      "files": [
+        "crates/mp/src/commands/show.rs",
+        "crates/mp/tests/lifecycle_setter_overlay.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)'",
+      "done_when": "show_milestone_includes_flow_stages test passes; manual: mp show milestone id --fields milestone.flow_stages returns the 12-key map",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S13",
+      "work_package": "WP5",
+      "order": 13,
+      "action": "Project flow_stages in the mp list milestones payload in crates/mp/src/commands/list.rs. The list projector adds the flow_stages map alongside the existing fields per row. Update the projection helper to include it.",
+      "files": [
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/tests/list_projection_flags.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test list_projection_flags --no-fail-fast -E 'test(/list_milestones_projects_flow_stages/)'",
+      "done_when": "list_milestones_projects_flow_stages test passes; manual: mp list milestones --fields flow_stages returns the map per row",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S14",
+      "work_package": "WP6",
+      "order": 14,
+      "action": "Extend MilestoneSummary in crates/raul/src/tui/app.rs with flow_stages field (BTreeMap String String is enough for the list view; full struct stays for the detail projection). Update parse_milestone_summaries in crates/raul/src/tui/runner_helpers.rs to populate the field from the new payload column.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/parse_milestone_summaries_populates_flow_stages/)",
+      "done_when": "parse_milestone_summaries_populates_flow_stages test passes; MilestoneSummary carries flow_stages",
+      "status": "pending",
+      "covers_ac": [
+        "AC-13"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S15",
+      "work_package": "WP6",
+      "order": 15,
+      "action": "Add progress::stage_cell_line helper in crates/raul/src/tui/progress.rs. Computes the current mp-flow stage from flow_stages (first non-done, non-skipped stage in MP_FLOW_STAGE_KEYS canonical order; falls back to last done stage plus its label) and renders as N/12 plus Stage Label. Uses existing palette colors for the ordinal and label.",
+      "files": [
+        "crates/raul/src/tui/progress.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/stage_cell_line_renders_n_over_twelve_and_label/)",
+      "done_when": "stage_cell_line_renders_n_over_twelve_and_label test passes for all 13 reachable states (12 stages plus the after-hand-off sentinel)",
+      "status": "pending",
+      "covers_ac": [
+        "AC-13"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S16",
+      "work_package": "WP6",
+      "order": 16,
+      "action": "Replace the Gauge column with the Stage column in render_milestones_table in crates/raul/src/tui/render/lane_lists.rs. Drop the Lifecycle text column (Stage cell already carries position). Update column widths and the header row. Add the TUI snapshot tests that pin the new layout. Covers AC-13.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/stage_column_shows_n_over_twelve_and_label|gauge_column_is_gone|lifecycle_text_column_is_gone|selected_row_highlight_stays/)",
+      "done_when": "All 4 named tests pass; the Milestones list no longer renders the gauge column or the lifecycle text column",
+      "status": "pending",
+      "covers_ac": [
+        "AC-13"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S17",
+      "work_package": "WP7",
+      "order": 17,
+      "action": "Add Stages section to render_milestone_detail in crates/raul/src/tui/render/milestone_detail.rs between Meta and G14. New helper renders 12 rows in canonical mp-flow order with status icon plus label plus relative timestamp. Status icons: check for done, dot for in_progress, empty circle for pending, struck-through for skipped. Add TUI snapshot tests. Covers AC-14.",
+      "files": [
+        "crates/raul/src/tui/render/milestone_detail.rs",
+        "crates/raul/src/tui/progress.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/stages_section_renders_twelve_rows|stages_section_order_is_canonical|stages_section_sits_between_meta_and_g14|status_icons_match_enum|skipped_icon_for_cancelled_stages/)",
+      "done_when": "All 5 named tests pass; Stages section renders between Meta and G14",
+      "status": "pending",
+      "covers_ac": [
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S18",
+      "work_package": "WP7",
+      "order": 18,
+      "action": "Add overlay sub-line for cancelled, blocked, and remediation milestones. Under the current-stage row in the Stages section, render an indented sub-line reading lifecycle overlay plus state (cancelled, blocked, remediation). Sub-line only renders when the milestone has a non-empty lifecycle overlay. Add TUI snapshot tests. Covers AC-15.",
+      "files": [
+        "crates/raul/src/tui/render/milestone_detail.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/cancelled_overlay_subline_appears|blocked_overlay_subline_appears|remediation_overlay_subline_appears|no_overlay_no_subline/)",
+      "done_when": "All 4 named tests pass; sub-line only appears when an overlay is set",
+      "status": "pending",
+      "covers_ac": [
+        "AC-15"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S19",
+      "work_package": "WP7",
+      "order": 19,
+      "action": "Replace the lifecycle badge in the detail header line with the Stage cell (e.g. 5/12 plus Claim and execute). Use the same progress::stage_cell_line helper from S15. Effort plus Risk stays on the same line for layout continuity. Add TUI snapshot test pinning the new header.",
+      "files": [
+        "crates/raul/src/tui/render/milestone_detail.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/detail_header_shows_stage_cell_not_lifecycle_badge/)",
+      "done_when": "detail_header_shows_stage_cell_not_lifecycle_badge test passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-14"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S20",
+      "work_package": "WP8",
+      "order": 20,
+      "action": "Update render_lifecycle_grid_lines in crates/raul/src/tui/render/dashboard_view.rs to use the 12 mp-flow buckets in canonical order. Each bucket label includes its N/12 ordinal marker. Update the title to Lifecycle (current mp-flow stage) to disambiguate from the legacy 8-state lifecycle. Add TUI snapshot tests. Covers AC-16.",
+      "files": [
+        "crates/raul/src/tui/render/dashboard_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E test(/grid_renders_twelve_buckets|grid_order_is_canonical_mp_flow|bucket_labels_include_n_over_twelve|title_includes_mp_flow_disambiguation/)",
+      "done_when": "All 4 named tests pass; grid renders 12 buckets with ordinal markers and the new title",
+      "status": "pending",
+      "covers_ac": [
+        "AC-16"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S21",
+      "work_package": "WP9",
+      "order": 21,
+      "action": "Run the full verification matrix for M202: cargo fmt --all -- --check; cargo clippy -p mp --tests --no-deps -- -D warnings; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo nextest run -p mp --no-fail-fast; cargo nextest run -p raul --no-fail-fast; mp validate. Each AC verification command must exit 0. If any AC cannot honestly pass, file a finding and block the milestone with the reason.",
+      "files": [
+        "crates/mp",
+        "crates/raul",
+        "crates/mp-model"
+      ],
+      "tests": "make test",
+      "done_when": "All ACs have non-prose evidence; fmt + clippy + nextest + mp validate all exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-17"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4.1",
+      "work_package": "WP2",
+      "order": 22,
+      "action": "Wire mp reviews pass --verdict ok to set flow_stages.external-review (and re-review if remediate is already done) to done. This is not a MilestoneEvent — hook it in crates/mp/src/commands/reviews.rs next to the existing pass handler. Tests: reviews_pass_marks_external_review_done.",
+      "files": [
+        "crates/mp/src/commands/reviews.rs",
+        "crates/mp/tests/lifecycle_complete_ceremony.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/reviews_pass_marks_external_review_done/)'",
+      "done_when": "reviews pass flips external-review to done; hand-off stays pending",
+      "status": "pending",
+      "covers_ac": [
+        "AC-19"
+      ],
+      "depends_on_steps": [
+        "S3",
+        "S4"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

@@ -1,0 +1,508 @@
+{
+  "milestone": {
+    "id": "204",
+    "title": "raul unified filter modal + active-filter chips with sort/filter persistence",
+    "slug": "raul-unified-filter-modal-active-filter-chips-with-ui-sort-ui-filter-persistence",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "203"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-29",
+    "updated": "2026-08-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-30T21:56:13.118237+00:00"
+  },
+  "intent": {
+    "outcome": "Every list-style lane in raul (Milestones, Backlog, Ideas) shares a unified filter modal UX opened by `F` (or `g` for the Milestones grooming preset). Active filters render as a chip strip below the lane title, with click-to-remove. Filter and sort state persist in master-plan/config.json under the existing [ui] section; debounced auto-save keeps state fresh without operator intervention. After this lands, operators move between sessions and projects with consistent filter affordances and never lose their working view."
+  },
+  "problem": {
+    "description": "Today the three list-style lanes (Milestones, Backlog, Ideas) have inconsistent filter affordances. Only Milestones has a filter modal (lifecycle-only); Backlog and Ideas have no modal at all. Sort cycles differ (Milestones has Lifecycle + Updated; Backlog/Ideas have Status but no Created/Updated). Filter and sort choices are session-local — closing the TUI loses them. Ideas have a `tags` field on disk that is never filterable. There is no `>Nd since created` (stale) filter anywhere. After M203 adds `created` to BacklogItem, the data is there but no UI uses it. The filter/sort story feels half-built per tab; one unified framework covers all three."
+  },
+  "scope": {
+    "in_scope": [
+      "Reuse the existing top-level `sort` section from M182 (`sort.<lane>` via `mp config set sort.milestones <key>`). Do NOT invent `[ui].sort` — that would duplicate the live persistence path in `persist_sort_rebind_choice` / `load_persisted_sort_keys`. Cycle `o` currently does not persist (only the sort-rebind confirm menu does); this milestone adds debounced persist on CycleSortNext through the existing `sort.<lane>` keys.",
+      "Add a new top-level `filter` section on ProjectConfig (same shape as `sort`: `BTreeMap<String, …>` keyed by lane). `[ui]` stays for color/icons/theme/hide_done/show_watch_tab. Serde default empty so legacy config.json loads fine.",
+      "Debounced auto-save (~500ms after last change) writes `sort.<lane>` (on cycle `o`) and `filter.<lane>` via `mp config set` / `store::atomic_write`. Rapid filter toggles coalesce into a single disk write. Sort-rebind confirm keeps its existing immediate write.",
+      "Unified filter modal: `F` opens a single modal UX on all three lanes (same widget, same keybindings, same submit/cancel pattern). `g` opens the same modal with the Milestones grooming preset (approved + in-progress + groomed) pre-selected on the lifecycle dimension.",
+      "Per-tab filter dimensions: Milestones gets lifecycle (multi-select) + priority (multi-select) + age preset; Backlog gets priority + status + age + source prefix (B-, BL-, BF-, TW-); Ideas gets priority + status + age + tags (multi-select). All dimensions AND-combine.",
+      "Active-filter chips: sub-header strip below the lane title. Each chip displays the dimension and value (e.g. `priority: high`, `lifecycle: in-progress`, `age: >30d`, `tags: spec-grill`) with a `✕` to remove that single chip. `c` clears all. Empty filter set hides the strip entirely.",
+      "Age filter semantics: `>Nd since created`. Uses `BacklogItem.created` (M203), `IdeaEntry.created`, and `MilestoneMeta.created` (already on the model — not lifecycle_at). Three preset chips: `>7d`, `>30d`, `>90d`.",
+      "Sort/filter footer indicator: small line above the per-tab footer showing the active sort (`sort: priority ▼`) and the chip count when filters are active.",
+      "If M201 has shipped, update the schema descriptions for `keybinds.filter`, `keybinds.lifecycle_filter`, and `keybinds.grooming_preset` so they describe the unified modal (not the pre-M204 Milestones-only lifecycle filter).",
+      "Tests: unit (config serde round-trip for `filter`; existing `sort` tests still pass; filter AND-combine logic; age computation; debounce coalescing); TUI snapshot (chip strip with multiple chips; modal open + commit; empty state hides strip; `g` preset pre-selection; footer indicator; cycle `o` persists via `sort.<lane>`)."
+    ],
+    "out_of_scope": [
+      "Bulk operations (multi-select + bulk resolve / promote / archive) — not this milestone and not M206 (M206 is the Path tab rework). Park as a future idea if needed.",
+      "Cross-tab search (`Ctrl+/` searches all tabs at once) — separate milestone if needed.",
+      "Saved views (named filter combinations like `My high-pri backlog`) — separate milestone.",
+      "Tag surfacing in Ideas list rows (render tags as chips under the description preview, click to filter) — separate milestone if needed.",
+      "Sort cycle consistency across tabs — M205. This slice persists existing sort choices (and makes cycle `o` persist), does not unify the cycles themselves.",
+      "Moving M182 `sort.<lane>` under `[ui]` — out of scope; keep the live key path.",
+      "Age filter on `lifecycle_at` (stale-since-last-touch) — out of scope; age means created.",
+      "Per-axis keyboard shortcuts (e.g. `p` to toggle a quick priority filter) — operators use the modal.",
+      "Cross-project defaults — operator is the only user; per-project config is sufficient. No global file.",
+      "The `hide_done` toggle — already persisted in `[ui].hide_done`; stays as-is. The new modal handles finer-grained filtering on top."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ProjectConfig gains a top-level `filter` map (per-lane). The existing M182 `sort` map is unchanged. `[ui]` keys (color, icons, theme, hide_done, show_watch_tab) are untouched. Round-trip preserves sort + filter + ui.",
+      "verification": "cargo nextest run -p mp --test config_set --no-fail-fast -E 'test(/config_set_preserves_sort_and_filter|round_trip_filter_section|sort_section_unchanged/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Debounced save writes `sort.<lane>` (on cycle o) and `filter.<lane>` within 1 second of the last change. Rapid filter toggles coalesce into a single disk write. Sort-rebind confirm keeps its existing immediate write.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/debounced_save_writes_within_one_second|rapid_filter_toggles_coalesce_to_single_write/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Filter modal opens on `F` from Milestones, Backlog, and Ideas. Same modal widget, same keybindings (Space to toggle, ↑↓ to navigate, ⏎ to commit, Esc to cancel), same visual style. `g` opens the same modal on Milestones with the grooming preset pre-selected on the lifecycle dimension.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/filter_modal_opens_on_F_from_milestones|filter_modal_opens_on_F_from_backlog|filter_modal_opens_on_F_from_ideas|g_opens_modal_with_grooming_preset|modal_visual_style_is_consistent_across_lanes/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Per-tab filter dimensions match the spec: Milestones exposes lifecycle + priority + age; Backlog exposes priority + status + age + source prefix; Ideas exposes priority + status + age + tags. Each dimension is independent (toggleable in any combination).",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/milestones_modal_exposes_lifecycle_priority_age|backlog_modal_exposes_priority_status_age_source|ideas_modal_exposes_priority_status_age_tags/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Filter AND-combines: a row matches only if it satisfies every active dimension. The chip strip displays every active dimension with `✕` to remove that single chip. Removing a chip updates the visible set immediately.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/filters_and_combine|chip_strip_shows_every_active_dimension|chip_remove_updates_visible_set/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Age preset chips: >7d, >30d, >90d. All three lanes use the created field (BacklogItem.created, IdeaEntry.created, MilestoneMeta.created). Items older than the threshold are hidden. Multi-select: >7d + >30d = older than 30d (intersection).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/age_filter_uses_created_for_backlog|age_filter_uses_created_for_milestones|age_filter_uses_created_for_ideas|age_preset_intersection_uses_strictest/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Empty filter state hides the chip strip entirely (no row reserved). `c` clears all active filters in one action. After clearing, the visible set returns to unfiltered.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/empty_filter_hides_chip_strip|c_clears_all_active_filters/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Cycle o persists via existing sort.<lane> (M182 path) within 1s (debounce). Quitting and relaunching restores the sort. Unrecognized persisted values fall back to the per-lane default (already implemented in load_persisted_sort_keys).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|unknown_persisted_sort_falls_back_to_default/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "Footer indicator shows active sort as `sort: <key> ▼` and shows chip count when filters are active (`3 filters`). Hidden when no filters and default sort.",
+      "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/footer_shows_active_sort_with_arrow|footer_shows_filter_count_when_active|footer_hidden_when_default_sort_no_filters/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-11",
+      "description": "If M201 schema descriptions are present, keybinds.filter / keybinds.lifecycle_filter / keybinds.grooming_preset descriptions describe the unified filter modal (F on list lanes; g opens grooming preset on Milestones only), not the pre-M204 Milestones-only lifecycle filter.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_keybind_help|grooming_preset_help|lifecycle_filter_help/)'",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Storage location",
+      "choice": "Reuse M182 top-level `sort` map (`sort.<lane>`). Add a sibling top-level `filter` map (`filter.<lane>`). Do not put either under `[ui]`.",
+      "rationale": "sort.<lane> is already live: persist_sort_rebind_choice writes mp config set sort.<lane>, load_persisted_sort_keys reads it, and crates/mp/tests/suites/m182/s4_persistence.rs pins the contract. A new [ui].sort would fork persistence and break existing user configs. filter follows the same top-level pattern. [ui] stays visual knobs."
+    },
+    {
+      "area": "Write trigger",
+      "choice": "Debounced auto-save (~500ms after last change)",
+      "rationale": "Survives a TUI crash. Operators never have to remember to save. Coalesces rapid toggles into a single write."
+    },
+    {
+      "area": "Schema keys",
+      "choice": "[ui].sort.milestones | backlog | ideas for sort; [ui].filter.milestones | backlog | ideas for filters",
+      "rationale": "Two top-level keys under [ui], each a per-lane map. Matches the existing pattern of [ui].hide_done (single key) extended to per-lane."
+    },
+    {
+      "area": "Modal UX",
+      "choice": "Unified modal widget shared by all three lanes; same keybindings and visual style",
+      "rationale": "One mental model. Operators learn the modal once. Per-lane dimensions are data, not UI."
+    },
+    {
+      "area": "Grooming preset",
+      "choice": "Fold `g` into `F` modal as a pre-selection on the lifecycle dimension",
+      "rationale": "One key to remember. `g` becomes a shortcut that opens the modal with state pre-filled; operator can still tweak before committing."
+    },
+    {
+      "area": "Age field",
+      "choice": "created on all three lanes (BacklogItem.created after M203, IdeaEntry.created, MilestoneMeta.created). Not lifecycle_at.",
+      "rationale": "The filter is named >Nd since created. MilestoneMeta.created already exists. Using lifecycle_at would make age mean last-touch and collide with the Since column / Updated sort. Stale-since-last-touch can be a later filter."
+    },
+    {
+      "area": "Chip strip placement",
+      "choice": "Sub-header strip between lane title and table",
+      "rationale": "Always visible above the table; takes 1 row only when filters are active. Hidden when empty so the layout collapses cleanly."
+    },
+    {
+      "area": "AND vs OR combination",
+      "choice": "AND across dimensions; OR within a single dimension (e.g. `priority: high OR medium` is one chip)",
+      "rationale": "AND across dimensions matches how multi-axis filters normally work (e.g. `status=active AND priority=high`). OR within a dimension lets the operator express `priority in (high, urgent)` without listing every combination."
+    },
+    {
+      "area": "Sort persistence vs sort cycle unification",
+      "choice": "Persist existing sort choices; defer sort cycle unification to M205",
+      "rationale": "M204 is about persistence + filter UX. The sort cycles differ across tabs today; making them consistent is a separate scope (M205) that reuses the persistence framework introduced here."
+    },
+    {
+      "area": "Cross-project defaults",
+      "choice": "None — each project has its own [ui] section",
+      "rationale": "Operator is the sole user; copy/paste [ui] between projects when starting a new one. No global file, no merge logic, no surprises."
+    },
+    {
+      "area": "Age multi-select semantics",
+      "choice": "Intersection — strictest wins.  matches items older than 30d (the strictest of the two). Matches AC-06 verification; diverges from the OR-within-dimension rule (age is special).",
+      "rationale": "Age is monotonic — older than 30d implies older than 7d. Union is counter-intuitive (operators want to tighten, not loosen). One explicit exception to the OR rule."
+    },
+    {
+      "area": "g key on non-Milestones lanes",
+      "choice": "No-op on Backlog and Ideas. Only Milestones has a grooming preset to bind to. Footer per-tab line documents the constraint (g: grooming (Milestones only)).",
+      "rationale": "Backlog and Ideas don't have a concept of 'grooming preset' — that's a Milestone-spec concept. Adding presets per lane would expand scope; defer to a follow-up milestone if needed."
+    },
+    {
+      "area": "Legacy milestone_filter migration",
+      "choice": "Drop the in-memory app.milestone_filter (BTreeSet String) once the new modal is in place. The new modal reads directly from ui.filter.milestones.lifecycle via the persistence framework. On TUI launch with no persisted filter, the modal opens empty (no migration of in-memory state).",
+      "rationale": "The legacy milestone_filter was session-local and not persisted. M204 introduces persistence — the legacy field becomes redundant. Single source of truth via the new framework."
+    },
+    {
+      "area": "Cycle o persistence",
+      "choice": "Debounce CycleSortNext onto the existing sort.<lane> write path. Sort-rebind confirm stays immediate (already implemented).",
+      "rationale": "Today o only mutates in-memory lane_sort_key; only the rebind menu confirm persists. That is the actual gap. Debounce avoids a write per o tap while cycling."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "When the persisted [ui].sort.<lane> holds an unrecognized value (forward-compat from a future milestone that added a new SortKey), does raul silently fall back to the built-in default, or surface a one-time warning?",
+      "status": "resolved",
+      "answer": "Silent fallback to the built-in default (per-lane Id). No warning, no flash. Matches M202/M205 forward-compat pattern; AC-08 already covers this case in its verification."
+    },
+    {
+      "id": "Q-02",
+      "question": "For the source-prefix filter on Backlog, do we expose each prefix as a separate toggle (B- / BL- / BF- / TW- = 4 chips in the modal) or a single multi-select dimension?",
+      "status": "resolved",
+      "answer": "Single multi-select dimension source with values B-, BL-, BF-, TW-. One chip in the modal; operator picks any combination inside. Simpler than four separate toggles."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Persistence framework + config schema",
+      "goal": "Add ProjectConfig.filter (top-level, matching M182 sort). Debounced auto-save for cycle o (sort.<lane>) and filter changes. Do not invent [ui].sort. Drop the legacy in-memory app.milestone_filter once the new modal owns filter state. Covers AC-01, AC-02, AC-08.",
+      "rollback": "Revert ProjectConfig schema changes. Revert debounced save mechanism. Re-add app.milestone_filter as the active lifecycle filter; new modal doesn't write persistence. Legacy milestones load without filter state."
+    },
+    {
+      "id": "WP2",
+      "name": "Unified filter modal + active-filter chips",
+      "goal": "Build the unified filter modal widget (shared by Milestones, Backlog, Ideas). Wire per-tab dimensions: Milestones gets lifecycle + priority + age; Backlog gets priority + status + age + source; Ideas gets priority + status + age + tags. AND-combine across dimensions; OR within a single dimension (age multi-select is intersection special case). Build the active-filter chip strip below the lane title with click-to-remove via x icon; c clears all. Wire the g key on Milestones to open the modal with the grooming preset pre-selected; no-op on Backlog/Ideas. Covers AC-03, AC-04, AC-05, AC-06, AC-07.",
+      "rollback": "Revert the modal widget. Revert the chip strip. Revert the g key wiring. The legacy lifecycle filter modal on Milestones stays as-is; Backlog/Ideas revert to no modal."
+    },
+    {
+      "id": "WP3",
+      "name": "Footer indicator + final verification",
+      "goal": "Add the sort/filter footer indicator above the per-tab footer: shows active sort key as sort: <key> v and chip count when filters are active. Hidden when no filters and default sort. Run the full verification matrix: cargo fmt + clippy + nextest + mp validate. Covers AC-09, AC-10.",
+      "rollback": "Revert footer indicator. The visual state reverts to no sort/filter indicator. Other WP functionality remains."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add a top-level filter field to ProjectConfig (BTreeMap per lane, serde default empty). Do not add ui.sort or ui.filter — sort already exists as ProjectConfig.sort (M182). Test that config set preserves existing sort keys and round-trips the new filter map.",
+      "files": [
+        "crates/mp/src/config.rs",
+        "crates/mp/tests/config_set.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test config_set --no-fail-fast -E 'test(/config_set_preserves_sort_and_filter|round_trip_filter_section|sort_section_unchanged/)'",
+      "done_when": "ProjectConfig.filter round-trips; ProjectConfig.sort unchanged; ui keys preserved",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Add debounced save for CycleSortNext and filter changes (~500ms coalesce) writing through mp config set sort.<lane> / filter.<lane>. Sort-rebind confirm keeps its existing immediate persist_sort_rebind_choice path. Test coalescing: 100 rapid filter toggles → 1 disk write.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/debounced_save_writes_within_one_second|rapid_filter_toggles_coalesce_to_single_write/)",
+      "done_when": "debounced_save_writes_within_one_second and rapid_filter_toggles_coalesce_to_single_write tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Drop the legacy in-memory app.milestone_filter field. The new filter modal reads from the loaded filter-by-lane struct (ProjectConfig.filter). Update any caller that referenced milestone_filter. Test that loading a config without filter renders empty chips on startup.",
+      "files": [
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/legacy_milestone_filter_field_dropped|no_milestone_filter_field_in_app_struct/)",
+      "done_when": "milestone_filter no longer exists in App; named tests pass; TUI launches with no filter by default",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Wire F key to open the modal on all three lanes (Milestones, Backlog, Ideas). Per-lane dimensions: Milestones gets lifecycle (multi-select), priority (multi-select), age preset chips (with intersection semantics); Backlog gets priority, status, age, source (multi-select per dimension); Ideas gets priority, status, age, tags. Wire c to clear all filters when pressed on a list lane.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filter_modal_opens_on_F_from_milestones|filter_modal_opens_on_F_from_backlog|filter_modal_opens_on_F_from_ideas|milestones_modal_exposes_lifecycle_priority_age|backlog_modal_exposes_priority_status_age_source|ideas_modal_exposes_priority_status_age_tags|c_clears_all_active_filters/)",
+      "done_when": "All 7 named tests pass; F opens modal on each lane with the right dimensions; c clears all",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-04",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Build the active-filter chip strip below the lane title (in render_milestones_table and render_backlog_list). Each chip displays the dimension and value (e.g. priority: high) with an x mark to remove that single chip. Click on the x removes the filter. Empty filter set hides the strip. AND-combine across dimensions in visible_milestones/visible_backlog.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filters_and_combine|chip_strip_shows_every_active_dimension|chip_remove_updates_visible_set|empty_filter_hides_chip_strip/)",
+      "done_when": "All 4 named tests pass; chip strip renders; AND-combine works; chip remove updates visible set; empty hides strip",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05",
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Build the unified filter modal widget in crates/raul/src/tui/modes/filter_modal.rs (new file). Single widget reused across all three lanes. Same keybindings (Space toggles value; up/down navigates; Enter commits; Esc cancels). Per-tab dimensions are data, not UI: the widget accepts a DimensionSpec (list of named dimensions with their values).",
+      "files": [
+        "crates/raul/src/tui/modes/filter_modal.rs",
+        "crates/raul/src/tui/mode.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filter_modal_widget_handles_dimension_spec|modal_visual_style_consistent_across_lanes/)",
+      "done_when": "Filter modal widget compiles; accepts a DimensionSpec; named tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Wire age filter with three preset chips (>7d, >30d, >90d) using the created field on all three lanes (BacklogItem.created, IdeaEntry.created, MilestoneMeta.created). Intersection semantics when multiple age chips are selected. Tests live in raul, not in mp lifecycle_setter_overlay.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/tests/tui_lifecycle_filter_modal.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/age_filter_uses_created_for_backlog|age_filter_uses_created_for_milestones|age_filter_uses_created_for_ideas|age_preset_intersection_uses_strictest/)'",
+      "done_when": "All 3 named tests pass; age filter chips work with intersection semantics",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S9",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Add footer indicator above the per-tab footer line: shows active sort key as sort: <key> v and shows chip count when filters are active (3 filters). Hidden when no filters and default sort. Wire into chrome.rs (or wherever the per-tab footer renders). Test footer_shows_active_sort_with_arrow, footer_shows_filter_count_when_active, footer_hidden_when_default_sort_no_filters all pass.",
+      "files": [
+        "crates/raul/src/tui/render/chrome.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/footer_shows_active_sort_with_arrow|footer_shows_filter_count_when_active|footer_hidden_when_default_sort_no_filters/)",
+      "done_when": "All 3 named tests pass; footer shows active sort + chip count; hides when default",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S10",
+      "work_package": "WP3",
+      "order": 9,
+      "action": "Run the full verification matrix for M204: cargo fmt --all -- --check; cargo clippy -p mp --tests --no-deps -- -D warnings; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo nextest run -p mp --no-fail-fast; cargo nextest run -p raul --no-fail-fast; mp validate. Each AC verification command must exit 0 with non-prose evidence.",
+      "files": [
+        "crates/mp",
+        "crates/raul",
+        "crates/mp-model"
+      ],
+      "tests": "make test",
+      "done_when": "All ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP2",
+      "order": 10,
+      "action": "Wire the g key on Milestones: opens the modal with the lifecycle dimension pre-selected to the grooming preset (approved + in-progress + groomed). On Backlog and Ideas, g is a no-op (the per-tab footer documents the constraint). Test g_opens_modal_with_grooming_preset passes on Milestones; g is unbound on Backlog/Ideas.",
+      "files": [
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/g_opens_modal_with_grooming_preset|g_noop_on_backlog|g_noop_on_ideas/)",
+      "done_when": "All 3 named tests pass; g opens modal with preset on Milestones; g is unbound on Backlog/Ideas",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S11",
+      "work_package": "WP3",
+      "order": 11,
+      "action": "Wire CycleSortNext to the debounced sort.<lane> save. On TUI launch, load_persisted_sort_keys already restores sort.<lane> (M182) — do not add a second loader. Unknown persisted values already fall back. Tests: cycle o twice then read sort.milestones; relaunch restores; writing an unknown key falls back.",
+      "files": [
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|unknown_persisted_sort_falls_back_to_default/)",
+      "done_when": "All 3 named tests pass; sort cycle persists; restart restores; unknown falls back silently",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S12",
+      "work_package": "WP2",
+      "order": 12,
+      "action": "If crates/mp/src/config_docs.rs exists (M201 shipped), update the descriptions for keybinds.filter, keybinds.lifecycle_filter, and keybinds.grooming_preset to the unified modal. If the file does not exist yet, update crates/raul/src/tui/modes/settings/help.rs (or the equivalent help strings) so the Settings lane does not still say lifecycle-filter-on-Milestones-only.",
+      "files": [
+        "crates/mp/src/config_docs.rs",
+        "crates/raul/src/tui/modes/settings/help.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_keybind_help|grooming_preset_help|lifecycle_filter_help/)'",
+      "done_when": "Filter keybind help describes F on list lanes and g as grooming preset on Milestones only",
+      "status": "pending",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

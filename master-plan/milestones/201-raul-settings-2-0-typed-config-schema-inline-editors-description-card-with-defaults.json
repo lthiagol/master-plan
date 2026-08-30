@@ -19,7 +19,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-28",
-    "updated": "2026-08-28",
+    "updated": "2026-08-30",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -59,57 +59,57 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "`mp config schema` emits a JSON document with a top-level `$schema_version: 1` field and a `keys` array of 46 entries, one per recognized config key, sorted by key. Each entry has {key, type, default, allowed?, description}. `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is present only for `choice` entries. `description` is the user-facing one-liner from the planning session sign-off (no internal `crates/...` pointers, no milestone IDs, no lesson codes). The JSON is deterministic across runs. Forward-compat contract: additive changes bump the minor version (e.g. `1.1`); breaking changes (renamed fields, removed types) bump the major (e.g. `2.0`).",
-      "verification": "new CLI scenario: `mp config schema` against an empty project config, golden-compare stdout to `tests/fixtures/golden/mp-config-schema.{stdout,exit}.txt`; `make test-scenarios`",
+      "description": "`mp config schema` emits JSON with top-level `$schema_version: \"1.0\"` (semver string) and a `keys` array of 45 entries (one per SETTINGS_KEYS row after focus_content is removed by M200), sorted by key. Each entry has {key, type, default, allowed?, description}. `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is present only for `choice`. Descriptions are user-facing (no crates/ paths, no milestone IDs, no lesson codes). JSON is deterministic. Additive changes bump minor; breaking changes bump major.",
+      "verification": "make test-scenarios",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "The Settings lane renders the new layout: bordered list at the top (with section headers and a REVERSED cursor on the focused key), framed description card UNDER the list with the key name in the title and a BOLD-label `Type / Default / Value / Description` body. Replaces the current 3-row un-bordered prose block. No centered modal in the default state.",
-      "verification": "new TUI snapshot test in `crates/raul/tests/` — render the Settings lane with `app.settings` populated, assert the framed-list + framed-description-card layout at 80×24, 120×40, and 200×60. Template: the `m169_rev.rs` snapshot pattern.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_layout|settings_snapshot/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "Each type's inline editor works without opening a modal:\n  - `bool` (e.g. `git.auto_commit`): Space toggles in place; no editor; the value cell flips immediately.\n  - `choice` (e.g. `ui.theme`): ← / → cycles through `allowed`; the value cell renders `‹ current ›` while cycling; no editor.\n  - `string` / `path` / `integer`: Enter drops the value cell into a caret-edit state; Backspace deletes; Enter commits; Esc reverts.\n  - `keybind` (e.g. `keybinds.refresh`): typed-string with `KeyCombo::parse` validation; Enter commits valid combos; invalid combos show an error in the description card area, Enter retries, Esc reverts.",
-      "verification": "new TUI unit tests in `crates/raul/src/tui/modes/settings.rs::tests` (or a new `crates/raul/src/tui/modes/settings/editor.rs`) — one test per type covering toggle/cycle/caret-edit/commit/revert/retry paths. `cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor|settings_inline/)'`",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor|settings_inline/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "The 46 per-key descriptions baked into the schema are user-facing. No `crates/...` references, no internal milestone IDs (M\\d+), no lesson codes (L\\d+), no repo-internal doc pointers. Consumer-surface lint (`make consumer-surface-lint`) is clean.",
-      "verification": "`make consumer-surface-lint` (CI gate) and a manual spot-check of the 46 descriptions for any internal pointer",
+      "description": "The 45 per-key descriptions baked into the schema are user-facing. No crates/ references, no internal milestone IDs, no lesson codes, no repo-internal doc pointers. Consumer-surface lint is clean.",
+      "verification": "make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Defaults in the description card come from the typed `Default` impls in `crates/mp/src/config.rs` and `crates/raul/src/tui/keybinds.rs::Keybinds::default()`. A change to a typed default (e.g. flipping `Keybinds::default().refresh` from `Ctrl-R` to `F5` in a test) shows up in the `mp config schema` output and in the rendered description card on the next lane open. No echo of defaults in the prose.",
-      "verification": "unit test that mutates a typed default, re-runs `mp config schema`, asserts the change. `cargo nextest run -p mp --no-fail-fast -E 'test(/config_schema/)'`",
+      "description": "Schema `default` values come from ProjectConfig::default() (non-keybind) and a KEYBIND_DEFAULTS table duplicated in mp (mp must not depend on raul). A unit test asserts the schema defaults match those tables. No echo of defaults in the prose.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_schema/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "Existing `mp config get / set / unset` behavior is unchanged. The new `mp config schema` subcommand is additive — no existing CLI subcommand's output, exit code, or behavior changes. Existing config tests pass.",
-      "verification": "`cargo nextest run -p mp --no-fail-fast -E 'test(/config_get|config_set|config_unset|config_validate|config_keys|config_ui_keys/)'` and a regression run of the existing `mp config show` golden",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_get|config_set|config_unset|config_validate|config_keys|config_ui_keys/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
-      "description": "All existing Settings tests pass: `m169_rev`, `tui_settings_automation`, `m168_settings_grouped`, `m198_watch_tab`, the new `m200_keybind_deconflict` tests. `cargo clippy -p mp --tests --no-deps -- -D warnings` and `cargo clippy -p raul --tests --no-deps -- -D warnings` clean. `cargo fmt --all -- --check` clean. The legacy `crates/raul/src/tui/modes/settings/help.rs` is no longer read by the renderer (or is replaced by a thin re-export from the schema doc).",
-      "verification": "`cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|m169_rev|m168_settings|m198_watch|m200_keybind/)'` && `cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|config_ui_keys|config_schema/)'` && `cargo clippy -p mp --tests --no-deps -- -D warnings` && `cargo clippy -p raul --tests --no-deps -- -D warnings` && `cargo fmt --all -- --check`",
+      "description": "Existing Settings tests pass: m169_rev, tui_settings_automation, m168_settings_grouped, the M200 deconflict tests. clippy -p mp and -p raul clean; cargo fmt --check clean. help.rs is no longer read by the renderer (deleted or thin re-export).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_settings|m169_rev|m168_settings|keybind_deconflict|defaults_are_disjoint/)' && cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|config_ui_keys|config_schema/)' && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-08",
-      "description": "When the installed `mp` is older than the version that ships `mp config schema`, the Settings 2.0 lane shows a clear, actionable error: \"Settings 2.0 requires mp 0.X.Y or later; run `mp --version` to check.\" The error replaces the framed list + framed description card layout (no half-rendered state). The lane is otherwise non-functional until mp is upgraded.",
-      "verification": "a TUI test that constructs an App with a mocked MpRunner that returns \"unknown subcommand\" for `mp config schema`; render the Settings lane; assert the error message is displayed in place of the framed list",
+      "description": "When `mp config schema` is unavailable (older mp, unknown subcommand), the Settings lane shows a clear error: the schema command is missing and the operator should upgrade mp (include `mp --version` in the hint). The error replaces the framed list — no half-rendered state.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_version_check|settings_minimum_mp|schema_unavailable/)'",
       "status": "pending",
       "evidence": ""
     }
@@ -132,8 +132,8 @@
     },
     {
       "area": "Defaults source of truth",
-      "choice": "Typed `Default` impls in `crates/mp/src/config.rs` (for non-keybind) and `crates/raul/src/tui/keybinds.rs::Keybinds::default()` (for keybinds). No echo of defaults in the prose.",
-      "rationale": "Single source of truth. A change to the typed default shows up in the schema output automatically. Avoids the drift we just deconflicted in M200."
+      "choice": "Typed Default impls in crates/mp/src/config.rs for non-keybind keys. Keybind defaults live in a KEYBIND_DEFAULTS table in crates/mp/src/config_docs.rs, duplicated from raul Keybinds::default() (mp must not depend on raul — same pattern as KEYBIND_ACTIONS). A unit test pins the two tables stay in lockstep. No echo of defaults in the prose.",
+      "rationale": "crates/mp/src/config.rs already documents that mp cannot depend on raul (UI_THEMES / KEYBIND_ACTIONS are duplicated deliberately). Wiring Keybinds::default() into mp config schema would add a forbidden crate edge. Duplicating the default chords next to the descriptions keeps a single compile unit and a lockstep test."
     },
     {
       "area": "Where the 46 descriptions live in source",
@@ -157,13 +157,18 @@
     },
     {
       "area": "Minimum mp version for Settings 2.0",
-      "choice": "The Settings 2.0 lane requires mp >= 0.X.Y (the version that ships `mp config schema`). If the installed `mp` is older, the lane shows a clear error: \"Settings 2.0 requires mp 0.X.Y or later; run `mp --version` to check.\" The lane does not attempt to render the legacy settings surface on older mp — the reworked renderer depends on the schema.",
-      "rationale": "raul reads `mp config schema` on lane open. If the subcommand does not exist, the lane cannot render. A fallback to the pre-M201 surface is more code than the upgrade coupling warrants (raul already depends on recent mp for `mp config get` / `set` / `show` semantics). The error message is the user-facing path; the version floor is documented in the design decision and in the Settings lane release note."
+      "choice": "Detect the missing subcommand (`unknown subcommand` / non-zero from `mp config schema`). Show an error that names `mp config schema` and tells the operator to upgrade mp, including `mp --version` in the hint. Do not hard-code a version number like 0.X.Y in the shipped string.",
+      "rationale": "A placeholder version in the AC would ship literally. Capability detection (does the subcommand exist?) is more honest than a version floor the runner cannot know at spec time."
     },
     {
       "area": "Schema output versioning",
       "choice": "The schema output includes a top-level `$schema_version: \"1.0\"` (semver string) field. Additive changes (new optional fields, new types, new keys) bump minor; breaking changes (renamed fields, removed fields, changed semantics) bump major. Consumers (raul, future tooling) can use the version to negotiate capability without re-reading the schema on every release.",
       "rationale": "The schema is now a stable contract — raul parses it on lane open, and any future agent / IDE consumer will too. Without a version field, every change is a silent breaking change for any strict consumer. The semver discipline matches the rest of the projects interfaces (the `mp` CLI uses semver, the JSON config format is a separate compat contract)."
+    },
+    {
+      "area": "KEY_DESCRIPTIONS row count",
+      "choice": "45 keys. Omit keybinds.focus_content even if the drafting JSON in in_scope still lists it (that blob was captured before M200 dropped the config surface).",
+      "rationale": "M200 removes focus_content from SETTINGS_KEYS and KEYBIND_ACTIONS. Baking it into the schema would resurrect a key the deconflict just deleted."
     }
   ],
   "open_questions": [
@@ -201,8 +206,8 @@
   "work_packages": [
     {
       "id": "WP1",
-      "name": "mp config schema subcommand + 46-key docs file",
-      "goal": "New 'mp config schema' subcommand that emits a deterministic JSON document with one entry per recognized config key (46 keys across ui, workflow, git, next, agent, keybinds). Each entry: {key, type, default, allowed?, description}. New file 'crates/mp/src/config_docs.rs' carries the 46 per-key entries baked from the M201 spec. Typed Default impls are the runtime source for 'default'; the docs file is the prose source for 'description'. Merge at emit time, typed wins on conflict.",
+      "name": "mp config schema subcommand + 45-key docs file",
+      "goal": "New mp config schema subcommand that emits deterministic JSON with one entry per recognized config key (45 keys after M200 dropped focus_content). Each entry: {key, type, default, allowed?, description}. New file crates/mp/src/config_docs.rs carries KEY_DESCRIPTIONS plus KEYBIND_DEFAULTS (duplicated from raul; mp must not depend on raul). Typed ProjectConfig::default() wins for non-keybind defaults; KEYBIND_DEFAULTS wins for keybinds.",
       "rollback": ""
     },
     {
@@ -235,7 +240,7 @@
         "crates/mp/src/config_cmd.rs",
         "crates/mp/src/cli/config_cmd.rs"
       ],
-      "tests": "cargo build -p mp && mp config schema --help exits 0",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_schema_help|config_schema_subcommand/)'",
       "done_when": "`mp config schema --help` lists the new subcommand; the subcommand is wired into the clap surface; no other behavior change",
       "status": "pending",
       "covers_ac": [
@@ -251,12 +256,12 @@
       "id": "S2",
       "work_package": "WP1",
       "order": 2,
-      "action": "Create `crates/mp/src/config_docs.rs` with the 46 per-key entries baked from the M201 spec. Each entry: {key, type, default, allowed?, description}. The full table is encoded at the end of the M201 scope.in_scope bullet (delimiter-wrapped `<<<KEY_DESCRIPTIONS_JSON>>>...<<<END_KEY_DESCRIPTIONS_JSON>>>` block) — extract the JSON array and bake it into a `pub const KEY_DESCRIPTIONS: &[(...)].` The `description` strings are user-facing prose; the `default` field is a fallback (typed impl wins at merge time).",
+      "action": "Create crates/mp/src/config_docs.rs with 45 per-key entries (SETTINGS_KEYS after M200 dropped focus_content). Each entry: {key, type, default, allowed?, description}. Omit keybinds.focus_content. Descriptions are user-facing prose; default is a fallback (typed ProjectConfig::default() and KEYBIND_DEFAULTS win at merge). Include a KEYBIND_DEFAULTS table duplicating raul Keybinds::default() chords — mp must not depend on raul.",
       "files": [
         "crates/mp/src/config_docs.rs"
       ],
-      "tests": "cargo build -p mp && a unit test that asserts `KEY_DESCRIPTIONS.len() == 46` and every entry has a non-empty `description`",
-      "done_when": "`KEY_DESCRIPTIONS` has 46 entries; all 46 `description` strings are non-empty and free of `crates/...` references, internal milestone IDs, and lesson codes",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_docs|key_descriptions_len|config_schema/)'",
+      "done_when": "KEY_DESCRIPTIONS has 45 entries; no focus_content; every description is non-empty and free of crates/ paths, milestone IDs, and lesson codes",
       "status": "pending",
       "covers_ac": [
         "AC-01",
@@ -272,14 +277,14 @@
       "id": "S3",
       "work_package": "WP1",
       "order": 3,
-      "action": "Wire the typed `Default` impls into the schema emit. In `mp config schema`, for each key in `KEY_DESCRIPTIONS`, override the `default` field with the typed default from `crates/mp/src/config.rs` (for non-keybind keys) and `crates/raul/src/tui/keybinds.rs::Keybinds::default()` (for keybinds). The typed default is authoritative — the docs file is a fallback. Sort entries by `(section, key)` for determinism. Stable JSON key ordering within each entry (BTreeMap or sorted serializer).",
+      "action": "Wire typed defaults into mp config schema without depending on raul. For each KEY_DESCRIPTIONS key, override default from ProjectConfig::default() (non-keybind) or KEYBIND_DEFAULTS (keybinds). Typed/table default is authoritative. Sort entries by (section, key). Stable JSON key ordering. A unit test asserts schema defaults match the tables — do not try to mutate a Default impl at runtime.",
       "files": [
         "crates/mp/src/commands/config.rs",
         "crates/mp/src/config.rs",
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/mp/src/config_docs.rs"
       ],
-      "tests": "a unit test that flips a typed default in a controlled fixture, re-runs `mp config schema`, asserts the change shows up in the output",
-      "done_when": "`mp config schema` output reflects the live typed defaults; deterministic ordering; a change to a typed default appears in the next schema emit",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_schema/)'",
+      "done_when": "mp config schema reflects live typed/table defaults; deterministic ordering; mp does not depend on raul",
       "status": "pending",
       "covers_ac": [
         "AC-01",
@@ -300,7 +305,7 @@
         "crates/raul/src/tui/mode.rs",
         "crates/raul/src/tui/modes/settings.rs"
       ],
-      "tests": "cargo build -p raul && a unit test that constructs a SettingsState, populates the schema, and reads back entries",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_schema|settings_state_caches_schema/)'",
       "done_when": "SettingsSchema is a typed struct; SettingsState has a cached schema field; no per-redraw fetch",
       "status": "pending",
       "covers_ac": [
@@ -321,7 +326,7 @@
       "files": [
         "crates/raul/src/tui/render/overlays.rs"
       ],
-      "tests": "a TUI snapshot test renders the lane at 80x24, 120x40, 200x60 and asserts the framed-list + framed-description-card layout",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_layout|settings_snapshot/)'",
       "done_when": "Both blocks render with the same bordered vocabulary as the milestone list; the description card rewrites as the cursor moves; no centered modal in the default state",
       "status": "pending",
       "covers_ac": [
@@ -341,7 +346,7 @@
       "files": [
         "crates/raul/src/tui/modes/settings.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_bool|settings_inline_bool/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor_bool|settings_inline_bool/)'",
       "done_when": "Bool keys toggle in place on Space; the change is staged; the value cell updates visually",
       "status": "pending",
       "covers_ac": [
@@ -361,7 +366,7 @@
       "files": [
         "crates/raul/src/tui/modes/settings.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_choice|settings_inline_choice/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor_choice|settings_inline_choice/)'",
       "done_when": "Choice keys cycle on Left/Right; the value cell shows the current option; the change is staged",
       "status": "pending",
       "covers_ac": [
@@ -381,7 +386,7 @@
       "files": [
         "crates/raul/src/tui/modes/settings.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_string|settings_editor_path|settings_editor_integer|settings_inline_(string|path|integer)/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor_string|settings_editor_path|settings_editor_integer|settings_inline_(string|path|integer)/)'",
       "done_when": "String/Path/Integer keys edit in-row; integer validates on commit; invalid values show in the description card hint",
       "status": "pending",
       "covers_ac": [
@@ -402,7 +407,7 @@
         "crates/raul/src/tui/modes/settings.rs",
         "crates/raul/src/tui/key_combo.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor_keybind|settings_inline_keybind|key_combo_parse/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor_keybind|settings_inline_keybind|key_combo_parse/)'",
       "done_when": "Keybind keys edit in-row; valid combos commit; invalid combos show the parse error; the typed-string editor handles every `KeyCombo::parse` case",
       "status": "pending",
       "covers_ac": [
@@ -423,7 +428,7 @@
         "crates/raul/tests/",
         "tests/snapshots/"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_layout|settings_snapshot/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_layout|settings_snapshot/)'",
       "done_when": "Three snapshots committed; the test passes against the new layout",
       "status": "pending",
       "covers_ac": [
@@ -444,7 +449,7 @@
       "files": [
         "crates/raul/src/tui/modes/settings.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E `test(/settings_editor|settings_inline/)`",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_editor|settings_inline/)'",
       "done_when": "All per-type editor tests pass; the state machine transitions are covered",
       "status": "pending",
       "covers_ac": [
@@ -461,7 +466,7 @@
       "id": "S12",
       "work_package": "WP4",
       "order": 12,
-      "action": "Add a golden fixture under `tests/fixtures/golden/mp-config-schema.{stdout,exit}.txt` showing the `mp config schema` output for an empty project config. Add a CLI scenario under `tests/scenarios/` that runs `mp config schema` against the empty fixture and golden-asserts both stdout and exit code. Add a second scenario that runs `mp config schema` against a fixture with all 46 keys set, golden-asserts the output, and asserts the description for `keybinds.refresh` contains `Ctrl-R` (the M200 default).",
+      "action": "Add a golden fixture under tests/fixtures/golden/mp-config-schema.{stdout,exit}.txt showing mp config schema for an empty project config (45 keys, no focus_content, $schema_version 1.0). Add a CLI scenario under tests/scenarios/ that golden-asserts stdout and exit code. Assert keybinds.refresh default is Ctrl-R.",
       "files": [
         "tests/fixtures/golden/",
         "tests/scenarios/"
@@ -548,11 +553,11 @@
       "id": "S16",
       "work_package": "WP4",
       "order": 16,
-      "action": "Add a TUI test for the version-check error path. Construct an App with a mocked MpRunner that returns \"unknown subcommand\" (or equivalent) for `mp config schema`; render the Settings lane; assert the version-check error message is displayed in place of the framed list. The mocked MpRunner pattern already exists in `crates/raul/tests/` (see the M169 review-reload tests).",
+      "action": "Add a TUI test for the schema-unavailable path. Construct an App with a mocked MpRunner that returns unknown subcommand for mp config schema; render the Settings lane; assert an error naming mp config schema (and hinting mp --version) replaces the framed list. No hard-coded 0.X.Y version string.",
       "files": [
         "crates/raul/tests/"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E \"test(/settings_version_check|settings_minimum_mp/)\"",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_version_check|settings_minimum_mp|schema_unavailable/)'",
       "done_when": "The TUI test passes; the error message text matches the AC; no half-rendered state when the schema command is unavailable",
       "status": "pending",
       "covers_ac": [

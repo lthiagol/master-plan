@@ -1,0 +1,387 @@
+{
+  "milestone": {
+    "id": "206",
+    "title": "raul Path tab rework — 2-line description preview + stage chip + status overlay",
+    "slug": "raul-path-tab-rework-2-line-description-preview-stage-chip-status-overlay",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "202"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-29",
+    "updated": "2026-08-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-30T21:57:48.016352+00:00"
+  },
+  "intent": {
+    "outcome": "Every milestone in the raul Path tab renders as 2 visual lines: a title line carrying the id, title, current mp-flow stage chip (`[N/12]` from M202's flow_stages), priority glyph, age, and (when set) a status overlay chip for blocked / cancelled / deferred; plus a preview line carrying the first line of `intent.outcome` truncated to ~80 chars with a `↳` prefix. The tree structure (trunk + branches + blocked fork) is preserved. Operators scanning the Path tree see what each milestone is about without opening detail."
+  },
+  "problem": {
+    "description": "Today's Path tab renderer (`crates/raul/src/tui/path_view.rs`) renders each milestone as a single line carrying only id + title + a short `detail` token (e.g. step id). After M202 introduced the per-milestone `flow_stages` map and M203 introduced the 2nd-line description preview pattern for Backlog/Ideas, the Path tab is the odd one out: it shows none of the new signals. Operators get the tree shape (which is genuinely useful) but no hint of what each milestone is about, what stage it's in, or whether it's blocked / cancelled / deferred beyond the implicit 'this is on the blocked branch' signal. The Path tab feels under-enriched relative to the Milestones / Backlog / Ideas tabs that landed M202 and M203."
+  },
+  "scope": {
+    "in_scope": [
+      "Update `trunk_item_line` and `flat_branch_lines` in `crates/raul/src/tui/path_view.rs` to emit 2 visual lines per milestone. Title line carries: id, title, stage chip `[N/12]` (from `flow_stages`, same computation as M202's Stage cell), priority glyph (urgent / high / normal / low), age (relative time via `humanize::humanize_relative` against created or updated), and the existing `◀ next` indicator on the first execution item. Preview line carries the first line of `intent.outcome` truncated to ~80 chars with a `↳` prefix in dim color.",
+      "Update `blocked_lines` to render 2 lines per blocked milestone too. The existing `blocker: M<n>` annotation on the title line stays; the preview line carries `intent.outcome` first line.",
+      "Status overlay chip on the title line: when the milestone has `blocked: true`, render a `⚠ blocked` chip; for `cancelled: true`, `⊘ cancelled`; for `deferred: true`, `⏸ deferred`. Multiple overlays: priority is blocked > cancelled > deferred (blocked wins; same precedence as the existing badge rendering). Color: blocked uses palette danger, cancelled uses palette warn, deferred uses palette dim.",
+      "Stage chip text: derive from `flow_stages` (current mp-flow stage). Same logic as `progress::stage_cell_line` / M202 Stage column. Falls back to `lifecycle` text when `flow_stages` is empty (legacy milestone that hasn't had a transition yet).",
+      "Empty preview behavior: when `intent.outcome` is empty or only whitespace, the preview line renders only the `↳` prefix (no `(no description)` placeholder). Matches M203's resolved collapse behavior.",
+      "Tree structure preservation: the `├─` / `└─` / `│` / `●` connector logic stays. Spines between trunk items stay. Branch headers (BLOCKED / AWAITING-APPROVAL / GROOMING / REVIEW) keep their bold color and item-count suffix.",
+      "Compact-mode handling: same 2-line layout at narrower terminal widths. Truncation kicks in earlier on the preview line due to less horizontal space. The spine characters and tree connectors stay.",
+      "Tests: unit (`intent.outcome` first-line extraction; truncation at 80 chars; status-overlay precedence; stage chip text derivation from flow_stages); TUI snapshot (2-line per item; preview line dim + ↳ prefix; status overlay chip; tree structure intact at width 120 and width 80).",
+      "`make test` and `make lint` clean."
+    ],
+    "out_of_scope": [
+      "Filter modal on the Path tab (separate milestone; reuses M204 framework).",
+      "Configurable profiles (compact / default / detailed) on Path — separate milestone.",
+      "Sort changes — Path is tree-ordered, not list-sorted; sort keys from M205 don't apply.",
+      "Changes to the data model — no new fields. Uses existing `flow_stages` (M202), `intent.outcome` (existing), `priority`, `created`/`updated`, blocked/cancelled/deferred overlays.",
+      "Changes to the branch fork logic — blocked items still fork at their blocker; the structure stays.",
+      "Drag-and-drop, expand/collapse of tree nodes — tree is always fully expanded; scroll handles overflow.",
+      "Changes to `path_tree_model` shape — the renderer is the only thing that changes; the model stays.",
+      "Adding `intent.outcome` to the data model — it already exists on every milestone; this slice only renders it."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Every milestone in the Path tree renders as 2 visual lines: title line + preview line. Preview is the first line of intent.outcome, truncated to ~80 chars, dim, with ↳ prefix.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Stage chip text derives from `flow_stages` (current mp-flow stage) using the same logic as M202's Stage column. Format: `[N/12]` where N is the position in MP_FLOW_STAGE_KEYS canonical order. Falls back to the milestone's `lifecycle` text when `flow_stages` is empty.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Status overlay chip renders on the title line when the milestone has blocked / cancelled / deferred set. Precedence when multiple overlays: blocked > cancelled > deferred (blocked wins). Color: blocked uses danger; cancelled uses warn; deferred uses dim.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Title line shows id, title, stage chip, priority glyph, age (relative time). Priority glyph: `⚑high` / `⚑urgent` for high+urgent, `─norm` for normal, `─low` for low. Age: relative time via humanize (e.g. `2d`, `5h`). Missing fields render as `—` (em-dash).",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Preview line uses `↳` prefix in dim color. Truncated text is plain (no extra formatting). When `intent.outcome` is empty or whitespace-only, the preview line renders only the `↳` prefix.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Blocked items still show `blocker: M<n>` on the title line (existing behavior preserved). The annotation appears alongside the status overlay chip.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "The `◀ next` indicator stays on the first execution item only (existing behavior preserved). Style: warn color + bold.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Tree structure is preserved. The `├─` / `└─` / `│` / `●` connector logic stays. Spines between trunk items stay. Blocked fork at the blocker (grouped by `depends_on`) stays.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved|blocked_fork_at_blocker_preserved/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "Branch headers (BLOCKED / AWAITING-APPROVAL / GROOMING / REVIEW) keep their bold color and item-count suffix. Color uses the existing `lane_color_for_tui` mapping.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "Whitespace-only intent.outcome is treated as empty: the preview line renders only the ↳ prefix (same as a missing outcome). No (no description) placeholder.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-11",
+      "description": "Compact-mode handling: same 2-line layout at narrower terminal widths. Preview truncation kicks in earlier due to less horizontal space. Tree structure (spines, connectors) stays.",
+      "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-12",
+      "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Layout",
+      "choice": "2 visual lines per milestone (title + preview)",
+      "rationale": "Matches the M203 Backlog/Ideas rework pattern. Half as many items visible but 2× the info per item. The Path tab is for scanning the bigger picture, not deep inspection, so the loss in item count is acceptable."
+    },
+    {
+      "area": "Description source",
+      "choice": "First line of intent.outcome",
+      "rationale": "intent.outcome already exists on every milestone. It's the 'what is this milestone about' prose. First-line truncation gives a meaningful preview without needing a new field."
+    },
+    {
+      "area": "Stage chip source",
+      "choice": "flow_stages (current mp-flow stage) with lifecycle fallback",
+      "rationale": "Same computation as M202's Stage column. flow_stages carries the per-stage map; lifecycle is the fallback for legacy milestones that haven't had a transition yet. Single source of truth via the Stage column helper."
+    },
+    {
+      "area": "Status overlay precedence",
+      "choice": "blocked > cancelled > deferred (blocked wins)",
+      "rationale": "Matches the existing badge rendering precedence in the codebase. Blocked is the most urgent state — should be the visible overlay when multiple are set."
+    },
+    {
+      "area": "Empty preview behavior",
+      "choice": "Preview line renders only the ↳ prefix when intent.outcome is empty",
+      "rationale": "Matches M203's resolved collapse behavior. No `(no description)` placeholder — keeps the visual rhythm consistent across rows."
+    },
+    {
+      "area": "Tree structure",
+      "choice": "Preserved exactly as today",
+      "rationale": "The trunk + branches + blocked fork shape is the value proposition of the Path tab. Operators depend on the tree visual to understand the bigger picture. The visual enrichment (more info per item) sits on top of the existing structure."
+    },
+    {
+      "area": "Filter modal on Path",
+      "choice": "Deferred to a separate milestone",
+      "rationale": "Filter modal reuses the M204 framework (unified UX across tabs). Folding it into this slice would expand scope and tangle the visual enrichment with the filter UX. Better as its own milestone."
+    },
+    {
+      "area": "Configurable profiles (compact / default / detailed)",
+      "choice": "Deferred to a separate milestone",
+      "rationale": "Profile selection is a configurator UX on top of the visual enrichment. The 2-line layout is one profile; adding compact and detailed is additive but not required for this slice."
+    },
+    {
+      "area": "Detail field placement",
+      "choice": "Keep on title line, after the status overlay chip. The detail (e.g. step: S1.1) is the most actionable field for execution items; it belongs on the title line even at the cost of crowded layout at narrow widths. Compact mode truncates the detail gracefully.",
+      "rationale": "Operators working the execution trunk need the step id at a glance. Moving it to the preview line buries it under the description."
+    },
+    {
+      "area": "Age field source for Milestones",
+      "choice": "Use lifecycle_at (RFC3339) as the primary source. Falls back to updated (YYYY-MM-DD) when lifecycle_at is empty (legacy milestone that has never had a transition). Matches M204 age filter semantics for Milestones.",
+      "rationale": "Consistent with the M204 age filter which uses lifecycle_at for Milestones. RFC3339 gives precise relative time; updated is the less-precise fallback."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "Should the preview line be present for milestones in the BLOCKED branch (where the blocker is the dominant signal) or skipped to keep the visual rhythm tight?",
+      "status": "resolved",
+      "answer": "Superseded by Q-02 resolution: every milestone renders 2 lines regardless of branch. Q-02 wins."
+    },
+    {
+      "id": "Q-02",
+      "question": "For blocked items, the title line already carries `blocker: M<n>` plus the blocked overlay chip. Does the preview line add value there, or should it be suppressed?",
+      "status": "resolved",
+      "answer": "Always render preview for all milestones regardless of branch. Visual rhythm stays consistent; BLOCKED branch and execution trunk have the same line count per item. The blocker annotation and blocked chip on the title line carry the BLOCKED-specific signal; the preview line carries the description."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Path tree visual enrichment - execution trunk",
+      "goal": "Update trunk_item_line in crates/raul/src/tui/path_view.rs to emit 2 visual lines per milestone. Title line carries id, title, stage chip [N/12] from flow_stages with lifecycle fallback, priority glyph, age (lifecycle_at with updated fallback), status overlay chip (blocked/cancelled/deferred with precedence), existing detail field (e.g. step: S1.1) stays on title line, existing ◀ next indicator preserved. Preview line carries the first line of intent.outcome truncated to ~80 chars with arrow prefix in dim color. Covers AC-01 through AC-08 for the execution trunk.",
+      "rollback": "Revert trunk_item_line to 1-line format. Stage chip + status overlay + description preview removed from execution trunk. Age reverts to hidden."
+    },
+    {
+      "id": "WP2",
+      "name": "Path tree visual enrichment - branches",
+      "goal": "Apply the same 2-line enrichment to flat_branch_lines (used by awaiting-approval, grooming, review branches) and blocked_lines (used by the BLOCKED branch with sub-fork). Branch headers (BLOCKED, AWAITING-APPROVAL, GROOMING, REVIEW) preserve their bold color via lane_color_for_tui and item-count suffix. Preview line on BLOCKED branch still renders per Q-02 resolution (always render regardless of branch). Covers AC-06 (blocker annotation), AC-08 (tree structure), AC-09 (branch headers).",
+      "rollback": "Revert flat_branch_lines and blocked_lines to 1-line format. Branches revert to id + title + detail only."
+    },
+    {
+      "id": "WP3",
+      "name": "Compact mode + final verification",
+      "goal": "Wire compact-mode handling: same 2-line layout at narrower terminal widths. Preview truncation kicks in earlier due to less horizontal space. Tree structure (spines, connectors) stays. Run full verification matrix. Covers AC-10 (empty preview), AC-11 (compact mode), AC-12 (final pass).",
+      "rollback": "Revert compact-mode handling. Narrow terminals render the same as wide; preview may overflow at narrow widths."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Update trunk_item_line to emit 2 visual lines. Preview line: ↳ + first line of intent.outcome truncated to ~80 chars in dim color. Empty or whitespace-only outcome renders only the ↳ prefix. Title line still carries the existing id + title + detail + next indicator for this step; stage chip, overlay, priority, and age land in the follow-up WP1 enrichment step.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars|preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty|next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold|preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)'",
+      "done_when": "trunk_item_line emits 2 visual lines with preview from intent.outcome; empty/whitespace outcome is prefix-only; next indicator preserved",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-05",
+        "AC-07",
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Verify tree structure preservation: the tree connectors (├─, └─, │, ●) and spines between trunk items stay intact across all 12 AC test cases. Add tree_connectors_preserved, spines_between_trunk_items_preserved tests that snapshot the rendered tree at width 120 and assert the connector characters appear in the expected positions.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/tree_connectors_preserved|spines_between_trunk_items_preserved/)",
+      "done_when": "Both named tests pass; tree structure intact",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Update blocked_lines to emit 2 visual lines per blocked milestone. The blocker: M<n> annotation on the title line is preserved alongside the blocked overlay chip (per design decision: keep on title line). Preview line carries the intent.outcome first line. The sub-fork at the blocker (grouped by depends_on) is preserved. Tests for blocked_items_show_blocker_annotation, blocker_annotation_appears_with_overlay_chip, blocked_lines_emits_two_visual_lines, blocked_fork_at_blocker_preserved.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip|blocked_lines_emits_two_visual_lines|blocked_fork_at_blocker_preserved/)",
+      "done_when": "All 4 named tests pass; blocked items use the 2-line format with blocker annotation + overlay chip + preview line",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Update flat_branch_lines (awaiting-approval, grooming, review) to emit 2 visual lines per milestone using the same enrichment as the trunk. Branch headers (the line that introduces each branch with bold color and item count) keep their existing bold styling via lane_color_for_tui. Tests for branch_headers_bold_color_preserved and branch_headers_show_item_count_suffix.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix|flat_branch_emits_two_visual_lines/)",
+      "done_when": "All 3 named tests pass; flat branches use the 2-line format with enriched title + preview; branch headers preserve existing style",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Wire compact-mode handling: the 2-line layout applies at narrow terminal widths. Preview line uses grapheme-safe truncation that kicks in earlier on narrower widths (less horizontal space). Tree connectors and spine characters stay. Tests for compact_mode_two_visual_lines, preview_truncates_earlier_in_compact_mode, compact_tree_structure_preserved.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)",
+      "done_when": "All 3 named tests pass; compact mode renders 2 lines with narrower columns and earlier truncation",
+      "status": "pending",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Run the full verification matrix for M206: cargo fmt --all -- --check; cargo clippy -p mp --tests --no-deps -- -D warnings; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo nextest run -p mp --no-fail-fast; cargo nextest run -p raul --no-fail-fast; mp validate. Each AC verification command must exit 0 with non-prose evidence.",
+      "files": [
+        "crates/raul"
+      ],
+      "tests": "make test",
+      "done_when": "All 12 ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-12"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Enrich the Path title line: stage chip [N/12] from flow_stages (lifecycle fallback), priority glyph, age via humanize_relative against lifecycle_at with updated fallback, status overlay chip (blocked > cancelled > deferred; danger/warn/dim). Detail field stays on the title line after the overlay. Reuse progress::stage_cell_line from M202 where possible.",
+      "files": [
+        "crates/raul/src/tui/path_view.rs",
+        "crates/raul/src/tui/progress.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve|blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins|title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)'",
+      "done_when": "Title line shows stage chip, priority, age, overlay; tests pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

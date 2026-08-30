@@ -1,0 +1,371 @@
+{
+  "milestone": {
+    "id": "203",
+    "title": "Backlog + Ideas 2nd-line description / body preview in raul",
+    "slug": "backlog-ideas-2nd-line-description-body-preview-in-raul",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-08-29",
+    "updated": "2026-08-30",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-08-29T12:54:29.618924+00:00"
+  },
+  "intent": {
+    "outcome": "Every Backlog and Ideas list row in the raul TUI gains a 2nd-line preview below the title: Backlog items show the continuation of their description (or collapsed to 'resolved · <resolution>' for resolved rows); Ideas show the first line of their body. The preview is dim color with a `↳` prefix, truncated to fit the column. BacklogItem gains a `created` field (serde default empty, no migration) that sets up a future age/since column slice."
+  },
+  "problem": {
+    "description": "Today `render_backlog_list` (shared by the Backlog and Ideas lanes) renders each row as a single line: `ID · Title · Priority · Status`. The title is the first line of the BacklogItem description (or the IdeaEntry title). To see the actual content the user has to press Enter to open the detail. With 156 backlog items + 31 mixed-in BF/TW/ID items, scanning the list tells you almost nothing about the substance of each item. Ideas have a `body` field on disk that never makes it to the list at all. The Milestones tab got per-stage tracking in M202; the Backlog/Ideas tabs still feel like a flat index."
+  },
+  "scope": {
+    "in_scope": [
+      "Add `created: String` (serde default empty) to `BacklogItem` in `crates/mp-model/src/track.rs`. No migration; legacy items load fine with empty `created`.",
+      "Update `mp list backlog` projection in `crates/mp/src/commands/list.rs` to add a `preview` field per item: continuation of `description` (everything after the first line), truncated to ~80 chars with `...` for active items; `resolved · <resolution>` for resolved items; `''` (empty) for items with no description continuation.",
+      "Update `mp list ideas` projection to add a `preview` field per item: first line of `body`, truncated to ~80 chars with `...`; `''` for items with no body.",
+      "Extend `BacklogLine` in `crates/raul/src/tui/app.rs` with `preview: String`. Update `parse_backlog_lines` in `crates/raul/src/tui/runner_helpers.rs` to populate it from the new payload field.",
+      "Update `render_backlog_list` in `crates/raul/src/tui/render/lane_lists.rs` (shared by the Backlog and Ideas lanes) to render 2-line rows. Each logical row produces 2 visual rows: title (bold, normal color) + preview (dim color, `↳` prefix, ~80-char truncation). The selected-row highlight spans both visual rows. Selected-index continues to address logical rows. Ideas get the same layout because they share this renderer.",
+      "Compact-mode (narrow terminal) renders the same 2-line layout but with reduced column widths. Same preview content; truncation may kick in earlier.",
+      "Tests: unit tests for the preview-projection logic (active vs resolved, with/without description continuation, with/without body); TUI snapshot tests for the new 2-line layout (wide + compact widths) on both Backlog and Ideas; round-trip serde test for the new `created` field on BacklogItem.",
+      "`make test` and `make lint` clean."
+    ],
+    "out_of_scope": [
+      "Rendering the `created` field — the age/since column slice is a separate milestone. The field is added to the schema now so that slice is purely a renderer change.",
+      "Merging BF/TW items from canonical `master-plan/tracks/{bugfix,tweak}.json` into the list payload. Today's `mp list backlog` returns stale copies from `backlog.json`; the preview uses the legacy `description` for those. Documenting the data hygiene gap as a future backlog item rather than fixing it in this slice.",
+      "Merging ID items from canonical `master-plan/ideas.json` — same reasoning.",
+      "Changing the Backlog list column grammar (still 4 columns: ID, Title, Priority, Status) or sort options (still Id, Title, Priority, Status).",
+      "Adding new affordances like `mp backlog promote` from the TUI — out of scope; existing CLI behavior preserved.",
+      "Editing the BacklogItem description semantics — `description` continues to play the title-equivalent role (first line is the row title, lines 2+ are the preview). No rename or split into separate `title`+`body` fields.",
+      "Editing the IdeaEntry model — `body` field already exists and is the canonical preview source.",
+      "Head or middle truncation — Q-01 already pinned tail truncation with `...` via `text::truncate`.",
+      "Animating or transitioning rows when content changes — preview is a static projection."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "BacklogItem gains `created: String` field with `#[serde(default)]`. Legacy backlog.json items without the field load fine; round-trip serde preserves an empty string.",
+      "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/backlog_item_serde_round_trip_with_created_field|legacy_backlog_item_loads_without_created/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp list backlog` JSON includes a `preview` field per item. For active items with multi-line description, preview is the continuation (everything after the first line), truncated to ~80 chars with `...`. For resolved items, preview is `resolved · <resolution>`. For items with no description continuation, preview is empty string.",
+      "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/list_backlog_projects_preview_field|preview_for_active_item_uses_description_continuation|preview_for_resolved_item_collapses_to_resolution/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp list ideas` JSON includes a `preview` field per idea. Preview is the first line of `body`, truncated to ~80 chars with `...`. Ideas with no body get an empty preview.",
+      "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/list_ideas_projects_preview_field|preview_uses_first_line_of_body|preview_truncates_at_eighty_chars/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "render_backlog_list (shared by Backlog and Ideas) renders 2-line rows. Each logical row produces 2 visual rows: title (bold) + preview (dim, ↳ prefix, ~80-char truncation). Selected-row highlight spans both visual rows. Selected-index addresses logical rows. Ideas use the same layout via the shared renderer.",
+      "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_row_renders_two_visual_lines|preview_line_is_dim_with_arrow_prefix|selected_row_highlight_spans_both_lines|selected_index_addresses_logical_rows/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Compact-mode (narrow terminal) renders the same 2-line layout with reduced column widths. Preview content unchanged; truncation may kick in earlier due to narrower title column.",
+      "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_compact_row_renders_two_visual_lines|preview_truncates_earlier_in_compact_mode/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Sort / search / filter behavior unchanged. Sorting by Id, Title, Priority, or Status still works; search (`/`) still matches against title; the `h` hide-done filter still respects `status`. The preview field does not affect sort keys.",
+      "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/sort_by_id_unchanged|sort_by_title_unchanged|sort_by_priority_unchanged|sort_by_status_unchanged|search_matches_title_not_preview|hide_done_respects_status/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Resolved backlog items render with `resolved · <resolution>` as the preview (NOT the full description continuation). Empty resolution renders as just `resolved`.",
+      "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/preview_for_resolved_collapses|preview_for_resolved_with_empty_resolution/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "BF/TW items (mixed into the Backlog lane via the legacy backlog.json payload) render with the legacy `description` continuation as the preview, same as BL/B-* items. No special-casing for BF/TW prefixes in this slice.",
+      "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/bf_item_preview_uses_legacy_description|tw_item_preview_uses_legacy_description/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "Preview source",
+      "choice": "Description continuation for active items; resolved · resolution for resolved items; first line of body for Ideas",
+      "rationale": "Matches how each model already structures its content. BacklogItem.description has the title on line 1 and the rest of the content on subsequent lines; truncating to the first ~80 chars of line 2+ gives a meaningful preview without needing new fields. IdeaEntry.body is a long-form field whose first line is the natural preview. No schema split needed."
+    },
+    {
+      "area": "BF/TW source",
+      "choice": "Use legacy description from backlog.json (same as BL/B-*); do not merge canonical tracks/{bugfix,tweak}.json",
+      "rationale": "Today's mp list backlog returns 151 items all from backlog.json (legacy). Merging canonical sources is a bigger change and a data hygiene fix on its own. Slice keeps the existing data flow; documents the gap as a future backlog item."
+    },
+    {
+      "area": "Resolved preview",
+      "choice": "Collapse to resolved · resolution (NOT full description continuation)",
+      "rationale": "Resolved items already carry their resolution text in the existing Status column; duplicating the full description wastes vertical space. The collapsed form keeps the row compact and surfaces the resolution directly without Enter."
+    },
+    {
+      "area": "Preview style",
+      "choice": "Dim color + ↳ prefix",
+      "rationale": "The ↳ prefix adds scan-ability without using horizontal space (the title column already starts indented). Dim color is the established visual idiom for secondary content in this TUI (Stages section checklist, scope items)."
+    },
+    {
+      "area": "Row layout",
+      "choice": "2 visual rows per logical row; selected-index addresses logical rows",
+      "rationale": "Matches the new info density without breaking the existing navigation model. Scroll offset accounts for 2 visual rows per logical row. Selected-row highlight spans both rows so the cursor stays visible."
+    },
+    {
+      "area": "Schema change",
+      "choice": "Add created field with serde default empty; no migration",
+      "rationale": "The created field is needed for the future age/since column slice. Adding it now (no migration, no consumer) lets the next slice be a pure renderer change instead of a schema + renderer change."
+    },
+    {
+      "area": "Column grammar",
+      "choice": "Keep 4 columns (ID, Title, Priority, Status); preview is a 2nd-line annotation, not a column",
+      "rationale": "The Milestones tab carries position info in a dedicated Stage column; the Backlog tab doesn't have a stage concept. A 2nd-line annotation keeps the column grammar unchanged (avoids horizontal re-budgeting) and follows the precedent of the Milestones Stages section."
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-01",
+      "question": "For preview text that exceeds 80 chars after the first line of description (or first line of body), should truncation be head, middle, or tail?",
+      "status": "resolved",
+      "answer": "Tail truncate with ... at 80 chars. Use the existing text::truncate helper (crates/raul/src/text.rs) for grapheme-safe truncation. Preview preserves the lead context, which is what users scan for."
+    },
+    {
+      "id": "Q-02",
+      "question": "For BF/TW items whose legacy `description` has only one line (title + no continuation), what shows in the preview line — empty, a (no description) placeholder, or fall back to the Status column?",
+      "status": "resolved",
+      "answer": "Empty preview line. When the legacy description has only the title line (no continuation), the preview row is rendered with only the ↳ prefix and nothing after. The Status column already carries the relevant signal; no placeholder needed."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Model + projection",
+      "goal": "Add created String to BacklogItem with serde default. Update mp list backlog projection in crates/mp/src/commands/list.rs to add preview field per item: continuation of description for active items, resolved plus resolution for resolved items, empty for items with no continuation. Update mp list ideas projection similarly with first line of body, truncated to 80 chars. Covers AC-01 AC-02 AC-03 AC-07 AC-08.",
+      "rollback": "Revert crates/mp-model/src/track.rs BacklogItem created field. Revert crates/mp/src/commands/list.rs preview projection for both backlog and ideas. Tests in crates/mp/tests/lifecycle_setter_overlay.rs and crates/mp/tests/backlog_list.rs revert to their pre-M203 expectations."
+    },
+    {
+      "id": "WP2",
+      "name": "TUI renderer 2-line rows",
+      "goal": "Extend BacklogLine in crates/raul/src/tui/app.rs with preview String. Update parse_backlog_lines in crates/raul/src/tui/runner_helpers.rs. Update render_backlog_list in crates/raul/src/tui/render/lane_lists.rs to render 2-line rows: title bold on line 1, preview dim with arrow prefix on line 2 truncated to ~80 chars. Selected-row highlight spans both visual rows; selected-index addresses logical rows. Compact mode renders same 2-line layout. Covers AC-04 AC-05 AC-06.",
+      "rollback": "Revert crates/raul/src/tui/app.rs BacklogLine preview field, runner_helpers.rs parser, and lane_lists.rs render_backlog_list. The 1-line row layout returns. Selected-row highlight reverts to single-line."
+    },
+    {
+      "id": "WP3",
+      "name": "Final verification matrix",
+      "goal": "Run cargo fmt, cargo clippy, cargo nextest, mp validate. Confirm every AC verification command exits 0 with non-prose evidence. Covers AC-09.",
+      "rollback": "N/A. Verification has no on-disk artifacts to revert."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add created String field to BacklogItem in crates/mp-model/src/track.rs with serde default. No migration. Tests in crates/mp/tests/lifecycle_setter_overlay.rs: round-trip serde preserves empty string for legacy items; new items round-trip with explicit created value.",
+      "files": [
+        "crates/mp-model/src/track.rs",
+        "crates/mp/tests/lifecycle_setter_overlay.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/backlog_item_serde_round_trip_with_created_field|legacy_backlog_item_loads_without_created/)",
+      "done_when": "BacklogItem has created String field with serde default; both named tests pass; cargo nextest exits 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Update mp list backlog projection in crates/mp/src/commands/list.rs to add preview field per item. Logic: for status=resolved items, preview equals resolved plus resolution. For active items, preview equals description continuation (everything after the first line), truncated to 80 chars with ellipsis. For items with no continuation, preview is empty string. Tests in crates/mp/tests/backlog_list.rs: preview_for_active_item_uses_description_continuation, preview_for_resolved_item_collapses_to_resolution, list_backlog_projects_preview_field, bf_item_preview_uses_legacy_description, tw_item_preview_uses_legacy_description, preview_for_resolved_collapses, preview_for_resolved_with_empty_resolution.",
+      "files": [
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/tests/backlog_list.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E test(/list_backlog_projects_preview_field|preview_for_active_item_uses_description_continuation|preview_for_resolved_item_collapses_to_resolution|bf_item_preview_uses_legacy_description|tw_item_preview_uses_legacy_description|preview_for_resolved_collapses|preview_for_resolved_with_empty_resolution/)",
+      "done_when": "All named tests pass; mp list backlog --fields preview returns the projected preview per row",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-07",
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Update mp list ideas projection to add preview field per idea. Logic: preview equals first line of body, truncated to 80 chars with ellipsis. Empty for items with no body. Tests in crates/mp/tests/backlog_list.rs: list_ideas_projects_preview_field, preview_uses_first_line_of_body, preview_truncates_at_eighty_chars.",
+      "files": [
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/tests/backlog_list.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E test(/list_ideas_projects_preview_field|preview_uses_first_line_of_body|preview_truncates_at_eighty_chars/)",
+      "done_when": "All named tests pass; mp list ideas --fields preview returns the projected preview per row",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Extend BacklogLine in crates/raul/src/tui/app.rs with preview String field. Update parse_backlog_lines in crates/raul/src/tui/runner_helpers.rs to read preview from the payload.",
+      "files": [
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/runner_helpers.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/parse_backlog_lines_populates_preview/)",
+      "done_when": "BacklogLine carries preview; parse_backlog_lines populates it from payload; named test passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Update render_backlog_list in crates/raul/src/tui/render/lane_lists.rs to render 2-line rows. Each logical row produces 2 visual rows: title bold on line 1, preview dim with arrow prefix on line 2 truncated to ~80 chars using text::truncate helper. Selected-row highlight spans both visual rows. Selected-index continues to address logical rows. Adjust scroll offset accounting. Tests in crates/raul/tests/tui_milestones_title_chip.rs: backlog_row_renders_two_visual_lines, preview_line_is_dim_with_arrow_prefix, selected_row_highlight_spans_both_lines, selected_index_addresses_logical_rows.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/raul/tests/tui_milestones_title_chip.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/backlog_row_renders_two_visual_lines|preview_line_is_dim_with_arrow_prefix|selected_row_highlight_spans_both_lines|selected_index_addresses_logical_rows/)",
+      "done_when": "All 4 named tests pass; Backlog list renders 2-line rows with dim preview and arrow prefix; selected-row highlight spans both rows",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Compact-mode handling: same 2-line layout with reduced column widths. Preview content unchanged; truncation may kick in earlier due to narrower title column. Tests in crates/raul/tests/tui_milestones_title_chip.rs: backlog_compact_row_renders_two_visual_lines, preview_truncates_earlier_in_compact_mode.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/raul/tests/tui_milestones_title_chip.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/backlog_compact_row_renders_two_visual_lines|preview_truncates_earlier_in_compact_mode/)",
+      "done_when": "Both named tests pass; compact mode renders 2-line rows with narrower columns",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Sort, search, and filter behavior unchanged. Sort by Id, Title, Priority, or Status still works; search matches against title only (not preview); hide-done filter respects status. Tests in crates/raul/tests/tui_milestones_title_chip.rs: sort_by_id_unchanged, sort_by_title_unchanged, sort_by_priority_unchanged, sort_by_status_unchanged, search_matches_title_not_preview, hide_done_respects_status.",
+      "files": [
+        "crates/raul/src/tui/render/lane_lists.rs",
+        "crates/raul/tests/tui_milestones_title_chip.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/sort_by_id_unchanged|sort_by_title_unchanged|sort_by_priority_unchanged|sort_by_status_unchanged|search_matches_title_not_preview|hide_done_respects_status/)",
+      "done_when": "All 6 named tests pass; sort and filter behavior unchanged after the 2-line refactor",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Run the full verification matrix for M203: cargo fmt --all -- --check; cargo clippy -p mp --tests --no-deps -- -D warnings; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo nextest run -p mp --no-fail-fast; cargo nextest run -p raul --no-fail-fast; mp validate. Each AC verification command must exit 0 with non-prose evidence.",
+      "files": [
+        "crates/mp",
+        "crates/raul",
+        "crates/mp-model"
+      ],
+      "tests": "make test",
+      "done_when": "All 9 ACs have non-prose evidence; fmt plus clippy plus nextest plus mp validate all exit 0",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

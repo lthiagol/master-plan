@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-28",
-    "updated": "2026-08-28",
+    "updated": "2026-08-30",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -54,43 +54,43 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "`keybinds.focus_content` is no longer a recognized key under `[keybinds]`. `mp config set keybinds.focus_content ...` errors with a clear deprecation message that names the deprecated key and points the user to the project CHANGELOG for the keybind deconflict entry; the key is removed from `KEYBIND_ACTIONS` in `crates/mp/src/config.rs`.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|keybind|focus_content/)' && a manual CLI check: `mp config set keybinds.focus_content Enter` exits non-zero with the deprecation message",
+      "description": "`keybinds.focus_content` is no longer a recognized config key. `mp config set keybinds.focus_content ...` exits non-zero with a deprecation message that names the key and points at the project CHANGELOG (no milestone IDs in user-visible text). The key is removed from KEYBIND_ACTIONS and from SETTINGS_KEYS. The Keybinds struct keeps the field as a non-rebindable reserved action.",
+      "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys|focus_content/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "`Keybinds::default().refresh` equals `[Ctrl-R]` (was `[r]`). `Keybinds::default().previous_lane` equals `[Left, BackTab]` (was `[Left, h, BackTab]`).",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)' and a unit test that pins the new defaults",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "All 28 rebindable keybind defaults are unique per chord — a unit test enumerates them and asserts no two user-facing keybinds share a `KeyCombo`. `keybinds.refresh` no longer collides with `keybinds.resolve`; `keybinds.previous_lane` no longer collides with `keybinds.hide_done`.",
-      "verification": "new unit test in `crates/raul/src/tui/keybinds.rs::tests::defaults_are_disjoint` — `cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'`",
+      "description": "All user-facing rebindable keybind defaults are unique per chord. A unit test enumerates SETTINGS_KEYS / KEYBIND_ACTIONS remaining actions (focus_content excluded) and asserts no two share a KeyCombo. keybinds.refresh no longer collides with keybinds.resolve; keybinds.previous_lane no longer collides with keybinds.hide_done.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "`mp config validate` on a fixture with a stale `[keybinds] focus_content = Enter` line emits a deprecation warning that names the field, the milestone (M200), and the deprecation reason. `mp config validate` on a clean config emits no warning. The warning is non-blocking (exit code 0).",
-      "verification": "new CLI scenario under `tests/scenarios/` — golden output captured in `tests/fixtures/golden/config-validate-keybind-deprecation.{stdout,exit}.txt`; verified via `make test-scenarios`",
+      "description": "`mp config validate` on a fixture with a stale `[keybinds] focus_content = Enter` line emits a non-blocking deprecation warning that names the field and points at the CHANGELOG (no milestone IDs). Exit code 0. A clean config emits no warning.",
+      "verification": "make test-scenarios",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "`mp config get keybinds.refresh` returns `Ctrl-R` on a fresh project; `mp config get keybinds.previous_lane` returns `Left, BackTab` (no `h`). `mp config get keybinds.focus_content` errors with 'unknown key' (or 'deprecated', per Q-01).",
-      "verification": "NEW FILE: create crates/mp/tests/suites/config_keys.rs with three get-cases: (a) `mp config get keybinds.refresh` on a fresh project returns `\"Ctrl-R\"` (the new default; was `r`); (b) `mp config get keybinds.previous_lane` on a fresh project returns `\"Left, BackTab\"` (no `h`); (c) `mp config get keybinds.focus_content` errors with `\"unknown config key: keybinds.focus_content\"` (the key is removed from the validation allow-list per AC-01, so the get arm returns the unknown-key error path). Run via `cargo nextest run -p mp --test suite_config --no-fail-fast -E \"test(/config_keys/)\"`. Naming: the file is named `config_keys.rs` (without `ui_` prefix) because it tests the [keybinds] section, not the [ui] section. The existing `config_ui_keys.rs` continues to cover [ui] keys; M200 adds this parallel file for [keybinds]. Per Q-01 resolution, also assert that `mp config set keybinds.focus_content Enter` (manual CLI check) exits non-zero with stderr naming M200 as the deprecation source.",
+      "description": "`mp config get keybinds.refresh` returns `Ctrl-R` on a fresh project; `mp config get keybinds.previous_lane` returns `Left, BackTab` (no `h`). `mp config get keybinds.focus_content` errors with unknown-key.",
+      "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "Existing settings tests pass unchanged: `m169_rev`, `tui_settings_automation`, `m168_settings_grouped`, the M198 test surface in `crates/raul/tests/keybinds.rs` and `crates/raul/src/tui/app.rs::tests`, and the `ui.show_watch_tab` cases in `crates/mp/tests/suites/config_ui_keys.rs`. The deconflict is a no-op for users who already have a `[keybinds]` section in their config (their overrides win).",
-      "verification": "Existing M198 tests must pass unchanged. The actual M198 test surface is split across these files (the spec previously named `crates/raul/tests/m198_watch_tab.rs`, which does not exist — fix the spec to reference the real files): (a) `crates/raul/tests/keybinds.rs::footers_are_generated_and_nonempty` — pins the footer_tab_bar 1-7 / 1-6 legend (the F-01 fix); (b) `crates/raul/src/tui/app.rs::tests::tab_move_*` and `reconcile_active_lane_*` — pins the Lane::ordered_visible filter and the startup-time guard; (c) `crates/mp/tests/suites/config_ui_keys.rs::ui_defaults_when_unset` and `ui_set_get_roundtrips` — pins the ui.show_watch_tab get/set surface. The M198 deconflict is a no-op for users with an existing [keybinds] section: existing overrides win over the new defaults. Run the full M198 sweep: `cargo nextest run -p raul --no-fail-fast -E \"test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible/)\"` and `cargo nextest run -p mp --no-fail-fast -E \"test(/config_ui_keys|config_keys/)\"` and `cargo clippy -p mp --tests --no-deps -- -D warnings` and `cargo clippy -p raul --tests --no-deps -- -D warnings` and `cargo fmt --all -- --check`.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible/)' && cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys|config_keys/)' && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
       "status": "pending",
       "evidence": ""
     }
@@ -120,6 +120,11 @@
       "area": "Help text update",
       "choice": "Update `crates/raul/src/tui/modes/settings/help.rs` to match the new defaults; let M201 subsume it once the Settings schema lands.",
       "rationale": "The pre-M201 help text is the only consumer of the old defaults in the rendered TUI. Until M201 lands, the help text is what users see in the Settings lane. Keeping it in sync now prevents a 'deconflict happened but help text still lies' window."
+    },
+    {
+      "area": "User-visible deprecation text",
+      "choice": "Name the deprecated key and point at CHANGELOG.md. Never include a milestone ID, lesson code, or repo-internal path in stderr or changelog.",
+      "rationale": "Consumer-surface hygiene: files and messages that ship to adopters must be self-contained. Q-01 originally said the warning names M200; that contradicts the consumer-surface lint and is overridden here."
     }
   ],
   "open_questions": [
@@ -167,12 +172,12 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Edit Keybinds::default() in crates/raul/src/tui/keybinds.rs: remove the focus_content field entirely; change refresh default from r to Ctrl-R; trim previous_lane default to [Left, BackTab] (drop the h alias). Also remove the `\"focus_content\" => ...` match arm from `keybind_default_label` in crates/raul/src/tui/modes/settings.rs (no longer a recognized action). Update any test in crates/raul/src/tui/keybinds.rs::tests or crates/raul/tests/ that constructs a Keybinds literal with the focus_content field — those will fail to compile after the field is removed. The compiler surfaces every call-site; this is a build-cleanup step, not a logic change.",
+      "action": "Edit Keybinds::default() in crates/raul/src/tui/keybinds.rs: change refresh default from r to Ctrl-R; trim previous_lane default to [Left, BackTab] (drop the h alias). Keep the focus_content field on the Keybinds struct — it stays a non-rebindable reserved action (see design decision). Update tests that pin the old refresh / previous_lane defaults.",
       "files": [
         "crates/raul/src/tui/keybinds.rs"
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)'",
-      "done_when": "Keybinds::default() has no focus_content field; refresh equals [Ctrl-R]; previous_lane equals [Left, BackTab]; existing tests in keybinds.rs still pass",
+      "done_when": "Keybinds::default().refresh equals [Ctrl-R]; previous_lane equals [Left, BackTab]; focus_content field still exists; keybinds.rs tests pass",
       "status": "pending",
       "covers_ac": [
         "AC-02"
@@ -187,18 +192,22 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 2,
-      "action": "Remove the focus_content arm from Keybinds::resolve in crates/raul/src/tui/keybinds.rs and from any dispatch path that calls Keybinds::resolve. Drop the focus_content field from the Keybinds struct (Q-02 says bare-r no longer routes to refresh in the default state — keep the per-action handler, just no longer keybind-rebindable).",
+      "action": "Remove focus_content from the user-rebindable surface only: drop the SETTINGS_KEYS row in crates/raul/src/tui/modes/settings.rs, drop the keybind_default_label arm, and remove \"focus_content\" from KEYBIND_ACTIONS in crates/mp/src/config.rs. Keep the Keybinds.focus_content field and the internal handler that routes list-pane ↔ content-pane focus. Do not remove the field from the struct.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/mp/src/config.rs"
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds|resolve/)' && cargo clippy -p raul --tests --no-deps -- -D warnings",
-      "done_when": "No code path references Keybinds::focus_content; the resolve() chain has no focus_content arm; raul still routes focus_content as an internal action via the lane mode handler",
+      "done_when": "SETTINGS_KEYS and KEYBIND_ACTIONS have no focus_content entry; Keybinds still has the field; raul still routes the reserved action internally",
       "status": "pending",
       "covers_ac": [
         "AC-01",
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -208,7 +217,7 @@
       "id": "S2",
       "work_package": "WP2",
       "order": 3,
-      "action": "Edit crates/mp/src/config_cmd.rs validate path: when a project config contains [keybinds] focus_content, emit a deprecation warning naming the deprecated field and pointing to the project CHANGELOG (no milestone IDs in user-visible text). Also update the set path so it self-heals (drops the line on first save after warning). Remove focus_content from KEYBIND_ACTIONS in crates/mp/src/config.rs.",
+      "action": "Edit crates/mp/src/config_cmd.rs validate path: when a project config contains [keybinds] focus_content, emit a deprecation warning naming the deprecated field and pointing to the project CHANGELOG (no milestone IDs in user-visible text). On mp config set of any other key, drop the stale line (self-heal). mp config set keybinds.focus_content itself is rejected (exit 1) with the same deprecation text. KEYBIND_ACTIONS should already lack focus_content after the SETTINGS_KEYS drop in the previous WP1 step.",
       "files": [
         "crates/mp/src/config_cmd.rs",
         "crates/mp/src/config.rs"
@@ -221,7 +230,9 @@
         "AC-04",
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -231,17 +242,19 @@
       "id": "S3",
       "work_package": "WP2",
       "order": 4,
-      "action": "Update crates/raul/src/tui/modes/settings/help.rs to match the new Keybinds::default() values: drop the focus_content entry; change the refresh default prose; update the previous_lane prose to 'Left, BackTab' (no h).",
+      "action": "Update crates/raul/src/tui/modes/settings/help.rs to match the new Keybinds::default() values: drop the focus_content entry; change the refresh default prose to Ctrl-R; update the previous_lane prose to Left, BackTab (no h). help_for() covers the remaining user-facing keybinds.",
       "files": [
         "crates/raul/src/tui/modes/settings/help.rs"
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_for|keybind_default/)'",
-      "done_when": "help_for() returns prose for all 27 rebindable keybinds (focus_content removed); the prose text matches the new defaults",
+      "done_when": "help_for() has no focus_content entry; refresh and previous_lane prose match the new defaults",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -251,7 +264,7 @@
       "id": "S4",
       "work_package": "WP3",
       "order": 5,
-      "action": "Add a unit test in crates/raul/src/tui/keybinds.rs::tests::defaults_are_disjoint that enumerates every (action, default_chord) pair in Keybinds::default() and asserts no two user-facing actions share a KeyCombo. focus_content is excluded (no longer a keybind). Use a HashSet<(&str, KeyCombo)> collector that fails on duplicate inserts with a clear error naming both actions.",
+      "action": "Add crates/raul/src/tui/keybinds.rs::tests::defaults_are_disjoint that enumerates every user-facing (action, default_chord) pair remaining after focus_content was dropped from SETTINGS_KEYS / KEYBIND_ACTIONS and asserts no two share a KeyCombo. The reserved focus_content field is excluded. Failure message names both actions and the chord.",
       "files": [
         "crates/raul/src/tui/keybinds.rs"
       ],
@@ -261,7 +274,9 @@
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -271,7 +286,7 @@
       "id": "S5",
       "work_package": "WP3",
       "order": 6,
-      "action": "Add a fixture under tests/fixtures/ showing the post-deconflict [keybinds] section in a sample project config (focus_content absent, refresh = Ctrl-R, previous_lane = Left+BackTab). Add a CLI scenario under tests/scenarios/ that runs {\n  \"ok\": true,\n  \"errors\": [],\n  \"warnings\": []\n} against the fixture twice — once expecting a deprecation warning (fixture with focus_content = Enter), once clean — and golden-asserts both stdout and exit code.",
+      "action": "Add a fixture under tests/fixtures/ with a stale [keybinds] focus_content = Enter line, and a clean fixture without it. Add a CLI scenario under tests/scenarios/ that runs mp config validate against both and golden-asserts stdout plus exit code (warning + exit 0 on stale; no warning + exit 0 on clean).",
       "files": [
         "tests/fixtures/",
         "tests/scenarios/"
@@ -282,7 +297,9 @@
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -292,17 +309,43 @@
       "id": "S6",
       "work_package": "WP3",
       "order": 7,
-      "action": "Add a one-line changelog / release-note entry per Q-03 resolution: 'raul keybind deconflict — keybinds.refresh now defaults to Ctrl-R; keybinds.focus_content removed from the user-rebindable surface. Existing user overrides win.' Place the entry in the consumer-facing changelog surface (not the help text, not the milestone internal notes).",
+      "action": "Add a one-line changelog entry: raul keybind deconflict — keybinds.refresh now defaults to Ctrl-R; keybinds.focus_content is no longer user-rebindable. Existing user overrides win. Place it in CHANGELOG.md. No milestone IDs or lesson codes in the entry.",
       "files": [
         "CHANGELOG.md"
       ],
       "tests": "manual: changelog entry visible at the repo root or in docs/; not leaked into the help text",
       "done_when": "Changelog entry exists at the project release surface; consumer-surface lint clean (no internal milestone IDs / lesson codes in the entry)",
       "status": "pending",
+      "covers_ac": [],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP3",
+      "order": 8,
+      "action": "Run the settings / M198 regression sweep plus clippy and fmt so existing tests stay green after the deconflict. This is a regression gate, not new functionality.",
+      "files": [
+        "crates/raul",
+        "crates/mp"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|tui_settings|m169_rev|m168_settings/)' && cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys|config_keys/)' && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
+      "done_when": "All named regression tests pass; clippy and fmt clean",
+      "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1",
+        "S2",
+        "S3",
+        "S4"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
