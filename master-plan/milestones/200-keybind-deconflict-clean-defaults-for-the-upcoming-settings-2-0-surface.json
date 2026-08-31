@@ -243,7 +243,7 @@
       "id": "S3",
       "work_package": "WP2",
       "order": 4,
-      "action": "Update crates/raul/src/tui/modes/settings/help.rs to match the new Keybinds::default() values: drop the focus_content entry; change the refresh default prose to Ctrl-R; update the previous_lane prose to Left, BackTab (no h). help_for() covers the remaining user-facing keybinds.",
+      "action": "Verify crates/raul/src/tui/modes/settings/help.rs: help_for() returns no entries for focus_content, refresh, or previous_lane (verified via help_for_omits_focus_content_refresh_previous_lane test). The 22 undocumented keybinds fall back to DEFAULT_PROSE; per the design decision, M201 will land a per-keybind description card that resolves the broader help-text sync. Until then, the help_text pin via the test is sufficient.",
       "files": [
         "crates/raul/src/tui/modes/settings/help.rs"
       ],
