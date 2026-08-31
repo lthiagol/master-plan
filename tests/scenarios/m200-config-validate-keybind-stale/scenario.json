@@ -1,0 +1,15 @@
+{
+  "id": "m200-config-validate-keybind-stale",
+  "phase": "implemented",
+  "description": "mp config validate on a stale focus_content line emits a non-blocking deprecation warning (exit 0)",
+  "fixture": "projects/m200-keybind-stale",
+  "command": ["config", "validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": true
+  }
+}

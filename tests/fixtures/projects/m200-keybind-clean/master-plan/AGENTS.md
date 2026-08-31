@@ -1,0 +1,1 @@
+# Fixture project — see tests/scenarios/m200-config-validate-keybind-clean

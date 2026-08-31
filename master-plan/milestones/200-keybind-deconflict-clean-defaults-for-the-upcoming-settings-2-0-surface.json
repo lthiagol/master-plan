@@ -77,8 +77,8 @@
       "id": "AC-04",
       "description": "`mp config validate` on a fixture with a stale `[keybinds] focus_content = Enter` line emits a non-blocking deprecation warning that names the field and points at the CHANGELOG (no milestone IDs). Exit code 0. A clean config emits no warning.",
       "verification": "make test-scenarios",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make test-scenarios exit 0 (m200-config-validate-keybind-stale + clean scenarios pass with exit 0 and golden stdout)"
     },
     {
       "id": "AC-05",
@@ -293,7 +293,7 @@
       ],
       "tests": "make test-scenarios",
       "done_when": "Golden scenario test passes; both .stdout.txt and .exit.txt files committed under tests/fixtures/golden/",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],

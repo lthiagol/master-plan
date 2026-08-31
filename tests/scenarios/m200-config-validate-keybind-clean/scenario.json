@@ -1,0 +1,15 @@
+{
+  "id": "m200-config-validate-keybind-clean",
+  "phase": "implemented",
+  "description": "mp config validate on a clean config (no focus_content) emits no deprecation warning (exit 0)",
+  "fixture": "projects/m200-keybind-clean",
+  "command": ["config", "validate", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/validate.json",
+    "fs_unchanged": true
+  }
+}

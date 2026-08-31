@@ -1,0 +1,55 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "validate exits 0 on minimal-ready fixture",
+      "evidence": "",
+      "id": "AC-01",
+      "status": "pending",
+      "verification": "mp validate --format json"
+    }
+  ],
+  "intent": {
+    "outcome": "Users can run mp validate against a fixture project."
+  },
+  "milestone": {
+    "created": "2026-06-17",
+    "depends_on": [
+      "01"
+    ],
+    "effort": "M",
+    "execution_status": "planned",
+    "id": "02",
+    "risk": "low",
+    "slug": "feature-alpha",
+    "spec_status": "ready",
+    "title": "Feature Alpha",
+    "updated": "2026-06-17"
+  },
+  "problem": {
+    "description": "Need contract tests before full CLI surface."
+  },
+  "scope": {
+    "in_scope": [
+      "validate command",
+      "fixture layout"
+    ],
+    "out_of_scope": [
+      "path engine",
+      "brief commands"
+    ]
+  },
+  "verification": {
+    "branch": "",
+    "date": "",
+    "evidence": ""
+  },
+  "work_packages": [
+    {
+      "goal": "Ship validate path",
+      "id": "WP1",
+      "name": "Implementation",
+      "rollback": "git restore tests/",
+      "steps": []
+    }
+  ]
+}
