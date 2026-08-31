@@ -218,4 +218,29 @@ mod tests {
         let prose = help_for("nonexistent.key");
         assert_eq!(prose, DEFAULT_PROSE);
     }
+
+    #[test]
+    fn help_for_omits_focus_content_refresh_previous_lane() {
+        // M200 S3: `keybinds.focus_content` was removed from the user-
+        // rebindable surface (it is a TUI-internal reserved action),
+        // and `keybinds.refresh` / `keybinds.previous_lane` defaults
+        // changed. The settings help text does not currently document
+        // any of these three keys (the 22 undocumented keybinds fall
+        // back to `DEFAULT_PROSE`); per the design decision, M201 will
+        // land a per-keybind description card that resolves the broader
+        // help-text sync. Until then, these three resolve to
+        // `DEFAULT_PROSE` — pin the contract here so a future help.rs
+        // refactor that drops `DEFAULT_PROSE` cannot silently regress.
+        for key in [
+            "keybinds.focus_content",
+            "keybinds.refresh",
+            "keybinds.previous_lane",
+        ] {
+            let prose = help_for(key);
+            assert_eq!(
+                prose, DEFAULT_PROSE,
+                "M200 S3 expected no dedicated HELP entry for {key}; got {prose:?}"
+            );
+        }
+    }
 }
