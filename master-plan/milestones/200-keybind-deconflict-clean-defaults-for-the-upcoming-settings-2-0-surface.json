@@ -366,7 +366,7 @@
       "description": "crates/mp/src/config.rs:286-318 — KEYBIND_ACTIONS (21 entries) and KEYBIND_DEFAULTS (27 entries) are out of sync. KEYBIND_DEFAULTS contains 6 user-rebindable keys (next_section, prev_section, next_item, prev_item, lifecycle_filter, grooming_preset) that are NOT in KEYBIND_ACTIONS; KEYBIND_ACTIONS contains 2 stale orphans (toggle_watch, toggle_tab_focus) that are NOT in KEYBIND_DEFAULTS or SETTINGS_KEYS. Repro: 'mp config set keybinds.next_section X' exits non-zero with 'unknown keybind action' even though next_section is a valid user-rebindable key (in SETTINGS_KEYS lines 65-72, in KEYBIND_DEFAULTS line 331, and a real field on Keybinds). The same gap makes 'mp config get keybinds.next_section' fail. KEYBIND_DEFAULTS was added in this milestone but the runner never validated that every entry has a matching KEYBIND_ACTIONS row. AC-05 only verifies keys that happen to be in both lists (refresh, previous_lane) so it does not surface the gap.",
       "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "0f246fa",
+      "fixed_in": "63266db",
       "created": "2026-08-31",
       "resolved": "2026-08-31"
     },
@@ -377,7 +377,7 @@
       "description": "crates/raul/src/tui/keybinds.rs (defaults_are_disjoint test, ~line 1546 onwards) — AC-03 description says 'All user-facing rebindable keybind defaults are unique per chord' but the test excludes 'approve' from the pairs list while 'approve' is in both KEYBIND_ACTIONS (line 301) and SETTINGS_KEYS (line 59), defaults to KeyCombo::Char('p'), and collides with 'prev_item' which also defaults to 'p'. The test would fail if 'approve' were added to the pairs list. The runner instead pinned the collision with a separate approve_and_prev_item_share_p_as_known_contextual_shadow test, accepting the shadow as a known exception. This means AC-03 is NOT actually verified by the implementation — the test as written proves only that 25 of the 27 KEYBIND_ACTIONS entries are pairwise disjoint (excluding approve and focus_content). Either the AC must be amended to carve out the approve/prev_item contextual shadow, or one of the two defaults needs to move to a different chord. Per L1 (green tests do not imply correct behavior), the spec drift was hidden by the disjoint test's hand-picked pairs list.",
       "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "0f246fa",
+      "fixed_in": "98dd281",
       "created": "2026-08-31",
       "resolved": "2026-08-31"
     },
@@ -388,7 +388,7 @@
       "description": "crates/raul/src/tui/modes/settings/help.rs S3 — S3 step action says 'drop the focus_content entry; change the refresh default prose to Ctrl-R; update the previous_lane prose to Left, BackTab (no h)'. Pre-M200, the HELP table at crates/raul/src/tui/modes/settings/help.rs (commit d8c5cc0~1) contained zero entries for focus_content, refresh, or previous_lane (verified: git show d8c5cc0~1:crates/raul/src/tui/modes/settings/help.rs | grep returned empty). The runner pinned the absence with a help_for_omits_focus_content_refresh_previous_lane test (help.rs:222-245) instead of updating prose that didn't exist. The done_when clause says 'help_for() has no focus_content entry; refresh and previous_lane prose match the new defaults' — but the second clause is moot because no HELP entry exists to match. Spec drift: S3 should have said 'verify HELP table does not document these three keys' rather than implying updates to existing prose. The deferral to M201 is fine; the S3 wording should be corrected.",
       "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "0f246fa",
+      "fixed_in": "3f7c46a",
       "created": "2026-08-31",
       "resolved": "2026-08-31"
     },
@@ -410,7 +410,7 @@
       "description": "master-plan/milestones/200-*.json AC-05 description says 'mp config get keybinds.focus_content errors with unknown-key' but the actual implementation returns ''keybinds.focus_content' is deprecated and no longer user-rebindable; see CHANGELOG.md for details.' (verified via target/release/mp config get keybinds.focus_content). The test config_keys_get_focus_content_errors_with_unknown_key at crates/mp/tests/suites/config_keys.rs:43 asserts only !out.status.success() — it does not assert on the error message text, so the AC's literal wording ('unknown-key') is not enforced. Either the AC description should drop 'with unknown-key' (preferred — the deprecation message is the user-facing answer), or the implementation should mirror the AC's wording.",
       "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "0f246fa",
+      "fixed_in": "a6f1252",
       "created": "2026-08-31",
       "resolved": "2026-08-31"
     },
