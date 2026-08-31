@@ -1,6 +1,6 @@
 //! M169-rev2 user report: 'h' was dispatching as `PreviousLane` on
 //! List view (the "h" tab jumped to Overview) instead of
-//! `ToggleHideDone`. The `previous_lane` default binding includes 'h'
+//! `ToggleHideDone`. The `previous_lane` default binding included 'h'
 //! as a vim-style alias; the dispatch in `modes::normal::handle_key`
 //! matched `previous_lane` BEFORE the per-lane handler could dispatch
 //! `ToggleHideDone`. The fix in `modes/normal.rs` overrides the
@@ -12,8 +12,18 @@
 //!      Overview (PreviousLane), not toggle hide-done.
 //!   2. Press `1` → moves to Overview too (digit-1 = Overview lane).
 //!
-//! Post-fix: 'h' on List view → `ToggleHideDone`. 'h' on Detail view
-//! → `PreviousLane` (no contextual meaning, vim alias wins).
+//! Post-M169-rev2: 'h' on List view → `ToggleHideDone`. 'h' on
+//! Detail view → `PreviousLane` (no contextual meaning, vim alias
+//! wins).
+//!
+//! M200 S1: the `h` alias was dropped from `previous_lane` entirely
+//! (the deconflict moved the overlap from contextual routing to a
+//! cleaner default-config layer). The Detail-view test below was
+//! rewritten to assert that `h` no longer emits any action on
+//! MilestoneDetail — the previous-lane routing now lives on `Left`
+//! and `BackTab`. The List-view tests still apply: `h` on a list
+//! still toggles `hide_done` (it now matches only `hide_done`,
+//! not the contextual `previous_lane`).
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use raul::tui::action::Action;
@@ -72,19 +82,22 @@ fn rev2_h_on_backlog_list_emits_toggle_hide_done() {
 }
 
 #[test]
-fn rev2_h_on_milestone_detail_still_emits_previous_lane() {
-    // Detail view has no hide_done semantic. The 'h' alias to
-    // PreviousLane stays in effect — the user can navigate back to
-    // the list with one keystroke.
+fn rev2_h_on_milestone_detail_emits_no_action_after_m200() {
+    // M200 S1: the `h` alias was dropped from `previous_lane` to
+    // deconflict with `keybinds.hide_done`. The user can still move
+    // back to the list with `Left` or `BackTab` (the remaining
+    // `previous_lane` defaults), but `h` itself no longer matches.
+    // On MilestoneDetail there is no other `h` binding, so `h`
+    // emits no action — the contextual routing that previously
+    // emitted `PreviousLane` here no longer fires.
     let mut app = App::new();
     app.active_lane = Lane::Milestones;
     app.content = ContentState::MilestoneDetail;
 
     let actions = modes::normal::handle_key(h_key(), &app);
-    assert_eq!(
-        actions,
-        vec![Action::PreviousLane],
-        "'h' on MilestoneDetail stays a PreviousLane alias"
+    assert!(
+        actions.is_empty(),
+        "M200 S1: 'h' on MilestoneDetail is no longer a PreviousLane alias; got: {actions:?}"
     );
 }
 
