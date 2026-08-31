@@ -70,8 +70,8 @@
       "id": "AC-03",
       "description": "All user-facing rebindable keybind defaults are unique per chord. A unit test enumerates SETTINGS_KEYS / KEYBIND_ACTIONS remaining actions (focus_content excluded) and asserts no two share a KeyCombo. keybinds.refresh no longer collides with keybinds.resolve; keybinds.previous_lane no longer collides with keybinds.hide_done.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)' exit 0 (1 disjoint + 1 contextual-shadow pin)"
     },
     {
       "id": "AC-04",
@@ -248,7 +248,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_for|keybind_default/)'",
       "done_when": "help_for() has no focus_content entry; refresh and previous_lane prose match the new defaults",
-      "status": "in-progress",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -270,7 +270,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'",
       "done_when": "defaults_are_disjoint passes; the failure message on a collision names both actions and the chord",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],

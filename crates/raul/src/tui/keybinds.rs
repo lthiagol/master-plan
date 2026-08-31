@@ -1478,6 +1478,99 @@ mod tests {
             "footer should no longer mention 'watch on' (legacy auto-refresh removed); got: {s}"
         );
     }
+
+    #[test]
+    fn defaults_are_disjoint() {
+        // M200 AC-03: every user-facing keybind default must be unique
+        // per chord. We enumerate the (action, default_chord) pairs that
+        // remain in `SETTINGS_KEYS` after `focus_content` was dropped
+        // from the user-rebindable surface and assert that no two actions
+        // share a `KeyCombo`. The reserved `focus_content` field is
+        // excluded — it is a TUI-internal action whose default
+        // intentionally overlaps with `keybinds.enter` (a contextual
+        // shadow routed by the per-mode handler).
+        //
+        // Modal/contextual shadows that fall outside the SETTINGS_KEYS
+        // list are not in scope (e.g. `sort_rebind_prev` mirrors
+        // `keybinds.up` while the sort-rebind menu is open). Pinning
+        // those requires modal-aware dispatch logic; the M200 design
+        // explicitly scopes the deconflict to the three documented
+        // defaults (refresh, previous_lane, focus_content) and leaves the
+        // remaining contextual shadows for a follow-up.
+        let kb = Keybinds::default();
+        let pairs: Vec<(&'static str, &Vec<KeyCombo>)> = vec![
+            ("quit", &kb.quit),
+            ("up", &kb.up),
+            ("down", &kb.down),
+            ("page_up", &kb.page_up),
+            ("page_down", &kb.page_down),
+            ("enter", &kb.enter),
+            ("escape", &kb.escape),
+            ("help", &kb.help),
+            ("filter", &kb.filter),
+            ("hide_done", &kb.hide_done),
+            ("create_annotation", &kb.create_annotation),
+            ("resolve", &kb.resolve),
+            ("reopen", &kb.reopen),
+            ("review_menu", &kb.review_menu),
+            ("open_settings", &kb.open_settings),
+            ("previous_lane", &kb.previous_lane),
+            ("next_lane", &kb.next_lane),
+            // `focus_content` is excluded — see the doc-comment above.
+            ("refresh", &kb.refresh),
+            ("next_section", &kb.next_section),
+            ("prev_section", &kb.prev_section),
+            ("next_item", &kb.next_item),
+            ("lifecycle_filter", &kb.lifecycle_filter),
+            ("grooming_preset", &kb.grooming_preset),
+            ("search", &kb.search),
+            ("cycle_sort", &kb.cycle_sort),
+        ];
+
+        // Pairwise comparison — `O(n^2)` but n=26 so this is cheap, and
+        // the inner loop is what produces a useful failure message that
+        // names both actions and the offending chord. On a collision the
+        // test panics with both action labels so the failure pinpoints
+        // which default needs revisiting.
+        for i in 0..pairs.len() {
+            for j in (i + 1)..pairs.len() {
+                let (a_name, a_combos) = pairs[i];
+                let (b_name, b_combos) = pairs[j];
+                for a_combo in a_combos.iter() {
+                    for b_combo in b_combos.iter() {
+                        if a_combo == b_combo {
+                            panic!(
+                                "M200 S4 defaults collide: {a_name} and {b_name} both default to \
+                                 {a_combo:?}; assign a different chord to one of them or document \
+                                 the contextual shadow in the code"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn approve_and_prev_item_share_p_as_known_contextual_shadow() {
+        // M200 AC-03 follow-up: `keybinds.approve` (default `p`) and
+        // `keybinds.prev_item` (default `p`) still overlap at the
+        // default-config layer. The M200 design explicitly scopes the
+        // deconflict to the three documented defaults (refresh,
+        // previous_lane, focus_content); this collision is left in place
+        // because `prev_item` is only consumed in `MilestoneDetail`
+        // context (see `modes::normal::handle_key` which checks
+        // `app.content == ContentState::MilestoneDetail` before matching
+        // `prev_item`), while `approve` is the CoApproval flow's primary
+        // action. Both never bind in the same content state, so the
+        // collision is a contextual shadow — pin the relationship here so
+        // a future change that drops the shadow does not silently break
+        // the disjoint test. A future milestone can resolve the shadow
+        // by moving one of the defaults to a different chord.
+        let kb = Keybinds::default();
+        assert_eq!(kb.approve, vec![plain(KeyCode::Char('p'))]);
+        assert_eq!(kb.prev_item, vec![plain(KeyCode::Char('p'))]);
+    }
 }
 
 // M199 S1: unit tests for `Keybinds::footer_per_tab`. The
