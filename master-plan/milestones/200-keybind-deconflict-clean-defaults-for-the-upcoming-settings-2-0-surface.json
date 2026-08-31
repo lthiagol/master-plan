@@ -57,42 +57,42 @@
       "description": "`keybinds.focus_content` is no longer a recognized config key. `mp config set keybinds.focus_content ...` exits non-zero with a deprecation message that names the key and points at the project CHANGELOG (no milestone IDs in user-visible text). The key is removed from KEYBIND_ACTIONS and from SETTINGS_KEYS. The Keybinds struct keeps the field as a non-rebindable reserved action.",
       "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys|focus_content/)'",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     },
     {
       "id": "AC-02",
       "description": "`Keybinds::default().refresh` equals `[Ctrl-R]` (was `[r]`). `Keybinds::default().previous_lane` equals `[Left, BackTab]` (was `[Left, h, BackTab]`).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)'",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     },
     {
       "id": "AC-03",
       "description": "All user-facing rebindable keybind defaults are unique per chord, except for documented contextual shadows (approve/prev_item share KeyCombo::Char('p') by design).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     },
     {
       "id": "AC-04",
       "description": "`mp config validate` on a fixture with a stale `[keybinds] focus_content = Enter` line emits a non-blocking deprecation warning that names the field and points at the CHANGELOG (no milestone IDs). Exit code 0. A clean config emits no warning.",
       "verification": "make test-scenarios",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     },
     {
       "id": "AC-05",
       "description": "mp config get keybinds.focus_content errors because focus_content is no longer user-rebindable (see deprecation message).",
       "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys/)'",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     },
     {
       "id": "AC-06",
       "description": "Existing settings tests pass unchanged: `m169_rev`, `tui_settings_automation`, `m168_settings_grouped`, the M198 test surface in `crates/raul/tests/keybinds.rs` and `crates/raul/src/tui/app.rs::tests`, and the `ui.show_watch_tab` cases in `crates/mp/tests/suites/config_ui_keys.rs`. The deconflict is a no-op for users who already have a `[keybinds]` section in their config (their overrides win).",
       "verification": "cargo nextest run --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|m169_rev|m168_settings|tui_settings|config_ui_keys|config_keys/)'",
       "status": "passed",
-      "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+      "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
     }
   ],
   "design_decisions": [
@@ -355,7 +355,7 @@
   "verification": {
     "date": "2026-08-31",
     "branch": "",
-    "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
+    "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
   },
   "findings": [
     {
