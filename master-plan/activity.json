@@ -786,6 +786,36 @@
       "type": "lifecycle-transition",
       "subject": "200",
       "summary": "lifecycle: remediation → executed"
+    },
+    {
+      "timestamp": "2026-08-31T21:05:03.210240+00:00",
+      "type": "validation-state",
+      "subject": "",
+      "summary": "validation state errors (0 → 1 errors)",
+      "data": {
+        "cur_count": 1,
+        "cur_ok": false,
+        "prev_count": 0,
+        "prev_ok": true
+      }
+    },
+    {
+      "timestamp": "2026-08-31T21:05:35.136112+00:00",
+      "type": "lifecycle-transition",
+      "subject": "200",
+      "summary": "lifecycle: executed → remediation"
+    },
+    {
+      "timestamp": "2026-08-31T21:12:44.913730+00:00",
+      "type": "validation-state",
+      "subject": "",
+      "summary": "validation state recovered (1 → 0 errors)",
+      "data": {
+        "cur_count": 0,
+        "cur_ok": true,
+        "prev_count": 1,
+        "prev_ok": false
+      }
     }
   ]
 }

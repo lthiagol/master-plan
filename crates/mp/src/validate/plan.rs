@@ -231,12 +231,23 @@ pub fn validate_plan_with_milestones(
                 }
             }
         }
-        if exec == "done" && spec != "verified" {
-            errors.push(issue(
-                "G7",
-                "execution_status done requires spec_status verified",
-                Some(id.clone()),
-            ));
+        if exec == "done" {
+            // M200 F-13: the legacy triple invariant (exec=done requires
+            // spec=verified) was tightened before M196 introduced the
+            // `lifecycle=executed` state. M196 lets a milestone reach
+            // exec=done via the new pipeline (lifecycle=executed,
+            // spec_status=implemented) without ever passing through
+            // spec=verified. The gate now accepts EITHER the legacy
+            // triple OR the M196 executed+implemented combination.
+            let legacy_ok = spec == "verified";
+            let m196_executed_ok = lc == "executed" && spec == "implemented";
+            if !legacy_ok && !m196_executed_ok {
+                errors.push(issue(
+                    "G7",
+                    "execution_status done requires spec_status verified (or lifecycle=executed with spec_status implemented)",
+                    Some(id.clone()),
+                ));
+            }
         }
         if (spec == "draft" || spec == "interview" || spec == "review")
             && m.has_implementation_plan()

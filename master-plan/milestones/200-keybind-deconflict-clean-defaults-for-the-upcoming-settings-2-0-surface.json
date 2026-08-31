@@ -3,9 +3,9 @@
     "id": "200",
     "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
     "slug": "keybind-deconflict-clean-defaults-for-the-upcoming-settings-2-0-surface",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,7 +23,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-31T20:51:23.112384+00:00"
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-08-31T21:05:35.131500+00:00"
   },
   "intent": {
     "outcome": "Every rebindable keybind has a unique default. No two user-facing keybinds share a chord in the default config. The settings help text can list defaults without footnotes about overlaps. The Settings 2.0 milestone (M201) gets a clean defaults table to point at."
@@ -489,6 +490,17 @@
       "fixed_in": "fb787e3",
       "created": "2026-08-31",
       "resolved": "2026-08-31"
+    },
+    {
+      "id": "F-13",
+      "severity": "high",
+      "category": "correctness",
+      "description": "crates/mp/src/validate/plan.rs:234-240 — G7 gate ('execution_status done requires spec_status verified') fires on M200's current state: lifecycle=executed, execution_status=done, spec_status=implemented. Verified empirically: 'mp validate --format json' reports 'G7: execution_status done requires spec_status verified (milestone 200)'; cargo nextest run -p mp -E 'test(/repo_plan_validates/)' --no-fail-fast FAILS (panic at crates/mp/tests/mini_schema_e2e.rs:24). Root cause: the G7 gate is the legacy triple invariant (exec=done requires spec=verified), but the M196 model allows the new 'executed' state (lifecycle=executed → spec_status=implemented) with execution_status=done. The gate does not know about lifecycle=executed. The runner moved M200 to lifecycle=executed without reconciling this — pre-M200 (commit a409e4f), M200 was at execution_status=planned and the G7 gate was silent. This breaks a documented behavior (mp validate) and a real test in the official test suite (mini_schema_e2e). M200 is the only milestone at lifecycle=executed in master-plan/, so the regression is M200-specific. The runner's AC-06 verification regex does not include mini_schema_e2e (it's a meta-test for the plan's own schema), so the F-06 fix didn't catch this. The fix is either (a) loosen G7 to allow lifecycle=executed with exec=done + spec=implemented, or (b) the runner must transition M200 to the legacy triple (lifecycle=done + exec=done + spec=verified) before this validation runs.",
+      "status": "open",
+      "author": "reviewer",
+      "fixed_in": "",
+      "created": "2026-08-31",
+      "resolved": ""
     }
   ]
 }
