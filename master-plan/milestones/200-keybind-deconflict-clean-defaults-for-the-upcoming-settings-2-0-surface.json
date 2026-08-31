@@ -83,7 +83,7 @@
     },
     {
       "id": "AC-05",
-      "description": "mp config get keybinds.focus_content errors because focus_content is no longer user-rebindable (see deprecation message).",
+      "description": "mp config get keybinds.refresh returns Ctrl-R on a fresh project; mp config get keybinds.previous_lane returns Left, BackTab (no h); mp config get keybinds.focus_content errors because focus_content is no longer user-rebindable (see deprecation message).",
       "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys/)'",
       "status": "passed",
       "evidence": "All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify."
