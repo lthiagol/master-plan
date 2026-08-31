@@ -56,8 +56,8 @@
       "id": "AC-01",
       "description": "`keybinds.focus_content` is no longer a recognized config key. `mp config set keybinds.focus_content ...` exits non-zero with a deprecation message that names the key and points at the project CHANGELOG (no milestone IDs in user-visible text). The key is removed from KEYBIND_ACTIONS and from SETTINGS_KEYS. The Keybinds struct keeps the field as a non-rebindable reserved action.",
       "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys|focus_content/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "nextest run -p raul --no-fail-fast -E 'test(/keybinds|resolve/)' exit 0; clippy -p raul --tests --no-deps -- -D warnings exit 0"
     },
     {
       "id": "AC-02",
@@ -200,7 +200,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds|resolve/)' && cargo clippy -p raul --tests --no-deps -- -D warnings",
       "done_when": "SETTINGS_KEYS and KEYBIND_ACTIONS have no focus_content entry; Keybinds still has the field; raul still routes the reserved action internally",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-02"

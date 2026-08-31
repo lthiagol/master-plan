@@ -261,6 +261,12 @@ pub const UI_THEMES: &[&str] = &["mocha", "macchiato", "frappe", "latte", "dracu
 /// so the action names are duplicated here deliberately. The list is the
 /// validation surface for `mp config set keybinds.<action>` and the shared
 /// prerequisite for M140 (the Settings TUI writes the same section).
+///
+/// M200: `focus_content` is no longer user-rebindable — it is a TUI-internal
+/// reserved action. The list mirrors only the user-rebindable subset of
+/// `Keybinds`; the `focus_content` field stays on the struct but cannot be
+/// overridden through config (deprecated `keybinds.focus_content` lines in
+/// a project config surface a non-blocking deprecation warning).
 pub const KEYBIND_ACTIONS: &[&str] = &[
     "quit",
     "up",
@@ -282,7 +288,6 @@ pub const KEYBIND_ACTIONS: &[&str] = &[
     "toggle_tab_focus",
     "previous_lane",
     "next_lane",
-    "focus_content",
     "refresh",
 ];
 
