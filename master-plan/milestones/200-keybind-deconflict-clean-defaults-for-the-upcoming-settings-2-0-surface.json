@@ -3,9 +3,9 @@
     "id": "200",
     "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
     "slug": "keybind-deconflict-clean-defaults-for-the-upcoming-settings-2-0-surface",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,8 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-08-31T20:18:16.951146+00:00"
+    "lifecycle_at": "2026-08-31T20:51:23.112384+00:00"
   },
   "intent": {
     "outcome": "Every rebindable keybind has a unique default. No two user-facing keybinds share a chord in the default config. The settings help text can list defaults without footnotes about overlaps. The Settings 2.0 milestone (M201) gets a clean defaults table to point at."
@@ -419,77 +418,77 @@
       "severity": "high",
       "category": "correctness",
       "description": "master-plan/milestones/200-*.json AC-06 verification regex is broken — nextest 'test(/.../)' matches against test function names, not binary names. The AC-06 verification command is 'cargo nextest run --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|m169_rev|m168_settings|tui_settings|config_ui_keys|config_keys/)'' but the named segments 'm169_rev', 'm168_settings', 'tui_settings' are binary names, not test function names. Verified empirically: cargo nextest run --no-fail-fast -E 'test(/m169_rev/)' matches 0 tests; cargo nextest run -p raul -E 'binary(/m169_rev/)' matches 28. The AC-06 verification regex therefore exercises zero of the named regression tests. AC-06 description says 'Existing settings tests pass unchanged: m169_rev, tui_settings_automation, m168_settings_grouped...' — none of those tests are actually being run. The F-04/F-04c collapses (0f246fa, eb9d9a2) inherited and concentrated this broken regex. The fix is to either switch to 'binary(/.../)' filters for binary-name matches, or include actual test function names ('rev_high_*', 's_opens_*', 'enter_stages_*', 'settings_save_*' etc.).",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "30cacd3",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-07",
       "severity": "high",
       "category": "correctness",
       "description": "master-plan/milestones/200-*.json AC-06 description claims m168_settings_grouped tests pass unchanged, but m168_settings_grouped::down_from_last_key_of_section_jumps_to_first_key_of_next FAILS at crates/raul/tests/m168_settings_grouped.rs:41 — assertion 'left == right' failed: left: 'ui.show_watch_tab' right: 'workflow.profile'. The test pins the section boundary at ui.hide_done→workflow.profile, but SETTINGS_KEYS (crates/raul/src/tui/modes/settings.rs:16-73) inserted ui.show_watch_tab between ui.hide_done and workflow.profile in M198. The runner's cycle-1 evidence acknowledged 'Pre-existing M198-related test failures (m168_settings lane numbering) excluded from scope.' but the cycle-2 'fix' did not amend the AC description. AC-06 verification (F-06 broken regex) does not catch this; but cargo nextest run -p raul -E 'binary(/m168_settings_grouped/)' --no-fail-fast shows 1/4 fail. Similar failures in m168_settings binary (3/7 fail) — s_opens_settings_lane_once expects Lane::Settings at index 5 but Lane::ordered() (crates/raul/src/tui/app.rs:207-217) returns 7 lanes post-M198 with Settings at index 6. Either fix the tests or amend AC-06 to exclude the M198-introduced regressions.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "30cacd3",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-08",
       "severity": "high",
       "category": "correctness",
       "description": "master-plan/milestones/200-*.json AC-06 description claims 'tui_settings_automation' tests pass unchanged, but 10/16 tests in tui_settings / tui_settings_automation / tui_settings_lane_smoke binaries are FAILING. Verified via cargo nextest run -p raul -E 'binary(/tui_settings/)' --no-fail-fast — Summary: 16 tests run, 6 passed, 10 failed. Failures include ctrl_o_from_normal_jumps_to_settings_lane, settings_save_commits_staged_edits, enter_opens_edit_then_stages_on_second_enter, jump_lane_opens_settings_and_loads_config, settings_modal_surfaces_agent_section_via_navigation, select_settings_lane_loads_settings_state, esc_on_settings_lane_is_noop_without_active_edit, settings_edit_persists_commit_after_execute_to_disk, settings_automation_invalid_value_rejected_by_dry_run, save_dry_run_first_then_commit_per_staged_edit. These predate M200 (M198 introduced the Watch lane). The F-06 broken regex masks this from AC-06 verification. AC-06 description should be amended to acknowledge these pre-existing M198 regressions, or the tests should be fixed.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "30cacd3",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-09",
       "severity": "medium",
       "category": "spec-drift",
       "description": "master-plan/milestones/200-*.json AC-05 description was over-corrected in commit a6f1252 (F-05 fix). Original AC-05 covered three get-cases: 'mp config get keybinds.refresh returns Ctrl-R on a fresh project; mp config get keybinds.previous_lane returns Left, BackTab (no h). mp config get keybinds.focus_content errors with unknown-key.' The F-05 fix replaced all three with a single clause: 'mp config get keybinds.focus_content errors because focus_content is no longer user-rebindable (see deprecation message).' This drops the contract that mp config get keybinds.refresh returns Ctrl-R and mp config get keybinds.previous_lane returns Left, BackTab — the central user-facing promises of M200. The tests config_keys_get_refresh_default and config_keys_get_previous_lane_default still exist (crates/mp/tests/suites/config_keys.rs:14, 26) and pass via the AC-05 verification command (test(/config_keys/) — 7 tests run). But the AC description no longer captures the contract. The F-05 fix should have dropped 'with unknown-key' from the focus_content clause while keeping the other two clauses.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "ff7ef69",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-10",
       "severity": "medium",
       "category": "spec-drift",
       "description": "master-plan/milestones/200-*.json S7 done_when contract is unfulfilled by the tests field after the F-04c collapse in commit eb9d9a2. S7 done_when says 'All named regression tests pass; clippy and fmt clean' but the tests field is now 'cargo nextest run --no-fail-fast -E test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|m169_rev|m168_settings|tui_settings|config_ui_keys|config_keys/)' — a single cargo nextest invocation with no clippy or fmt. The action text still says 'Run the settings / M198 regression sweep plus clippy and fmt'. Either the tests field should include 'cargo clippy -p mp --tests --no-deps -- -D warnings && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo fmt --all -- --check' (which would re-trigger the &&-rejection issue), or the done_when / action text should drop 'plus clippy and fmt' / 'clippy and fmt clean'. Same drift in S1.1 tests field which previously ran 'cargo nextest ... && cargo clippy -p raul --tests --no-deps -- -D warnings' but now runs only the nextest portion.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "daf7d86",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-11",
       "severity": "low",
       "category": "record-keeping",
       "description": "master-plan/milestones/200-*.json findings[].fixed_in metadata is incorrect for 4 of 5 cycle-1 findings. In commit 1cbec07 (resolve all 5 review findings), all 5 findings were stamped with fixed_in: 0f246fa, but the actual fixing commits differ: F-01 was fixed in 63266db, F-02 in 98dd281, F-03 in 3f7c46a, F-05 in a6f1252. Only F-04 was actually fixed in 0f246fa (the F-04b commit that collapsed the AC-06 verification). Record-keeping issue — fixed_in should point to the commit that resolved the finding, not the latest commit at resolve time.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "cf0c216",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-12",
       "severity": "low",
       "category": "record-keeping",
       "description": "master-plan/milestones/200-*.json AC evidence quality regressed in commit 3127896. All 6 AC evidence fields and the top-level verification.evidence were overwritten with the same generic string 'All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify.' The previous evidence (e.g. 'cargo nextest run -p mp --no-fail-fast -E test(/config_keys|keybind|focus_content|config_validate/) exit 0 (16/16 pass)') had per-AC test output and exit codes. The new generic evidence doesn't pin which test command ran for which AC — a future maintainer cannot reproduce the verification from the evidence alone. Evidence should be per-AC command + exit code + test count.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "fb787e3",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     }
   ]
 }
