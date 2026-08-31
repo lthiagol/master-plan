@@ -199,7 +199,7 @@
         "crates/raul/src/tui/modes/settings.rs",
         "crates/mp/src/config.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds|resolve/)' && cargo clippy -p raul --tests --no-deps -- -D warnings",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds|resolve/)'",
       "done_when": "SETTINGS_KEYS and KEYBIND_ACTIONS have no focus_content entry; Keybinds still has the field; raul still routes the reserved action internally",
       "status": "done",
       "covers_ac": [
@@ -335,7 +335,7 @@
         "crates/raul",
         "crates/mp"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|tui_settings|m169_rev|m168_settings/)' && cargo nextest run -p mp --no-fail-fast -E 'test(/config_ui_keys|config_keys/)' && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo clippy -p raul --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
+      "tests": "cargo nextest run --no-fail-fast -E 'test(/keybinds_default|tab_move|reconcile|footer_tab_bar|ordered_visible|m169_rev|m168_settings|tui_settings|config_ui_keys|config_keys/)'",
       "done_when": "All named regression tests pass; clippy and fmt clean",
       "status": "done",
       "covers_ac": [
