@@ -1,5 +1,14 @@
 ## Unreleased — WIP CI hardening
 
+- **raul keybind deconflict.** `keybinds.refresh` now defaults to
+  `Ctrl-R` (was `r`); `keybinds.previous_lane` dropped the `h` alias
+  (use `Left` or `BackTab`); `keybinds.focus_content` is no longer a
+  user-rebindable setting (it was a TUI-internal reserved action).
+  Existing user overrides win — no migration is required for projects
+  with a `[keybinds]` section in their config. `mp config validate`
+  surfaces a non-blocking deprecation warning for any stale
+  `focus_content` line; the line is silently dropped the next time you
+  set a different keybind.
 - **CI provides `mp` on PATH** (`target/release` via `$GITHUB_PATH` in
   `wip-ci.yml` / `stable-ci.yml`) so raul integration tests that shell out
   to `mp` run on clean runners.
