@@ -267,6 +267,15 @@ pub const UI_THEMES: &[&str] = &["mocha", "macchiato", "frappe", "latte", "dracu
 /// `Keybinds`; the `focus_content` field stays on the struct but cannot be
 /// overridden through config (deprecated `keybinds.focus_content` lines in
 /// a project config surface a non-blocking deprecation warning).
+///
+/// F-01 (review): the list was out of sync with `KEYBIND_DEFAULTS` — six
+/// M167 / M185 / M186 user-rebindable keys (`next_section`, `prev_section`,
+/// `next_item`, `prev_item`, `lifecycle_filter`, `grooming_preset`, plus
+/// `search` and `cycle_sort` from M186) were missing, and two pre-M179
+/// orphans (`toggle_watch`, `toggle_tab_focus`) had been left behind. The
+/// list now matches `SETTINGS_KEYS` and `KEYBIND_DEFAULTS` line-for-line;
+/// the docstring on `KEYBIND_DEFAULTS` restates the contract that every
+/// action name appears in both lists.
 pub const KEYBIND_ACTIONS: &[&str] = &[
     "quit",
     "up",
@@ -284,11 +293,17 @@ pub const KEYBIND_ACTIONS: &[&str] = &[
     "approve",
     "review_menu",
     "open_settings",
-    "toggle_watch",
-    "toggle_tab_focus",
     "previous_lane",
     "next_lane",
     "refresh",
+    "next_section",
+    "prev_section",
+    "next_item",
+    "prev_item",
+    "lifecycle_filter",
+    "grooming_preset",
+    "search",
+    "cycle_sort",
 ];
 
 /// Canonical default values for user-rebindable keybinds, paired with the
