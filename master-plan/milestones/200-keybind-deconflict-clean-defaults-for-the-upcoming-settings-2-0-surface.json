@@ -3,9 +3,9 @@
     "id": "200",
     "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
     "slug": "keybind-deconflict-clean-defaults-for-the-upcoming-settings-2-0-surface",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,8 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-08-31T19:25:19.071728+00:00"
+    "lifecycle_at": "2026-08-31T20:04:41.435301+00:00"
   },
   "intent": {
     "outcome": "Every rebindable keybind has a unique default. No two user-facing keybinds share a chord in the default config. The settings help text can list defaults without footnotes about overlaps. The Settings 2.0 milestone (M201) gets a clean defaults table to point at."
@@ -364,55 +363,55 @@
       "severity": "high",
       "category": "spec-gap",
       "description": "crates/mp/src/config.rs:286-318 — KEYBIND_ACTIONS (21 entries) and KEYBIND_DEFAULTS (27 entries) are out of sync. KEYBIND_DEFAULTS contains 6 user-rebindable keys (next_section, prev_section, next_item, prev_item, lifecycle_filter, grooming_preset) that are NOT in KEYBIND_ACTIONS; KEYBIND_ACTIONS contains 2 stale orphans (toggle_watch, toggle_tab_focus) that are NOT in KEYBIND_DEFAULTS or SETTINGS_KEYS. Repro: 'mp config set keybinds.next_section X' exits non-zero with 'unknown keybind action' even though next_section is a valid user-rebindable key (in SETTINGS_KEYS lines 65-72, in KEYBIND_DEFAULTS line 331, and a real field on Keybinds). The same gap makes 'mp config get keybinds.next_section' fail. KEYBIND_DEFAULTS was added in this milestone but the runner never validated that every entry has a matching KEYBIND_ACTIONS row. AC-05 only verifies keys that happen to be in both lists (refresh, previous_lane) so it does not surface the gap.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "0f246fa",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-02",
       "severity": "medium",
       "category": "correctness",
       "description": "crates/raul/src/tui/keybinds.rs (defaults_are_disjoint test, ~line 1546 onwards) — AC-03 description says 'All user-facing rebindable keybind defaults are unique per chord' but the test excludes 'approve' from the pairs list while 'approve' is in both KEYBIND_ACTIONS (line 301) and SETTINGS_KEYS (line 59), defaults to KeyCombo::Char('p'), and collides with 'prev_item' which also defaults to 'p'. The test would fail if 'approve' were added to the pairs list. The runner instead pinned the collision with a separate approve_and_prev_item_share_p_as_known_contextual_shadow test, accepting the shadow as a known exception. This means AC-03 is NOT actually verified by the implementation — the test as written proves only that 25 of the 27 KEYBIND_ACTIONS entries are pairwise disjoint (excluding approve and focus_content). Either the AC must be amended to carve out the approve/prev_item contextual shadow, or one of the two defaults needs to move to a different chord. Per L1 (green tests do not imply correct behavior), the spec drift was hidden by the disjoint test's hand-picked pairs list.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "0f246fa",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-03",
       "severity": "medium",
       "category": "spec-drift",
       "description": "crates/raul/src/tui/modes/settings/help.rs S3 — S3 step action says 'drop the focus_content entry; change the refresh default prose to Ctrl-R; update the previous_lane prose to Left, BackTab (no h)'. Pre-M200, the HELP table at crates/raul/src/tui/modes/settings/help.rs (commit d8c5cc0~1) contained zero entries for focus_content, refresh, or previous_lane (verified: git show d8c5cc0~1:crates/raul/src/tui/modes/settings/help.rs | grep returned empty). The runner pinned the absence with a help_for_omits_focus_content_refresh_previous_lane test (help.rs:222-245) instead of updating prose that didn't exist. The done_when clause says 'help_for() has no focus_content entry; refresh and previous_lane prose match the new defaults' — but the second clause is moot because no HELP entry exists to match. Spec drift: S3 should have said 'verify HELP table does not document these three keys' rather than implying updates to existing prose. The deferral to M201 is fine; the S3 wording should be corrected.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "0f246fa",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-04",
       "severity": "medium",
       "category": "process",
       "description": "master-plan/milestones/200-*.json evidence tag '[skip-verify: AC and step verifications skipped]' — runner used 'mp milestone complete --skip-verify' to bypass BOTH AC and step verification entirely. The runner's own evidence cites 'AC-06 ... multi-step chain with && shell operators' as the blocker for honest completion. Per docs/agent-guide/executing.md:70-91, --skip-verify is stronger than --force and is recorded debt; honest completion is preferred over force/skip-verify. The runner added a test for AC-02 in commit 8387bcf so AC-02's spec verification would actually run cleanly. For AC-06, the spec verification joins commands with && (which mp's verify executor does not run as a shell chain). The proper fix is one of: (a) split AC-06's verification into a single cargo nextest invocation covering both crates, or (b) replace && with multiple independent verification lines. Using --skip-verify is acceptable as last resort but the runner should have flagged the AC-06 verification form as broken and gotten it fixed before complete.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "0f246fa",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     },
     {
       "id": "F-05",
       "severity": "low",
       "category": "spec-drift",
       "description": "master-plan/milestones/200-*.json AC-05 description says 'mp config get keybinds.focus_content errors with unknown-key' but the actual implementation returns ''keybinds.focus_content' is deprecated and no longer user-rebindable; see CHANGELOG.md for details.' (verified via target/release/mp config get keybinds.focus_content). The test config_keys_get_focus_content_errors_with_unknown_key at crates/mp/tests/suites/config_keys.rs:43 asserts only !out.status.success() — it does not assert on the error message text, so the AC's literal wording ('unknown-key') is not enforced. Either the AC description should drop 'with unknown-key' (preferred — the deprecation message is the user-facing answer), or the implementation should mirror the AC's wording.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "0f246fa",
       "created": "2026-08-31",
-      "resolved": ""
+      "resolved": "2026-08-31"
     }
   ]
 }
