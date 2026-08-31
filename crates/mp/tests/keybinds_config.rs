@@ -15,9 +15,15 @@ fn get(env: &TestEnv, key: &str) -> Value {
 }
 
 #[test]
-fn keybind_defaults_to_null_when_unset() {
+fn keybind_defaults_to_canonical_form_when_unset() {
+    // M200: `mp config get` now surfaces the canonical default from
+    // `KEYBIND_DEFAULTS` when the user has not customized the action,
+    // matching what raul applies at runtime. Pre-M200 this returned
+    // null, which conflated "unset" with "I don't know what raul uses".
     let env = TestEnv::new();
-    assert_eq!(get(&env, "keybinds.quit"), Value::Null);
+    assert_eq!(get(&env, "keybinds.quit"), json!("q, Q"));
+    assert_eq!(get(&env, "keybinds.up"), json!("Up, k"));
+    assert_eq!(get(&env, "keybinds.refresh"), json!("Ctrl-R"));
 }
 
 #[test]
@@ -44,7 +50,9 @@ fn empty_value_clears_the_override() {
     env.run(&["config", "set", "keybinds.quit", "ctrl+c"]);
     assert_eq!(get(&env, "keybinds.quit"), json!("ctrl+c"));
     env.run(&["config", "set", "keybinds.quit", ""]);
-    assert_eq!(get(&env, "keybinds.quit"), Value::Null);
+    // After clearing the override, `config get` falls back to the
+    // canonical default (M200) instead of null.
+    assert_eq!(get(&env, "keybinds.quit"), json!("q, Q"));
 }
 
 #[test]

@@ -84,8 +84,8 @@
       "id": "AC-05",
       "description": "`mp config get keybinds.refresh` returns `Ctrl-R` on a fresh project; `mp config get keybinds.previous_lane` returns `Left, BackTab` (no `h`). `mp config get keybinds.focus_content` errors with unknown-key.",
       "verification": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/config_keys/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|keybind|focus_content|config_validate/)' exit 0 (16/16 pass)"
     },
     {
       "id": "AC-06",
@@ -224,7 +224,7 @@
       ],
       "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/config_keys|keybind|focus_content|config_validate/)'",
       "done_when": "mp config validate on a fixture with [keybinds] focus_content = Enter emits the deprecation warning; on a clean config no warning; mp config set to any key on a fixture with the stale line strips the line",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-04",

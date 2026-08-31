@@ -291,6 +291,53 @@ pub const KEYBIND_ACTIONS: &[&str] = &[
     "refresh",
 ];
 
+/// Canonical default values for user-rebindable keybinds, paired with the
+/// matching `KEYBIND_ACTIONS` entry. Each value is the comma-separated
+/// canonical form (`"Ctrl-R"`, `"Left, BackTab"`) that `mp config get`
+/// surfaces when the user has not customized the action — matching what
+/// raul would apply at runtime via `Keybinds::default()`.
+///
+/// mp cannot depend on `raul` (where `Keybinds::default()` lives), so the
+/// canonical strings are duplicated here. The format matches the human-
+/// readable form documented in CHANGELOG.md; the on-disk storage form is
+/// the raw combo string the user typed (`parse_key_combo` parses both).
+///
+/// M200: `refresh` moved from `r` to `Ctrl-R`; `previous_lane` dropped the
+/// `h` alias (kept `Left` and `BackTab`). The list excludes `focus_content`,
+/// which is no longer user-rebindable.
+pub const KEYBIND_DEFAULTS: &[(&str, &str)] = &[
+    ("quit", "q, Q"),
+    ("up", "Up, k"),
+    ("down", "Down, j"),
+    ("page_up", "PageUp"),
+    ("page_down", "PageDown"),
+    ("enter", "Enter"),
+    ("escape", "Esc"),
+    ("help", "?"),
+    ("filter", "f"),
+    ("hide_done", "h"),
+    ("create_annotation", "A"),
+    ("resolve", "r"),
+    ("reopen", "R"),
+    ("approve", "p"),
+    ("review_menu", "m"),
+    ("open_settings", "Ctrl-O"),
+    // M200: dropped the `h` alias (vim-style conflict with `hide_done`).
+    ("previous_lane", "Left, BackTab"),
+    ("next_lane", "Right, l, Tab"),
+    // M200: refresh default moved from `r` to `Ctrl-R` (no longer collides
+    // with `resolve` at the default layer).
+    ("refresh", "Ctrl-R"),
+    ("next_section", "]"),
+    ("prev_section", "["),
+    ("next_item", "n"),
+    ("prev_item", "p"),
+    ("lifecycle_filter", "F"),
+    ("grooming_preset", "g"),
+    ("search", "/"),
+    ("cycle_sort", "o"),
+];
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WorkflowConfig {
     #[serde(default)]

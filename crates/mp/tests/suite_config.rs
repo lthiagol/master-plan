@@ -2,6 +2,9 @@
 
 mod common;
 
+#[path = "suites/config_keys.rs"]
+mod config_keys;
+
 #[path = "suites/config_load_reliability.rs"]
 mod config_load_reliability;
 

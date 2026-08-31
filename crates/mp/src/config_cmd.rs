@@ -505,15 +505,32 @@ fn collect_semantic_issues(
     }
 
     for action in cfg.keybinds.keys() {
-        if !crate::config::KEYBIND_ACTIONS.contains(&action.as_str()) {
-            errors.push(ConfigFieldIssue {
-                field: format!("keybinds.{action}"),
-                message: format!(
-                    "unknown keybind action: keybinds.{action} (expected one of: {})",
-                    crate::config::KEYBIND_ACTIONS.join(", ")
-                ),
-            });
+        if crate::config::KEYBIND_ACTIONS.contains(&action.as_str()) {
+            continue;
         }
+        if action == "focus_content" {
+            // M200: `focus_content` is a TUI-internal reserved action; the
+            // field is intentionally not user-rebindable. Emit a non-blocking
+            // deprecation warning so users with a stale config line learn
+            // the key is gone (without forcing an error on validate). The
+            // warning names the field and points at CHANGELOG.md, with no
+            // milestone IDs or internal paths in the user-visible text.
+            warnings.push(ConfigFieldIssue {
+                field: "keybinds.focus_content".to_string(),
+                message: "'keybinds.focus_content' is deprecated and no longer has effect; \
+                     remove it from your config to silence this warning. \
+                     See CHANGELOG.md for details."
+                    .to_string(),
+            });
+            continue;
+        }
+        errors.push(ConfigFieldIssue {
+            field: format!("keybinds.{action}"),
+            message: format!(
+                "unknown keybind action: keybinds.{action} (expected one of: {})",
+                crate::config::KEYBIND_ACTIONS.join(", ")
+            ),
+        });
     }
 
     for (role, rc) in roles_iter(cfg) {
@@ -584,6 +601,15 @@ fn parse_icons(value: &str) -> Result<String> {
 fn validate_keybind_action(action: &str) -> Result<()> {
     if crate::config::KEYBIND_ACTIONS.contains(&action) {
         Ok(())
+    } else if action == "focus_content" {
+        // M200: `focus_content` was removed from the user-rebindable set,
+        // so explicit `mp config set keybinds.focus_content ...` must be
+        // rejected (exit 1). The error message mirrors the validate-path
+        // deprecation text so users see one canonical explanation.
+        bail!(
+            "'keybinds.focus_content' is deprecated and no longer user-rebindable; \
+             see CHANGELOG.md for details."
+        )
     } else {
         bail!(
             "unknown keybind action: keybinds.{action} (expected one of: {})",
@@ -593,13 +619,23 @@ fn validate_keybind_action(action: &str) -> Result<()> {
 }
 
 /// Read a single `keybinds.<action>` value. Returns the stored combo string,
-/// or `null` when the action is unset (raul then applies its built-in default).
+/// or the canonical default from `KEYBIND_DEFAULTS` when the action is
+/// unset. Existing user overrides win over the canonical default.
 fn config_get_keybind(cfg: &ProjectConfig, action: &str) -> Result<Value> {
     validate_keybind_action(action)?;
-    Ok(match cfg.keybinds.get(action) {
-        Some(v) => json!(v),
-        None => Value::Null,
-    })
+    if let Some(v) = cfg.keybinds.get(action) {
+        return Ok(json!(v));
+    }
+    // M200: surface the canonical default instead of null so the user
+    // auditing their config sees the effective value. raul applies the
+    // same default at runtime via `Keybinds::default()`; the canonical
+    // string lives in `KEYBIND_DEFAULTS` (mp cannot depend on raul).
+    for (name, default) in crate::config::KEYBIND_DEFAULTS {
+        if *name == action {
+            return Ok(json!(default));
+        }
+    }
+    Ok(Value::Null)
 }
 
 /// Set a single `keybinds.<action>` binding. mp stores the raw combo string;
@@ -611,6 +647,15 @@ fn set_keybind(cfg: &mut ProjectConfig, action: &str, value: &str) -> Result<()>
         cfg.keybinds.remove(action);
     } else {
         cfg.keybinds.insert(action.to_string(), value.to_string());
+    }
+    // M200: drop a stale `keybinds.focus_content` line on any successful
+    // keybind write. The key is no longer user-rebindable (see the
+    // validate-path warning); self-healing the moment the user touches
+    // any keybind keeps the config from carrying a no-op line forward.
+    // `keybinds.focus_content` is never written here because
+    // `validate_keybind_action` rejects the action with exit 1.
+    if cfg.keybinds.contains_key("focus_content") {
+        cfg.keybinds.remove("focus_content");
     }
     Ok(())
 }
