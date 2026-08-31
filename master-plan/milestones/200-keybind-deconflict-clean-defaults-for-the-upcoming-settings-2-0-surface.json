@@ -3,9 +3,9 @@
     "id": "200",
     "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
     "slug": "keybind-deconflict-clean-defaults-for-the-upcoming-settings-2-0-surface",
-    "lifecycle": "approved",
+    "lifecycle": "in-progress",
     "spec_status": "ready",
-    "execution_status": "planned",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -17,13 +17,13 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-28",
-    "updated": "2026-08-30",
+    "updated": "2026-08-31",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-28T17:54:26.619399+00:00"
+    "lifecycle_at": "2026-08-31T16:19:23.650237+00:00"
   },
   "intent": {
     "outcome": "Every rebindable keybind has a unique default. No two user-facing keybinds share a chord in the default config. The settings help text can list defaults without footnotes about overlaps. The Settings 2.0 milestone (M201) gets a clean defaults table to point at."
@@ -63,8 +63,8 @@
       "id": "AC-02",
       "description": "`Keybinds::default().refresh` equals `[Ctrl-R]` (was `[r]`). `Keybinds::default().previous_lane` equals `[Left, BackTab]` (was `[Left, h, BackTab]`).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "nextest exit 0"
     },
     {
       "id": "AC-03",
@@ -178,7 +178,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds_default|keybind_default_label/)'",
       "done_when": "Keybinds::default().refresh equals [Ctrl-R]; previous_lane equals [Left, BackTab]; focus_content field still exists; keybinds.rs tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],

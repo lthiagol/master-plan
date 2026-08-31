@@ -179,20 +179,22 @@ impl Default for Keybinds {
             open_settings: vec![ctrl(KeyCode::Char('o'))],
             // M167: Tab/Shift+Tab are now lane-navigation bindings (they
             // used to toggle a focus state, which removed the need for
-            // up/down/up/down round-trips); Left/Right and h/l kept as
+            // up/down/up/down round-trips); Left/Right and l kept as
             // multi-binding aliases so vim users keep their muscle memory.
-            previous_lane: vec![
-                plain(KeyCode::Left),
-                plain(KeyCode::Char('h')),
-                plain(KeyCode::BackTab),
-            ],
+            // M200: dropped the `h` alias — `keybinds.hide_done` already
+            // claims `h`, so the two defaults no longer overlap. Left and
+            // BackTab remain.
+            previous_lane: vec![plain(KeyCode::Left), plain(KeyCode::BackTab)],
             next_lane: vec![
                 plain(KeyCode::Right),
                 plain(KeyCode::Char('l')),
                 plain(KeyCode::Tab),
             ],
             focus_content: vec![plain(KeyCode::Enter)],
-            refresh: vec![plain(KeyCode::Char('r'))],
+            // M200: refresh default moves from `r` to `Ctrl-R` so it no
+            // longer collides with `keybinds.resolve` at the default layer.
+            // Existing user overrides win (see `Keybinds::load_from_config`).
+            refresh: vec![ctrl(KeyCode::Char('r'))],
             // M167: detail-section navigation — only consumed when
             // `app.content == ContentState::MilestoneDetail`.
             next_section: vec![plain(KeyCode::Char(']'))],
