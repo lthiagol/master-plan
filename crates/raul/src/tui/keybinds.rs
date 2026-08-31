@@ -1571,6 +1571,38 @@ mod tests {
         assert_eq!(kb.approve, vec![plain(KeyCode::Char('p'))]);
         assert_eq!(kb.prev_item, vec![plain(KeyCode::Char('p'))]);
     }
+
+    #[test]
+    fn keybinds_default_returns_m200_deconflicted_defaults() {
+        // M200 AC-02: pin the post-deconflict defaults at the
+        // `Keybinds::default()` layer so a future regression that
+        // accidentally restores the pre-M200 defaults (`r` for
+        // refresh, `h` for previous_lane) fails this test. The
+        // `focus_content` field stays on the struct (it's a
+        // non-rebindable reserved action, not a default change).
+        use crossterm::event::{KeyCode, KeyModifiers};
+        let kb = Keybinds::default();
+        // refresh default: Ctrl-R (was `r`)
+        assert_eq!(
+            kb.refresh,
+            vec![(KeyCode::Char('r'), KeyModifiers::CONTROL)],
+            "M200 AC-02: refresh default must be [Ctrl-R], got {:?}",
+            kb.refresh
+        );
+        // previous_lane default: Left + BackTab (was [Left, h, BackTab])
+        assert_eq!(
+            kb.previous_lane,
+            vec![plain(KeyCode::Left), plain(KeyCode::BackTab)],
+            "M200 AC-02: previous_lane default must be [Left, BackTab], got {:?}",
+            kb.previous_lane
+        );
+        // focus_content field is preserved (non-rebindable reserved action).
+        assert!(
+            !kb.focus_content.is_empty(),
+            "M200 AC-02: focus_content field must be preserved on Keybinds; got: {:?}",
+            kb.focus_content
+        );
+    }
 }
 
 // M199 S1: unit tests for `Keybinds::footer_per_tab`. The
