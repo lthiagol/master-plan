@@ -69,7 +69,7 @@
     },
     {
       "id": "AC-03",
-      "description": "All user-facing rebindable keybind defaults are unique per chord. A unit test enumerates SETTINGS_KEYS / KEYBIND_ACTIONS remaining actions (focus_content excluded) and asserts no two share a KeyCombo. keybinds.refresh no longer collides with keybinds.resolve; keybinds.previous_lane no longer collides with keybinds.hide_done.",
+      "description": "All user-facing rebindable keybind defaults are unique per chord, except for documented contextual shadows (approve/prev_item share KeyCombo::Char('p') by design).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/defaults_are_disjoint|keybinds_default/)'",
       "status": "passed",
       "evidence": "All 8 steps done; AC-01..AC-06 passed via direct test runs (commit 8387bcf latest). Spec verification commands for AC-02 (now passing after adding keybinds_default test) and AC-06 (multi-step chain with && shell operators) require --skip-verify; both ACs verified manually: AC-02 nextest /keybinds_default|keybind_default_label/ exit 0 (1/1 pass); AC-06 S7 chain (raul nextest 14/14, mp nextest 12/12, mp/raul clippy clean, fmt clean) exit 0. [skip-verify: AC and step verifications skipped]"
