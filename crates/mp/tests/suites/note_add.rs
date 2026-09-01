@@ -387,3 +387,92 @@ fn note_add_body_file_expands_tilde() {
         .unwrap();
     assert_eq!(body, "tilde-expanded body");
 }
+
+// ─── M202 S8: --milestone-id flag on `mp note add` ─────────────────────────
+//
+// AC-10 contract: the flag is optional and backwards-compatible. When
+// absent, the note write is unchanged (no milestone association, no
+// post-complete hook). When present, the note fires the post-complete
+// document-done stage hook (covered separately in
+// tests/lifecycle_complete_ceremony.rs).
+
+#[test]
+fn note_add_accepts_milestone_id() {
+    let env = TestEnv::new();
+    let out = env.run(&[
+        "milestone",
+        "create",
+        "--json",
+        r#"{"title":"M202 note flag","intent":{"outcome":"x"},"problem":{"description":"y"},"scope":{"in_scope":["x"],"out_of_scope":["y","z"]},"acceptance_criteria":[{"description":"x","verification":"manual: ok"}]}"#,
+        "--format",
+        "json",
+    ]);
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let ms_id = v["milestone"]["id"].as_str().unwrap().to_string();
+
+    // Pre-condition: fresh milestone has no flow_stages entries.
+    let out = env.run(&["show", "milestone", &ms_id, "--format", "raw"]);
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(
+        doc["milestone"]["flow_stages"].is_null()
+            || doc["milestone"]["flow_stages"].as_object().map(|o| o.is_empty()).unwrap_or(true),
+        "fresh milestone must have empty flow_stages"
+    );
+
+    // Note add with --milestone-id must succeed even when the
+    // milestone is NOT complete (the hook is a no-op in that case;
+    // the flag itself must be accepted).
+    let out = env.run(&[
+        "note",
+        "add",
+        "--title",
+        "M202 note",
+        "--body",
+        "non-complete milestone",
+        "--milestone-id",
+        &ms_id,
+    ]);
+    assert!(
+        out.status.success(),
+        "note add --milestone-id failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["ok"], true);
+    assert!(v["idea_id"].as_str().is_some());
+    // Document stage must NOT have been flipped (milestone is still draft).
+    let out = env.run(&["show", "milestone", &ms_id, "--format", "raw"]);
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let flow = doc["milestone"]["flow_stages"].as_object();
+    assert!(
+        flow.is_none()
+            || !flow.unwrap().contains_key("document")
+            || flow.unwrap()["document"]["status"] != "done",
+        "non-complete milestone must NOT have document=done after a note add"
+    );
+}
+
+#[test]
+fn note_add_without_milestone_id_still_works() {
+    let env = TestEnv::new();
+    // Backwards-compat: pre-M202 callers omitting --milestone-id see
+    // no behavior change. The note write succeeds without touching any
+    // milestone's flow_stages.
+    let out = env.run(&[
+        "note",
+        "add",
+        "--title",
+        "M202 backward-compat",
+        "--body",
+        "no milestone flag",
+    ]);
+    assert!(
+        out.status.success(),
+        "note add without --milestone-id failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["ok"], true);
+    assert!(v["idea_id"].as_str().is_some());
+}

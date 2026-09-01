@@ -248,6 +248,38 @@ pub enum MilestoneCmd {
     /// execution with per-id result reporting; --dry-run previews mutations.
     #[command(subcommand)]
     Bulk(BulkCmd),
+    /// M202: per-stage mp-flow tracker. Read all 12 stages as a CLI table
+    /// (`mp milestone stage list <id>`), or set one stage explicitly
+    /// (`mp milestone stage set <id> <stage> <status>`). Explicit sets
+    /// override auto-derive — a stage the user flipped to `done` stays
+    /// `done` even when a subsequent lifecycle transition would normally
+    /// re-write it. The only escape from the override is another
+    /// explicit `set` (or a fresh lifecycle event after the override
+    /// was cleared). Hand-off is included in the 12-stage list but
+    /// ONLY advances via this CLI (AC-11).
+    Stage {
+        #[command(subcommand)]
+        cmd: StageCmd,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum StageCmd {
+    /// List all 12 mp-flow stages for a milestone as a CLI table
+    /// (id, status, at). Stages without an entry yet show `pending`
+    /// and `—` for the timestamp. Exit 0 even when the milestone has
+    /// no recorded flow_stages (the table is canonical regardless of
+    /// how many stages have actually fired).
+    List { id: String },
+    /// Set one stage to a new status. Accepts only the canonical
+    /// 12 stage slugs and the 4-value status enum (`pending`,
+    /// `done`, `in_progress`, `skipped`). Exit 2 on invalid input;
+    /// the milestone file is unchanged on rejection.
+    Set {
+        id: String,
+        stage: String,
+        status: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -291,6 +323,29 @@ pub enum BulkCmd {
         /// Lifecycle value (draft, groomed, approved, in-progress,
         /// done, self-reviewed, reviewed, complete, remediation) or
         /// empty to reset.
+        #[arg(long)]
+        status: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// M202: bulk-update one mp-flow stage across multiple milestones.
+    /// Mirrors bulk set-priority: targets resolve via --ids / --where,
+    /// cancelled milestones are skipped (no-op) and listed with reason
+    /// `cancelled` in the per-id report, --dry-run previews mutations,
+    /// exit code 2 on partial failure. The `--stage` slug must be one
+    /// of the canonical 12 (`draft` … `hand-off`); `--status` must be
+    /// one of `pending | done | in_progress | skipped`. Both are
+    /// validated upfront so a typo aborts the whole batch with a
+    /// precise error instead of silently no-oping per target.
+    SetStage {
+        #[arg(long, value_delimiter = ',')]
+        ids: Option<Vec<String>>,
+        #[arg(long = "where", value_delimiter = ',')]
+        r#where: Vec<String>,
+        /// Stage slug (one of the canonical 12 mp-flow stage keys).
+        #[arg(long)]
+        stage: String,
+        /// Stage status (pending | done | in_progress | skipped).
         #[arg(long)]
         status: String,
         #[arg(long)]

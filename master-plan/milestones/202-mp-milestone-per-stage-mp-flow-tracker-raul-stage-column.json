@@ -98,22 +98,22 @@
       "id": "AC-06",
       "description": "`mp milestone stage set <id> external-review done` overrides the auto-derived value for that stage only. Subsequent `complete` lifecycle transitions update other stages but do NOT clobber the explicitly-set `external-review`.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "explicit_stage_set_survives_subsequent_lifecycle_transition test passes — apply_flow_stages_for_event override guard preserves terminal status (done/skipped)"
     },
     {
       "id": "AC-07",
       "description": "`mp milestone stage list <id>` prints all 12 stages as a CLI table with id, status, and `at` (or `—` when unset). Exit 0.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_list_prints_twelve_rows/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "stage_list_prints_twelve_rows test passes — mp milestone stage list prints all 12 stage slugs with status + at"
     },
     {
       "id": "AC-08",
       "description": "`mp milestone stage set <id> <stage> bogus` (invalid status) exits non-zero with a precise error listing the allowed values; the milestone file is unchanged.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_set_rejects_invalid_status/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "stage_set_rejects_invalid_status + stage_set_rejects_unknown_stage_key tests pass — exit 2, no on-disk mutation, error enumerates allowed values"
     },
     {
       "id": "AC-09",
@@ -126,15 +126,15 @@
       "id": "AC-10",
       "description": "After a milestone reaches `complete`, the first `mp note add --milestone-id <id> ...` (or `mp reviews finding resolve <id>` associated with that milestone) flips `flow_stages.document.status == \"done\"` on read. Subsequent notes do not re-flip (idempotent).",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/note_add_after_complete_marks_document_done|reviews_finding_resolve_after_complete_marks_document_done/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "note_add_after_complete_marks_document_done + reviews_finding_resolve_after_complete_marks_document_done tests pass in tests/lifecycle_complete_ceremony.rs"
     },
     {
       "id": "AC-11",
       "description": "`flow_stages.hand-off` flips to `done` ONLY via explicit `mp milestone stage set <id> hand-off done`. No other event (note add, finding resolve, git commit, archive) auto-advances it. Auto-advance attempts are recorded as no-ops.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/hand_off_only_advances_via_explicit_set|no_event_auto_advances_hand_off/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "hand_off_only_advances_via_explicit_set + no_event_auto_advances_hand_off tests pass in tests/lifecycle_setter_overlay.rs; model unit tests also pin hand-off exclusion"
     },
     {
       "id": "AC-12",
@@ -182,8 +182,8 @@
       "id": "AC-18",
       "description": "`mp milestone bulk set-stage --ids … --stage … --status …` mirrors bulk set-priority: --dry-run, --where, per-id succeeded/failed, exit 2 on partial failure. Cancelled milestones are skipped (no-op) and listed with reason cancelled.",
       "verification": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled|bulk_set_stage_dry_run/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "bulk_set_stage_skips_cancelled + bulk_set_stage_dry_run + bulk_set_stage_validates_stage_and_status_eagerly tests pass in suite_milestone"
     },
     {
       "id": "AC-19",
@@ -429,7 +429,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/stage_list_prints_twelve_rows|stage_set_rejects_invalid_status|stage_set_rejects_unknown_stage_key/)",
       "done_when": "stage_list_prints_twelve_rows and stage_set_rejects_invalid_status tests pass; cargo nextest exits 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07",
         "AC-08"
@@ -450,7 +450,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled|bulk_set_stage_dry_run/)'",
       "done_when": "bulk_set_stage_skips_cancelled and bulk_set_stage_dry_run tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-18"
       ],
@@ -471,7 +471,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)",
       "done_when": "explicit_stage_set_survives_subsequent_lifecycle_transition test passes; cargo nextest exits 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -492,7 +492,7 @@
       ],
       "tests": "cargo nextest run -p mp --test note_add --no-fail-fast -E test(/note_add_accepts_milestone_id|note_add_without_milestone_id_still_works/)",
       "done_when": "note_add_accepts_milestone_id and note_add_without_milestone_id_still_works tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-10"
       ],
@@ -513,7 +513,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E test(/note_add_after_complete_marks_document_done/)",
       "done_when": "note_add_after_complete_marks_document_done test passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-10"
       ],
@@ -534,7 +534,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E test(/reviews_finding_resolve_after_complete_marks_document_done/)",
       "done_when": "reviews_finding_resolve_after_complete_marks_document_done test passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-10"
       ],
@@ -554,7 +554,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/hand_off_only_advances_via_explicit_set|no_event_auto_advances_hand_off/)",
       "done_when": "hand_off_only_advances_via_explicit_set and no_event_auto_advances_hand_off tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-11"
       ],

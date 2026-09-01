@@ -206,6 +206,40 @@ pub(crate) fn cmd_milestone_bulk(ctx: &PlanContext, cmd: BulkCmd, format: Fmt) -
                 )
             }
         },
+        BulkCmd::SetStage {
+            ids,
+            r#where,
+            stage,
+            status,
+            dry_run,
+        } => {
+            // Upfront validation: typo in --stage or --status should fail
+            // the whole batch loudly instead of silently no-oping per target.
+            // The single-id `mp milestone stage set` does the same guard.
+            if !crate::model::MP_FLOW_STAGE_KEYS.contains(&stage.as_str()) {
+                anyhow::bail!(
+                    "invalid stage: {stage:?} (expected one of: {})",
+                    crate::model::MP_FLOW_STAGE_KEYS.join(", ")
+                );
+            }
+            if !crate::model::MP_FLOW_STAGE_STATUSES.contains(&status.as_str()) {
+                anyhow::bail!(
+                    "invalid status: {status:?} (expected one of: {})",
+                    crate::model::MP_FLOW_STAGE_STATUSES.join(", ")
+                );
+            }
+            let stage = stage.clone();
+            let status = status.clone();
+            run_bulk(
+                ctx,
+                format,
+                ids.as_deref(),
+                &r#where,
+                dry_run,
+                "set-stage",
+                |id| apply_set_stage(ctx, id, &stage, &status, !dry_run),
+            )
+        }
     }
 }
 
@@ -249,6 +283,9 @@ where
                     if let Some(e) = outcome.error {
                         row["error"] = Value::String(e);
                     }
+                    if let Some(r) = outcome.reason {
+                        row["reason"] = Value::String(r);
+                    }
                     if outcome.ok {
                         succeeded += 1;
                     } else {
@@ -284,6 +321,9 @@ where
                 }
                 if let Some(e) = outcome.error {
                     row["error"] = Value::String(e);
+                }
+                if let Some(r) = outcome.reason {
+                    row["reason"] = Value::String(r);
                 }
                 results.push(row);
                 if outcome.ok {
@@ -331,6 +371,11 @@ struct ApplyOutcome {
     before: Option<Value>,
     after: Option<Value>,
     error: Option<String>,
+    /// M202 AC-18: free-form marker for skipped rows (e.g.
+    /// `reason: cancelled` for cancelled-milestone skips). Rendered
+    /// as a top-level `reason` field on the per-id row so operators
+    /// can distinguish "skipped on purpose" from "real mutation".
+    reason: Option<String>,
 }
 
 fn apply_set_priority(
@@ -351,12 +396,14 @@ fn apply_set_priority(
             before: before.map(|v| json!(v)),
             after: Some(json!(m.milestone.priority)),
             error: None,
+            reason: None,
         }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
+            reason: None,
         }),
     }
 }
@@ -374,18 +421,21 @@ fn apply_set_spec_status(
             before: before.map(|v| json!(v)),
             after: Some(json!(m.milestone.spec_status)),
             error: None,
+            reason: None,
         }),
         Ok(ApplySpecStatusResult::Blocked { gate_errors, .. }) => Ok(ApplyOutcome {
             ok: false,
             before: before.map(|v| json!(v)),
             after: None,
             error: Some(format_gate_errors(&gate_errors)),
+            reason: None,
         }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
+            reason: None,
         }),
     }
 }
@@ -410,7 +460,7 @@ fn apply_add_depends_on(
                 before: before_value.clone(),
                 after: before_value,
                 error: None,
-            });
+                reason: None,            });
         }
     }
     let mut prospective = before_vec.clone().unwrap_or_default();
@@ -423,7 +473,7 @@ fn apply_add_depends_on(
             error: Some(format!(
                 "adding depends_on={dep} on {id} would create a cycle"
             )),
-        });
+            reason: None,        });
     }
     match milestone::add_depends_on_with_graph(ctx, id, dep, commit) {
         Ok(m) => Ok(ApplyOutcome {
@@ -431,13 +481,13 @@ fn apply_add_depends_on(
             before: before_value,
             after: Some(json!(m.milestone.depends_on)),
             error: None,
-        }),
+            reason: None,        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before_vec.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
-        }),
+            reason: None,        }),
     }
 }
 
@@ -455,13 +505,13 @@ fn apply_remove_depends_on(
             before: before_value,
             after: Some(json!(m.milestone.depends_on)),
             error: None,
-        }),
+            reason: None,        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before_value,
             after: None,
             error: Some(format!("{e}")),
-        }),
+            reason: None,        }),
     }
 }
 
@@ -498,14 +548,84 @@ fn apply_set_lifecycle(
             before: before.map(|v| json!(v)),
             after: Some(json!(m.milestone.lifecycle)),
             error: None,
-        }),
+            reason: None,        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
-        }),
+            reason: None,        }),
     }
+}
+
+/// M202: apply a single `mp milestone stage set <id> <stage> <status>`
+/// to one milestone. Cancelled milestones are skipped (no-op) and the
+/// per-id result lists `reason: cancelled` — mirrors the AC-18
+/// contract that bulk-set-stage must not disturb terminal-cancelled
+/// state. The single-id CLI has no equivalent skip (the operator can
+/// see the milestone is cancelled and choose), so this is bulk-only
+/// behaviour.
+fn apply_set_stage(
+    ctx: &PlanContext,
+    id: &str,
+    stage: &str,
+    status: &str,
+    commit: bool,
+) -> Result<ApplyOutcome> {
+    let path = match milestone::load_milestone_path(ctx, id) {
+        Ok(p) => p,
+        Err(e) => {
+            return Ok(ApplyOutcome {
+                ok: false,
+                before: None,
+                after: None,
+                error: Some(format!("{e}")),
+                reason: None,            });
+        }
+    };
+    let mut m = store::load_milestone(&path)?;
+    if m.milestone.cancelled {
+        // AC-18: cancelled milestones are skipped (no mutation). The
+        // row carries `reason: "cancelled"` so the operator can
+        // distinguish the skip from a real mutation without comparing
+        // `before` to `after`.
+        return Ok(ApplyOutcome {
+            ok: true,
+            before: Some(json!({ "cancelled": true })),
+            after: Some(json!({ "cancelled": true })),
+            error: None,
+            reason: Some("cancelled".to_string()),
+        });
+    }
+    let before_status = m
+        .milestone
+        .flow_stages
+        .get(stage)
+        .map(|s| s.status.clone())
+        .unwrap_or_default();
+    if !commit {
+        return Ok(ApplyOutcome {
+            ok: true,
+            before: Some(json!({ "stage": stage, "status": before_status })),
+            after: Some(json!({ "stage": stage, "status": status })),
+            error: None,
+            reason: None,        });
+    }
+    m.milestone.flow_stages.insert(
+        stage.to_string(),
+        crate::model::FlowStage {
+            status: status.to_string(),
+            at: Some(crate::store::now_rfc3339()),
+        },
+    );
+    m.milestone.updated = store::today();
+    milestone::write_milestone_synced(ctx, &path, &m)?;
+    Ok(ApplyOutcome {
+        ok: true,
+        before: Some(json!({ "stage": stage, "status": before_status })),
+        after: Some(json!({ "stage": stage, "status": status })),
+        error: None,
+        reason: None,    })
 }
 
 #[cfg(test)]

@@ -18,6 +18,7 @@ pub fn note_add(
     body: Option<&str>,
     body_file: Option<&str>,
     to: Option<&str>,
+    milestone_id: Option<&str>,
 ) -> Result<NoteAddReport> {
     const VALID_DESTINATIONS: &[&str] = &["idea"];
     let destination = to.unwrap_or("idea");
@@ -40,6 +41,15 @@ pub fn note_add(
     match destination {
         "idea" => {
             let idea = idea::idea_create_meeting(ctx, title, resolved_body.as_deref())?;
+            // M202 S9: post-complete document-done hook. When the caller
+            // passed --milestone-id AND that milestone's lifecycle is
+            // `complete`, flip flow_stages.document to done idempotently.
+            // The hook does NOT fail the note write — a milestone load
+            // failure or a non-complete lifecycle is a no-op. Hand-off
+            // is intentionally not touched (AC-11).
+            if let Some(ms_id) = milestone_id {
+                let _ = apply_document_done_hook(ctx, ms_id);
+            }
             Ok(NoteAddReport {
                 ok: true,
                 idea_id: idea.id,
@@ -55,6 +65,51 @@ pub fn note_add(
             VALID_DESTINATIONS.join(", ")
         ),
     }
+}
+
+/// M202 S9: post-complete document-done stage hook for `mp note add`.
+/// Mirrors the reviews-finding-resolve path (S10) so any post-completion
+/// note / finding resolution auto-closes the document stage. Idempotent:
+/// re-running on a milestone whose document stage is already done is a
+/// no-op (the same `at` timestamp is preserved).
+///
+/// Failures are swallowed + silently ignored — a missing or non-complete
+/// milestone must not block the note write (the note is the user's
+/// primary intent; the stage flip is a derived side effect).
+fn apply_document_done_hook(ctx: &PlanContext, milestone_id: &str) {
+    use crate::milestone;
+    use crate::model::FlowStage;
+    use crate::store;
+    let normalized = crate::paths::normalize_milestone_id(milestone_id);
+    let path = match milestone::load_milestone_path(ctx, &normalized) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let mut m = match store::load_milestone(&path) {
+        Ok(m) => m,
+        Err(_) => return,
+    };
+    // The hook fires ONLY for milestones at terminal complete (AC-10
+    // contract). Earlier lifecycles leave document pending — the
+    // operator hasn't finished yet.
+    if m.milestone.lifecycle != "complete" {
+        return;
+    }
+    // Idempotent: skip when already done (preserve the original `at`).
+    if let Some(existing) = m.milestone.flow_stages.get("document") {
+        if existing.status == "done" {
+            return;
+        }
+    }
+    m.milestone.flow_stages.insert(
+        "document".to_string(),
+        FlowStage {
+            status: "done".to_string(),
+            at: Some(store::now_rfc3339()),
+        },
+    );
+    m.milestone.updated = store::today();
+    let _ = milestone::write_milestone_synced(ctx, &path, &m);
 }
 
 /// Read the body from a file path (or `-` for stdin) given to `--body-file`.

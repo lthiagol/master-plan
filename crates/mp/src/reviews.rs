@@ -1037,6 +1037,37 @@ pub fn resolve_finding(
         &lc_was,
         &m.milestone.lifecycle,
     )?;
+    // M202 S10: post-complete document-done hook. When the resolved
+    // finding closes on a milestone whose lifecycle is `complete`,
+    // flip `flow_stages.document` to done idempotently. Mirrors the
+    // S9 note-add hook — any post-completion activity (a closing
+    // note OR a finding resolution) auto-advances the document
+    // stage. Hand-off stays explicit-only (AC-11).
+    if m.milestone.lifecycle == "complete" {
+        if let Some(existing) = m.milestone.flow_stages.get("document") {
+            if existing.status != "done" {
+                m.milestone.flow_stages.insert(
+                    "document".to_string(),
+                    crate::model::FlowStage {
+                        status: "done".to_string(),
+                        at: Some(crate::store::now_rfc3339()),
+                    },
+                );
+                m.milestone.updated = store::today();
+                store::write_milestone(&path, &m)?;
+            }
+        } else {
+            m.milestone.flow_stages.insert(
+                "document".to_string(),
+                crate::model::FlowStage {
+                    status: "done".to_string(),
+                    at: Some(crate::store::now_rfc3339()),
+                },
+            );
+            m.milestone.updated = store::today();
+            store::write_milestone(&path, &m)?;
+        }
+    }
     Ok(result)
 }
 

@@ -17,5 +17,14 @@ pub enum NoteCmd {
         body_file: Option<String>,
         #[arg(long)]
         to: Option<String>,
+        /// M202: associate this note with a milestone. When present AND
+        /// the milestone's lifecycle is `complete`, the note fires the
+        /// post-complete document-done stage hook (`flow_stages.document`
+        /// flips to done idempotently). When absent or the milestone is
+        /// not yet complete, the hook does not fire — `document` stays
+        /// pending. Optional and backwards-compatible: pre-M202 callers
+        /// omitting this flag see no behavior change.
+        #[arg(long, value_name = "ID")]
+        milestone_id: Option<String>,
     },
 }

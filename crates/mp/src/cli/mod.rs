@@ -52,7 +52,7 @@ pub use interview::InterviewCmd;
 pub use list_show::{ListTarget, ShowTarget};
 pub use milestone::{
     BulkCmd, BulkDependsOnAction, ChallengeCmd, CriterionCmd, DesignDecisionCmd, MilestoneCmd,
-    QuestionCmd, StepCmd, WpCmd,
+    QuestionCmd, StageCmd, StepCmd, WpCmd,
 };
 pub use note::NoteCmd;
 pub use overview::OverviewCmd;

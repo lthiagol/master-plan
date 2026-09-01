@@ -568,6 +568,177 @@ fn reviews_pass_after_remediation_closes_re_review() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// M202 AC-10: post-complete document-done stage hook. Any post-completion
+// activity on a `complete` milestone auto-closes `flow_stages.document`:
+//   * `mp note add --milestone-id <id>` flips document=done (S9).
+//   * `mp reviews finding resolve <id>` flips document=done (S10).
+// Both hooks are idempotent — re-running on an already-done document is
+// a no-op. Hand-off stays explicit-only regardless (AC-11).
+// ---------------------------------------------------------------------------
+
+fn promote_to_complete(env: &TestEnv, id: &str) {
+    let _ = run_mp(env, &["milestone", "approve", id]);
+    let _ = run_mp(env, &["milestone", "set-status", id, "in-progress"]);
+    let complete = run_mp(
+        env,
+        &[
+            "milestone",
+            "complete",
+            id,
+            "--evidence",
+            "M202 AC-10 fixture",
+            "--skip-review",
+        ],
+    );
+    assert!(complete.status.success());
+}
+
+#[test]
+fn note_add_after_complete_marks_document_done() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 note-add hook");
+    promote_to_complete(&env, &id);
+
+    // Pre-condition: document is pending (or absent).
+    let before = read_milestone(&env, &id);
+    let before_flow = before["milestone"]["flow_stages"].as_object();
+    assert!(
+        before_flow.is_none()
+            || !before_flow.unwrap().contains_key("document")
+            || before_flow.unwrap()["document"]["status"] != "done",
+        "document must start pending before the note add fires"
+    );
+
+    // Add a note tied to this milestone via the new --milestone-id flag.
+    let out = run_mp(
+        &env,
+        &[
+            "note",
+            "add",
+            "--title",
+            "M202 post-complete note",
+            "--body",
+            "S9 hook pin",
+            "--milestone-id",
+            &id,
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "note add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let after = read_milestone(&env, &id);
+    let flow = after["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages present after note add");
+    assert_eq!(
+        flow["document"]["status"], "done",
+        "AC-10: note add post-complete must flip flow_stages.document=done"
+    );
+    assert!(
+        flow["document"]["at"].is_string()
+            && !flow["document"]["at"].as_str().unwrap().is_empty(),
+        "document.at must be set"
+    );
+    // Idempotency: a second note add must NOT advance the at timestamp.
+    let first_at = flow["document"]["at"].as_str().unwrap().to_string();
+    let second = run_mp(
+        &env,
+        &[
+            "note",
+            "add",
+            "--title",
+            "M202 second note",
+            "--body",
+            "Idempotency pin",
+            "--milestone-id",
+            &id,
+        ],
+    );
+    assert!(second.status.success());
+    let after2 = read_milestone(&env, &id);
+    let flow2 = after2["milestone"]["flow_stages"].as_object().unwrap();
+    assert_eq!(
+        flow2["document"]["at"].as_str().unwrap(),
+        first_at,
+        "idempotent note add must preserve the original at timestamp"
+    );
+    assert_eq!(flow2["document"]["status"], "done");
+}
+
+#[test]
+fn reviews_finding_resolve_after_complete_marks_document_done() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 finding-resolve hook");
+    promote_to_complete(&env, &id);
+
+    // Add a finding on the complete milestone (no auto-remediation
+    // because there are no open findings at completion time).
+    let added = run_mp(
+        &env,
+        &[
+            "reviews",
+            "finding",
+            "add",
+            &id,
+            "--severity",
+            "low",
+            "--category",
+            "nit",
+            "--desc",
+            "M202 S10 fixture finding",
+            "--author",
+            "test",
+        ],
+    );
+    assert!(
+        added.status.success(),
+        "finding add failed: {}",
+        String::from_utf8_lossy(&added.stderr)
+    );
+
+    // Pre-condition: document is pending.
+    let before = read_milestone(&env, &id);
+    let before_flow = before["milestone"]["flow_stages"].as_object();
+    assert!(
+        before_flow.is_none()
+            || !before_flow.unwrap().contains_key("document")
+            || before_flow.unwrap()["document"]["status"] != "done",
+        "document must start pending before resolve fires"
+    );
+
+    // Resolve the finding — S10 hook fires.
+    let resolved = run_mp(
+        &env,
+        &[
+            "reviews",
+            "finding",
+            "resolve",
+            &id,
+            "F-01",
+            "--commit",
+            "M202-S10-pin",
+        ],
+    );
+    assert!(
+        resolved.status.success(),
+        "finding resolve failed: {}",
+        String::from_utf8_lossy(&resolved.stderr)
+    );
+
+    let after = read_milestone(&env, &id);
+    let flow = after["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages present after resolve");
+    assert_eq!(
+        flow["document"]["status"], "done",
+        "AC-10: finding resolve post-complete must flip flow_stages.document=done"
+    );
+}
+
 #[test]
 fn validate_silent_for_mid_review_lifecycle_even_with_legacy_triple() {
     let env = TestEnv::new();

@@ -969,3 +969,314 @@ fn cancel_marks_remaining_stages_skipped() {
         "cancel must never auto-advance hand-off"
     );
 }
+
+#[test]
+fn stage_list_prints_twelve_rows() {
+    // AC-07: `mp milestone stage list <id>` prints all 12 stages as a
+    // CLI table with id, status, and `at` (or `—` when unset). Exit 0.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "stage-list");
+    let out = env.run(&["milestone", "stage", "list", &id]);
+    assert!(
+        out.status.success(),
+        "stage list failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // All 12 canonical stage slugs must appear in the output.
+    for slug in [
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+        "external-review",
+        "remediate",
+        "re-review",
+        "document",
+        "hand-off",
+    ] {
+        assert!(
+            stdout.contains(slug),
+            "stage list must include slug {slug}; got: {stdout}"
+        );
+    }
+    // Brand-new milestone has no flow_stages entries — every row must
+    // show `pending` and `—`.
+    let pending_rows = stdout.matches("pending").count();
+    let em_dash_rows = stdout.matches('—').count();
+    assert!(
+        pending_rows >= 12,
+        "expected at least 12 pending rows for a fresh milestone; got {pending_rows}\n{stdout}"
+    );
+    assert!(
+        em_dash_rows >= 12,
+        "expected at least 12 em-dash timestamp rows for a fresh milestone; got {em_dash_rows}\n{stdout}"
+    );
+}
+
+#[test]
+fn stage_set_rejects_invalid_status() {
+    // AC-08: invalid status exits non-zero with a precise error listing
+    // the allowed values; the milestone file is unchanged.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "stage-set-bad-status");
+    let out = env.run(&["milestone", "stage", "set", &id, "draft", "bogus"]);
+    assert!(
+        !out.status.success(),
+        "stage set bogus must exit non-zero; got status={:?}",
+        out.status.code()
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "invalid status must exit 2; got {:?}",
+        out.status.code()
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        combined.contains("invalid status") || combined.contains("bogus"),
+        "error must reference the bad value; got: {combined}"
+    );
+    assert!(
+        combined.contains("pending")
+            && combined.contains("done")
+            && combined.contains("in_progress")
+            && combined.contains("skipped"),
+        "error must enumerate the 4 allowed statuses; got: {combined}"
+    );
+    // On-disk milestone must be unchanged.
+    let meta = milestone_meta(&env, &id);
+    let flow = meta.get("flow_stages").and_then(|v| v.as_object());
+    assert!(
+        flow.is_none() || flow.unwrap().is_empty(),
+        "invalid stage set must not touch flow_stages; got: {flow:?}"
+    );
+}
+
+#[test]
+fn stage_set_rejects_unknown_stage_key() {
+    // Same guard shape as AC-08 but for the stage-slug side.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "stage-set-bad-key");
+    let out = env.run(&["milestone", "stage", "set", &id, "not-a-stage", "done"]);
+    assert!(
+        !out.status.success(),
+        "stage set bogus-stage must exit non-zero; got status={:?}",
+        out.status.code()
+    );
+    assert_eq!(out.status.code(), Some(2));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(combined.contains("invalid stage"), "{combined}");
+    assert!(combined.contains("not-a-stage"), "{combined}");
+    // On-disk milestone must be unchanged.
+    let meta = milestone_meta(&env, &id);
+    let flow = meta.get("flow_stages").and_then(|v| v.as_object());
+    assert!(
+        flow.is_none() || flow.unwrap().is_empty(),
+        "invalid stage key must not touch flow_stages; got: {flow:?}"
+    );
+}
+
+#[test]
+fn hand_off_only_advances_via_explicit_set() {
+    // AC-11: hand-off must NEVER auto-advance. The only path that
+    // touches flow_stages.hand-off.status is `mp milestone stage set
+    // <id> hand-off done`. This test pins the explicit path so a
+    // future widening of the auto-advance table can be caught by a
+    // failing test rather than a silent regression.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "hand-off-explicit");
+    approve_and_start(&env, &id);
+    // Drive the full lifecycle to complete so every other stage has
+    // a real status. hand-off must remain pending (or absent).
+    let complete = env.run(&[
+        "milestone",
+        "complete",
+        &id,
+        "--evidence",
+        "M202 hand-off pin",
+        "--skip-review",
+    ]);
+    assert!(complete.status.success());
+
+    // Step 1: hand-off must NOT have been auto-flipped.
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after complete");
+    let hand_off = flow.get("hand-off");
+    assert!(
+        hand_off.is_none()
+            || hand_off.unwrap()["status"] != "done",
+        "hand-off must NOT auto-advance on complete; got: {hand_off:?}"
+    );
+
+    // Step 2: explicit set is the ONLY path that touches it.
+    let explicit = env.run(&["milestone", "stage", "set", &id, "hand-off", "done"]);
+    assert!(
+        explicit.status.success(),
+        "explicit stage set hand-off done failed: {}",
+        String::from_utf8_lossy(&explicit.stderr)
+    );
+    let meta2 = milestone_meta(&env, &id);
+    let flow2 = meta2
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after explicit set");
+    assert_eq!(
+        flow2["hand-off"]["status"], "done",
+        "explicit stage set must close hand-off"
+    );
+}
+
+#[test]
+fn no_event_auto_advances_hand_off() {
+    // AC-11 negative pin: every event in the auto-advance table
+    // (Groom, Approve, Start, FinishExecution, Complete, EnterRemediation,
+    // ExitRemediation, Cancel) MUST leave hand-off pending. The
+    // model-level unit tests cover this at the function level; the
+    // integration version exercises the durable writers end-to-end.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "hand-off-negatives");
+    // Drive a representative subset of events.
+    let _ = env.run(&["milestone", "set-spec-status", &id, "review"]);
+    let _ = env.run(&["milestone", "approve", &id]);
+    let _ = env.run(&["milestone", "set-status", &id, "in-progress"]);
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after groom→approve→start");
+    let hand_off = flow.get("hand-off");
+    assert!(
+        hand_off.is_none() || hand_off.unwrap()["status"] != "done",
+        "groom/approve/start must not auto-advance hand-off; got: {hand_off:?}"
+    );
+    // Now complete the milestone (with --skip-review for non-track
+    // gating). Hand-off must STILL stay pending — auto-advance never
+    // touches it.
+    let _ = env.run(&[
+        "milestone",
+        "complete",
+        &id,
+        "--evidence",
+        "M202 hand-off negatives pin",
+        "--skip-review",
+    ]);
+    let meta2 = milestone_meta(&env, &id);
+    let flow2 = meta2
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after complete");
+    let hand_off2 = flow2.get("hand-off");
+    assert!(
+        hand_off2.is_none() || hand_off2.unwrap()["status"] != "done",
+        "complete must not auto-advance hand-off; got: {hand_off2:?}"
+    );
+    // Stages 1-7 are done after complete; stage 8 (external-review)
+    // is in_progress (the milestone is sitting in the review queue);
+    // stages 9-12 (remediate, re-review, document, hand-off) stay
+    // pending. The AC-11 invariant is that hand-off stays pending
+    // — verify the post-complete stage map so a future widening of
+    // the auto-advance table can't silently flip hand-off.
+    for slug in [
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+    ] {
+        assert_eq!(
+            flow2[slug]["status"], "done",
+            "stage {slug} must be done after complete; got: {}",
+            flow2[slug]["status"]
+        );
+    }
+    assert_eq!(
+        flow2["external-review"]["status"], "in_progress",
+        "external-review must be in_progress after complete (review queue)"
+    );
+    for slug in ["remediate", "re-review", "document", "hand-off"] {
+        let s = flow2.get(slug);
+        assert!(
+            s.is_none() || s.unwrap()["status"] != "done",
+            "stage {slug} must NOT be done after complete; got: {s:?}"
+        );
+    }
+}
+
+#[test]
+fn explicit_stage_set_survives_subsequent_lifecycle_transition() {
+    // AC-06: `mp milestone stage set <id> external-review done` overrides
+    // the auto-derived value for that stage only. Subsequent `complete`
+    // lifecycle transitions update other stages but do NOT clobber the
+    // explicitly-set `external-review`.
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "explicit-override");
+    approve_and_start(&env, &id);
+
+    // Step 1: explicit set on external-review → done.
+    let explicit = env.run(&[
+        "milestone",
+        "stage",
+        "set",
+        &id,
+        "external-review",
+        "done",
+    ]);
+    assert!(
+        explicit.status.success(),
+        "stage set external-review done failed: {}",
+        String::from_utf8_lossy(&explicit.stderr)
+    );
+    let meta = milestone_meta(&env, &id);
+    let flow_before = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after explicit set");
+    assert_eq!(flow_before["external-review"]["status"], json!("done"));
+
+    // Step 2: run a lifecycle transition that WOULD normally write
+    // external-review. We re-approve and complete (with --skip-review)
+    // so the Complete transition fires.
+    let _ = env.run(&["milestone", "approve", &id]);
+    let complete = env.run(&[
+        "milestone",
+        "complete",
+        &id,
+        "--evidence",
+        "M202 explicit-set survives",
+        "--skip-review",
+    ]);
+    assert!(complete.status.success());
+
+    let meta_after = milestone_meta(&env, &id);
+    let flow_after = meta_after
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after complete");
+    // Lifecycle flipped to complete; stage entries reflect that.
+    assert_eq!(flow_after["complete"]["status"], json!("done"));
+    // BUT external-review must STILL be done (the explicit override),
+    // not in_progress which Complete would normally write.
+    assert_eq!(
+        flow_after["external-review"]["status"],
+        json!("done"),
+        "explicit stage set must survive a subsequent lifecycle transition (AC-06); got: {}",
+        flow_after["external-review"]["status"]
+    );
+}

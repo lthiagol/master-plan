@@ -1437,6 +1437,14 @@ pub fn next_handoff_id(handoffs: &[ReviewHandoff]) -> String {
 /// Returns the list of `(slug, new_status)` mutations applied in canonical
 /// `MP_FLOW_STAGE_KEYS` order so callers can audit / log / surface them.
 ///
+/// **Override semantics (AC-06):** a stage whose existing status is already
+/// `done` or `skipped` (terminal) is preserved — auto-advance writes do
+/// NOT clobber explicit `mp milestone stage set <id> <stage> done` calls
+/// or stages flipped to `skipped` by an earlier cancel. A stage at
+/// `pending` or `in_progress` advances normally. The hand-off stage is
+/// absent from the auto-advance graph (AC-11) regardless of override —
+/// only the explicit CLI mutates it.
+///
 /// Hand-off is intentionally absent from the auto-advance graph — only the
 /// explicit `mp milestone stage set <id> hand-off done` CLI mutates it
 /// (AC-11). Every other event either promotes stages forward, leaves them
@@ -1515,6 +1523,22 @@ pub fn apply_flow_stages_for_event(
     };
     let mut result: Vec<(String, String)> = Vec::with_capacity(raw_updates.len());
     for (slug, status) in raw_updates {
+        // AC-06 override guard: a stage explicitly set to a terminal
+        // status (`done` or `skipped`) stays put. Auto-advance writes
+        // only promote `pending` → forward states. This is the only
+        // mechanism that lets a user-set `external-review: done`
+        // survive a subsequent `complete` lifecycle transition (which
+        // would otherwise write `in_progress` and silently undo the
+        // user's explicit mark).
+        let existing = flow_stages.get(slug).map(|s| s.status.as_str());
+        let keep_override = matches!(existing, Some("done") | Some("skipped"));
+        if keep_override && existing != Some(status) {
+            // Stage is at a terminal status the user (or a prior
+            // event) explicitly set; preserve it. Do NOT include the
+            // mutation in the result either — the caller has nothing
+            // new to audit.
+            continue;
+        }
         flow_stages.insert(
             slug.to_string(),
             FlowStage {
@@ -2697,5 +2721,82 @@ mod tests {
         apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-05T00:00:00Z");
         assert_eq!(stages["approve"].at.as_deref(), Some("2026-09-05T00:00:00Z"));
         assert_eq!(stages["approve"].status, "done");
+    }
+
+    #[test]
+    fn apply_flow_stages_preserves_done_override_against_complete_downgrade() {
+        // AC-06: an explicit `stage set <id> external-review done` must
+        // survive a subsequent Complete lifecycle transition (which would
+        // otherwise write external-review=in_progress). Pin the model-
+        // level override guard so a future regression in `apply_flow_-
+        // stages_for_event` silently regresses the override contract.
+        let mut stages = BTreeMap::new();
+        // User explicitly sets external-review to done.
+        stages.insert(
+            "external-review".to_string(),
+            FlowStage {
+                status: "done".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        // Complete fires; without the override guard, this would clobber
+        // external-review to in_progress. With the guard, the done
+        // status stays put.
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::Complete,
+            "2026-09-02T00:00:00Z",
+        );
+        assert_eq!(
+            stages["external-review"].status, "done",
+            "Complete must not clobber an explicit external-review=done override (AC-06)"
+        );
+        assert_eq!(
+            stages["external-review"].at.as_deref(),
+            Some("2026-09-01T00:00:00Z"),
+            "the override's `at` timestamp must be preserved (no over-write on skipped mutation)"
+        );
+        // The other stages still get the normal Complete treatment.
+        assert_eq!(stages["execute"].status, "done");
+        assert_eq!(stages["self-review"].status, "done");
+        assert_eq!(stages["complete"].status, "done");
+        // Updates vec must NOT include external-review (it was a no-op).
+        let external_in_updates = updates
+            .iter()
+            .any(|(slug, _)| slug == "external-review");
+        assert!(
+            !external_in_updates,
+            "skipped override mutations must not appear in the updates audit; got {updates:?}"
+        );
+    }
+
+    #[test]
+    fn apply_flow_stages_preserves_skipped_override_against_lifecycle_advance() {
+        // Mirror of the done-override test, but for `skipped` (the
+        // cancel escape). Cancel sets every non-done stage to skipped;
+        // a subsequent event must NOT promote a skipped stage back to
+        // a forward state.
+        let mut stages = BTreeMap::new();
+        stages.insert(
+            "execute".to_string(),
+            FlowStage {
+                status: "skipped".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        // Start would normally flip execute from pending→in_progress.
+        // With the skipped override, it must stay skipped.
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::Start,
+            "2026-09-02T00:00:00Z",
+        );
+        assert_eq!(
+            stages["execute"].status, "skipped",
+            "Start must not promote a skipped stage back to in_progress"
+        );
+        // Updates vec must not include execute.
+        let exec_in_updates = updates.iter().any(|(slug, _)| slug == "execute");
+        assert!(!exec_in_updates, "got {updates:?}");
     }
 }

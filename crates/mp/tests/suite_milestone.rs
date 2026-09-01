@@ -55,3 +55,6 @@ mod findings_hunk_compat;
 
 #[path = "suites/show_review_trail.rs"]
 mod show_review_trail;
+
+#[path = "suites/milestone_bulk_set_stage.rs"]
+mod milestone_bulk_set_stage;

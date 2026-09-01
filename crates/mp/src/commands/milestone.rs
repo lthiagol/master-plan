@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use serde_json::json;
 
 use crate::ac_verify;
-use crate::cli::{CriterionCmd, DesignDecisionCmd, MilestoneCmd, OutputFormat as Fmt, QuestionCmd};
+use crate::cli::{CriterionCmd, DesignDecisionCmd, MilestoneCmd, OutputFormat as Fmt, QuestionCmd, StageCmd};
 use crate::commands::challenge as cmd_challenge_mod;
 use crate::commands::common::{
     emit, emit_gate_failure, milestone_summary, prose_verification_warn, read_evidence,
@@ -1214,6 +1214,143 @@ fn cmd_milestone_inner(ctx: &PlanContext, cmd: MilestoneCmd, format: Fmt) -> Res
             }
         },
         MilestoneCmd::Bulk(cmd) => cmd_milestone_bulk_mod::cmd_milestone_bulk(ctx, cmd, format),
+        MilestoneCmd::Stage { cmd } => handle_stage_cmd(ctx, cmd, format),
+    }
+}
+
+/// M202: per-stage mp-flow tracker dispatch.
+///
+/// `stage list <id>` prints all 12 stages as a CLI table with status
+/// and timestamp. Stages with no entry yet show `pending` and `—` for
+/// the timestamp — the table is canonical regardless of how many
+/// stages have actually fired (AC-07).
+///
+/// `stage set <id> <stage> <status>` enforces two guards: only the
+/// 12 canonical stage slugs are accepted, and only the 4-value enum
+/// (`pending | done | in_progress | skipped`) is accepted. Exit code 2
+/// on invalid input; the milestone file is unchanged on rejection
+/// (AC-08). Hand-off is in the 12-stage list and accepts any of the 4
+/// values explicitly — it just never auto-advances (AC-11).
+fn handle_stage_cmd(ctx: &PlanContext, cmd: StageCmd, format: Fmt) -> Result<()> {
+    use crate::cli::StageCmd as S;
+    match cmd {
+        S::List { id } => {
+            let path = milestone::load_milestone_path(ctx, &id)?;
+            let m = crate::store::load_milestone(&path)?;
+            let stages = m
+                .milestone
+                .flow_stages
+                .iter()
+                .map(|(slug, stage)| {
+                    (
+                        slug.as_str(),
+                        stage.status.as_str(),
+                        stage.at.as_deref().unwrap_or("—"),
+                    )
+                })
+                .collect::<Vec<_>>();
+            // Stable canonical order: emit MP_FLOW_STAGE_KEYS first (in
+            // order), then any unexpected keys (defensive — should not
+            // happen, but don't silently drop user-written stages).
+            let mut rows: Vec<(String, String, String)> = Vec::with_capacity(12);
+            for slug in mp_model::MP_FLOW_STAGE_KEYS {
+                let (status, at) = stages
+                    .iter()
+                    .find(|(s, _, _)| *s == *slug)
+                    .map(|(_, status, at)| (status.to_string(), at.to_string()))
+                    .unwrap_or_else(|| ("pending".to_string(), "—".to_string()));
+                rows.push((slug.to_string(), status, at));
+            }
+            let known: std::collections::HashSet<&str> = mp_model::MP_FLOW_STAGE_KEYS
+                .iter()
+                .copied()
+                .collect();
+            for (slug, stage) in &m.milestone.flow_stages {
+                if !known.contains(slug.as_str()) {
+                    rows.push((
+                        slug.clone(),
+                        stage.status.clone(),
+                        stage.at.clone().unwrap_or_else(|| "—".to_string()),
+                    ));
+                }
+            }
+            let value = json!({
+                "ok": true,
+                "milestone": id,
+                "stages": rows
+                    .iter()
+                    .map(|(slug, status, at)| {
+                        json!({
+                            "stage": slug,
+                            "status": status,
+                            "at": at,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            });
+            // Format=human renders as a 12-row table. JSON emits the
+            // same rows as a `stages` array. Default (human) stays the
+            // primary surface so an operator can scan all 12 at a glance.
+            match format {
+                Fmt::Json => emit(format, &value),
+                _ => {
+                    let header = format!(
+                        "{:<14} {:<12} {}",
+                        "STAGE", "STATUS", "AT"
+                    );
+                    let mut out = String::new();
+                    out.push_str(&header);
+                    out.push('\n');
+                    for (slug, status, at) in &rows {
+                        out.push_str(&format!("{slug:<14} {status:<12} {at}\n"));
+                    }
+                    println!("{out}");
+                    Ok(())
+                }
+            }
+        }
+        S::Set { id, stage, status } => {
+            // AC-08: strict 12-key guard + 4-value enum guard. Exit 2
+            // on either failure; no on-disk mutation.
+            if !mp_model::MP_FLOW_STAGE_KEYS.contains(&stage.as_str()) {
+                eprintln!(
+                    "invalid stage: {stage:?} (expected one of: {})",
+                    mp_model::MP_FLOW_STAGE_KEYS.join(", ")
+                );
+                std::process::exit(2);
+            }
+            if !mp_model::MP_FLOW_STAGE_STATUSES.contains(&status.as_str()) {
+                eprintln!(
+                    "invalid status: {status:?} (expected one of: {})",
+                    mp_model::MP_FLOW_STAGE_STATUSES.join(", ")
+                );
+                std::process::exit(2);
+            }
+            // Load + apply + write. We use with_milestone_mut_unlocked
+            // so the durable-writer contract (atomic write + lock
+            // discipline) matches every other stage-touching site.
+            let path = milestone::load_milestone_path(ctx, &id)?;
+            let mut m = crate::store::load_milestone(&path)?;
+            m.milestone.flow_stages.insert(
+                stage.clone(),
+                mp_model::FlowStage {
+                    status: status.clone(),
+                    at: Some(crate::store::now_rfc3339()),
+                },
+            );
+            m.milestone.updated = crate::store::today();
+            milestone::write_milestone_synced(ctx, &path, &m)?;
+            emit(
+                format,
+                &json!({
+                    "ok": true,
+                    "milestone": id,
+                    "stage": stage,
+                    "status": status,
+                    "at": crate::store::now_rfc3339(),
+                }),
+            )
+        }
     }
 }
 
