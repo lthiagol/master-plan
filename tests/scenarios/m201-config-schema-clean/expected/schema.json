@@ -1,0 +1,312 @@
+{
+  "$schema_version": "1.0",
+  "keys": [
+    {
+      "key": "agent.automation.auto_remediate",
+      "type": "choice",
+      "default": "none",
+      "allowed": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "all"
+      ],
+      "description": "How aggressive the auto-remediation loop should be when the runner surfaces a fixable finding."
+    },
+    {
+      "key": "agent.automation.branch_strategy",
+      "type": "choice",
+      "default": "current",
+      "allowed": [
+        "per-milestone",
+        "current",
+        "none"
+      ],
+      "description": "Branch strategy the runner uses when a milestone needs its own branch."
+    },
+    {
+      "key": "agent.automation.commit_after_execute",
+      "type": "bool",
+      "default": "false",
+      "description": "When true, the runner commits after each executed step that touched the plan."
+    },
+    {
+      "key": "agent.automation.push_after_review",
+      "type": "bool",
+      "default": "false",
+      "description": "When true, the runner pushes the review branch automatically once it lands cleanly."
+    },
+    {
+      "key": "git.auto_commit",
+      "type": "bool",
+      "default": "false",
+      "description": "Auto-commit plan mutations after each step that touches the repo."
+    },
+    {
+      "key": "git.auto_push",
+      "type": "bool",
+      "default": "false",
+      "description": "When auto-commit is on, push the resulting commit too."
+    },
+    {
+      "key": "git.commit_on_milestone_complete",
+      "type": "bool",
+      "default": "false",
+      "description": "Auto-commit a milestone-completion marker when a milestone closes out."
+    },
+    {
+      "key": "keybinds.approve",
+      "type": "keybind",
+      "default": "p",
+      "description": "Approve the currently selected milestone from the review menu."
+    },
+    {
+      "key": "keybinds.create_annotation",
+      "type": "keybind",
+      "default": "A",
+      "description": "Open the annotation composer on the focused milestone."
+    },
+    {
+      "key": "keybinds.cycle_sort",
+      "type": "keybind",
+      "default": "o",
+      "description": "Cycle through the available sort orders for the active list lane."
+    },
+    {
+      "key": "keybinds.down",
+      "type": "keybind",
+      "default": "Down, j",
+      "description": "Move the list cursor one row down. Vim-style `j` is mirrored as an alias."
+    },
+    {
+      "key": "keybinds.enter",
+      "type": "keybind",
+      "default": "Enter",
+      "description": "Activate the focused row — open the editor on a setting, expand a milestone, or commit a search."
+    },
+    {
+      "key": "keybinds.escape",
+      "type": "keybind",
+      "default": "Esc",
+      "description": "Cancel the active overlay or dismiss the help screen."
+    },
+    {
+      "key": "keybinds.filter",
+      "type": "keybind",
+      "default": "f",
+      "description": "Open the lane-specific filter input."
+    },
+    {
+      "key": "keybinds.grooming_preset",
+      "type": "keybind",
+      "default": "g",
+      "description": "Cycle through the grooming presets on the Backlog lane."
+    },
+    {
+      "key": "keybinds.help",
+      "type": "keybind",
+      "default": "?",
+      "description": "Toggle the keyboard-help overlay."
+    },
+    {
+      "key": "keybinds.hide_done",
+      "type": "keybind",
+      "default": "h",
+      "description": "Toggle the hide-done filter on list lanes."
+    },
+    {
+      "key": "keybinds.lifecycle_filter",
+      "type": "keybind",
+      "default": "F",
+      "description": "Open the multi-select lifecycle filter on the Milestones lane."
+    },
+    {
+      "key": "keybinds.next_item",
+      "type": "keybind",
+      "default": "n",
+      "description": "Move to the next sibling item within the focused section."
+    },
+    {
+      "key": "keybinds.next_lane",
+      "type": "keybind",
+      "default": "Right, l, Tab",
+      "description": "Move the lane focus one step to the right. Wraps at the end."
+    },
+    {
+      "key": "keybinds.next_section",
+      "type": "keybind",
+      "default": "]",
+      "description": "Jump to the next section header in the active list."
+    },
+    {
+      "key": "keybinds.open_settings",
+      "type": "keybind",
+      "default": "Ctrl-O",
+      "description": "Jump directly to the Settings lane."
+    },
+    {
+      "key": "keybinds.page_down",
+      "type": "keybind",
+      "default": "PageDown",
+      "description": "Page the active list down by one viewport."
+    },
+    {
+      "key": "keybinds.page_up",
+      "type": "keybind",
+      "default": "PageUp",
+      "description": "Page the active list up by one viewport."
+    },
+    {
+      "key": "keybinds.prev_item",
+      "type": "keybind",
+      "default": "p",
+      "description": "Move to the previous sibling item within the focused section."
+    },
+    {
+      "key": "keybinds.prev_section",
+      "type": "keybind",
+      "default": "[",
+      "description": "Jump to the previous section header in the active list."
+    },
+    {
+      "key": "keybinds.previous_lane",
+      "type": "keybind",
+      "default": "Left, BackTab",
+      "description": "Move the lane focus one step to the left. Wraps at the start."
+    },
+    {
+      "key": "keybinds.quit",
+      "type": "keybind",
+      "default": "q, Q",
+      "description": "Quit the TUI."
+    },
+    {
+      "key": "keybinds.refresh",
+      "type": "keybind",
+      "default": "Ctrl-R",
+      "description": "Reload the active lane from disk."
+    },
+    {
+      "key": "keybinds.reopen",
+      "type": "keybind",
+      "default": "R",
+      "description": "Reopen a closed milestone — undoes a previous resolve/approve on the focused row."
+    },
+    {
+      "key": "keybinds.resolve",
+      "type": "keybind",
+      "default": "r",
+      "description": "Mark the focused milestone as resolved."
+    },
+    {
+      "key": "keybinds.review_menu",
+      "type": "keybind",
+      "default": "m",
+      "description": "Open the per-milestone review menu."
+    },
+    {
+      "key": "keybinds.search",
+      "type": "keybind",
+      "default": "/",
+      "description": "Open the live substring search input on list lanes."
+    },
+    {
+      "key": "keybinds.up",
+      "type": "keybind",
+      "default": "Up, k",
+      "description": "Move the list cursor one row up. Vim-style `k` is mirrored as an alias."
+    },
+    {
+      "key": "next.prefer",
+      "type": "choice",
+      "default": "milestone",
+      "allowed": [
+        "milestone",
+        "track"
+      ],
+      "description": "Which lane `mp next` should prefer when both have work available."
+    },
+    {
+      "key": "ui.color",
+      "type": "bool",
+      "default": "false",
+      "description": "Enable ANSI color for status, decisions, and read paths."
+    },
+    {
+      "key": "ui.hide_done",
+      "type": "bool",
+      "default": "false",
+      "description": "Hide milestones in the done lifecycle across all list lanes."
+    },
+    {
+      "key": "ui.icons",
+      "type": "choice",
+      "default": "unicode",
+      "allowed": [
+        "none",
+        "ascii",
+        "unicode"
+      ],
+      "description": "Glyph set used by list decorators and section markers."
+    },
+    {
+      "key": "ui.show_watch_tab",
+      "type": "bool",
+      "default": "false",
+      "description": "Show the Watch lane in the tab bar. The `mp watch` command is unaffected — only the TUI surface reacts."
+    },
+    {
+      "key": "ui.theme",
+      "type": "choice",
+      "default": "mocha",
+      "allowed": [
+        "mocha",
+        "macchiato",
+        "frappe",
+        "latte",
+        "dracula"
+      ],
+      "description": "Theme palette name. Picked up at startup; relaunch to apply."
+    },
+    {
+      "key": "workflow.gates.strictness",
+      "type": "choice",
+      "default": "relaxed",
+      "allowed": [
+        "relaxed",
+        "full"
+      ],
+      "description": "How strictly gate failures block the workflow."
+    },
+    {
+      "key": "workflow.plan.in_repo",
+      "type": "bool",
+      "default": "true",
+      "description": "Keep `master-plan/` inside the project repo (vs. an out-of-repo location)."
+    },
+    {
+      "key": "workflow.plan.location",
+      "type": "path",
+      "default": "master-plan",
+      "description": "Path to the plan directory, relative to the project root."
+    },
+    {
+      "key": "workflow.profile",
+      "type": "choice",
+      "default": "full",
+      "allowed": [
+        "full",
+        "hybrid",
+        "session"
+      ],
+      "description": "Workflow profile — which artifacts and gates the project runs."
+    },
+    {
+      "key": "workflow.steps.code_review",
+      "type": "bool",
+      "default": "false",
+      "description": "Run an external review pass on milestones before they reach approved."
+    }
+  ]
+}

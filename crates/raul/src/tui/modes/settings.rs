@@ -10,7 +10,6 @@ use crate::tui::app::{App, Lane};
 use crate::tui::keybinds::any_matches;
 use crate::tui::mode::SettingsFocus;
 
-pub mod help;
 pub mod schema;
 
 /// Flat list of configurable keys. Each row is `(section, key)`.

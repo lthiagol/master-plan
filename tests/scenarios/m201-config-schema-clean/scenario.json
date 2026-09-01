@@ -1,0 +1,15 @@
+{
+  "id": "m201-config-schema-clean",
+  "phase": "implemented",
+  "description": "mp config schema on a fresh project emits the typed 45-key schema (no focus_content), $schema_version 1.0, keybinds.refresh default is Ctrl-R",
+  "fixture": "projects/m200-keybind-clean",
+  "command": ["config", "schema", "--format", "json"],
+  "env": {
+    "MP_HOME": "{{repo_root}}"
+  },
+  "assert": {
+    "exit_code": 0,
+    "stdout_json_file": "expected/schema.json",
+    "fs_unchanged": true
+  }
+}

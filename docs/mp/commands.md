@@ -177,7 +177,7 @@ at least one execution-ready milestone or track-pending work exists,
 **and** `watch_readiness.ok` is true. The two surfaces (`execution check`,
 `execution status`, `mp watch start`, `mp milestone handoff`) answer the
 same go/no-go question so the readiness signal cannot drift between
-them (M197 / DD-04). The `ui.show_watch_tab` value (M198) is a separate
+them. The `ui.show_watch_tab` value is a separate
 TUI preference and is reported under a distinct key.
 
 ### Reviews — `mp reviews …`
