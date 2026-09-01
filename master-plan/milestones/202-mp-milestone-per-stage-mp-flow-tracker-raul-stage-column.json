@@ -940,7 +940,7 @@
       "description": "F-06 fix overwritten by the completion step: commit 256b926 restored per-AC evidence (command + exit + test count), but the cycle-2 completion commit 10a5586 replaced ALL 19 acceptance_criteria[].evidence fields AND verification.evidence with the placeholder string 'M202 cycle 2 retry'. Current state: every AC carries the same prose placeholder, not test output — the M200 F-12 pattern repeating a third time. Restore per-AC evidence AFTER the final mp milestone complete (stamp each AC with its verification command + exit code + test count).",
       "status": "fixed",
       "author": "",
-      "fixed_in": "d4feeb3",
+      "fixed_in": "83bd1e3",
       "created": "2026-09-01",
       "resolved": "2026-09-01"
     }
