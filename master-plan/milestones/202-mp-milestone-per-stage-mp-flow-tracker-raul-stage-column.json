@@ -807,88 +807,88 @@
       "severity": "high",
       "category": "bug",
       "description": "AC-16 broken end-to-end: the raul dashboard 12-bucket grid always shows zero counts. raul reads snap.mp_flow_stage_counts from the overview snapshot (crates/raul/src/tui/render/dashboard_view.rs:265) but NOTHING on the mp side emits that field — grep 'mp_flow_stage_counts' crates/mp/src/ is empty, and 'target/debug/mp overview' top-level keys are only activity/health/inbox/lifecycle/path/queues/steps/totals. crates/raul/src/overview_snapshot.rs:66 declares the field with the comment 'added by the mp side per M202' but no mp-side change exists in the M202 diff. The 4 AC-16 tests only assert bucket labels/order/title, never counts from a real payload, so the verification regex passes while the rollup is dead.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-02",
       "severity": "medium",
       "category": "spec-drift",
       "description": "AC-01 drift: AC says show milestone JSON includes flow_stages 'keyed by all 12 mp-flow stage slugs', but the implementation stores only fired stages (M202 itself shows just execute+self-review; untouched stages are absent). The test crates/mp/tests/lifecycle_setter_overlay.rs:1091 re-interprets the AC in a comment ('untouched stages may be absent') without the AC wording being amended and without a declared-drift finding. Either expand show output to all 12 keys or amend AC-01.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-03",
       "severity": "medium",
       "category": "spec-drift",
       "description": "ExitRemediation drift: S3 action and scope.in_scope say 'ExitRemediation → remediate done + re-review done', but crates/mp-model/src/milestone.rs:1484 sets re-review to in_progress (unit test at :2634 asserts in_progress). The code comment rationalizes the change ('back in the review queue waiting on the re-review pass') but the approved spec was not updated and no drift finding was declared.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-04",
       "severity": "medium",
       "category": "spec-drift",
       "description": "AC-09 vs implementation: Cancel excludes hand-off from the skipped flip (crates/mp-model/src/milestone.rs Cancel arm skips 'hand-off'), so a cancelled milestone leaves hand-off pending/absent while AC-09 says 'flips every non-done stage to skipped' and scope says 'all non-done stages set to skipped'. The code comment justifies via AC-11, but skipping is not auto-advancing to done — the exclusion is undeclared drift and feeds the raul 12/12 render bug.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-05",
       "severity": "medium",
       "category": "bug",
       "description": "raul Stage cell renders '12/12 · Hand-off' for real cancelled milestones. After cancel, all remaining stages are skipped and hand-off is absent; crates/raul/src/tui/progress.rs current_mp_flow_stage's second pass treats absent hand-off as pending and ignores skipped stages, so a milestone cancelled at stage 4 displays 12/12 · Hand-off in the list column and detail header. The cancelled case in tui_lifecycle_gauge_render.rs:120 uses a synthetic fixture (skipped entries omitted → 6/12) that masks real cancel output; no test covers realistic cancel state. Also diverges from S15's stated fallback ('last done stage plus its label').",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-06",
       "severity": "medium",
       "category": "evidence",
       "description": "Per-AC evidence is one generic string on all 19 ACs plus verification.evidence: 'All 22 steps + 19 ACs done. Full matrix green: make test (3268 tests), clippy mp+raul+mp-model -D warnings, mp validate exit 0.' — the exact M200 F-12 pattern the series already flagged (lesson 5). Lifecycle gate requires non-prose per-AC evidence (command + exit code + test count per AC). Also internally inconsistent: commit 9580636 says 3267 tests, evidence says 3268 (actual make test: 3268 passed + 1 skipped).",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "256b926",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-07",
       "severity": "medium",
       "category": "verification-gap",
       "description": "AC-17 verification is 'make test' which runs cargo nextest run + cargo fmt --check only — it does not run cargo clippy -p mp/raul or mp validate, all of which AC-17's description asserts exit 0. The verification command must exercise every assertion in the AC description (clippy + mp validate are currently ungated by the per-AC gate; they could regress silently).",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "92bbb09",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-08",
       "severity": "medium",
       "category": "spec-drift",
       "description": "AC-15/S18 sub-line placement drift: crates/raul/src/tui/render/milestone_detail.rs pushes the '└─ lifecycle overlay: <state>' sub-line AFTER all 12 stage rows, but AC-15 says 'the current-stage row carries the sub-line' and S18 says 'Under the current-stage row'. For a milestone at stage 5 the sub-line renders after the hand-off row. The 4 AC-15 tests pin only presence, not placement. Secondary edge: for legacy milestones with no flow_stages key, current_stage_slug is None and the sub-line is silently suppressed even when the overlay is set.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-09",
@@ -917,11 +917,11 @@
       "severity": "low",
       "category": "code-quality",
       "description": "Canonical 12-stage table is hard-coded in THREE places: crates/mp-model/src/milestone.rs MP_FLOW_STAGE_KEYS + mp_flow_stage_label, and a duplicated copy in crates/raul/src/tui/progress.rs (comment says 'keep in sync'). No code reads templates/skills/mp-flow/stages.toml, contradicting scope.out_of_scope which claims 'this milestone reads from the same source'. make mp-flow-lint guards SKILL.md vs stages.toml but nothing guards code vs stages.toml — the copies can silently diverge.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "eb3b66d",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     }
   ]
 }

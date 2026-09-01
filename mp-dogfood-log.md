@@ -1184,3 +1184,25 @@ Closure path: M176 — re-spec AC-04 to measure
 - Suspected cause / code path: the installed `mp-runner` stage-7 checklist documents a `--phase self` list filter that the current `mp reviews finding list` parser does not expose.
 - Verdict: **spec-gap**.
 - One-line: self-review checklist must list all findings and filter returned phase fields client-side until `finding list --phase` exists.
+
+## Entry 27 — 2026-09-01 — M202 cycle-1 bundled out-of-scope fixes (F-09)
+
+- Date / when: 2026-09-01, M202 external review (cycle 2) flagged F-09.
+- Command attempted: review of commit 9580636 (M202 S21 verification matrix).
+- Observed output: two changes bundled into the M202 S21 commit that no
+  M202 step covers: (1) `crates/raul/src/tui/render/tab_bar.rs` lane-index
+  fix (renderer now uses `ordered_visible(app.show_watch_tab)` to match
+  the layout's filtered lane list), and (2) the M201 settings-schema
+  fetch refactor (fetch moved out of the per-mode handler tree into the
+  runner layer, keeping per-mode handlers pure).
+- Suspected cause / code path: both were REQUIRED to make the M202
+  AC-17 gate (`make test`) green. The wip branch carried 52 pre-existing
+  failures at M201-cycle-3 baseline (mostly M198/M201-era settings and
+  tab-bar tests); AC-17's `make test` cannot pass with a red raul suite,
+  so the runner fixed the underlying code instead of amending AC-17 or
+  skipping the gate. The fixes are M198/M201 follow-ups surfaced by
+  M202's verification matrix, not M202 feature work.
+- Verdict: **spec-gap** — declared drift, accepted as prerequisite
+  repairs for the AC-17 gate; recorded here per the workaround queue.
+- One-line: M202 S21 commit bundled tab-bar + settings-schema repairs
+  required to unblock `make test`; declared as drift in F-09 resolution.
