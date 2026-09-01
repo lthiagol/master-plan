@@ -99,9 +99,7 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
         })
         .unwrap_or_default();
     let (stage_slug, stage_label) = crate::tui::progress::current_mp_flow_stage(&header_stage_map);
-    let stage_idx = crate::tui::progress::MP_FLOW_STAGE_KEYS
-        .iter()
-        .position(|s| *s == stage_slug)
+    let stage_idx = crate::tui::progress::mp_flow_stage_index(stage_slug)
         .unwrap_or(crate::tui::progress::MP_FLOW_STAGE_KEYS.len() - 1);
     let stage_text = format!(
         "{}/{} · {}",
@@ -272,19 +270,57 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
     // the next lifecycle transition auto-populates it.
     let flow_stages_obj = detail["milestone"]["flow_stages"].as_object();
     let flow_stages_loaded = flow_stages_obj.is_some();
-    let mut current_stage_slug: Option<&'static str> = None;
-    if let Some(obj) = flow_stages_obj {
-        let owned: std::collections::BTreeMap<String, String> = obj
-            .iter()
-            .filter_map(|(slug, stage)| {
-                stage
-                    .get("status")
-                    .and_then(|s| s.as_str())
-                    .map(|s| (slug.clone(), s.to_string()))
-            })
-            .collect();
-        current_stage_slug = Some(crate::tui::progress::current_mp_flow_stage(&owned).0);
-    }
+    // Current-stage derivation ALWAYS runs — for pre-M202 milestones
+    // (no flow_stages key) the empty status map derives `draft`
+    // (1/12) so the overlay sub-line (F-08) still has a row to sit
+    // under instead of being silently suppressed.
+    let owned_statuses: std::collections::BTreeMap<String, String> = flow_stages_obj
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(slug, stage)| {
+                    stage
+                        .get("status")
+                        .and_then(|s| s.as_str())
+                        .map(|s| (slug.clone(), s.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let current_stage_slug = crate::tui::progress::current_mp_flow_stage(&owned_statuses).0;
+
+    // M202 S18 (F-08 fix): overlay state is computed BEFORE the row
+    // loop so the sub-line can be placed directly under the
+    // current-stage row (AC-15: "the current-stage row carries the
+    // sub-line"), not after all 12 rows. When the milestone carries
+    // a non-empty lifecycle overlay (cancelled, blocked,
+    // remediation) the indented `└─ lifecycle overlay: <state>`
+    // line renders right after the current-stage row. Skipped when
+    // no overlay is set so a normal milestone shows no extra row.
+    let overlay_state: Option<&'static str> = if m["cancelled"].as_bool().unwrap_or(false) {
+        Some("cancelled")
+    } else if m["remediation_pre_state"].as_str().is_some() {
+        Some("remediation")
+    } else if m["blocked"].as_bool().unwrap_or(false) {
+        Some("blocked")
+    } else {
+        None
+    };
+    let push_overlay_subline = |lines: &mut Vec<Line>| {
+        if let Some(state) = overlay_state {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "      └─ lifecycle overlay: ",
+                    Style::default().fg(palette.warn),
+                ),
+                Span::styled(
+                    state,
+                    Style::default()
+                        .fg(palette.warn)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
+        }
+    };
     lines.push(Line::from(""));
     section_rows.push(lines.len() as u16);
     lines.extend_from_slice(&section_header("Stages", None, app, Some(md_width)));
@@ -309,6 +345,11 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
                 Style::default().fg(palette.dim),
             ),
         ]));
+        // F-08: the sub-line renders IMMEDIATELY under the
+        // current-stage row — not after the whole 12-row section.
+        if slug == current_stage_slug {
+            push_overlay_subline(lines);
+        }
     };
     if !flow_stages_loaded {
         for slug in crate::tui::progress::MP_FLOW_STAGE_KEYS {
@@ -319,6 +360,11 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
                 Span::styled(format!("  {label}  "), Style::default().fg(palette.dim)),
                 Span::styled("pending (unknown)", Style::default().fg(palette.dim)),
             ]));
+            // Legacy milestone: derived current stage is `draft`
+            // (the empty-map fallback) — the sub-line sits under it.
+            if *slug == current_stage_slug {
+                push_overlay_subline(&mut lines);
+            }
         }
     } else {
         let obj = flow_stages_obj.unwrap();
@@ -345,37 +391,6 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
                 .map(crate::tui::humanize::humanize_relative)
                 .unwrap_or_else(|| "—".to_string());
             render_stage_row(slug, icon, icon_style, status_text, &at_text, &mut lines);
-        }
-    }
-
-    // M202 S18: overlay sub-line. When the milestone carries a
-    // non-empty lifecycle overlay (cancelled, blocked,
-    // remediation), render an indented sub-line under the
-    // current-stage row reading `└─ lifecycle overlay: <state>`.
-    // Skipped when no overlay is set so a normal milestone shows
-    // no extra row.
-    let mut overlay_state: Option<&'static str> = None;
-    if m["cancelled"].as_bool().unwrap_or(false) {
-        overlay_state = Some("cancelled");
-    } else if m["remediation_pre_state"].as_str().is_some() {
-        overlay_state = Some("remediation");
-    } else if m["blocked"].as_bool().unwrap_or(false) {
-        overlay_state = Some("blocked");
-    }
-    if let Some(state) = overlay_state {
-        if current_stage_slug.is_some() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    "      └─ lifecycle overlay: ",
-                    Style::default().fg(palette.warn),
-                ),
-                Span::styled(
-                    state,
-                    Style::default()
-                        .fg(palette.warn)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]));
         }
     }
 

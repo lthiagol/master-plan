@@ -1089,11 +1089,11 @@ fn stage_set_rejects_unknown_stage_key() {
 
 #[test]
 fn show_milestone_includes_flow_stages() {
-    // AC-01: `mp show milestone <id>` JSON includes a `flow_stages`
-    // object keyed by all 12 mp-flow stage slugs. After any
-    // transition, every touched stage is present (status + at);
-    // untouched stages may be absent (the BTreeMap only stores what
-    // has actually fired).
+    // AC-01 (F-02 fix): `mp show milestone <id>` JSON includes a
+    // `flow_stages` object keyed by ALL 12 mp-flow stage slugs. The
+    // on-disk map stores only fired stages; the show projection
+    // fills the rest with `{status: pending}` so the AC contract
+    // ("keyed by all 12 mp-flow stage slugs") holds end-to-end.
     let env = TestEnv::new();
     let id = make_milestone(&env, "show-flow-stages");
     // Drive the full pre-complete pipeline so draft + groom fire too.
@@ -1119,8 +1119,8 @@ fn show_milestone_includes_flow_stages() {
     let flow = v["milestone"]["flow_stages"]
         .as_object()
         .expect("flow_stages object on mp show milestone JSON");
-    // After draft→groom→specify→approve→execute→self-review→complete,
-    // the present stages must include every stage 1-8.
+    // AC-01: ALL 12 canonical slugs must be present — fired stages
+    // carry their real status; unfired stages render as pending.
     for slug in [
         "draft",
         "groom",
@@ -1130,6 +1130,10 @@ fn show_milestone_includes_flow_stages() {
         "self-review",
         "complete",
         "external-review",
+        "remediate",
+        "re-review",
+        "document",
+        "hand-off",
     ] {
         assert!(
             flow.contains_key(slug),
@@ -1150,6 +1154,12 @@ fn show_milestone_includes_flow_stages() {
             );
         }
     }
+    // Unfired stages (hand-off) must render as pending with no `at`.
+    assert_eq!(flow["hand-off"]["status"], "pending");
+    assert!(flow["hand-off"].get("at").is_none());
+    // Fired stages keep their real status.
+    assert_eq!(flow["execute"]["status"], "done");
+    assert_eq!(flow["external-review"]["status"], "in_progress");
 }
 
 #[test]

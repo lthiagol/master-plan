@@ -64,6 +64,13 @@ pub(crate) fn cmd_show(
                     // bulk migration has been applied to every milestone and
                     // the legacy fields are gone, this layer can be removed.
                     value = inject_legacy_status_view(value, &m);
+                    // M202 / AC-01 (F-02 fix): the on-disk flow_stages map
+                    // stores only stages that actually fired; the AC contract
+                    // says `mp show milestone <id>` JSON includes flow_stages
+                    // "keyed by all 12 mp-flow stage slugs". Fill the missing
+                    // slugs with `{status: pending}` so every projection and
+                    // every consumer sees the full canonical 12-key object.
+                    value = inject_flow_stages_full(value);
                     // M133 AC-03: surface the durable review conversation
                     // (threaded comments + coordinator/runner hand-offs)
                     // alongside the milestone body. Additive — the existing
@@ -233,12 +240,38 @@ fn derive_legacy_execution_status(lifecycle: &str, m: &crate::model::MilestoneFi
     }
 }
 
+/// M202 / AC-01 (F-02 fix): fill the serialized milestone's
+/// `flow_stages` object with ALL 12 canonical mp-flow stage slugs.
+/// The on-disk map only stores stages that actually fired; the AC
+/// contract requires the show JSON to be keyed by all 12. Missing
+/// slugs are inserted as `{status: "pending"}` (no `at` — the stage
+/// has never fired). The full map keeps every consumer (agents
+/// projecting `--fields milestone.flow_stages`, raul detail view,
+/// scripts) able to iterate the canonical 12 without defaulting.
+fn inject_flow_stages_full(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(milestone) = obj.get_mut("milestone").and_then(|v| v.as_object_mut()) {
+            let mut flow = milestone
+                .get("flow_stages")
+                .and_then(|v| v.as_object())
+                .cloned()
+                .unwrap_or_default();
+            for slug in mp_model::MP_FLOW_STAGE_KEYS {
+                flow.entry(slug.to_string()).or_insert_with(|| {
+                    serde_json::json!({ "status": "pending" })
+                });
+            }
+            milestone.insert("flow_stages".to_string(), serde_json::Value::Object(flow));
+        }
+    }
+    value
+}
+
 /// M133 AC-03: surface the durable review trail (threaded comments +
 /// coordinator/runner hand-offs) on `mp show milestone` output. Pulls
 /// the latest snapshot from `reviews.json` via the existing
 /// `reviews::review_trail` helper and inserts three top-level fields
 /// onto the serialized milestone value:
-///
 /// - `reviews`: review verdicts (newest-first) — already present in
 ///   reviews.json before M133; surfaced for parity with `mp reviews show`.
 /// - `comments`: threaded review comments (oldest-first).

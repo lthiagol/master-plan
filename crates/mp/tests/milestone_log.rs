@@ -615,3 +615,107 @@ fn milestone_set_lifecycle_succeeds_when_activity_journal_is_a_directory() {
     let m = run_mp_json(&env, &["show", "milestone", "01", "--format", "json"]);
     assert_eq!(m["milestone"]["spec_status"], "ready");
 }
+
+// ────────────────────────────────────────────────────────────────────
+// M202 F-01: mp_flow_stage_counts writer
+// ────────────────────────────────────────────────────────────────────
+
+#[test]
+fn overview_emits_mp_flow_stage_counts_with_all_twelve_slugs() {
+    let env = TestEnv::new();
+    // Create + approve + start a milestone so it lands at execute
+    // (in_progress) — the 5th mp-flow stage.
+    let create = run_mp_json(
+        &env,
+        &[
+            "milestone",
+            "create",
+            "--json",
+            r#"{
+                "title": "F-01 counts",
+                "intent": {"outcome": "x"},
+                "problem": {"description": "y"},
+                "scope": {"in_scope": ["a"], "out_of_scope": ["b", "c"]},
+                "acceptance_criteria": [
+                    {"description": "ac1", "verification": "manual: x"}
+                ]
+            }"#,
+            "--format",
+            "json",
+        ],
+    );
+    let id = create["milestone"]["id"].as_str().unwrap().to_string();
+    let _ = run_mp(&env, &["milestone", "set-spec-status", &id, "review"]);
+    let _ = run_mp(&env, &["milestone", "approve", &id]);
+    let _ = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
+
+    let payload = run_mp_json(&env, &["overview"]);
+    let counts = payload["mp_flow_stage_counts"].as_object().expect("counts object");
+    // All 12 canonical slugs present.
+    for slug in [
+        "draft", "groom", "specify", "approve", "execute", "self-review",
+        "complete", "external-review", "remediate", "re-review",
+        "document", "hand-off",
+    ] {
+        assert!(
+            counts.contains_key(slug),
+            "mp_flow_stage_counts must include {slug}; got keys: {:?}",
+            counts.keys().collect::<Vec<_>>()
+        );
+    }
+    // The milestone is at `execute` (5/12) — its bucket must be 1.
+    assert_eq!(
+        counts["execute"], 1,
+        "in-progress milestone must land in the execute bucket; got: {counts:?}"
+    );
+    // The fresh-milestone bucket (draft) must be 0 — the milestone
+    // advanced past it.
+    assert_eq!(counts["draft"], 0);
+    // The summary variant carries the rollup too (the dashboard
+    // header strip reads the same numbers).
+    let summary = run_mp_json(&env, &["overview", "--summary"]);
+    assert!(
+        summary["mp_flow_stage_counts"].is_object(),
+        "summary must carry mp_flow_stage_counts; got: {summary}"
+    );
+}
+
+#[test]
+fn overview_mp_flow_stage_counts_reflect_cancelled_milestone() {
+    let env = TestEnv::new();
+    let create = run_mp_json(
+        &env,
+        &[
+            "milestone",
+            "create",
+            "--json",
+            r#"{
+                "title": "F-01 cancelled",
+                "intent": {"outcome": "x"},
+                "problem": {"description": "y"},
+                "scope": {"in_scope": ["a"], "out_of_scope": ["b", "c"]},
+                "acceptance_criteria": [
+                    {"description": "ac1", "verification": "manual: x"}
+                ]
+            }"#,
+            "--format",
+            "json",
+        ],
+    );
+    let id = create["milestone"]["id"].as_str().unwrap().to_string();
+    let _ = run_mp(&env, &["milestone", "set-spec-status", &id, "review"]);
+    let _ = run_mp(&env, &["milestone", "approve", &id]);
+    let _ = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
+    let _ = run_mp(&env, &["milestone", "set-status", &id, "cancelled"]);
+
+    let payload = run_mp_json(&env, &["overview"]);
+    let counts = payload["mp_flow_stage_counts"].as_object().expect("counts object");
+    // Cancelled at execute → the fallback is the last done stage
+    // (approve, 4/12). The cancelled milestone must count toward
+    // `approve`, NOT toward a misleading hand-off bucket.
+    assert_eq!(
+        counts["approve"], 1,
+        "cancelled milestone must land on its last done stage (F-05/F-01); got: {counts:?}"
+    );
+    assert_eq!(counts["hand-off"], 0);
+}

@@ -68,6 +68,76 @@ pub fn mp_flow_stage_label(slug: &str) -> &'static str {
     }
 }
 
+/// M202: derive the current mp-flow stage slug from a milestone's
+/// `flow_stages` map. The "current" stage is the first stage in
+/// canonical order whose status is NOT `done` and NOT `skipped`
+/// (i.e. it is `pending` or `in_progress`). When every stage is
+/// `done` or `skipped` — e.g. a fully-cancelled milestone where
+/// Cancel flipped all remaining stages to `skipped` — the fallback
+/// is the LAST `done` stage (the milestone ended there, and the
+/// Stage cell must show where it ended rather than a misleading
+/// "hand-off" sentinel). When nothing is done either (fresh
+/// milestone, empty map) the first stage (`draft`) is current.
+///
+/// This is the single source of truth for "which stage is this
+/// milestone on" — the mp-side overview rollup (F-01) and the raul
+/// Stage cell (AC-13) both call it so the two surfaces can never
+/// disagree (F-11).
+pub fn current_mp_flow_stage(flow_stages: &BTreeMap<String, FlowStage>) -> &'static str {
+    // First pass: first non-done, non-skipped stage in canonical
+    // order. Absent entries read as `pending` (the stage has not
+    // fired yet).
+    for slug in MP_FLOW_STAGE_KEYS {
+        let status = flow_stages
+            .get(*slug)
+            .map(|s| s.status.as_str())
+            .unwrap_or("pending");
+        if status != "done" && status != "skipped" {
+            return slug;
+        }
+    }
+    // Fallback: every stage done or skipped → last done stage.
+    for slug in MP_FLOW_STAGE_KEYS.iter().rev() {
+        let status = flow_stages
+            .get(*slug)
+            .map(|s| s.status.as_str())
+            .unwrap_or("pending");
+        if status == "done" {
+            return slug;
+        }
+    }
+    // Nothing done at all — the milestone has not started.
+    MP_FLOW_STAGE_KEYS[0]
+}
+
+/// M202: [`current_mp_flow_stage`] over a slug→status map (the shape
+/// raul's `MilestoneSummary.flow_stages` carries and the shape the
+/// mp-side overview rollup builds from the on-disk `FlowStage`
+/// entries). Keeps the derivation identical across both consumers.
+pub fn current_mp_flow_stage_from_status_map(statuses: &BTreeMap<String, String>) -> &'static str {
+    for slug in MP_FLOW_STAGE_KEYS {
+        let status = statuses
+            .get(*slug)
+            .map(String::as_str)
+            .unwrap_or("pending");
+        if status != "done" && status != "skipped" {
+            return slug;
+        }
+    }
+    for slug in MP_FLOW_STAGE_KEYS.iter().rev() {
+        if statuses.get(*slug).map(String::as_str) == Some("done") {
+            return slug;
+        }
+    }
+    MP_FLOW_STAGE_KEYS[0]
+}
+
+/// M202: ordinal (1-based) of a stage slug in `MP_FLOW_STAGE_KEYS`.
+/// `None` for slugs outside the canonical table.
+pub fn mp_flow_stage_index(slug: &str) -> Option<usize> {
+    MP_FLOW_STAGE_KEYS.iter().position(|s| *s == slug)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MilestoneFile {
     pub milestone: MilestoneMeta,
@@ -1477,21 +1547,25 @@ pub fn apply_flow_stages_for_event(
         MilestoneEvent::EnterRemediation => {
             vec![("external-review", "done"), ("remediate", "in_progress")]
         }
-        // ExitRemediation: remediation landed, the milestone is back in
-        // the review queue waiting on the re-review pass. remediate closes,
-        // re-review opens.
+        // ExitRemediation: remediation landed and the milestone is
+        // leaving the remediation loop. Per the approved spec (S3):
+        // remediate closes AND re-review closes together — the
+        // remediation pass that just exited WAS the re-review of the
+        // findings (the reviewer's verdict is recorded separately via
+        // `mp reviews pass`; the stage tracker records the loop
+        // closure here).
         MilestoneEvent::ExitRemediation => {
-            vec![("remediate", "done"), ("re-review", "in_progress")]
+            vec![("remediate", "done"), ("re-review", "done")]
         }
-        // Cancel: every non-done stage flips to skipped. hand-off is
-        // excluded explicitly so a cancelled milestone never auto-advances
-        // to hand-off (AC-11 contract).
+        // Cancel: every non-done stage flips to skipped, INCLUDING
+        // hand-off (AC-09: "flips every non-done stage to skipped").
+        // Skipping is NOT auto-advancing hand-off to `done`, so the
+        // AC-11 "hand-off only advances via explicit set" contract is
+        // preserved — a cancelled milestone simply shows hand-off as
+        // skipped like every other stage that never fired.
         MilestoneEvent::Cancel => {
             let mut updates: Vec<(&str, &str)> = Vec::new();
             for slug in MP_FLOW_STAGE_KEYS {
-                if *slug == "hand-off" {
-                    continue;
-                }
                 let current = flow_stages
                     .get(*slug)
                     .map(|s| s.status.as_str())
@@ -2609,7 +2683,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_flow_stages_exit_remediation_marks_remediate_done_and_re_review_in_progress() {
+    fn apply_flow_stages_exit_remediation_marks_remediate_done_and_re_review_done() {
         let mut stages = BTreeMap::new();
         stages.insert(
             "remediate".to_string(),
@@ -2623,15 +2697,18 @@ mod tests {
             MilestoneEvent::ExitRemediation,
             "2026-09-02T00:00:00Z",
         );
+        // Per the approved spec (S3): ExitRemediation closes both
+        // remediate AND re-review. F-03 fix: re-review was previously
+        // in_progress here, drifting from the spec.
         assert_eq!(
             updates,
             vec![
                 ("remediate".to_string(), "done".to_string()),
-                ("re-review".to_string(), "in_progress".to_string()),
+                ("re-review".to_string(), "done".to_string()),
             ]
         );
         assert_eq!(stages["remediate"].status, "done");
-        assert_eq!(stages["re-review"].status, "in_progress");
+        assert_eq!(stages["re-review"].status, "done");
         assert_no_hand_off_in_updates(&updates);
         assert_hand_off_pending(&stages);
     }
@@ -2673,12 +2750,18 @@ mod tests {
                 "non-done stages must flip to skipped on Cancel; got {slug}={status}"
             );
         }
-        // Verify hand-off is absent from updates and not flipped in the map.
-        assert_no_hand_off_in_updates(&updates);
-        assert_hand_off_pending(&stages);
+        // F-04 fix: Cancel flips EVERY non-done stage to skipped,
+        // including hand-off (AC-09). Skipping hand-off is not
+        // auto-advancing it to done, so AC-11's explicit-only contract
+        // is preserved — the stage just reads `skipped` like the rest.
+        assert_eq!(
+            stages["hand-off"].status, "skipped",
+            "Cancel must flip hand-off to skipped (AC-09); the updates must include it"
+        );
+        let hand_off_in_updates = updates.iter().any(|(slug, _)| slug == "hand-off");
         assert!(
-            !stages.contains_key("hand-off"),
-            "Cancel must not create hand-off entry"
+            hand_off_in_updates,
+            "hand-off must appear in the Cancel updates as skipped; got {updates:?}"
         );
         // Verify done stages stayed done (Cancel must NOT clobber).
         assert_eq!(stages["draft"].status, "done");
@@ -2688,11 +2771,8 @@ mod tests {
         assert_eq!(stages["execute"].status, "skipped");
         assert_eq!(stages["complete"].status, "skipped");
         assert_eq!(stages["external-review"].status, "skipped");
-        // Verify document / hand-off stay untouched.
-        assert!(
-            !stages.contains_key("document") || stages["document"].status == "skipped",
-            "document was pending so it should be skipped"
-        );
+        // Verify document also got skipped (was pending).
+        assert_eq!(stages["document"].status, "skipped");
     }
 
     #[test]
@@ -2817,5 +2897,123 @@ mod tests {
         // Updates vec must not include execute.
         let exec_in_updates = updates.iter().any(|(slug, _)| slug == "execute");
         assert!(!exec_in_updates, "got {updates:?}");
+    }
+
+    // ─── M202 F-01/F-05/F-11: current_mp_flow_stage derivation ────────
+    //
+    // The derivation is the single source of truth for "which stage is
+    // this milestone on". F-01 (overview rollup) and F-05 (raul Stage
+    // cell cancelled fallback) both rely on it; the pins below lock the
+    // semantics so the two consumers can never disagree.
+
+    fn stage_map(entries: &[(&str, &str)]) -> BTreeMap<String, FlowStage> {
+        entries
+            .iter()
+            .map(|(slug, status)| {
+                (
+                    slug.to_string(),
+                    FlowStage {
+                        status: status.to_string(),
+                        at: None,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn current_stage_fresh_milestone_is_draft() {
+        // Empty map → every stage is pending → draft (1/12).
+        let stages = BTreeMap::new();
+        assert_eq!(current_mp_flow_stage(&stages), "draft");
+        let statuses = BTreeMap::new();
+        assert_eq!(current_mp_flow_stage_from_status_map(&statuses), "draft");
+    }
+
+    #[test]
+    fn current_stage_is_first_in_progress() {
+        let stages = stage_map(&[
+            ("draft", "done"),
+            ("groom", "done"),
+            ("specify", "done"),
+            ("approve", "done"),
+            ("execute", "in_progress"),
+        ]);
+        assert_eq!(current_mp_flow_stage(&stages), "execute");
+        let mut statuses = BTreeMap::new();
+        statuses.insert("draft".to_string(), "done".to_string());
+        statuses.insert("groom".to_string(), "done".to_string());
+        statuses.insert("specify".to_string(), "done".to_string());
+        statuses.insert("approve".to_string(), "done".to_string());
+        statuses.insert("execute".to_string(), "in_progress".to_string());
+        assert_eq!(current_mp_flow_stage_from_status_map(&statuses), "execute");
+    }
+
+    #[test]
+    fn current_stage_skips_done_entries_to_next_pending() {
+        // draft done → groom is the first pending stage.
+        let stages = stage_map(&[("draft", "done")]);
+        assert_eq!(current_mp_flow_stage(&stages), "groom");
+    }
+
+    #[test]
+    fn current_stage_cancelled_falls_back_to_last_done() {
+        // F-05: after Cancel, draft..approve done and execute..hand-off
+        // all skipped. The Stage cell must show where the milestone
+        // ENDED (approve, 4/12), NOT a misleading 12/12 hand-off
+        // sentinel.
+        let mut stages = stage_map(&[
+            ("draft", "done"),
+            ("groom", "done"),
+            ("specify", "done"),
+            ("approve", "done"),
+        ]);
+        apply_flow_stages_for_event(&mut stages, MilestoneEvent::Cancel, "2026-09-01T00:00:00Z");
+        assert_eq!(stages["execute"].status, "skipped");
+        assert_eq!(stages["hand-off"].status, "skipped");
+        assert_eq!(
+            current_mp_flow_stage(&stages),
+            "approve",
+            "cancelled milestone must fall back to the last done stage (F-05)"
+        );
+    }
+
+    #[test]
+    fn current_stage_status_map_cancelled_falls_back_to_last_done() {
+        let mut statuses = BTreeMap::new();
+        for slug in MP_FLOW_STAGE_KEYS {
+            let status = if matches!(*slug, "draft" | "groom" | "specify" | "approve") {
+                "done"
+            } else {
+                "skipped"
+            };
+            statuses.insert(slug.to_string(), status.to_string());
+        }
+        assert_eq!(
+            current_mp_flow_stage_from_status_map(&statuses),
+            "approve",
+            "status-map variant must agree with the FlowStage variant (F-11)"
+        );
+    }
+
+    #[test]
+    fn current_stage_all_done_falls_back_to_hand_off() {
+        // Every stage done (explicit hand-off included) → the last
+        // done stage is hand-off → 12/12 sentinel is correct here.
+        let stages = stage_map(
+            &MP_FLOW_STAGE_KEYS
+                .iter()
+                .map(|slug| (*slug, "done"))
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(current_mp_flow_stage(&stages), "hand-off");
+    }
+
+    #[test]
+    fn mp_flow_stage_index_returns_ordinal() {
+        assert_eq!(mp_flow_stage_index("draft"), Some(0));
+        assert_eq!(mp_flow_stage_index("execute"), Some(4));
+        assert_eq!(mp_flow_stage_index("hand-off"), Some(11));
+        assert_eq!(mp_flow_stage_index("bogus"), None);
     }
 }

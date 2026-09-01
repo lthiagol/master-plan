@@ -500,6 +500,24 @@ fn cancelled_overlay_subline_appears() {
         flat.contains("└─ lifecycle overlay: cancelled"),
         "cancelled overlay sub-line must render; got: {flat}"
     );
+    // F-08: the sub-line must sit DIRECTLY under the current-stage
+    // row (groom — the first non-done stage after draft), not after
+    // the whole 12-row section. Verify the sub-line appears before
+    // the "specify" stage row.
+    let subline_pos = flat.find("└─ lifecycle overlay: cancelled").unwrap();
+    let specify_pos = flat.find("specify").unwrap();
+    assert!(
+        subline_pos < specify_pos,
+        "overlay sub-line must render under the current-stage row (before the next stage row); \
+         sub-line at {subline_pos}, specify row at {specify_pos}"
+    );
+    // And the sub-line must come AFTER the current-stage row (groom).
+    let groom_pos = flat.find("groom").unwrap();
+    assert!(
+        groom_pos < subline_pos,
+        "overlay sub-line must render after the current-stage (groom) row; \
+         groom at {groom_pos}, sub-line at {subline_pos}"
+    );
 }
 
 #[test]

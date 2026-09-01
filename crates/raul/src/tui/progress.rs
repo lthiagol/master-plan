@@ -7,97 +7,44 @@ use crate::config::{status_role, StatusRole};
 use crate::theme::Palette;
 
 /// M202: canonical mp-flow stage slugs in execution order. Re-export
-/// of `mp_model::MP_FLOW_STAGE_KEYS` so the raul crate doesn't have
-/// to take a hard dependency on the mp-model types. The Stage cell
+/// of `mp_model::MP_FLOW_STAGE_KEYS` so there is exactly ONE source
+/// of truth for the 12-stage table (F-11) — the raul crate must not
+/// carry a second copy that can silently diverge. The Stage cell
 /// renders the ordinal (`<N>/12`) by indexing into this slice; the
 /// milestone-detail Stages section reads the same slice for canonical
 /// row order.
-pub const MP_FLOW_STAGE_KEYS: &[&str] = &[
-    "draft",
-    "groom",
-    "specify",
-    "approve",
-    "execute",
-    "self-review",
-    "complete",
-    "external-review",
-    "remediate",
-    "re-review",
-    "document",
-    "hand-off",
-];
-
-/// M202: human-readable label per stage slug. Mirrors
-/// `mp_model::mp_flow_stage_label`; the duplicate lives here so the
-/// raul crate doesn't have to import mp-model just to format a
-/// string. Keep in sync with the model-side label table.
-pub fn mp_flow_stage_label(slug: &str) -> &'static str {
-    match slug {
-        "draft" => "Define outcome",
-        "groom" => "Interview & shape",
-        "specify" => "Write acceptance",
-        "approve" => "Approve spec",
-        "execute" => "Claim & execute",
-        "self-review" => "Self-review",
-        "complete" => "Mark complete",
-        "external-review" => "External review",
-        "remediate" => "Remediate findings",
-        "re-review" => "Re-review",
-        "document" => "Document",
-        "hand-off" => "Hand-off",
-        _ => "",
-    }
-}
+pub use mp_model::{mp_flow_stage_index, mp_flow_stage_label, MP_FLOW_STAGE_KEYS};
 
 /// M202: compute the Stage cell content (`<N>/12 · <Stage Label>`) for a
-/// milestone's `flow_stages` map. The "current stage" is the first
-/// entry in canonical order whose status is `in_progress` (the
-/// milestone is actively in that stage), or — when every earlier
-/// stage is `done` and no later stage is `in_progress` — the first
-/// `pending` stage (the milestone is past the last completed rung).
-/// Falls back to stage 12 (`hand-off`) plus its label when every
-/// earlier stage is `done`, matching the AC-13 contract.
+/// milestone's `flow_stages` map. The "current stage" derivation
+/// DELEGATES to `mp_model::current_mp_flow_stage_from_status_map` —
+/// the single source of truth shared with the mp-side overview
+/// rollup (F-01 / F-11) — so the list column and the dashboard grid
+/// can never disagree.
+///
+/// Per S15: the current stage is the first non-done, non-skipped
+/// stage in canonical order (absent entries read as pending). When
+/// every stage is done or skipped — e.g. a cancelled milestone where
+/// Cancel flipped all remaining stages to skipped (F-04) — the
+/// fallback is the LAST `done` stage, so a milestone cancelled at
+/// stage 4 renders `4/12 · Approve spec`, NOT a misleading
+/// `12/12 · Hand-off` sentinel (F-05).
 pub fn current_mp_flow_stage(
     flow_stages: &BTreeMap<String, String>,
 ) -> (&'static str, &'static str) {
-    // First pass: look for any in_progress stage (canonical-order priority).
-    for slug in MP_FLOW_STAGE_KEYS {
-        let status = flow_stages
-            .get(*slug)
-            .map(String::as_str)
-            .unwrap_or("pending");
-        if status == "in_progress" {
-            return (slug, mp_flow_stage_label(slug));
-        }
-    }
-    // Second pass: first pending stage (the milestone has finished
-    // everything up to here and is queued at this rung).
-    for slug in MP_FLOW_STAGE_KEYS {
-        let status = flow_stages
-            .get(*slug)
-            .map(String::as_str)
-            .unwrap_or("pending");
-        if status == "pending" {
-            return (slug, mp_flow_stage_label(slug));
-        }
-    }
-    // All stages done → hand-off is the after-everything state.
-    ("hand-off", mp_flow_stage_label("hand-off"))
+    let slug = mp_model::current_mp_flow_stage_from_status_map(flow_stages);
+    (slug, mp_flow_stage_label(slug))
 }
 
 /// M202: render the Stage cell line `<N>/12 · <Label>` for a
 /// `MilestoneSummary.flow_stages` map. The ordinal is `idx + 1`
 /// (1-based) so the lane renders `1/12 · Define outcome` for a
 /// fresh milestone and `12/12 · Hand-off` for a fully-complete
-/// one. Falls back to the after-everything sentinel when the
-/// milestone is past stage 12 (caller can override via the
-/// explicit `mp milestone stage set <id> hand-off done`).
+/// one. Cancelled milestones fall back to the last done stage
+/// (F-05) instead of the after-everything sentinel.
 pub fn stage_cell_line(flow_stages: &BTreeMap<String, String>, palette: &Palette) -> Line<'static> {
     let (slug, label) = current_mp_flow_stage(flow_stages);
-    let idx = MP_FLOW_STAGE_KEYS
-        .iter()
-        .position(|s| *s == slug)
-        .unwrap_or(MP_FLOW_STAGE_KEYS.len() - 1);
+    let idx = mp_flow_stage_index(slug).unwrap_or(MP_FLOW_STAGE_KEYS.len() - 1);
     let ordinal_color = palette.dim;
     Line::from(vec![
         Span::styled(
@@ -111,10 +58,7 @@ pub fn stage_cell_line(flow_stages: &BTreeMap<String, String>, palette: &Palette
 /// Plain-text form of the Stage cell for width-aware tests (no styles).
 pub fn stage_cell_plain(flow_stages: &BTreeMap<String, String>) -> String {
     let (slug, _label) = current_mp_flow_stage(flow_stages);
-    let idx = MP_FLOW_STAGE_KEYS
-        .iter()
-        .position(|s| *s == slug)
-        .unwrap_or(MP_FLOW_STAGE_KEYS.len() - 1);
+    let idx = mp_flow_stage_index(slug).unwrap_or(MP_FLOW_STAGE_KEYS.len() - 1);
     format!("{}/{}", idx + 1, MP_FLOW_STAGE_KEYS.len())
 }
 

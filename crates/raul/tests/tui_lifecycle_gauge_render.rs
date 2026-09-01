@@ -117,7 +117,9 @@ fn stage_cell_line_renders_n_over_twelve_and_label() {
         plain, "12/12",
         "every-stage-done must collapse to 12/12 hand-off sentinel; got {plain:?}"
     );
-    // Cancelled milestone (no in_progress; some skipped).
+    // Cancelled milestone — partial skip (only execute skipped).
+    // First non-done non-skipped is `self-review` (absent → pending)
+    // → 6/12.
     let stages = stages_with(&[
         ("draft", "done"),
         ("groom", "done"),
@@ -126,9 +128,39 @@ fn stage_cell_line_renders_n_over_twelve_and_label() {
         ("execute", "skipped"),
     ]);
     let plain = stage_cell_plain(&stages);
-    // First pending (skip) stage is the next rung after the last
-    // done — `self-review` is next. 6/12.
     assert_eq!(plain, "6/12");
+
+    // F-05: REALISTIC cancel state — every stage after `approve` is
+    // skipped (Cancel flips all remaining non-done stages to skipped,
+    // including hand-off per F-04). The Stage cell must fall back to
+    // the LAST DONE stage (`approve`, 4/12), NOT render a misleading
+    // `12/12 · Hand-off` sentinel.
+    let stages = stages_with(&[
+        ("draft", "done"),
+        ("groom", "done"),
+        ("specify", "done"),
+        ("approve", "done"),
+        ("execute", "skipped"),
+        ("self-review", "skipped"),
+        ("complete", "skipped"),
+        ("external-review", "skipped"),
+        ("remediate", "skipped"),
+        ("re-review", "skipped"),
+        ("document", "skipped"),
+        ("hand-off", "skipped"),
+    ]);
+    let plain = stage_cell_plain(&stages);
+    assert_eq!(
+        plain, "4/12",
+        "cancelled milestone must fall back to last done stage (F-05); got {plain:?}"
+    );
+    let p = Palette::default_palette();
+    let line = raul::tui::progress::stage_cell_line(&stages, p);
+    let s = format!("{line:?}");
+    assert!(
+        s.contains("4/12") && s.contains("Approve spec"),
+        "cancelled Stage cell must render 4/12 · Approve spec; got {s}"
+    );
 }
 
 // ─── M202 S16: Milestones lane Stage column replaces Gauge + Lifecycle ───
