@@ -680,3 +680,44 @@ pub fn profile_config_json(profile: &str) -> anyhow::Result<String> {
     };
     crate::assets::read_embedded(rel)
 }
+
+// ---------------------------------------------------------------------------
+// M201: typed config schema (`mp config schema`).
+//
+// The shape is stable and additive:
+//   { "$schema_version": "1.0", "keys": [ {key, type, default, allowed?, description}, ... ] }
+//
+// `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is
+// present only for `choice`. Defaults reflect the live values from
+// `ProjectConfig::default()` and `KEYBIND_DEFAULTS` — see
+// `crate::config_docs::KEY_DESCRIPTIONS` for the per-key prose the TUI uses.
+
+/// M201: schema version constant. Additive changes bump the minor digit;
+/// breaking changes bump the major digit. The current shape is `1.0`.
+pub const CONFIG_SCHEMA_VERSION: &str = "1.0";
+
+/// M201: one row in `mp config schema`'s `keys` array. Field presence is
+/// driven by `type` — only `choice` rows carry `allowed`. `default` is
+/// the live default from `ProjectConfig::default()` (or the canonical
+/// chord string from `KEYBIND_DEFAULTS` for keybind rows).
+#[derive(Debug, Clone, Serialize)]
+pub struct SchemaEntry {
+    pub key: String,
+    /// One of `bool | choice | string | integer | path | keybind`.
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub default: String,
+    /// Present only when `type == "choice"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed: Option<Vec<String>>,
+    pub description: String,
+}
+
+/// M201: top-level schema payload. Emitted verbatim as JSON; field
+/// ordering matches the public contract.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigSchemaReport {
+    #[serde(rename = "$schema_version")]
+    pub schema_version: &'static str,
+    pub keys: Vec<SchemaEntry>,
+}

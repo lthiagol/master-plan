@@ -20,6 +20,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod config_cmd;
+pub mod config_docs;
 pub mod decisions;
 pub mod doctor;
 pub mod execution;

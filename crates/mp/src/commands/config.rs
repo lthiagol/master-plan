@@ -37,5 +37,9 @@ fn cmd_config_inner(ctx: &PlanContext, cmd: ConfigCmd, format: OutputFormat) -> 
             let report = config_cmd::config_validate(ctx, file.as_deref());
             emit_and_exit_on_fail(format, &report, report.ok)
         }
+        ConfigCmd::Schema => {
+            let report = config_cmd::config_schema(ctx);
+            emit(format, &report)
+        }
     }
 }

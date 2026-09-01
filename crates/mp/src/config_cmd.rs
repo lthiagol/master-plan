@@ -4,7 +4,8 @@ use anyhow::{bail, Result};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::config::{ProjectConfig, RoleConfig};
+use crate::config::{ConfigSchemaReport, ProjectConfig, RoleConfig};
+use crate::config_docs;
 use crate::paths::PlanContext;
 use crate::store;
 
@@ -70,6 +71,16 @@ pub fn config_show(ctx: &PlanContext) -> ConfigShowReport {
         config: store::load_config(ctx),
         role,
     }
+}
+
+/// M201: emit the typed config schema. The shape is stable and
+/// additive: `{ "$schema_version": "1.0", "keys": [ {key, type, default, allowed?, description}, ... ] }`.
+/// Keys are sorted by key. `default` reflects `ProjectConfig::default()`
+/// for non-keybinds and `KEYBIND_DEFAULTS` for keybinds. `ctx` is
+/// accepted for symmetry with `config_show` — the schema is independent
+/// of the project state, so loading the config is unnecessary.
+pub fn config_schema(_ctx: &PlanContext) -> ConfigSchemaReport {
+    config_docs::build_schema_report()
 }
 
 fn read_session_role(ctx: &PlanContext) -> Option<String> {

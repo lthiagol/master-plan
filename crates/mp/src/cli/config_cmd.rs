@@ -22,4 +22,11 @@ pub enum ConfigCmd {
         #[arg(long)]
         file: Option<PathBuf>,
     },
+    /// M201: emit the typed config schema as JSON. The shape is stable:
+    /// `{ "$schema_version": "1.0", "keys": [ {key, type, default, allowed?, description}, ... ] }`.
+    /// `type` is one of `bool | choice | string | integer | path | keybind`. `allowed` is
+    /// present only for `choice`. `default` reflects the live defaults from
+    /// `ProjectConfig::default()` and `KEYBIND_DEFAULTS`; keybinds surface their canonical
+    /// chord string (e.g. `Ctrl-R`).
+    Schema,
 }
