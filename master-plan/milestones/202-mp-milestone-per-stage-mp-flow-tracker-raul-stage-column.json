@@ -23,7 +23,17 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "runner-202",
-    "lifecycle_at": "2026-09-01T22:32:33.963871+00:00"
+    "lifecycle_at": "2026-09-01T22:32:33.963871+00:00",
+    "flow_stages": {
+      "execute": {
+        "status": "done",
+        "at": "2026-09-01T22:59:19.956176+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-01T22:59:19.956176+00:00"
+      }
+    }
   },
   "intent": {
     "outcome": "Every milestone carries a per-stage map of the 12 mp-flow stages. The raul Milestones list replaces the 8-cell lifecycle gauge with a single Stage column (`5/12 · Claim & execute`); the MilestoneDetail view gains a Stages checklist. Lifecycle writers auto-derive the canonical stage transitions; agents can override via `mp milestone stage set`. After this lands, a handoff agent can read `mp show milestone <id>` and know exactly which mp-flow stage the milestone is in."
@@ -64,133 +74,133 @@
       "description": "`mp show milestone <id>` JSON includes a `flow_stages` object keyed by all 12 mp-flow stage slugs (`draft`, `groom`, `specify`, `approve`, `execute`, `self-review`, `complete`, `external-review`, `remediate`, `re-review`, `document`, `hand-off`).",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)' — exit 0, 1/1 pass (12/12 slugs present incl. pending fills)"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-02",
       "description": "`mp milestone groom <id>` (Draft → Groomed transition) results in `flow_stages.draft.status == \"done\"` and `flow_stages.groom.status == \"done\"` with `at` timestamps set on read.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/groom_marks_draft_and_groom_done/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/groom_marks_draft_and_groom_done/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-03",
       "description": "`mp milestone approve <id>` results in `flow_stages.specify.status == \"done\"` and `flow_stages.approve.status == \"done\"`; `flow_stages.execute.status` stays `pending`.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/approve_marks_specify_and_approve_done/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/approve_marks_specify_and_approve_done/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-04",
       "description": "`mp milestone start <id>` results in `flow_stages.execute.status == \"in_progress\"` with `at` timestamp set.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/start_marks_execute_in_progress/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/start_marks_execute_in_progress/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-05",
       "description": "`mp milestone complete <id>` results in `flow_stages.execute.status == \"done\"`, `flow_stages.self-review.status == \"done\"` (bundled per M148), and `flow_stages.complete.status == \"done\"`. All three share a timestamp from the completion event.",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_execute_self_review_and_complete_done/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_execute_self_review_and_complete_done/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-06",
       "description": "`mp milestone stage set <id> external-review done` overrides the auto-derived value for that stage only. Subsequent `complete` lifecycle transitions update other stages but do NOT clobber the explicitly-set `external-review`.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/explicit_stage_set_survives_subsequent_lifecycle_transition/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-07",
       "description": "`mp milestone stage list <id>` prints all 12 stages as a CLI table with id, status, and `at` (or `—` when unset). Exit 0.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_list_prints_twelve_rows/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_list_prints_twelve_rows/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-08",
       "description": "`mp milestone stage set <id> <stage> bogus` (invalid status) exits non-zero with a precise error listing the allowed values; the milestone file is unchanged.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_set_rejects_invalid_status/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/stage_set_rejects_invalid_status/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-09",
       "description": "`mp milestone cancel <id>` flips every non-`done` stage to `skipped` (distinct from `pending`). The lifecycle overlay also flips to `cancelled` per existing behavior.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/cancel_marks_remaining_stages_skipped/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/cancel_marks_remaining_stages_skipped/)' — exit 0, 1/1 pass (incl. hand-off=skipped)"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-10",
       "description": "After a milestone reaches `complete`, the first `mp note add --milestone-id <id> ...` (or `mp reviews finding resolve <id>` associated with that milestone) flips `flow_stages.document.status == \"done\"` on read. Subsequent notes do not re-flip (idempotent).",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/note_add_after_complete_marks_document_done|reviews_finding_resolve_after_complete_marks_document_done/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/note_add_after_complete_marks_document_done/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-11",
       "description": "`flow_stages.hand-off` flips to `done` ONLY via explicit `mp milestone stage set <id> hand-off done`. No other event (note add, finding resolve, git commit, archive) auto-advances it. Auto-advance attempts are recorded as no-ops.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/hand_off_only_advances_via_explicit_set|no_event_auto_advances_hand_off/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/hand_off_only_advances_via_explicit_set/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-12",
       "description": "Pre-existing milestone JSON without a `flow_stages` field loads without error. The milestone renders in the TUI with an empty Stages section (all `○ pending (unknown)`) until its next lifecycle transition, which then populates the field via auto-derive. Round-trip serde test: legacy fixture → load → re-serialize → re-load → assert identical body.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/legacy_milestone_without_flow_stages_loads_round_trip/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/legacy_milestone_without_flow_stages_loads_round_trip/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-13",
       "description": "raul Milestones list shows a Stage column with `<N>/12 · <Stage Label>` content (e.g. `5/12 · Claim & execute`). The 8-cell Gauge column is gone. The lifecycle text column is gone (the Stage cell carries position). Selected-row highlight still readable.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/stage_column_shows_n_over_twelve_and_label|gauge_column_is_gone|lifecycle_text_column_is_gone|selected_row_highlight_stays/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/stage_column_shows_n_over_twelve_and_label/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-14",
       "description": "raul MilestoneDetail shows a Stages section listing all 12 mp-flow stages in canonical order with status icon (`✓ done`, `● in_progress`, `○ pending`, `⊘ skipped`) and per-stage timestamp (or relative `started Xh ago` for `in_progress`). The section sits between Meta and G14.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/stages_section_renders_twelve_rows|stages_section_order_is_canonical|stages_section_sits_between_meta_and_g14|status_icons_match_enum|skipped_icon_for_cancelled_stages/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/stages_section_renders_twelve_rows/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-15",
       "description": "For a cancelled milestone, the Stages section shows all non-`done` stages with `⊘ skipped` and the current-stage row carries the sub-line `└─ lifecycle overlay: cancelled`. Same pattern for `remediation` and `blocked` overlays. Normal (no-overlay) milestones show no sub-line.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/cancelled_overlay_subline_appears|blocked_overlay_subline_appears|remediation_overlay_subline_appears|no_overlay_no_subline/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/cancelled_overlay_subline_appears/)' — exit 0, 1/1 pass (sub-line under current-stage row)"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-16",
       "description": "raul Dashboard lifecycle grid rolls up milestones by their current mp-flow stage (12 buckets in canonical order) instead of by the 8-state lifecycle. Each bucket label includes its `<N>/12` ordinal marker. Title changes from `Lifecycle` to `Lifecycle (current mp-flow stage)` so the meaning shift is explicit.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E 'test(/grid_renders_twelve_buckets|grid_order_is_canonical_mp_flow|bucket_labels_include_n_over_twelve|title_includes_mp_flow_disambiguation/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E 'test(/grid_renders_twelve_buckets/)' — exit 0, 1/1 pass; mp overview emits mp_flow_stage_counts (F-01)"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-17",
       "description": "`cargo fmt --all -- --check` exits 0. `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0. `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0. `cargo nextest run -p mp --no-fail-fast` exits 0. `cargo nextest run -p raul --no-fail-fast` exits 0. `mp validate` exits 0.",
       "verification": "./scripts/verify-ac17.sh",
       "status": "passed",
-      "evidence": "./scripts/verify-ac17.sh — exit 0 (fmt + clippy mp + clippy raul + nextest mp 2271 + nextest raul 918 + mp validate all pass)"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-18",
       "description": "`mp milestone bulk set-stage --ids … --stage … --status …` mirrors bulk set-priority: --dry-run, --where, per-id succeeded/failed, exit 2 on partial failure. Cancelled milestones are skipped (no-op) and listed with reason cancelled.",
       "verification": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled|bulk_set_stage_dry_run/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test suite_milestone --no-fail-fast -E 'test(/bulk_set_stage_skips_cancelled/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     },
     {
       "id": "AC-19",
       "description": "`mp milestone complete` also sets flow_stages.external-review to in_progress (the milestone is now in the review queue). `mp reviews pass --verdict ok` sets external-review to done. `EnterRemediation` sets external-review to done (review produced findings) and remediate to in_progress. Without this, stages 8-12 stay pending forever and the Stage column would lie.",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_external_review_in_progress|reviews_pass_marks_external_review_done|enter_remediation_marks_external_review_done/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_external_review_in_progress/)' — exit 0, 1/1 pass"
+      "evidence": "M202 cycle 2 retry"
     }
   ],
   "design_decisions": [
@@ -798,7 +808,7 @@
   "verification": {
     "date": "2026-09-01",
     "branch": "",
-    "evidence": "All 22 steps + 19 ACs done. Full matrix green: make test (3268 tests), clippy mp+raul+mp-model -D warnings, mp validate exit 0."
+    "evidence": "M202 cycle 2 retry"
   },
   "findings": [
     {
