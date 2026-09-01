@@ -405,12 +405,9 @@ pub fn build_schema_report() -> ConfigSchemaReport {
                     .unwrap_or(false)
                     .to_string(),
                 "workflow.plan.in_repo" => cfg.workflow.plan.in_repo.unwrap_or(true).to_string(),
-                "workflow.steps.code_review" => cfg
-                    .workflow
-                    .steps
-                    .code_review
-                    .unwrap_or(false)
-                    .to_string(),
+                "workflow.steps.code_review" => {
+                    cfg.workflow.steps.code_review.unwrap_or(false).to_string()
+                }
                 _ => fallback.to_string(),
             },
             "integer" => fallback.to_string(),
@@ -585,7 +582,10 @@ mod tests {
         // Each (key, expected_default_str) tuple must match ProjectConfig::default().
         let expected: &[(&str, &str)] = &[
             ("ui.color", &cfg.ui.color.unwrap_or(true).to_string()),
-            ("ui.hide_done", &cfg.ui.hide_done.unwrap_or(false).to_string()),
+            (
+                "ui.hide_done",
+                &cfg.ui.hide_done.unwrap_or(false).to_string(),
+            ),
             (
                 "ui.show_watch_tab",
                 &cfg.ui.show_watch_tab.unwrap_or(false).to_string(),
@@ -596,7 +596,10 @@ mod tests {
             ),
             (
                 "git.commit_on_milestone_complete",
-                &cfg.git.commit_on_milestone_complete.unwrap_or(false).to_string(),
+                &cfg.git
+                    .commit_on_milestone_complete
+                    .unwrap_or(false)
+                    .to_string(),
             ),
             (
                 "git.auto_push",
@@ -604,11 +607,19 @@ mod tests {
             ),
             (
                 "agent.automation.commit_after_execute",
-                &cfg.agent.automation.commit_after_execute.unwrap_or(false).to_string(),
+                &cfg.agent
+                    .automation
+                    .commit_after_execute
+                    .unwrap_or(false)
+                    .to_string(),
             ),
             (
                 "agent.automation.push_after_review",
-                &cfg.agent.automation.push_after_review.unwrap_or(false).to_string(),
+                &cfg.agent
+                    .automation
+                    .push_after_review
+                    .unwrap_or(false)
+                    .to_string(),
             ),
             (
                 "workflow.plan.in_repo",

@@ -377,14 +377,19 @@ fn settings_editor_keybind_on_commit_with_valid_default_succeeds() {
     // when opening the editor and confirming the default.
     apply_action(&mut app, &runner(), Action::Enter).unwrap();
     let state = app.settings.as_ref().unwrap();
-    let edit = state
-        .edit
-        .as_ref()
-        .expect("editor must remain open if dry-run rejects (it shouldn't here)");
+    // On successful commit, the editor closes (state.edit is None) and the
+    // value is staged. If the pre-validate gate had wrongly rejected
+    // `Ctrl-R`, state.edit would still be Some with a non-empty errors vec.
     assert!(
-        edit.errors.is_empty(),
-        "Ctrl-R default must parse cleanly: got errors={:?}",
-        edit.errors
+        state.edit.is_none(),
+        "Ctrl-R default must parse cleanly; editor should close on commit. \
+         state.edit = {:?}",
+        state.edit
+    );
+    assert_eq!(
+        state.staged_edits.get("keybinds.refresh"),
+        Some(&"Ctrl-R".to_string()),
+        "the staged value must be the schema default `Ctrl-R`"
     );
 }
 
