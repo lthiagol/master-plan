@@ -55,6 +55,17 @@ pub enum Action {
     /// survives across sessions.
     ToggleHideDone,
 
+    // ---- M201: in-place settings editors ------------------------------------
+    /// Space on a focused `bool` key — toggle the value in place. The
+    /// change is staged; no editor opens.
+    SettingsToggleBool,
+    /// Left / Right on a focused `choice` key — cycle through `allowed`.
+    /// `forward = true` moves Right (next), `false` moves Left (prev).
+    /// The change is staged; no editor opens.
+    SettingsCycleChoice {
+        forward: bool,
+    },
+
     // ---- tab bar focus ------------------------------------------------------
     /// Move to the previous lane in `Lane::ordered()` (Left / h).
     PreviousLane,
@@ -634,6 +645,19 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             apply_settings_save(app, runner)?;
         }
 
+        // M201: in-place editors. Bool toggles and choice cycles stage the
+        // new value through `mp config set --dry-run` (via the shared
+        // staging path) so an invalid choice is caught before reaching
+        // `staged_edits`. String / path / integer / keybind keys still
+        // flow through `apply_settings_enter` which opens the caret-edit
+        // popup.
+        Action::SettingsToggleBool => {
+            apply_settings_toggle_bool(app, runner)?;
+        }
+        Action::SettingsCycleChoice { forward } => {
+            apply_settings_cycle_choice(app, runner, forward)?;
+        }
+
         // ---- watch lane --------------------------------------------------
         Action::WatchToggleSelect => {
             let id_opt = app.watch.picker_candidate().map(|c| c.id.clone());
@@ -692,6 +716,17 @@ fn apply_settings_enter(app: &mut App, runner: &MpRunner) -> Result<()> {
     let Some((_section, key)) = flat_key(selected_idx) else {
         return Ok(());
     };
+
+    // M201: route by type ONLY for explicit in-place actions
+    // (SettingsToggleBool / SettingsCycleChoice). Enter continues to
+    // open the caret-edit editor for all types — that preserves the
+    // pre-M201 M169-rev contract (Enter → editor for `ui.color` and
+    // friends) while the new in-place actions are emitted by the
+    // dispatcher for Space / ← / →.
+    //
+    // Operators who want the in-place toggle/cycle experience can use
+    // Space (bool) or ←/→ (choice); Enter still opens the editor.
+
     // **M169-rev (MED fix):** prefer a previously staged value over the
     // on-disk value when re-opening the edit on the same key. The
     // post-staging renderer previews the raw buffer string, so the
@@ -728,6 +763,151 @@ fn apply_settings_enter(app: &mut App, runner: &MpRunner) -> Result<()> {
     Ok(())
 }
 
+/// M201 S6: bool editor — Space toggles the value in place. The new
+/// value is dry-run through `mp config set` first; only valid bool
+/// strings reach `staged_edits`. No editor opens.
+fn apply_settings_toggle_bool(app: &mut App, runner: &MpRunner) -> Result<()> {
+    let Some(state) = app.settings.as_ref() else {
+        return Ok(());
+    };
+    let Some(schema) = state.schema.as_ref() else {
+        return Ok(());
+    };
+    let Some((_section, key)) = crate::tui::modes::settings::flat_key(state.selected_idx) else {
+        return Ok(());
+    };
+    let Some(entry) = schema.get(key) else {
+        return Ok(());
+    };
+    if entry.ty != "bool" {
+        return Ok(());
+    }
+    // Resolve the current value: staged > on-disk > schema default.
+    let current = app
+        .settings
+        .as_ref()
+        .and_then(|s| s.staged_edits.get(key).cloned())
+        .or_else(|| {
+            app.settings
+                .as_ref()
+                .and_then(|s| s.config.pointer(&format!("/{}", key.replace('.', "/")))
+                    .and_then(|v| match v {
+                        serde_json::Value::Bool(b) => Some(b.to_string()),
+                        serde_json::Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    }))
+        })
+        .unwrap_or_else(|| entry.default.clone());
+    let next = if matches!(current.as_str(), "true" | "1" | "yes") {
+        "false"
+    } else {
+        "true"
+    };
+    stage_setting_via_dry_run(app, runner, key, next)
+}
+
+/// M201 S7: choice editor — Left/Right cycles through `allowed`. The
+/// new value is dry-run through `mp config set` first; only valid
+/// choice strings reach `staged_edits`. No editor opens.
+fn apply_settings_cycle_choice(
+    app: &mut App,
+    runner: &MpRunner,
+    forward: bool,
+) -> Result<()> {
+    let Some(state) = app.settings.as_ref() else {
+        return Ok(());
+    };
+    let Some(schema) = state.schema.as_ref() else {
+        return Ok(());
+    };
+    let Some((_section, key)) = crate::tui::modes::settings::flat_key(state.selected_idx) else {
+        return Ok(());
+    };
+    let Some(entry) = schema.get(key) else {
+        return Ok(());
+    };
+    if entry.ty != "choice" {
+        return Ok(());
+    }
+    let Some(allowed) = entry.allowed.as_ref() else {
+        return Ok(());
+    };
+    if allowed.is_empty() {
+        return Ok(());
+    }
+
+    // Resolve the current value: staged > on-disk > schema default.
+    let current = app
+        .settings
+        .as_ref()
+        .and_then(|s| s.staged_edits.get(key).cloned())
+        .or_else(|| {
+            app.settings.as_ref().and_then(|s| {
+                s.config
+                    .pointer(&format!("/{}", key.replace('.', "/")))
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+            })
+        })
+        .unwrap_or_else(|| entry.default.clone());
+
+    let pos = allowed.iter().position(|a| a == &current).unwrap_or(0);
+    let n = allowed.len();
+    let next_idx = if forward {
+        (pos + 1) % n
+    } else {
+        (pos + n - 1) % n
+    };
+    let next = allowed[next_idx].clone();
+    stage_setting_via_dry_run(app, runner, key, &next)
+}
+
+/// M201 S6/S7 helper: dry-run the proposed value through
+/// `mp config set --dry-run` and stage it on success. Failures are
+/// non-fatal — the renderer keeps the prior staged value.
+fn stage_setting_via_dry_run(
+    app: &mut App,
+    runner: &MpRunner,
+    key: &str,
+    value: &str,
+) -> Result<()> {
+    let dry_stdout = runner
+        .run_raw_allow_failure("config", &["set", key, value, "--dry-run"])?;
+    let dry: serde_json::Value = serde_json::from_slice(&dry_stdout).unwrap_or_else(|_| {
+        serde_json::json!({
+            "ok": false,
+            "errors": [{ "field": key, "message": "invalid dry-run response" }]
+        })
+    });
+    let ok = dry.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+    if !ok {
+        let errors = dry_run_errors_for(&dry, key);
+        let msg = errors.join("; ");
+        if let Some(state) = app.settings.as_mut() {
+            // Surface the parse error in the description card footer
+            // via a transient edit error (mirrors the string-editor
+            // contract: an invalid value rewrites the footer hint).
+            state.edit = Some(crate::tui::mode::SettingsEdit {
+                key: key.to_string(),
+                buffer: value.to_string(),
+                cursor: value.chars().count(),
+                errors,
+            });
+            state.focus = crate::tui::mode::SettingsFocus::Editing;
+            app.touch();
+        } else {
+            app.set_action_error(format!("Settings stage failed: {msg}"), msg);
+        }
+        return Ok(());
+    }
+    if let Some(state) = app.settings.as_mut() {
+        state.staged_edits.insert(key.to_string(), value.to_string());
+        state.edit = None;
+        state.focus = crate::tui::mode::SettingsFocus::Fields;
+        app.touch();
+    }
+    Ok(())
+}
+
 fn apply_settings_commit_edit(app: &mut App, runner: &MpRunner) -> Result<()> {
     let (key, value) = {
         let Some(state) = app.settings.as_ref() else {
@@ -738,6 +918,50 @@ fn apply_settings_commit_edit(app: &mut App, runner: &MpRunner) -> Result<()> {
         };
         (edit.key.clone(), edit.buffer.clone())
     };
+
+    // M201 S9: pre-validate keybind values via `KeyCombo::parse` so the
+    // user sees a parse error in the description card footer instead of
+    // an mp-accepted raw string that silently falls back to the default
+    // at load time. mp only stores the raw combo string; the parse gate
+    // belongs in the TUI.
+    let ty = app
+        .settings
+        .as_ref()
+        .and_then(|s| s.schema.as_ref())
+        .and_then(|sc| sc.get(&key))
+        .map(|e| e.ty.as_str());
+    if matches!(ty, Some("keybind")) {
+        let combo_strings: Vec<&str> = value.split(',').map(str::trim).collect();
+        if combo_strings.is_empty() || combo_strings.iter().any(|c| c.is_empty()) {
+            let msg = "keybind: empty combo (e.g. Ctrl+R, Enter, Left)";
+            if let Some(state) = app.settings.as_mut() {
+                if let Some(edit) = state.edit.as_mut() {
+                    edit.errors = vec![msg.to_string()];
+                    app.touch();
+                }
+            }
+            return Ok(());
+        }
+        let mut bad: Vec<String> = Vec::new();
+        for c in &combo_strings {
+            if crate::tui::key_combo::parse_key_combo(c).is_none() {
+                bad.push((*c).to_string());
+            }
+        }
+        if !bad.is_empty() {
+            let msg = format!(
+                "not a valid key combo: {} (try Ctrl+R, Enter, Left)",
+                bad.join(", ")
+            );
+            if let Some(state) = app.settings.as_mut() {
+                if let Some(edit) = state.edit.as_mut() {
+                    edit.errors = vec![msg];
+                    app.touch();
+                }
+            }
+            return Ok(());
+        }
+    }
 
     let dry_stdout = runner.run_raw_allow_failure("config", &["set", &key, &value, "--dry-run"])?;
     let dry: serde_json::Value = serde_json::from_slice(&dry_stdout).unwrap_or_else(|_| {

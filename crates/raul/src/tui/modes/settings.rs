@@ -102,6 +102,42 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
         }
     }
 
+    // M201 S7: while NOT editing, Left / Right on a `choice` key cycles
+    // through `allowed` in place. The schema lookup is best-effort: if
+    // the schema isn't loaded, fall through to the editor path so the
+    // user can still type into a free-form edit popup.
+    if !matches!(state.focus, SettingsFocus::Editing) {
+        if matches!(key.code, KeyCode::Right | KeyCode::Left) && key.modifiers.is_empty() {
+            let key_name = crate::tui::modes::settings::flat_key(state.selected_idx)
+                .map(|(_, k)| k.to_string());
+            let ty = key_name
+                .as_deref()
+                .and_then(|k| state.schema.as_ref().and_then(|s| s.get(k)))
+                .map(|e| e.ty.as_str());
+            if matches!(ty, Some("choice")) {
+                return vec![Action::SettingsCycleChoice {
+                    forward: matches!(key.code, KeyCode::Right),
+                }];
+            }
+        }
+
+        // M201 S6: while NOT editing, Space on a `bool` key toggles
+        // in place. No editor opens.
+        if let KeyCode::Char(' ') = key.code {
+            if key.modifiers.is_empty() {
+                let key_name = crate::tui::modes::settings::flat_key(state.selected_idx)
+                    .map(|(_, k)| k.to_string());
+                let ty = key_name
+                    .as_deref()
+                    .and_then(|k| state.schema.as_ref().and_then(|s| s.get(k)))
+                    .map(|e| e.ty.as_str());
+                if matches!(ty, Some("bool")) {
+                    return vec![Action::SettingsToggleBool];
+                }
+            }
+        }
+    }
+
     if matches!(state.focus, SettingsFocus::Editing) {
         if any_matches(&kb.escape, &key) {
             return vec![Action::Esc];

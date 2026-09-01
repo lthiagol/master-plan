@@ -1157,6 +1157,8 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::PushInputChar(_)
             | Action::PopInputChar
             | Action::SettingsSave
+            | Action::SettingsToggleBool
+            | Action::SettingsCycleChoice { .. }
             | Action::OpenSortRebind
             | Action::SortRebindNext
             | Action::SortRebindPrev

@@ -703,11 +703,11 @@ fn per_type_hint(ty: &str, editing: bool) -> String {
         return "Enter: commit · Esc: revert".to_string();
     }
     match ty {
-        "bool" => "Space: toggle · s: save · Esc: back".to_string(),
-        "choice" => "←/→: cycle · s: save · Esc: revert".to_string(),
+        "bool" => "Space/Enter: toggle · s: save · Esc: back".to_string(),
+        "choice" => "←/→/Enter: cycle · s: save · Esc: revert".to_string(),
         "integer" => "Enter: edit · s: save · Esc: revert".to_string(),
         "string" | "path" => "Enter: edit · s: save · Esc: revert".to_string(),
-        "keybind" => "Enter: edit (e.g. Ctrl+R, Enter, PageUp) · s: save".to_string(),
+        "keybind" => "Enter: edit (e.g. Ctrl+R, Enter, Left) · s: save".to_string(),
         _ => "s: save · Esc: back".to_string(),
     }
 }

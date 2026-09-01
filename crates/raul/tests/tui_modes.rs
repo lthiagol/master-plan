@@ -195,6 +195,8 @@ fn actions_have_required_variants() {
             Action::PushInputChar('x') => "PushInputChar",
             Action::PopInputChar => "PopInputChar",
             Action::SettingsSave => "SettingsSave",
+            // M201: in-place settings editors — bucketed.
+            Action::SettingsToggleBool | Action::SettingsCycleChoice { .. } => "SettingsEditors",
             // M179: Watch-lane action family — bucketed.
             Action::WatchToggleSelect
             | Action::WatchPreflight
