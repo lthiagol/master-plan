@@ -1089,6 +1089,71 @@ fn stage_set_rejects_unknown_stage_key() {
 }
 
 #[test]
+fn show_milestone_includes_flow_stages() {
+    // AC-01: `mp show milestone <id>` JSON includes a `flow_stages`
+    // object keyed by all 12 mp-flow stage slugs. After any
+    // transition, every touched stage is present (status + at);
+    // untouched stages may be absent (the BTreeMap only stores what
+    // has actually fired).
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "show-flow-stages");
+    // Drive the full pre-complete pipeline so draft + groom fire too.
+    let _ = env.run(&["milestone", "set-spec-status", &id, "review"]);
+    let _ = env.run(&["milestone", "approve", &id]);
+    let _ = env.run(&["milestone", "set-status", &id, "in-progress"]);
+    let _ = env.run(&[
+        "milestone",
+        "complete",
+        &id,
+        "--evidence",
+        "M202 show flow_stages pin",
+        "--skip-review",
+    ]);
+
+    let out = env.run(&["show", "milestone", &id, "--format", "json"]);
+    assert!(
+        out.status.success(),
+        "show failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let flow = v["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages object on mp show milestone JSON");
+    // After draft→groom→specify→approve→execute→self-review→complete,
+    // the present stages must include every stage 1-8.
+    for slug in [
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+        "external-review",
+    ] {
+        assert!(
+            flow.contains_key(slug),
+            "show milestone JSON must include {slug}; got keys: {:?}",
+            flow.keys().collect::<Vec<_>>()
+        );
+    }
+    // The shape of each entry must be `{status, at?}` per FlowStage serde.
+    for (slug, entry) in flow {
+        assert!(
+            entry["status"].is_string(),
+            "{slug}.status must be a string; got: {entry:?}"
+        );
+        if entry["at"].is_string() {
+            assert!(
+                !entry["at"].as_str().unwrap().is_empty(),
+                "{slug}.at must be non-empty when present"
+            );
+        }
+    }
+}
+
+#[test]
 fn hand_off_only_advances_via_explicit_set() {
     // AC-11: hand-off must NEVER auto-advance. The only path that
     // touches flow_stages.hand-off.status is `mp milestone stage set

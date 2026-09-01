@@ -403,6 +403,16 @@ fn build_milestone_item(
         "cancelled": m.milestone.cancelled,
         "cancelled_at": m.milestone.cancelled_at,
         "cancel_reason": m.milestone.cancel_reason,
+        // M202 S13: project the 12-stage mp-flow timeline as a JSON
+        // object (same shape the on-disk milestone carries). Pre-M202
+        // milestones serialize as an empty object here because the
+        // underlying map is empty (the skip_serializing_if on the
+        // struct field omits the key in that case — but this list
+        // projection always emits the key with whatever entries exist,
+        // so a `mp list milestones --fields flow_stages` projection
+        // can read the map regardless of M202 status).
+        "flow_stages": serde_json::to_value(&m.milestone.flow_stages)
+            .unwrap_or(json!({})),
     });
     if let serde_json::Value::Object(ref mut map) = item {
         if include_steps {

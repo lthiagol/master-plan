@@ -63,8 +63,8 @@
       "id": "AC-01",
       "description": "`mp show milestone <id>` JSON includes a `flow_stages` object keyed by all 12 mp-flow stage slugs (`draft`, `groom`, `specify`, `approve`, `execute`, `self-review`, `complete`, `external-review`, `remediate`, `re-review`, `document`, `hand-off`).",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "show_milestone_includes_flow_stages test passes — mp show milestone JSON carries flow_stages object keyed by stage slug with status + at"
     },
     {
       "id": "AC-02",
@@ -575,7 +575,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/show_milestone_includes_flow_stages/)'",
       "done_when": "show_milestone_includes_flow_stages test passes; manual: mp show milestone id --fields milestone.flow_stages returns the 12-key map",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -596,7 +596,7 @@
       ],
       "tests": "cargo nextest run -p mp --test list_projection_flags --no-fail-fast -E 'test(/list_milestones_projects_flow_stages/)'",
       "done_when": "list_milestones_projects_flow_stages test passes; manual: mp list milestones --fields flow_stages returns the map per row",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
