@@ -769,3 +769,50 @@ fn validate_silent_for_mid_review_lifecycle_even_with_legacy_triple() {
          the auto-promote advice would be unactionable. Got: {lc_terminal:?}"
     );
 }
+
+// ─── M202 AC-05: complete marks execute + self-review + complete done ─────
+
+#[test]
+fn complete_marks_execute_self_review_and_complete_done() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 complete ceremony");
+    // Promote to in-progress and then complete (with --skip-review so
+    // non-track milestones reach terminal complete in tests).
+    let approve = run_mp(&env, &["milestone", "approve", &id]);
+    assert!(approve.status.success());
+    let start = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
+    assert!(start.status.success());
+    let complete = run_mp(
+        &env,
+        &[
+            "milestone",
+            "complete",
+            &id,
+            "--evidence",
+            "M202 AC-05 pin",
+            "--skip-review",
+        ],
+    );
+    assert!(complete.status.success());
+
+    let m = read_milestone(&env, &id);
+    let flow = m["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages map");
+    // AC-05: execute + self-review + complete all done, sharing the
+    // completion timestamp (bundled per M148).
+    assert_eq!(flow["execute"]["status"], "done");
+    assert_eq!(flow["self-review"]["status"], "done");
+    assert_eq!(flow["complete"]["status"], "done");
+    let exec_at = flow["execute"]["at"].as_str().unwrap();
+    assert_eq!(
+        flow["self-review"]["at"].as_str().unwrap(),
+        exec_at,
+        "self-review must share the completion timestamp"
+    );
+    assert_eq!(
+        flow["complete"]["at"].as_str().unwrap(),
+        exec_at,
+        "complete must share the completion timestamp"
+    );
+}
