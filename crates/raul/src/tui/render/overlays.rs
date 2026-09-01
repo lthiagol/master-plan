@@ -7,11 +7,11 @@ use ratatui::Frame;
 use crate::tui::app::{App, CoApprovalAction, CoApprovalState};
 use crate::tui::key_combo::{format_key_combo, KeyCombo};
 use crate::tui::mode::Mode;
-use crate::tui::modes::settings::{
-    help::help_for, keybind_default_label, value_for_key, SETTINGS_KEYS,
-};
+#[allow(unused_imports)] // keybind_default_label + value_for_key are used inside nested fns below
+use crate::tui::modes::settings::{keybind_default_label, value_for_key, SETTINGS_KEYS};
 use crate::tui::render::modal::centered_popup_rect;
 use crate::tui::view_state::ViewState;
+use crate::theme::Palette as ThemePalette;
 
 /// First formatted combo in a binding, or empty when unbound. Mirrors the
 /// private `Keybinds::primary` helper so overlays can render a one-key
@@ -338,190 +338,71 @@ pub(super) fn render_input_overlay(frame: &mut Frame, app: &App, overlay_area: R
     frame.render_widget(paragraph, overlay_area);
 }
 
-/// M140: Settings lane — flat list with optional field-edit popup.
+/// M201: Settings lane — bordered list (top) + framed description card (bottom).
+///
+/// Layout (within `overlay_area`, top to bottom):
+///   - List block: a bordered frame containing section headers (ui,
+///     workflow, git, next, agent, keybinds) and Key rows. Each Key row
+///     has a type-badge column and a value cell; the focused row uses a
+///     REVERSED cursor.
+///   - Description card: a separate bordered frame BELOW the list with
+///     the focused key name in the title and a BOLD-label
+///     `Type / Default / Value / Description` grid body. The footer is
+///     a per-type hint line (e.g. `Space: toggle · s: save · Esc: back`).
+///
+/// The previous centered modal — `Edit <key>` popup from M168 — is
+/// retained as the in-row editor surface for string/path/integer/
+/// keybind keys. Bool and choice keys don't open it (Space / ← → cycle
+/// in place).
 pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: Rect) {
-    use crate::tui::modes::settings::flat_key;
+    use crate::lanes::LANE_SETTINGS;
+
+    let palette = *app.effective_palette();
 
     let Some(state) = app.settings.as_ref() else {
         let msg = Paragraph::new("Loading settings…")
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(crate::lanes::LANE_SETTINGS),
+                    .title(LANE_SETTINGS),
             )
             .alignment(Alignment::Center)
-            .style(Style::default().fg(app.effective_palette().dim));
+            .style(Style::default().fg(palette.dim));
         frame.render_widget(msg, overlay_area);
         return;
     };
 
-    // M168 BF-03 layout:
-    //   rows 0..2  (above the pane) — the lane title bar / footer
-    //     come from `chrome.rs`; the renderer only paints inside
-    //     `overlay_area` (the content pane).
-    //   row 0..3   inside the pane — header strip
-    //   row 3..    flat list (clamped by the pane's bottom)
-    //
-    // The previous four-band `modal_stack_areas` (header / content /
-    // footer / actions) is gone. The field-edit popup (inner) keeps
-    // its own Clear + Block — it's a small inner modal that benefits
-    // from a clean underline.
+    // AC-08: when `mp config schema` is unavailable, the schema cache
+    // is `None` and the lane renders a single error block replacing
+    // the framed list. The hint includes `mp --version` so the
+    // operator can see what they have installed.
+    if state.schema.is_none() {
+        render_settings_schema_unavailable(frame, palette, overlay_area, state);
+        return;
+    }
 
-    let palette = app.effective_palette();
-    let dim = Style::default().fg(palette.dim);
-    let accent = Style::default()
-        .fg(palette.accent)
-        .add_modifier(Modifier::BOLD);
-
-    // ---- 3-row help box at the top of the pane (rows 0..2 inside
-    //      `overlay_area`). The first row carries the key in accent;
-    //      the next two rows carry the hard-coded prose from
-    //      `modes::settings::help`.
-    let help_rows = 3usize;
-    let help_area = Rect {
+    // Card height reservation: title (1) + 4 label/value rows + hint
+    // footer (1) + borders (2) = 9. Clamp so the list keeps at least
+    // 5 rows on tight panes.
+    let card_height = 9u16.min(overlay_area.height.saturating_sub(5));
+    let list_area = Rect {
         x: overlay_area.x,
         y: overlay_area.y,
         width: overlay_area.width,
-        height: help_rows as u16,
+        height: overlay_area.height.saturating_sub(card_height),
     };
-    if let Some((_section, key)) = flat_key(state.selected_idx) {
-        let prose = help_for(key);
-        let mut lines: Vec<Line> = Vec::new();
-        lines.push(Line::from(Span::styled(format!(" {key}"), accent)));
-        for prose_line in prose {
-            lines.push(Line::from(Span::styled(format!(" {prose_line}"), dim)));
-        }
-        // Pad with empty lines if the prose is shorter than help_rows-1.
-        while lines.len() < help_rows {
-            lines.push(Line::from(""));
-        }
-        frame.render_widget(Paragraph::new(lines), help_area);
-    }
-
-    // ---- Grouped list (BF-04): one section header row before each
-    //      section's key rows. The cursor is over a Key row; Up/Down
-    //      skip Section rows automatically (handled at the renderer
-    //      level here — the dispatcher's selected_idx is the index
-    //      into SETTINGS_KEYS, not into the rendered list).
-    let list_y = overlay_area.y + help_rows as u16;
-    let list_height = overlay_area.height.saturating_sub(help_rows as u16);
-    if list_height == 0 {
-        return;
-    }
-    let list_area = Rect {
+    let card_area = Rect {
         x: overlay_area.x,
-        y: list_y,
+        y: overlay_area.y + list_area.height,
         width: overlay_area.width,
-        height: list_height,
+        height: card_height,
     };
 
-    // Build the full rendered row sequence (one entry per row,
-    // counting Section headers as rows too). The cursor lands on the
-    // Key row at SETTINGS_KEYS[state.selected_idx].
-    let section_header = Style::default()
-        .fg(palette.accent)
-        .add_modifier(Modifier::BOLD);
-    // Each entry: a Section row, or a Key row. We track (key_index,
-    // is_section) per entry so cursor math is simple.
-    enum RowKind {
-        Section(&'static str),
-        Key(usize, &'static str, &'static str), // (SETTINGS_KEYS index, section, key)
-    }
-    let mut rows: Vec<RowKind> = Vec::new();
-    let mut last_section: Option<&'static str> = None;
-    for (i, (section, key)) in SETTINGS_KEYS.iter().enumerate() {
-        if Some(*section) != last_section {
-            rows.push(RowKind::Section(section));
-            last_section = Some(*section);
-        }
-        rows.push(RowKind::Key(i, section, key));
-    }
+    render_settings_list(frame, palette, state, list_area);
+    render_settings_description_card(frame, palette, state, card_area);
 
-    // Map `state.selected_idx` (an index into SETTINGS_KEYS) onto the
-    // row index in the rendered list. We scan `rows` to find the row
-    // whose Key index matches `state.selected_idx`; the rendered row
-    // index is that scan offset.
-    let selected = state
-        .selected_idx
-        .min(SETTINGS_KEYS.len().saturating_sub(1));
-    let mut selected_row_idx: Option<usize> = None;
-    for (i, r) in rows.iter().enumerate() {
-        if let RowKind::Key(idx, _, _) = r {
-            if *idx == selected {
-                selected_row_idx = Some(i);
-                break;
-            }
-        }
-    }
-    let selected_row_idx = selected_row_idx.unwrap_or(0);
-
-    // Smooth-scroll the window so the cursor stays in view. Section
-    // headers take a rendered row but they aren't Key rows; the
-    // smooth-scroll offset is computed in `total_rows` (mixed Key +
-    // Section) so the cursor never lands on a Section header even when
-    // it's the first/last row.
-    let visible_rows = list_height as usize;
-    let total_rows = rows.len();
-    let cursor_offset = selected_row_idx;
-    let view_offset = total_rows.checked_sub(visible_rows).map_or(0, |_| {
-        cursor_offset
-            .saturating_sub(visible_rows.saturating_sub(2))
-            .min(total_rows.saturating_sub(visible_rows))
-    });
-    let view_end = (view_offset + visible_rows).min(total_rows);
-
-    // Render the visible window.
-    let mut items: Vec<ListItem> = Vec::new();
-    for r in &rows[view_offset..view_end] {
-        match r {
-            RowKind::Section(section) => {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    format!("--- {section} ---"),
-                    section_header,
-                ))));
-            }
-            RowKind::Key(_, _section, key) => {
-                let mut val = state
-                    .staged_edits
-                    .get(*key)
-                    .cloned()
-                    .unwrap_or_else(|| value_for_key(&state.config, key));
-                if val.is_empty() {
-                    if let Some(rest) = key.strip_prefix("keybinds.") {
-                        if let Some(label) = keybind_default_label(rest) {
-                            val = label;
-                        }
-                    }
-                }
-                // Key row: `  key = value` (no [section] prefix — the
-                // section header above the group carries it).
-                items.push(ListItem::new(Line::from(Span::styled(
-                    format!("  {key} = {val}"),
-                    Style::default(),
-                ))));
-            }
-        }
-    }
-
-    let list = List::new(items).highlight_style(
-        Style::default()
-            .fg(crate::tui::palette::on_accent_fg(palette))
-            .bg(palette.accent)
-            .add_modifier(Modifier::BOLD),
-    );
-    // Map the cursor's row index in the full `rows` vec to the
-    // relative index within the visible window. The List widget's
-    // `selected` is relative to the slice it was given.
-    let list_selected = selected_row_idx
-        .saturating_sub(view_offset)
-        .min(view_end.saturating_sub(view_offset).saturating_sub(1));
-    frame.render_stateful_widget(
-        list,
-        list_area,
-        &mut ratatui::widgets::ListState::default().with_selected(Some(list_selected)),
-    );
-
-    // Field-edit popup (inner) — unchanged from the pre-M168 shape.
+    // Optional inner edit popup — only for string/path/integer/keybind
+    // keys. Bool and choice edits don't open it.
     if let Some(edit) = &state.edit {
         let popup = centered_popup_rect(overlay_area, 50, 30);
         frame.render_widget(Clear, popup);
@@ -543,7 +424,7 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
             )
         };
         let caret_style = {
-            let (bg, fg) = crate::tui::palette::caret_block(palette);
+            let (bg, fg) = crate::tui::palette::caret_block(&palette);
             Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD)
         };
         let buf_line = Line::from(vec![
@@ -585,6 +466,296 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
             frame.render_widget(Paragraph::new(body), inner);
         }
     }
+}
+
+/// M201: render the top block — a bordered list with section headers,
+/// Key rows carrying a type badge + value cell, and a REVERSED cursor.
+fn render_settings_list(
+    frame: &mut Frame,
+    palette: ThemePalette,
+    state: &crate::tui::mode::SettingsState,
+    area: Rect,
+) {
+    use crate::lanes::LANE_SETTINGS;
+    use crate::tui::modes::settings::{keybind_default_label, value_for_key};
+
+    let section_header_style = Style::default()
+        .fg(palette.accent)
+        .add_modifier(Modifier::BOLD);
+    let cursor_style = Style::default()
+        .fg(crate::tui::palette::on_accent_fg(&palette))
+        .bg(palette.accent)
+        .add_modifier(Modifier::BOLD | Modifier::REVERSED);
+    let badge_style = Style::default().fg(palette.dim);
+
+    // Build the full rendered row sequence: section headers + Key rows.
+    // Cursor math stays the same as the M168 flat-list contract.
+    enum RowKind {
+        Section(&'static str),
+        Key(usize, &'static str, &'static str), // (SETTINGS_KEYS index, section, key)
+    }
+    let mut rows: Vec<RowKind> = Vec::new();
+    let mut last_section: Option<&'static str> = None;
+    for (i, (section, key)) in SETTINGS_KEYS.iter().enumerate() {
+        if Some(*section) != last_section {
+            rows.push(RowKind::Section(section));
+            last_section = Some(*section);
+        }
+        rows.push(RowKind::Key(i, section, key));
+    }
+
+    // Map selected_idx (a SETTINGS_KEYS index) onto the rendered row
+    // index for cursor math.
+    let selected = state
+        .selected_idx
+        .min(SETTINGS_KEYS.len().saturating_sub(1));
+    let mut selected_row_idx: usize = 0;
+    for (i, r) in rows.iter().enumerate() {
+        if let RowKind::Key(idx, _, _) = r {
+            if *idx == selected {
+                selected_row_idx = i;
+                break;
+            }
+        }
+    }
+
+    // Smooth-scroll the window so the cursor stays in view.
+    let inner_h = area.height.saturating_sub(2) as usize; // borders
+    let total_rows = rows.len();
+    let cursor_offset = selected_row_idx;
+    let view_offset = total_rows.checked_sub(inner_h).map_or(0, |_| {
+        cursor_offset
+            .saturating_sub(inner_h.saturating_sub(2))
+            .min(total_rows.saturating_sub(inner_h))
+    });
+    let view_end = (view_offset + inner_h).min(total_rows);
+
+    let mut items: Vec<ListItem> = Vec::new();
+    for r in &rows[view_offset..view_end] {
+        match r {
+            RowKind::Section(section) => {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    format!(" ▾ {section} "),
+                    section_header_style,
+                ))));
+            }
+            RowKind::Key(idx, _section, key) => {
+                // Resolve the value cell: staged > on-disk > default.
+                let mut val = state
+                    .staged_edits
+                    .get(*key)
+                    .cloned()
+                    .unwrap_or_else(|| value_for_key(&state.config, key));
+                if val.is_empty() {
+                    if let Some(rest) = key.strip_prefix("keybinds.") {
+                        if let Some(label) = keybind_default_label(rest) {
+                            val = label;
+                        }
+                    }
+                }
+                let badge = match state
+                    .schema
+                    .as_ref()
+                    .and_then(|s| s.get(key))
+                    .map(|e| e.ty.as_str())
+                {
+                    Some("bool") => "[bool]",
+                    Some("choice") => "[choice]",
+                    Some("integer") => "[int]",
+                    Some("path") => "[path]",
+                    Some("keybind") => "[key]",
+                    _ => "[str]",
+                };
+                let is_cursor = *idx == selected;
+                let line = if is_cursor {
+                    Line::from(vec![
+                        Span::styled("▶ ", cursor_style),
+                        Span::styled(format!("{key} "), cursor_style),
+                        Span::styled(badge, cursor_style),
+                        Span::styled(format!("  {val}"), cursor_style),
+                    ])
+                } else {
+                    Line::from(vec![
+                        Span::raw("  "),
+                        Span::raw(format!("{key} ")),
+                        Span::styled(format!("{badge} "), badge_style),
+                        Span::styled(format!(" {val}"), Style::default()),
+                    ])
+                };
+                items.push(ListItem::new(line));
+            }
+        }
+    }
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain)
+            .title(format!(" {LANE_SETTINGS} ")),
+    );
+    let list_selected = selected_row_idx
+        .saturating_sub(view_offset)
+        .min(view_end.saturating_sub(view_offset).saturating_sub(1));
+    frame.render_stateful_widget(
+        list,
+        area,
+        &mut ratatui::widgets::ListState::default().with_selected(Some(list_selected)),
+    );
+}
+
+/// M201: render the framed description card UNDER the list. The title
+/// carries the focused key name (accent border); the body is a
+/// BOLD-label `Type / Default / Value / Description` grid; the footer
+/// is a per-type hint line.
+fn render_settings_description_card(
+    frame: &mut Frame,
+    palette: ThemePalette,
+    state: &crate::tui::mode::SettingsState,
+    area: Rect,
+) {
+    use crate::tui::modes::settings::{keybind_default_label, value_for_key};
+
+    let Some((_section, key)) = crate::tui::modes::settings::flat_key(state.selected_idx) else {
+        return;
+    };
+
+    let entry = state.schema.as_ref().and_then(|s| s.get(key));
+    let ty = entry.map(|e| e.ty.as_str()).unwrap_or("string");
+    let default = entry.map(|e| e.default.as_str()).unwrap_or("");
+    let description = entry.map(|e| e.description.as_str()).unwrap_or("");
+
+    let mut val = state
+        .staged_edits
+        .get(key)
+        .cloned()
+        .unwrap_or_else(|| value_for_key(&state.config, key));
+    if val.is_empty() {
+        if let Some(rest) = key.strip_prefix("keybinds.") {
+            if let Some(label) = keybind_default_label(rest) {
+                val = label;
+            }
+        }
+    }
+
+    let label_style = Style::default().add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(palette.dim);
+    let accent_border = Style::default().fg(palette.accent);
+
+    let hint = per_type_hint(ty, state.edit.is_some());
+    let hint_style = if state.edit.is_some() {
+        Style::default().fg(palette.warn)
+    } else {
+        dim
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain)
+        .border_style(accent_border)
+        .title(format!(" {key} "));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Build the body lines manually so we control width allocation per
+    // label. Each row: <BOLD label>: <value>.
+    let inner_w = inner.width as usize;
+    let label_w = 11usize; // "Description" + padding
+    let value_w = inner_w.saturating_sub(label_w + 1);
+    let value_style = Style::default();
+
+    let trunc = |s: &str| -> String {
+        if s.chars().count() <= value_w {
+            s.to_string()
+        } else {
+            let mut out: String = s.chars().take(value_w.saturating_sub(1)).collect();
+            out.push('…');
+            out
+        }
+    };
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(format!("{:<label_w$}", "Type"), label_style),
+            Span::raw(trunc(ty)),
+        ]),
+        Line::from(vec![
+            Span::styled(format!("{:<label_w$}", "Default"), label_style),
+            Span::styled(trunc(default), dim),
+        ]),
+        Line::from(vec![
+            Span::styled(format!("{:<label_w$}", "Value"), label_style),
+            Span::styled(trunc(&val), value_style),
+        ]),
+        Line::from(vec![
+            Span::styled(format!("{:<label_w$}", "Description"), label_style),
+            Span::raw(trunc(description)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(trunc(&hint), hint_style)),
+    ];
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+/// M201: per-type hint line shown in the description card footer.
+fn per_type_hint(ty: &str, editing: bool) -> String {
+    if editing {
+        return "Enter: commit · Esc: revert".to_string();
+    }
+    match ty {
+        "bool" => "Space: toggle · s: save · Esc: back".to_string(),
+        "choice" => "←/→: cycle · s: save · Esc: revert".to_string(),
+        "integer" => "Enter: edit · s: save · Esc: revert".to_string(),
+        "string" | "path" => "Enter: edit · s: save · Esc: revert".to_string(),
+        "keybind" => "Enter: edit (e.g. Ctrl+R, Enter, PageUp) · s: save".to_string(),
+        _ => "s: save · Esc: back".to_string(),
+    }
+}
+
+/// AC-08: when `mp config schema` is unavailable, render a single
+/// error block replacing the framed list — no half-rendered state.
+fn render_settings_schema_unavailable(
+    frame: &mut Frame,
+    palette: ThemePalette,
+    area: Rect,
+    state: &crate::tui::mode::SettingsState,
+) {
+    use crate::lanes::LANE_SETTINGS;
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain)
+        .border_style(Style::default().fg(palette.warn))
+        .title(format!(" {LANE_SETTINGS} "));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let warn = Style::default().fg(palette.warn).add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(palette.dim);
+
+    let detail = state
+        .schema_warning
+        .as_deref()
+        .unwrap_or("mp config schema is unavailable");
+    let lines = vec![
+        Line::from(Span::styled(" Schema unavailable ", warn)),
+        Line::from(""),
+        Line::from(Span::styled(detail.to_string(), dim)),
+        Line::from(""),
+        Line::from(Span::styled(
+            " The Settings lane needs `mp config schema` to render descriptions.".to_string(),
+            dim,
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            " Update `mp` to a version that ships the schema subcommand.".to_string(),
+            dim,
+        )),
+        Line::from(Span::styled(
+            " Run `mp --version` to see what you have installed.".to_string(),
+            dim,
+        )),
+    ];
+    frame.render_widget(Paragraph::new(lines), inner);
 }
 
 pub(super) fn render_review_menu_overlay(frame: &mut Frame, app: &App, overlay_area: Rect) {

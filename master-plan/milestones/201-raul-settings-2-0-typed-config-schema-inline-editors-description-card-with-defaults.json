@@ -19,7 +19,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-28",
-    "updated": "2026-08-30",
+    "updated": "2026-09-01",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -307,7 +307,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_schema|settings_state_caches_schema/)'",
       "done_when": "SettingsSchema is a typed struct; SettingsState has a cached schema field; no per-redraw fetch",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-05"
@@ -328,7 +328,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_layout|settings_snapshot/)'",
       "done_when": "Both blocks render with the same bordered vocabulary as the milestone list; the description card rewrites as the cursor moves; no centered modal in the default state",
-      "status": "pending",
+      "status": "in-progress",
       "covers_ac": [
         "AC-02"
       ],
