@@ -14,9 +14,11 @@
 //!
 //!   * modifiers: `ctrl`/`control`, `shift`, `alt`/`option`/`meta`,
 //!     `cmd`/`command`/`super`, `hyper` — any combination, any order,
-//!     case-insensitive, joined with `+`.
-//!   * named keys: `enter`/`return`, `esc`/`escape`, `tab`, `backspace`/`bs`,
-//!     `space` (also a literal `" "`), arrows (`left`/`right`/`up`/`down`).
+//!     case-insensitive, joined with `+` or `-`.
+//!   * named keys: `enter`/`return`, `esc`/`escape`, `tab`/`backtab`/
+//!     `back-tab`/`shift+tab`, `backspace`/`bs`, `space` (also a literal
+//!     `" "`), arrows (`left`/`right`/`up`/`down`), `pageup`/`page_up`/
+//!     `page-up`/`pgup`, `pagedown`/`page_down`/`page-down`/`pgdn`.
 //!   * function keys: `f1`..`f12` (any `fN`).
 //!   * named symbols: `minus`, `comma`, `period`, `slash`, `backslash`,
 //!     `quote`, `double_quote`/`double-quote`, `semicolon`, `colon`,
@@ -28,6 +30,19 @@
 //! `shift+tab` normalizes to [`KeyCode::BackTab`] (crossterm reports a
 //! shifted Tab as `BackTab` with no SHIFT modifier), so a config author can
 //! write either `"shift+tab"` or the raw backtab and both resolve the same.
+//!
+//! ## M201 cycle 3: dash separator + hyphenated named keys
+//!
+//! Both `+` and `-` are accepted as token separators (F-02): the
+//! `KEYBIND_DEFAULTS` table canonicalizes chords like `Ctrl-R`.
+//! However, this conflicted with documented hyphenated named-key aliases
+//! like `double-quote`, `page-up`, `page-down`, and `back-tab` — they
+//! would split on `-` and be rejected as "two key tokens". The fix is
+//! a pre-scan: if the WHOLE input (case-folded) matches a known named
+//! key (single-word or hyphenated alias), resolve it directly. Otherwise
+//! fall through to the normal split logic. The match arm below also
+//! recognizes the hyphenated aliases so `Ctrl+page-up` and similar
+//! combos work end-to-end.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -59,6 +74,54 @@ fn single_key_char(s: &str) -> Option<char> {
     }
 }
 
+/// M201 cycle 3 (F-01/F-02): pre-scan the input for a known named key
+/// (single-word OR hyphenated alias). Returns `Some(KeyCode)` if the
+/// whole trimmed, case-folded input matches a named key. This runs
+/// before the dash-separator split so documented aliases like
+/// `double-quote` (which would otherwise split into `["double", "quote"]`
+/// and be rejected as "two key tokens") resolve directly.
+///
+/// The aliases here are the ONLY named keys that contain `-` in their
+/// canonical form. Adding a new hyphenated alias means adding it here
+/// AND in the match arm in `parse_key_combo` so `Ctrl+page-up` style
+/// chords work end-to-end.
+fn lookup_named_key(s: &str) -> Option<KeyCode> {
+    let lower = s.trim().to_lowercase();
+    match lower.as_str() {
+        // Named keys that contain '-' (M201 cycle 3 — F-01/F-02 fix).
+        "double-quote" | "double_quote" => Some(KeyCode::Char('"')),
+        "page-up" | "page_up" | "pageup" | "pgup" => Some(KeyCode::PageUp),
+        "page-down" | "page_down" | "pagedown" | "pgdn" => Some(KeyCode::PageDown),
+        "back-tab" | "back_tab" | "backtab" => Some(KeyCode::BackTab),
+        // Single-word named keys (re-listed here so the pre-scan is
+        // self-contained — `parse_key_combo` falls through to the
+        // match arm which has the canonical spelling, but a top-level
+        // input that is, e.g., `Tab` resolves here without a split).
+        "space" | " " => Some(KeyCode::Char(' ')),
+        "enter" | "return" => Some(KeyCode::Enter),
+        "esc" | "escape" => Some(KeyCode::Esc),
+        "tab" => Some(KeyCode::Tab),
+        "backspace" | "bs" => Some(KeyCode::Backspace),
+        "left" => Some(KeyCode::Left),
+        "right" => Some(KeyCode::Right),
+        "up" => Some(KeyCode::Up),
+        "down" => Some(KeyCode::Down),
+        "minus" => Some(KeyCode::Char('-')),
+        "comma" => Some(KeyCode::Char(',')),
+        "period" => Some(KeyCode::Char('.')),
+        "slash" => Some(KeyCode::Char('/')),
+        "backslash" => Some(KeyCode::Char('\\')),
+        "quote" => Some(KeyCode::Char('\'')),
+        "semicolon" => Some(KeyCode::Char(';')),
+        "colon" => Some(KeyCode::Char(':')),
+        "percent" => Some(KeyCode::Char('%')),
+        "ampersand" => Some(KeyCode::Char('&')),
+        "backtick" => Some(KeyCode::Char('`')),
+        "plus" => Some(KeyCode::Char('+')),
+        _ => None,
+    }
+}
+
 /// Parse a human key-combo string into a [`KeyCombo`], or `None` when the
 /// string is malformed (empty part, two non-modifier tokens, unknown `fN`,
 /// unknown multi-char name).
@@ -68,85 +131,119 @@ fn single_key_char(s: &str) -> Option<char> {
 /// `Left, BackTab` alias uses `-` for the back-tab name). To bind the
 /// literal `-` key, use the named keyword `minus`.
 ///
+/// A pre-scan ([`lookup_named_key`]) resolves documented hyphenated
+/// named-key aliases (`double-quote`, `page-up`, `back-tab`) before the
+/// split, so they aren't rejected as "two key tokens".
+///
 /// See the module docs for the full accepted grammar.
 pub fn parse_key_combo(s: &str) -> Option<KeyCombo> {
-    let parts: Vec<&str> = split_combo(s);
-    let mut modifiers = KeyModifiers::empty();
-    let mut key_str: Option<&str> = None;
+    // M201 cycle 3 (F-01/F-02): pre-scan the WHOLE input for a known
+    // named key. Without this, "double-quote" alone would split on
+    // '-' into ["double", "quote"] and the parser would reject the
+    // input as "two key tokens". The pre-scan catches it as a whole
+    // input and returns the correct KeyCode.
+    if let Some(code) = lookup_named_key(s) {
+        return Some(normalize_key_combo((code, KeyModifiers::empty())));
+    }
 
-    for part in &parts {
-        // A truly empty part comes from a stray separator ("ctrl+", "+a",
-        // "ctrl-", "a--b") and is always malformed. A whitespace-only part,
-        // by contrast, is the literal space key (`" "`), which we must not
-        // trim away.
-        if part.is_empty() {
+    // M201 cycle 3: two-level split.
+    //   - Top level: split on `+` so "Ctrl+double-quote" produces two
+    //     segments ["Ctrl", "double-quote"].
+    //   - Per segment: pre-scan for a known named key (catches
+    //     "double-quote" as a whole segment). Otherwise split on `-`
+    //     so "Ctrl-R" → ["Ctrl", "R"] and accumulates modifiers.
+    //
+    // The per-segment named-key pre-scan is what makes
+    // `Ctrl+page-up` work end-to-end: the segment "page-up" is
+    // resolved as PageUp without breaking it on the `-` separator.
+    let mut modifiers = KeyModifiers::empty();
+    let mut key_code: Option<KeyCode> = None;
+
+    for segment in s.split('+') {
+        // An empty segment is a stray `+` separator ("ctrl+", "+a") —
+        // malformed.
+        if segment.is_empty() {
             return None;
         }
-        let trimmed = part.trim();
-        let token = if trimmed.is_empty() { " " } else { trimmed };
-        if let Some(modifier) = parse_modifier_token(token) {
-            modifiers |= modifier;
-        } else if key_str.is_some() {
-            // Two non-modifier tokens ("a+b") is not a valid single combo.
-            return None;
-        } else {
-            key_str = Some(token);
+        let trimmed = segment.trim();
+        // A whitespace-only segment is the literal space key (` `).
+        // Route it to the named-key lookup so `" "` still resolves
+        // to Char(' ').
+        let segment = if trimmed.is_empty() { " " } else { trimmed };
+
+        // Pre-scan the segment as a whole named key.
+        if let Some(code) = lookup_named_key(segment) {
+            if key_code.is_some() {
+                return None;
+            }
+            key_code = Some(code);
+            continue;
+        }
+
+        // Otherwise split the segment on `-` (dash separator) and
+        // process each sub-token as either a modifier or the key.
+        for sub in segment.split('-') {
+            if sub.is_empty() {
+                return None;
+            }
+            let trimmed = sub.trim();
+            // Whitespace-only sub-tokens are the literal space key
+            // (`" "`); route them to the named-key lookup.
+            let sub = if trimmed.is_empty() { " " } else { trimmed };
+            if let Some(m) = parse_modifier_token(sub) {
+                modifiers |= m;
+            } else if key_code.is_some() {
+                return None;
+            } else {
+                key_code = Some(parse_key_token(sub, &mut modifiers)?);
+            }
         }
     }
 
-    let key_str = key_str?;
-    let single_char = single_key_char(key_str);
-    let lower = key_str.to_lowercase();
-    let code = match lower.as_str() {
-        "space" | " " => KeyCode::Char(' '),
-        "enter" | "return" => KeyCode::Enter,
-        "esc" | "escape" => KeyCode::Esc,
-        "tab" if modifiers.contains(KeyModifiers::SHIFT) => {
-            modifiers.remove(KeyModifiers::SHIFT);
-            KeyCode::BackTab
-        }
-        "tab" => KeyCode::Tab,
-        "backtab" | "shift+tab" => KeyCode::BackTab,
-        "backspace" | "bs" => KeyCode::Backspace,
-        "left" => KeyCode::Left,
-        "right" => KeyCode::Right,
-        "up" => KeyCode::Up,
-        "down" => KeyCode::Down,
-        "pageup" | "page_up" | "pgup" => KeyCode::PageUp,
-        "pagedown" | "page_down" | "pgdn" => KeyCode::PageDown,
-        "minus" => KeyCode::Char('-'),
-        "comma" => KeyCode::Char(','),
-        "period" => KeyCode::Char('.'),
-        "slash" => KeyCode::Char('/'),
-        "backslash" => KeyCode::Char('\\'),
-        "quote" => KeyCode::Char('\''),
-        "double_quote" | "double-quote" => KeyCode::Char('"'),
-        "semicolon" => KeyCode::Char(';'),
-        "colon" => KeyCode::Char(':'),
-        "percent" => KeyCode::Char('%'),
-        "ampersand" => KeyCode::Char('&'),
-        "backtick" => KeyCode::Char('`'),
-        "plus" => KeyCode::Char('+'),
-        _ if single_char.is_some() => {
-            let ch = single_char?;
-            if ch.is_ascii_uppercase() {
-                modifiers |= KeyModifiers::SHIFT;
-                KeyCode::Char(ch.to_ascii_lowercase())
-            } else {
-                KeyCode::Char(ch)
-            }
-        }
-        s if s.starts_with('f') => s[1..].parse::<u8>().ok().map(KeyCode::F)?,
-        _ => return None,
-    };
-
+    let code = key_code?;
     Some(normalize_key_combo((code, modifiers)))
 }
 
-/// Split a combo string on `+` or `-`. Each separator must have non-empty
-/// content on both sides (so a leading `-` is NOT a separator — it leaves
-/// the literal `-` char token alone, which the caller routes to the `minus`
-/// named key).
+/// Resolve a single key token (no modifiers) to a [`KeyCode`]. Used
+/// after the modifier extraction in `parse_key_combo`. For known named
+/// keys and named symbols this routes through [`lookup_named_key`] so
+/// the alias table lives in one place. Single-char tokens auto-apply
+/// `SHIFT` for uppercase letters; `f1`..`f12` parse as function keys.
+fn parse_key_token(token: &str, modifiers: &mut KeyModifiers) -> Option<KeyCode> {
+    // Try the named-key table first so hyphenated aliases
+    // (double-quote, page-up, etc.) and underscore/contraction
+    // spellings all resolve the same.
+    if let Some(code) = lookup_named_key(token) {
+        return Some(code);
+    }
+    // `shift+tab` normalizes to BackTab; the match arm inside
+    // `lookup_named_key` doesn't see the modifier context, so handle
+    // it here.
+    let lower = token.to_lowercase();
+    if lower == "tab" && modifiers.contains(KeyModifiers::SHIFT) {
+        modifiers.remove(KeyModifiers::SHIFT);
+        return Some(KeyCode::BackTab);
+    }
+    // Single-character token: uppercase ASCII letters auto-apply SHIFT.
+    if let Some(ch) = single_key_char(token) {
+        if ch.is_ascii_uppercase() {
+            *modifiers |= KeyModifiers::SHIFT;
+            return Some(KeyCode::Char(ch.to_ascii_lowercase()));
+        }
+        return Some(KeyCode::Char(ch));
+    }
+    // Function-key token: `f1`..`f12`.
+    if let Some(rest) = lower.strip_prefix('f') {
+        return rest.parse::<u8>().ok().map(KeyCode::F);
+    }
+    None
+}
+
+/// Split a combo string on `+` or `-` for the helper used by the F-02
+/// fix's regression test. Production parsing now uses a two-level
+/// split inside `parse_key_combo` (per-segment pre-scan + dash split)
+/// so this helper is kept only as a documentation / testing utility.
+#[allow(dead_code)]
 fn split_combo(s: &str) -> Vec<&str> {
     let bytes = s.as_bytes();
     let mut parts: Vec<&str> = Vec::new();
@@ -155,16 +252,10 @@ fn split_combo(s: &str) -> Vec<&str> {
     while i < bytes.len() {
         let b = bytes[i];
         if b == b'+' || b == b'-' {
-            // Reject stray leading/trailing/consecutive separators by
-            // splitting but letting the empty-part check in `parse_key_combo`
-            // catch them. Allow a single `-` token at the very start or end
-            // (the caller treats it as the literal minus char token).
             if start < i {
                 parts.push(&s[start..i]);
                 start = i + 1;
             } else {
-                // Empty left half (e.g. "-R" or "--") — keep the separator as
-                // part of the next token so the empty-part check fires.
                 start = i;
                 i += 1;
                 continue;
@@ -377,5 +468,108 @@ mod tests {
         // recognized named key in this build, so we only assert the
         // parsing path; the actual result is `None` for unknown keys.
         assert!(parse_key_combo("Ctrl+Alt-r").is_some());
+    }
+
+    // M201 cycle 3 (F-01/F-02 regression guard): the dash-separator
+    // addition broke `double-quote` (and would have broken the other
+    // documented hyphenated aliases). The pre-scan + match-arm aliases
+    // restore them. Pin every documented alias.
+
+    #[test]
+    fn parse_key_combo_accepts_double_quote_aliases() {
+        // The pre-existing `double_quote_both_spellings` test in
+        // crates/raul/tests/key_combo.rs pins the same surface; this
+        // adds a settings-side test so the M201 S9 editor's parse gate
+        // is also covered in unit tests.
+        assert_eq!(
+            parse_key_combo("double-quote").map(|c| c.0),
+            Some(KeyCode::Char('"'))
+        );
+        assert_eq!(
+            parse_key_combo("double_quote").map(|c| c.0),
+            Some(KeyCode::Char('"'))
+        );
+        // Hyphen + modifier combo: Ctrl+double-quote should resolve to
+        // CONTROL + '"' even though the dash conflicts with the named
+        // key's own dash.
+        assert_eq!(
+            parse_key_combo("Ctrl+double-quote").map(|c| c.0),
+            Some(KeyCode::Char('"'))
+        );
+        assert_eq!(
+            parse_key_combo("Ctrl+double-quote").map(|c| c.1),
+            Some(KeyModifiers::CONTROL)
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_page_up_aliases() {
+        assert_eq!(
+            parse_key_combo("page-up").map(|c| c.0),
+            Some(KeyCode::PageUp)
+        );
+        assert_eq!(
+            parse_key_combo("page_up").map(|c| c.0),
+            Some(KeyCode::PageUp)
+        );
+        assert_eq!(
+            parse_key_combo("pageup").map(|c| c.0),
+            Some(KeyCode::PageUp)
+        );
+        assert_eq!(parse_key_combo("pgup").map(|c| c.0), Some(KeyCode::PageUp));
+        // Modifier combo via '+' (not '-', which would be ambiguous).
+        assert_eq!(
+            parse_key_combo("Ctrl+page-up").map(|c| c.0),
+            Some(KeyCode::PageUp)
+        );
+        assert_eq!(
+            parse_key_combo("Ctrl+page-up").map(|c| c.1),
+            Some(KeyModifiers::CONTROL)
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_page_down_aliases() {
+        assert_eq!(
+            parse_key_combo("page-down").map(|c| c.0),
+            Some(KeyCode::PageDown)
+        );
+        assert_eq!(
+            parse_key_combo("page_down").map(|c| c.0),
+            Some(KeyCode::PageDown)
+        );
+        assert_eq!(
+            parse_key_combo("pagedown").map(|c| c.0),
+            Some(KeyCode::PageDown)
+        );
+        assert_eq!(
+            parse_key_combo("pgdn").map(|c| c.0),
+            Some(KeyCode::PageDown)
+        );
+        assert_eq!(
+            parse_key_combo("Ctrl+page-down").map(|c| c.1),
+            Some(KeyModifiers::CONTROL)
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_back_tab_aliases() {
+        assert_eq!(
+            parse_key_combo("back-tab").map(|c| c.0),
+            Some(KeyCode::BackTab)
+        );
+        assert_eq!(
+            parse_key_combo("back_tab").map(|c| c.0),
+            Some(KeyCode::BackTab)
+        );
+        assert_eq!(
+            parse_key_combo("backtab").map(|c| c.0),
+            Some(KeyCode::BackTab)
+        );
+        // shift+tab still normalizes to BackTab with no SHIFT modifier.
+        assert_eq!(
+            parse_key_combo("shift+tab").map(|c| (c.0, c.1)),
+            Some((KeyCode::BackTab, KeyModifiers::empty()))
+        );
     }
 }
