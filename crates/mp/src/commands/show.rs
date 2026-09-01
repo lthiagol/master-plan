@@ -257,9 +257,8 @@ fn inject_flow_stages_full(mut value: serde_json::Value) -> serde_json::Value {
                 .cloned()
                 .unwrap_or_default();
             for slug in mp_model::MP_FLOW_STAGE_KEYS {
-                flow.entry(slug.to_string()).or_insert_with(|| {
-                    serde_json::json!({ "status": "pending" })
-                });
+                flow.entry(slug.to_string())
+                    .or_insert_with(|| serde_json::json!({ "status": "pending" }));
             }
             milestone.insert("flow_stages".to_string(), serde_json::Value::Object(flow));
         }

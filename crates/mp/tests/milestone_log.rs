@@ -650,12 +650,23 @@ fn overview_emits_mp_flow_stage_counts_with_all_twelve_slugs() {
     let _ = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
 
     let payload = run_mp_json(&env, &["overview"]);
-    let counts = payload["mp_flow_stage_counts"].as_object().expect("counts object");
+    let counts = payload["mp_flow_stage_counts"]
+        .as_object()
+        .expect("counts object");
     // All 12 canonical slugs present.
     for slug in [
-        "draft", "groom", "specify", "approve", "execute", "self-review",
-        "complete", "external-review", "remediate", "re-review",
-        "document", "hand-off",
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+        "external-review",
+        "remediate",
+        "re-review",
+        "document",
+        "hand-off",
     ] {
         assert!(
             counts.contains_key(slug),
@@ -709,7 +720,9 @@ fn overview_mp_flow_stage_counts_reflect_cancelled_milestone() {
     let _ = run_mp(&env, &["milestone", "set-status", &id, "cancelled"]);
 
     let payload = run_mp_json(&env, &["overview"]);
-    let counts = payload["mp_flow_stage_counts"].as_object().expect("counts object");
+    let counts = payload["mp_flow_stage_counts"]
+        .as_object()
+        .expect("counts object");
     // Cancelled at execute → the fallback is the last done stage
     // (approve, 4/12). The cancelled milestone must count toward
     // `approve`, NOT toward a misleading hand-off bucket.

@@ -175,7 +175,7 @@
     {
       "id": "AC-17",
       "description": "`cargo fmt --all -- --check` exits 0. `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0. `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0. `cargo nextest run -p mp --no-fail-fast` exits 0. `cargo nextest run -p raul --no-fail-fast` exits 0. `mp validate` exits 0.",
-      "verification": "make test",
+      "verification": "./scripts/verify-ac17.sh",
       "status": "passed",
       "evidence": "All 22 steps + 19 ACs done. Full matrix green: make test (3268 tests), clippy mp+raul+mp-model -D warnings, mp validate exit 0."
     },

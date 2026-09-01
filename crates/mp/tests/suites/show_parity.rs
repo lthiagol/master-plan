@@ -81,10 +81,18 @@ fn show_default_json_matches_persisted_document_shape() {
     // parity check on the lifecycle-only payload; the legacy compat view
     // is covered separately by inject_legacy_status_view / show_includes
     // derive tests in commands::show::tests.
+    //
+    // M202 F-02: `show` also injects the full 12-key `flow_stages`
+    // object (AC-01: "keyed by all 12 mp-flow stage slugs") while the
+    // on-disk document stores only fired stages. Strip the injected
+    // field the same way before the parity comparison — the AC-01
+    // contract is verified separately by
+    // `show_milestone_includes_flow_stages`.
     let mut shown_stripped = shown.clone();
     if let Some(milestone_obj) = shown_stripped["milestone"].as_object_mut() {
         milestone_obj.remove("spec_status");
         milestone_obj.remove("execution_status");
+        milestone_obj.remove("flow_stages");
     }
     assert_eq!(shown_stripped["milestone"], disk["milestone"]);
     assert_eq!(shown_stripped["intent"], disk["intent"]);

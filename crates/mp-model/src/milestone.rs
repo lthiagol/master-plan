@@ -116,10 +116,7 @@ pub fn current_mp_flow_stage(flow_stages: &BTreeMap<String, FlowStage>) -> &'sta
 /// entries). Keeps the derivation identical across both consumers.
 pub fn current_mp_flow_stage_from_status_map(statuses: &BTreeMap<String, String>) -> &'static str {
     for slug in MP_FLOW_STAGE_KEYS {
-        let status = statuses
-            .get(*slug)
-            .map(String::as_str)
-            .unwrap_or("pending");
+        let status = statuses.get(*slug).map(String::as_str).unwrap_or("pending");
         if status != "done" && status != "skipped" {
             return slug;
         }
