@@ -354,13 +354,219 @@ fn validate_silent_for_in_progress_milestone() {
 }
 
 // ---------------------------------------------------------------------------
-// M145 F-02 (external review): W-LC-TERMINAL must NOT fire for a mid-review
-// lifecycle (self-reviewed/reviewed) even when the legacy-shape triple is
-// present. The prior broader condition fired here, but the warning's advice
-// ("run `mp reviews pass --verdict ok`") is unactionable for non-`done`
-// lifecycles because the auto-promote only covers `done`. Narrowing the
-// trigger keeps the warning honest.
+// M202: AC-19 stage-8/9/10/11 wiring. The complete/review/remediate flow
+// drives the auto-advance graph for stages 7-10; AC-19 pins each
+// transition's effect on `flow_stages`.
 // ---------------------------------------------------------------------------
+
+#[test]
+fn complete_marks_external_review_in_progress() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 stage-8 in-progress");
+
+    // Promote to in-progress and then complete (with --skip-review so
+    // non-track milestones reach terminal complete in tests).
+    let approve = run_mp(&env, &["milestone", "approve", &id]);
+    assert!(approve.status.success());
+    let start = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
+    assert!(start.status.success());
+    let complete = run_mp(
+        &env,
+        &[
+            "milestone",
+            "complete",
+            &id,
+            "--evidence",
+            "M202 stage-8 pin",
+            "--skip-review",
+        ],
+    );
+    assert!(complete.status.success());
+
+    let m = read_milestone(&env, &id);
+    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    // After complete: execute + self-review + complete all done;
+    // external-review sits in_progress (the review queue).
+    assert_eq!(flow["execute"]["status"], "done");
+    assert_eq!(flow["self-review"]["status"], "done");
+    assert_eq!(flow["complete"]["status"], "done");
+    assert_eq!(
+        flow["external-review"]["status"],
+        "in_progress",
+        "complete must land external-review at in_progress (AC-19)"
+    );
+}
+
+#[test]
+fn reviews_pass_marks_external_review_done() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 reviews pass external done");
+    set_legacy_done(&env, &id);
+
+    // The reviews pass --verdict ok path: external-review is currently
+    // pending (the milestone was patched directly to lifecycle=done
+    // without ever firing Complete). The hook must close it.
+    let out = run_mp(
+        &env,
+        &[
+            "reviews",
+            "pass",
+            &id,
+            "--verdict",
+            "ok",
+            "--reviewer",
+            "test",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "reviews pass failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let m = read_milestone(&env, &id);
+    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    assert_eq!(
+        flow["external-review"]["status"],
+        "done",
+        "reviews pass --verdict ok must close external-review (AC-19)"
+    );
+    assert!(
+        flow["external-review"]["at"].is_string()
+            && !flow["external-review"]["at"].as_str().unwrap().is_empty(),
+        "external-review.at must be set to a non-empty RFC3339 timestamp"
+    );
+    // Re-review must stay pending — this was a first-time pass, not a
+    // post-remediation pass.
+    let re_review = flow.get("re-review");
+    assert!(
+        re_review.is_none() || re_review.unwrap()["status"] != "done",
+        "re-review must stay pending on a first-time review pass; got: {re_review:?}"
+    );
+}
+
+#[test]
+fn enter_remediation_marks_external_review_done() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 enter remediation");
+    // Promote to complete via the canonical path (apply_transition
+    // Complete sets external-review to in_progress).
+    let _ = run_mp(&env, &["milestone", "approve", &id]);
+    let _ = run_mp(&env, &["milestone", "set-status", &id, "in-progress"]);
+    let complete = run_mp(
+        &env,
+        &[
+            "milestone",
+            "complete",
+            &id,
+            "--evidence",
+            "M202 enter remediation pin",
+            "--skip-review",
+        ],
+    );
+    assert!(complete.status.success());
+
+    // File an external-phase finding on the complete milestone. The
+    // add_finding_with_phase path auto-enters remediation when an
+    // external finding lands on a `complete` milestone (per the
+    // reviews.rs auto-remediation contract).
+    let finding = run_mp(
+        &env,
+        &[
+            "reviews",
+            "finding",
+            "add",
+            &id,
+            "--severity",
+            "high",
+            "--category",
+            "correctness",
+            "--desc",
+            "M202 remediation entry pin",
+            "--phase",
+            "external",
+            "--author",
+            "test",
+        ],
+    );
+    assert!(
+        finding.status.success(),
+        "finding add failed: {}",
+        String::from_utf8_lossy(&finding.stderr)
+    );
+
+    let m = read_milestone(&env, &id);
+    assert_eq!(m["milestone"]["lifecycle"], "remediation");
+    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    // EnterRemediation: external-review closes (done), remediate opens
+    // (in_progress).
+    assert_eq!(
+        flow["external-review"]["status"],
+        "done",
+        "EnterRemediation must close external-review (AC-19)"
+    );
+    assert_eq!(
+        flow["remediate"]["status"],
+        "in_progress",
+        "EnterRemediation must open remediate (S3 contract)"
+    );
+}
+
+#[test]
+fn reviews_pass_after_remediation_closes_re_review() {
+    // M202 S4.1: when remediate is already done and a reviews pass fires,
+    // both external-review AND re-review close. This is the post-
+    // remediation second-pass path; the first-pass path is covered by
+    // reviews_pass_marks_external_review_done.
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "M202 re-review done");
+    // Pre-seed flow_stages with remediate=done so the second-pass hook
+    // fires when reviews pass runs.
+    let path = milestone_file_path(&env, &id);
+    let raw = std::fs::read_to_string(&path).unwrap();
+    let mut m: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    m["milestone"]["lifecycle"] = serde_json::json!("done");
+    m["milestone"]["spec_status"] = serde_json::json!("verified");
+    m["milestone"]["execution_status"] = serde_json::json!("done");
+    let mut flow = serde_json::Map::new();
+    flow.insert(
+        "external-review".into(),
+        serde_json::json!({"status": "in_progress", "at": "2026-09-01T00:00:00Z"}),
+    );
+    flow.insert(
+        "remediate".into(),
+        serde_json::json!({"status": "done", "at": "2026-09-02T00:00:00Z"}),
+    );
+    flow.insert(
+        "re-review".into(),
+        serde_json::json!({"status": "in_progress", "at": "2026-09-03T00:00:00Z"}),
+    );
+    m["milestone"]["flow_stages"] = serde_json::Value::Object(flow);
+    std::fs::write(&path, serde_json::to_string_pretty(&m).unwrap()).unwrap();
+
+    let out = run_mp(
+        &env,
+        &[
+            "reviews",
+            "pass",
+            &id,
+            "--verdict",
+            "ok",
+            "--reviewer",
+            "test",
+        ],
+    );
+    assert!(out.status.success());
+
+    let m = read_milestone(&env, &id);
+    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    assert_eq!(flow["external-review"]["status"], "done");
+    assert_eq!(
+        flow["re-review"]["status"],
+        "done",
+        "post-remediation pass must close re-review too (S4.1)"
+    );
+}
 
 #[test]
 fn validate_silent_for_mid_review_lifecycle_even_with_legacy_triple() {

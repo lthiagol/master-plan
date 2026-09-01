@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-29",
-    "updated": "2026-08-30",
+    "updated": "2026-09-01",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -70,29 +70,29 @@
       "id": "AC-02",
       "description": "`mp milestone groom <id>` (Draft → Groomed transition) results in `flow_stages.draft.status == \"done\"` and `flow_stages.groom.status == \"done\"` with `at` timestamps set on read.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/groom_marks_draft_and_groom_done/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "groom_marks_draft_and_groom_done test passes — flow_stages.draft.status==done and flow_stages.groom.status==done after mp milestone set-spec-status review"
     },
     {
       "id": "AC-03",
       "description": "`mp milestone approve <id>` results in `flow_stages.specify.status == \"done\"` and `flow_stages.approve.status == \"done\"`; `flow_stages.execute.status` stays `pending`.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/approve_marks_specify_and_approve_done/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "approve_marks_specify_and_approve_done test passes — flow_stages.specify.status==done and flow_stages.approve.status==done after mp milestone approve"
     },
     {
       "id": "AC-04",
       "description": "`mp milestone start <id>` results in `flow_stages.execute.status == \"in_progress\"` with `at` timestamp set.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/start_marks_execute_in_progress/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "start_marks_execute_in_progress test passes — flow_stages.execute.status==in_progress after mp milestone set-status in-progress"
     },
     {
       "id": "AC-05",
       "description": "`mp milestone complete <id>` results in `flow_stages.execute.status == \"done\"`, `flow_stages.self-review.status == \"done\"` (bundled per M148), and `flow_stages.complete.status == \"done\"`. All three share a timestamp from the completion event.",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_execute_self_review_and_complete_done/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "complete_marks_execute_self_review_and_complete_done test passes — execute + self-review + complete all done with shared timestamp after mp milestone complete"
     },
     {
       "id": "AC-06",
@@ -119,8 +119,8 @@
       "id": "AC-09",
       "description": "`mp milestone cancel <id>` flips every non-`done` stage to `skipped` (distinct from `pending`). The lifecycle overlay also flips to `cancelled` per existing behavior.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/cancel_marks_remaining_stages_skipped/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cancel_marks_remaining_stages_skipped test passes — non-done stages flip to skipped, done stages stay done, hand-off never auto-advances"
     },
     {
       "id": "AC-10",
@@ -140,8 +140,8 @@
       "id": "AC-12",
       "description": "Pre-existing milestone JSON without a `flow_stages` field loads without error. The milestone renders in the TUI with an empty Stages section (all `○ pending (unknown)`) until its next lifecycle transition, which then populates the field via auto-derive. Round-trip serde test: legacy fixture → load → re-serialize → re-load → assert identical body.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/legacy_milestone_without_flow_stages_loads_round_trip/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "legacy_milestone_without_flow_stages_loads_round_trip + flow_stage_serde_round_trip tests pass in tests/lifecycle_setter_overlay.rs"
     },
     {
       "id": "AC-13",
@@ -189,8 +189,8 @@
       "id": "AC-19",
       "description": "`mp milestone complete` also sets flow_stages.external-review to in_progress (the milestone is now in the review queue). `mp reviews pass --verdict ok` sets external-review to done. `EnterRemediation` sets external-review to done (review produced findings) and remediate to in_progress. Without this, stages 8-12 stay pending forever and the Stage column would lie.",
       "verification": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/complete_marks_external_review_in_progress|reviews_pass_marks_external_review_done|enter_remediation_marks_external_review_done/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "complete_marks_external_review_in_progress + reviews_pass_marks_external_review_done + enter_remediation_marks_external_review_done + reviews_pass_after_remediation_closes_re_review tests pass in tests/lifecycle_complete_ceremony.rs"
     }
   ],
   "design_decisions": [
@@ -337,7 +337,7 @@
       ],
       "tests": "cargo nextest run -p mp-model --no-fail-fast",
       "done_when": "MilestoneMeta has flow_stages BTreeMap with serde default; FlowStage struct compiles; MP_FLOW_STAGE_KEYS lists 12 slugs; cargo nextest run -p mp-model exits 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-12"
       ],
@@ -357,7 +357,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/legacy_milestone_without_flow_stages_loads_round_trip|flow_stage_serde_round_trip/)",
       "done_when": "legacy_milestone_without_flow_stages_loads_round_trip and flow_stage_serde_round_trip tests pass; cargo nextest run exits 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-12"
       ],
@@ -377,7 +377,7 @@
       ],
       "tests": "cargo nextest run -p mp-model --no-fail-fast",
       "done_when": "apply_flow_stages_for_event compiles and unit-tested against every MilestoneEvent variant; hand-off never appears in the mutation list",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-03",
@@ -403,7 +403,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/groom_marks_draft_and_groom_done|approve_marks_specify_and_approve_done|start_marks_execute_in_progress|complete_marks_execute_self_review_and_complete_done|cancel_marks_remaining_stages_skipped/)",
       "done_when": "All 5 named tests pass; on-disk milestone JSON has flow_stages populated with the expected statuses",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-03",
@@ -781,7 +781,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_complete_ceremony --no-fail-fast -E 'test(/reviews_pass_marks_external_review_done/)'",
       "done_when": "reviews pass flips external-review to done; hand-off stays pending",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-19"
       ],

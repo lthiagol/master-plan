@@ -5,6 +5,9 @@ mod normalize;
 mod plan;
 mod track;
 
+#[cfg(test)]
+use std::collections::BTreeMap;
+
 pub use config::*;
 pub use datetime::*;
 pub use milestone::*;
@@ -142,6 +145,7 @@ mod tests {
                 target_version: String::new(),
                 executed_by: String::new(),
                 remediation_pre_state: None,
+                flow_stages: BTreeMap::new(),
             },
             intent: Intent {
                 outcome: "It works".into(),

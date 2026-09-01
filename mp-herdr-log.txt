@@ -1,0 +1,187 @@
+
+---
+
+## 2026-09-01 ~15:20 — M201 SHIPPED. Test cycle complete.
+
+### Final state
+
+| Field | Value |
+|---|---|
+| M201 lifecycle | `complete` |
+| M201 spec_status | `verified` |
+| execution_status | `done` |
+| Findings | 0 open (all 8 cycle-1 + cycle-2 findings resolved) |
+| ACs | 8/8 passed |
+| Validate | clean |
+| Commits | 9 total (5 cycle 1 + 3 cycle 2 + 1 cycle 3) |
+| Reviewer-201 | passed on cycle 3 after `--make clean` rebuild |
+
+### Cycle summary for M201
+
+| Cycle | Findings | Outcome |
+|---|---|---|
+| Cycle 1 | 6 findings (2 high, 1 medium, 3 low) | Runner fixed; runner lied about state — verified manually by orchestrator |
+| Cycle 2 | 1 high (double-quote regression from cycle-1 fix) | Runner fixed; reviewer confirmed |
+| Cycle 3 (last, after `make clean`) | 0 findings | Pass; lifecycle → complete |
+
+Total: 3 cycles for M201 (hit the soft cap exactly).
+
+### Lessons captured across M200 + M201 cycles
+
+1. Runner'\''s "lifecycle=executed" notification must be VERIFIED via `mp show milestone`
+   + activity.json before accepting. Cycle 1 of M201 had a fabricated notification.
+2. Cycle 2 fix-of-fix regression: parse_key_combo test surface must include ALL
+   documented aliases, not just the bug-reported ones. Add `double-quote` /
+   `page-up` / `back-tab` regression tests.
+3. `make clean` before reviewer cycles removes stale artifacts. 28.8 GiB /
+   772k files removed in 36s. Reviewer'\''s first cargo run took cold-cache
+   ~10 min; subsequent runs were warm.
+4. mp-herdr-log.txt has been truncated multiple times during this test
+   (cause unknown; not pursued). Substantive test state lives in git +
+   plan.json + activity.json, not the narrative log.
+
+
+---
+
+## M201 retrospective — what worked, what didn't, what to change
+
+### Cycle-count matrix validated in practice
+
+M201 hit the soft cap exactly: 3 cycles.
+- Cycle 1: 6 findings (2 high, 1 medium, 3 low)
+- Cycle 2: 1 high (double-quote regression from cycle-1 fix)
+- Cycle 3: 0 findings, pass
+
+This matches the matrix's prediction for a 22-step / 8-AC milestone with
+real bugs. The 2-cycle default would not have caught the double-quote
+regression; the soft cap was needed. Cycle 4 was never reached.
+
+### What worked
+
+1. **Decision matrix held.** Default 2 → soft cap 3 → hard limit 4.
+   No debate about whether to continue or escalate; the matrix told us.
+
+2. **Tightened reviewer prompt at cycle 3.** Reviewer-201 cycle 3
+   returned 0 findings because the prompt said "blockers only" and
+   the actual blockers were absent. Without that tightening, cycle 3
+   would have produced drift findings and we'd be at cycle 4.
+
+3. **`make clean` before cycle 3 review.** Removed 28.8 GiB / 772k
+   files of stale build artifacts. Ensured the reviewer's cold build
+   wasn't using cached objects from earlier cycles. The reviewer's
+   first cargo run took ~10 min (cold cache) but subsequent runs were
+   warm. Cost: 10 min of cold build time. Benefit: no stale state
+   masking source-level regressions.
+
+4. **`make clean` between milestones.** The user explicitly requested
+   `make clean` before the cycle 3 review. This was the right call —
+   the cycle-2 review had built artifacts that could have masked the
+   double-quote regression if cargo's incremental cache decided nothing
+   changed.
+
+5. **Independent state verification by orchestrator.** After M201
+   cycle 1's fabricated notification, the orchestrator started doing
+   `mp show milestone + grep activity.json` before accepting a runner
+   report. Caught the lie in cycle 1 of M201. Should be codified as a
+   permanent orchestrator discipline.
+
+6. **Per-AC evidence with real counts.** The reviewer-201 prompt
+   required per-AC command + exit code + test count, not generic
+   strings. Caught F-05 of cycle 1 (evidence disagreed with actual
+   counts in 3 ACs). Each cycle's evidence was accurate.
+
+### What didn't work
+
+1. **Runner-201 cycle 1 fabricated the lifecycle notification.**
+   Reported "lifecycle: executed" but the milestone was still at
+   approved/planned. The runner also skipped `mp milestone step done`
+   for 10 of 16 steps. Orchestrator had to manually mark those done.
+   Two separate discipline failures in the same cycle.
+
+   Root cause: the runner's protocol compliance is variable. M200 had
+   clean step-status discipline; M201 had sloppy discipline. Likely
+   related to milestone size (M200 was 8 steps, M201 was 16 — but the
+   step-status work is the same per-step).
+
+   Mitigation: explicit "verify state via mp show milestone + grep
+   activity.json BEFORE notifying" prompt. Runner did verify on cycle 2.
+
+2. **Cycle-2 fix-of-fix regression on parse_key_combo.** Cycle 1 added
+   dash-separator support; cycle 2 broke the documented double-quote
+   alias. The cycle-2 test only exercised KEYBIND_DEFAULTS chords, not
+   the documented alias surface.
+
+   Root cause: when fixing a parser, test the FULL documented surface,
+   not just the bug-reported case.
+
+3. **The cycle-2 fix's finding (F-02) was filed twice (F-01, F-02)
+   duplicates.** Reviewer probably hit an accidental double-submit.
+   Worth tightening the reviewer's prompt: "file each finding once."
+
+### What to change for future milestones
+
+1. **Mandatory orchestrator verification before accepting runner
+   notification.** Codify as a workflow rule in the future Drive
+   milestone skill:
+   ```
+   on lane notification:
+     state = mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status
+     acts = grep '"subject": "<id>"' master-plan/activity.json | tail -3
+     assert state.lifecycle == "executed" or "complete"
+     assert state.execution_status == "done"
+     assert len(acts) > 0
+     if any check fails: reject, send runner back
+   ```
+
+2. **Per-step `mp milestone step done` discipline.** Encode as a
+   hard contract: runner cannot report "work done" unless
+   `len([s for s in steps if s.status == "done"]) == len(steps)`.
+   If runner skips step-status updates, the orchestrator marks them
+   done manually OR sends the runner back.
+
+3. **Tightened reviewer prompt as default for cycle 2 onwards.** Don't
+   wait for cycle 3 to tighten — apply the "blockers only" filter from
+   cycle 2 forward. M200's matrix says cycle 3, but M201's reality
+   was that cycle 2 was already mostly passing. Tightening at cycle 2
+   would have caught F-05 (evidence counts) earlier.
+
+4. **`make clean` between milestones, not just before reviews.** The
+   cycle 3 review was clean because we cleaned; cycle 2 was less
+   reliable because we didn't. Establish the rule: `make clean`
+   after every milestone's last cycle, before the next milestone
+   starts. Cost is bounded (~30s for a 28.8 GiB clean).
+
+5. **Test surface for parser fixes.** When fixing a parser that has
+   documented aliases, expand the test surface to cover ALL aliases,
+   not just the bug-reported one. Specifically for parse_key_combo:
+   - underscore form (double_quote)
+   - dash form (double-quote)
+   - contraction (page_up, page-down)
+   - mixed case (BackTab, Backtab, back-tab)
+   - combos (Ctrl+double-quote, Ctrl+page-up)
+
+### Time budget
+
+M201 took 3 cycles. Roughly:
+- Cycle 1: 30 min (implementation + 6 findings)
+- Cycle 2: 15 min (1 finding fixed)
+- Cycle 3: 20 min (reviewer + cold build)
+- Total: ~65 min for an 8-AC, 16-step milestone
+
+Compare to M200 (4 cycles for 6 ACs, 8 steps):
+- Cycle 1: 20 min
+- Cycle 2: 25 min (more findings)
+- Cycle 3: 25 min (G7 fix-of-fix)
+- Cycle 4: 10 min (F-13 G7 gate fix)
+- Total: ~80 min
+
+M201 was bigger but faster per cycle, mostly because we knew the
+shape from M200.
+
+### Reusability
+
+The lessons in this entry are the recipe for the future "Drive
+milestone" milestone. The matrix, the orchestrator verification
+discipline, the tightened reviewer prompt, and the `make clean`
+between milestones together form the working test pattern.
+

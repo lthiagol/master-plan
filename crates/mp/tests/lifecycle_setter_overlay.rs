@@ -653,3 +653,319 @@ fn block_and_cancel_refuse_on_complete() {
     assert_eq!(meta["blocked"], json!(false));
     assert_eq!(meta["cancelled"], json!(false));
 }
+
+// ── M202: flow_stages wiring + serde round-trip ─────────────────────────────
+//
+// AC-12 pins two contracts:
+//   1. Pre-M202 milestone JSON without `flow_stages` loads cleanly; the
+//      field populates via auto-derive on the next lifecycle transition
+//      and round-trips through serde without altering the body.
+//   2. FlowStage serializes with the expected shape ({status, at?}).
+//
+// AC-02..AC-05, AC-09, AC-19 pin the durable-writer wiring: every
+// MilestoneEvent that flows through `apply_transition` also writes the
+// corresponding mp-flow stage mutations. Hand-off is intentionally NOT
+// touched by any auto-advance event (AC-11, covered separately in S11).
+
+#[test]
+fn legacy_milestone_without_flow_stages_loads_round_trip() {
+    // Pre-M202 on-disk shape: a milestone JSON object with NO `flow_stages`
+    // field at all. serde_json::from_str must load it without error and
+    // produce a MilestoneMeta whose `flow_stages` is the empty BTreeMap.
+    let legacy_json = r#"{
+        "milestone": {
+            "id": "01",
+            "title": "Legacy pre-M202",
+            "slug": "legacy",
+            "lifecycle": "approved",
+            "spec_status": "",
+            "execution_status": "",
+            "blocked": false,
+            "needs_regrooming": false,
+            "cancelled": false,
+            "cancelled_at": null,
+            "cancel_reason": null,
+            "deferred": false,
+            "deferred_reason": "",
+            "depends_on": [],
+            "effort": "S",
+            "risk": "low",
+            "change_kind": "",
+            "priority": "normal",
+            "created": "2026-08-01",
+            "updated": "2026-08-01",
+            "blocked_at": "",
+            "block_reason": "",
+            "blocked_by": "",
+            "target_version": "",
+            "executed_by": "",
+            "remediation_pre_state": null
+        },
+        "intent": {"outcome": "ship"},
+        "problem": {"description": "need"},
+        "scope": {"in_scope": [], "out_of_scope": []},
+        "acceptance_criteria": [],
+        "design_decisions": [],
+        "open_questions": [],
+        "work_packages": [],
+        "steps": [],
+        "findings": []
+    }"#;
+    let m1: mp_model::MilestoneFile =
+        serde_json::from_str(legacy_json).expect("legacy JSON must load without flow_stages");
+    assert!(
+        m1.milestone.flow_stages.is_empty(),
+        "legacy load must produce an empty flow_stages map; got: {:?}",
+        m1.milestone.flow_stages
+    );
+    // Round-trip: re-serialize then re-load must produce identical bytes
+    // for the body. The skip_serializing_if predicate omits the key when
+    // the map is empty, so a healthy legacy file stays healthy legacy.
+    let reserialized = serde_json::to_string(&m1).expect("serialize");
+    let m2: mp_model::MilestoneFile =
+        serde_json::from_str(&reserialized).expect("reload after serialize");
+    let v1 = serde_json::to_value(&m1).unwrap();
+    let v2 = serde_json::to_value(&m2).unwrap();
+    assert_eq!(
+        v1, v2,
+        "round-trip must preserve the milestone body byte-identically"
+    );
+    // The reserialized body must NOT contain the `flow_stages` key when
+    // the map is empty (skip_serializing_if contract).
+    assert!(
+        !reserialized.contains("\"flow_stages\""),
+        "empty flow_stages must be omitted from serialized output; got: {reserialized}"
+    );
+}
+
+#[test]
+fn flow_stage_serde_round_trip() {
+    // FlowStage serializes with the expected shape: a JSON object with
+    // `status` always present and `at` present only when set. The skip
+    // for `at: None` keeps pre-M202 fields byte-clean.
+    use mp_model::FlowStage;
+    let pending = FlowStage {
+        status: "pending".to_string(),
+        at: None,
+    };
+    let pending_json = serde_json::to_value(&pending).unwrap();
+    assert_eq!(pending_json["status"], "pending");
+    assert!(
+        pending_json.get("at").is_none(),
+        "at=None must skip the key on serialize; got: {pending_json}"
+    );
+    let done = FlowStage {
+        status: "done".to_string(),
+        at: Some("2026-09-01T00:00:00Z".to_string()),
+    };
+    let done_json = serde_json::to_value(&done).unwrap();
+    assert_eq!(done_json["status"], "done");
+    assert_eq!(done_json["at"], "2026-09-01T00:00:00Z");
+    // Round-trip: serialize then deserialize — both objects must match.
+    let done_round: FlowStage = serde_json::from_value(done_json.clone()).unwrap();
+    assert_eq!(done_round.status, "done");
+    assert_eq!(done_round.at.as_deref(), Some("2026-09-01T00:00:00Z"));
+    let pending_round: FlowStage = serde_json::from_value(pending_json.clone()).unwrap();
+    assert_eq!(pending_round.status, "pending");
+    assert!(pending_round.at.is_none());
+}
+
+#[test]
+fn groom_marks_draft_and_groom_done() {
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "groom-flow-stages");
+
+    // AC-02: the Groom MilestoneEvent (Draft → Groomed transition)
+    // results in `flow_stages.draft.status == "done"` and
+    // `flow_stages.groom.status == "done"` with `at` timestamps set
+    // on read. The mp milestone groom CLI is read-only (it produces a
+    // GroomReport); the Groom transition fires through `mp milestone
+    // set-spec-status review`, which routes through event_for_spec_status
+    // → MilestoneEvent::Groom.
+    let out = env.run(&["milestone", "set-spec-status", &id, "review"]);
+    assert!(
+        out.status.success(),
+        "set-spec-status review failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages must be present after a lifecycle transition");
+    assert_eq!(
+        flow["draft"]["status"],
+        json!("done"),
+        "groom must flip flow_stages.draft.status to done"
+    );
+    assert_eq!(
+        flow["groom"]["status"],
+        json!("done"),
+        "groom must flip flow_stages.groom.status to done"
+    );
+    assert!(
+        flow["draft"]["at"].is_string() && !flow["draft"]["at"].as_str().unwrap().is_empty(),
+        "draft.at must be a non-empty RFC3339 timestamp; got: {}",
+        flow["draft"]["at"]
+    );
+    assert!(
+        flow["groom"]["at"].is_string() && !flow["groom"]["at"].as_str().unwrap().is_empty(),
+        "groom.at must be a non-empty RFC3339 timestamp; got: {}",
+        flow["groom"]["at"]
+    );
+    // AC-11 negative: hand-off must NOT auto-advance on any event.
+    assert!(
+        flow.get("hand-off").is_none()
+            || flow["hand-off"]["status"] != "done",
+        "groom must never auto-advance hand-off; got: {}",
+        flow.get("hand-off").cloned().unwrap_or_default()
+    );
+}
+
+#[test]
+fn approve_marks_specify_and_approve_done() {
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "approve-flow-stages");
+
+    let out = env.run(&["milestone", "approve", &id]);
+    assert!(
+        out.status.success(),
+        "approve failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after approve");
+    assert_eq!(flow["specify"]["status"], json!("done"));
+    assert_eq!(flow["approve"]["status"], json!("done"));
+    // draft may be null (legacy pre-groom milestone skipped Groom) OR
+    // status==done (full draft→groom path). The contract here is just
+    // that the Approve step wrote the two new stages; do not over-pin.
+    let draft = flow.get("draft");
+    assert!(
+        draft.is_none() || draft.unwrap() == &serde_json::Value::Null,
+        "draft must be absent or null when approve fires without groom; got: {draft:?}"
+    );
+}
+
+#[test]
+fn start_marks_execute_in_progress() {
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "start-flow-stages");
+    approve_and_start(&env, &id);
+
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after start");
+    assert_eq!(
+        flow["execute"]["status"],
+        json!("in_progress"),
+        "start must flip flow_stages.execute.status to in_progress"
+    );
+    // self-review must NOT have been flipped to in_progress yet — that
+    // happens at Complete / FinishExecution.
+    let self_review = flow.get("self-review");
+    assert!(
+        self_review.is_none() || self_review.unwrap()["status"] != "in_progress",
+        "self-review must stay pending after Start; got: {self_review:?}"
+    );
+}
+
+#[test]
+fn complete_marks_execute_self_review_and_complete_done() {
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "complete-flow-stages");
+    approve_and_start(&env, &id);
+    // AC-05: complete_milestone must set execute, self-review, AND
+    // complete stages to done in one transition (bundled per M148).
+    let out = env.run(&[
+        "milestone",
+        "complete",
+        &id,
+        "--evidence",
+        "M202 flow_stages pin",
+        "--skip-review",
+    ]);
+    assert!(
+        out.status.success(),
+        "complete failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after complete");
+    assert_eq!(flow["execute"]["status"], json!("done"));
+    assert_eq!(flow["self-review"]["status"], json!("done"));
+    assert_eq!(flow["complete"]["status"], json!("done"));
+    // All three must share a timestamp from the completion event — pin
+    // that the same `now_rfc3339()` call set them in one write.
+    let exec_at = flow["execute"]["at"].as_str().unwrap();
+    assert_eq!(flow["self-review"]["at"].as_str().unwrap(), exec_at);
+    assert_eq!(flow["complete"]["at"].as_str().unwrap(), exec_at);
+}
+
+#[test]
+fn cancel_marks_remaining_stages_skipped() {
+    let env = TestEnv::new();
+    let id = make_milestone(&env, "cancel-flow-stages");
+    // Run the full draft→groom→approve→start path so draft, groom,
+    // specify, approve all flip to done and execute is in_progress.
+    // Cancel then leaves execute + the rest as skipped.
+    let groom = env.run(&["milestone", "set-spec-status", &id, "review"]);
+    assert!(
+        groom.status.success(),
+        "groom failed: {}",
+        String::from_utf8_lossy(&groom.stderr)
+    );
+    let approve = env.run(&["milestone", "approve", &id]);
+    assert!(
+        approve.status.success(),
+        "approve failed: {}",
+        String::from_utf8_lossy(&approve.stderr)
+    );
+    let start = env.run(&["milestone", "set-status", &id, "in-progress"]);
+    assert!(
+        start.status.success(),
+        "set-status in-progress failed: {}",
+        String::from_utf8_lossy(&start.stderr)
+    );
+
+    let out = env.run(&["milestone", "set-status", &id, "cancelled"]);
+    assert!(
+        out.status.success(),
+        "set-status cancelled failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let meta = milestone_meta(&env, &id);
+    let flow = meta
+        .get("flow_stages")
+        .and_then(|v| v.as_object())
+        .expect("flow_stages present after cancel");
+    // Pre-cancel: draft, groom, specify, approve are done; execute is
+    // in_progress. After cancel, the remaining non-done stages must
+    // flip to skipped.
+    assert_eq!(flow["execute"]["status"], json!("skipped"));
+    assert_eq!(flow["self-review"]["status"], json!("skipped"));
+    assert_eq!(flow["complete"]["status"], json!("skipped"));
+    assert_eq!(flow["external-review"]["status"], json!("skipped"));
+    // Done stages must stay done — cancel must NOT clobber them.
+    assert_eq!(flow["draft"]["status"], json!("done"));
+    assert_eq!(flow["groom"]["status"], json!("done"));
+    assert_eq!(flow["specify"]["status"], json!("done"));
+    assert_eq!(flow["approve"]["status"], json!("done"));
+    // Hand-off must NEVER auto-advance, even on cancel (AC-11).
+    assert!(
+        flow.get("hand-off").is_none() || flow["hand-off"]["status"] != "done",
+        "cancel must never auto-advance hand-off"
+    );
+}

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use serde_json::json;
@@ -146,6 +148,7 @@ fn session_start_impl(
             target_version: String::new(),
             executed_by: String::new(),
             remediation_pre_state: None,
+            flow_stages: BTreeMap::new(),
         },
         ..Default::default()
     };

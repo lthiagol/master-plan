@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -384,6 +385,7 @@ pub fn create_milestone(ctx: &PlanContext, input: CreateMilestoneInput) -> Resul
             target_version: String::new(),
             executed_by: String::new(),
             remediation_pre_state: None,
+            flow_stages: BTreeMap::new(),
         },
         intent: input.intent,
         problem: input.problem,
@@ -539,6 +541,13 @@ pub const SPEC_STATUSES: &[&str] = &[
 
 /// Apply the shared pure state-machine result to an in-memory milestone.
 /// This is the only non-migration assignment site used by public mp writers.
+///
+/// M202: every MilestoneEvent that flows through here also writes the
+/// corresponding mp-flow stage mutations via `apply_flow_stages_for_event`,
+/// so a milestone's 12-stage timeline stays in sync with its lifecycle
+/// without each call site having to remember to do it. Hand-off is
+/// intentionally never auto-advanced (AC-11); explicit
+/// `mp milestone stage set <id> hand-off done` is the only path.
 pub(crate) fn apply_transition(
     m: &mut MilestoneFile,
     event: crate::model::MilestoneEvent,
@@ -561,6 +570,17 @@ pub(crate) fn apply_transition(
     if effects.phase_changed {
         m.milestone.lifecycle_at = Some(crate::store::now_rfc3339());
     }
+    // M202: mirror the lifecycle transition into the 12-stage mp-flow
+    // timeline. The pure-state function returns the (slug, new_status)
+    // pairs it wrote; we ignore the return value here because the durable
+    // writer only needs to know the side effect happened. Previews (the
+    // apply_spec_status_with_gates dry-run path) ALSO run this so the
+    // dry-run envelope mirrors what would land on disk.
+    crate::model::apply_flow_stages_for_event(
+        &mut m.milestone.flow_stages,
+        event,
+        &crate::store::now_rfc3339(),
+    );
     Ok(effects)
 }
 

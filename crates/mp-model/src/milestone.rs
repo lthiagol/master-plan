@@ -1,6 +1,77 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 // ── Milestone types ─────────────────────────────────────────────────────────
+
+/// M202: a single mp-flow stage's recorded status. The `status` field is one
+/// of `pending`, `in_progress`, `done`, or `skipped`; `at` is the RFC3339
+/// timestamp the transition fired (None when the stage has not been
+/// touched yet). Hand-off is intentionally absent from the auto-advance
+/// graph — it only flips via explicit `mp milestone stage set … hand-off
+/// done` per AC-11.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowStage {
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+}
+
+/// M202: canonical mp-flow stage slugs in execution order. The dashboard
+/// grid (AC-16) and the milestone-detail Stages section (AC-14) both
+/// render the 12 buckets in this order — the same order the
+/// `mp-flow SKILL.md` 12-stage timeline uses (draft → groom → specify →
+/// approve → execute → self-review → complete → external-review →
+/// remediate → re-review → document → hand-off). Stable IDs because
+/// `apply_flow_stages_for_event` and the milestone-detail renderer both
+/// index by position.
+pub const MP_FLOW_STAGE_KEYS: &[&str] = &[
+    "draft",
+    "groom",
+    "specify",
+    "approve",
+    "execute",
+    "self-review",
+    "complete",
+    "external-review",
+    "remediate",
+    "re-review",
+    "document",
+    "hand-off",
+];
+
+/// M202: legal `FlowStage.status` values. Used by the `mp milestone stage
+/// set` CLI guard (AC-08). Hand-off and document use the same 4-value
+/// enum as every other stage — they just never auto-advance.
+pub const MP_FLOW_STAGE_STATUSES: &[&str] = &[
+    "pending",
+    "in_progress",
+    "done",
+    "skipped",
+];
+
+/// M202: human-readable label per stage slug. The Stage cell renders
+/// `N/12 · <Label>` (AC-13); the Stages section row labels come from
+/// here too. Labels stay stable so a milestone that flips stage 5 to
+/// done and stage 6 to in_progress renders `6/12 · Claim & execute`
+/// regardless of theme / locale.
+pub fn mp_flow_stage_label(slug: &str) -> &'static str {
+    match slug {
+        "draft" => "Define outcome",
+        "groom" => "Interview & shape",
+        "specify" => "Write acceptance",
+        "approve" => "Approve spec",
+        "execute" => "Claim & execute",
+        "self-review" => "Self-review",
+        "complete" => "Mark complete",
+        "external-review" => "External review",
+        "remediate" => "Remediate findings",
+        "re-review" => "Re-review",
+        "document" => "Document",
+        "hand-off" => "Hand-off",
+        _ => "",
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MilestoneFile {
@@ -519,6 +590,19 @@ pub struct MilestoneMeta {
     /// milestone JSON byte-identical to pre-M144.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifecycle_at: Option<String>,
+    /// M202: per-stage status of the 12-stage mp-flow timeline
+    /// (`draft` → `hand-off`). Keyed by `MP_FLOW_STAGE_KEYS` slug;
+    /// values carry `status` (`pending|in_progress|done|skipped`) plus
+    /// the optional `at` RFC3339 timestamp. `serde(default)` keeps the
+    /// field backwards-compatible with pre-M202 milestone JSON; the
+    /// `skip_serializing_if` predicate omits the key entirely when
+    /// the map is empty so legacy-shaped files round-trip clean.
+    #[serde(default, skip_serializing_if = "is_flow_stages_empty")]
+    pub flow_stages: BTreeMap<String, FlowStage>,
+}
+
+fn is_flow_stages_empty(map: &BTreeMap<String, FlowStage>) -> bool {
+    map.is_empty()
 }
 
 fn default_lifecycle() -> String {
@@ -948,6 +1032,7 @@ impl Default for MilestoneFile {
                 target_version: String::new(),
                 executed_by: String::new(),
                 remediation_pre_state: None,
+                flow_stages: BTreeMap::new(),
             },
             intent: Intent::default(),
             problem: Problem::default(),
@@ -1344,6 +1429,102 @@ pub fn next_handoff_id(handoffs: &[ReviewHandoff]) -> String {
         .max()
         .unwrap_or(0);
     format!("H-{:02}", max + 1)
+}
+
+/// M202: apply the mp-flow stage mutations triggered by a `MilestoneEvent`.
+/// Mutates `flow_stages` in place: inserts the new status + RFC3339 `at`
+/// timestamp for every stage that flipped, leaves all others untouched.
+/// Returns the list of `(slug, new_status)` mutations applied in canonical
+/// `MP_FLOW_STAGE_KEYS` order so callers can audit / log / surface them.
+///
+/// Hand-off is intentionally absent from the auto-advance graph — only the
+/// explicit `mp milestone stage set <id> hand-off done` CLI mutates it
+/// (AC-11). Every other event either promotes stages forward, leaves them
+/// alone (Sync / Reopen / Block / Unblock / Defer / Resume / SetNeedsRegrooming /
+/// MigrateRaw), or cancels every non-done stage (Cancel).
+pub fn apply_flow_stages_for_event(
+    flow_stages: &mut BTreeMap<String, FlowStage>,
+    event: MilestoneEvent,
+    at: &str,
+) -> Vec<(String, String)> {
+    let raw_updates: Vec<(&str, &str)> = match event {
+        MilestoneEvent::Groom => vec![("draft", "done"), ("groom", "done")],
+        MilestoneEvent::Approve => vec![("specify", "done"), ("approve", "done")],
+        MilestoneEvent::Start => vec![("execute", "in_progress")],
+        // FinishExecution is the executor's end-state: execute flips to done
+        // and self-review flips to done (bundled per M148 — the runner
+        // performs both as one self-review pass). Stage 7 (complete) stays
+        // pending until `Complete`; stage 8 (external-review) is the next
+        // stage the milestone will pass through.
+        MilestoneEvent::FinishExecution => {
+            vec![("execute", "done"), ("self-review", "done")]
+        }
+        // Complete bundles execute + self-review + complete (the runner's
+        // terminal write), then flips external-review to in_progress so
+        // the milestone is now sitting in the review queue (AC-19).
+        MilestoneEvent::Complete => vec![
+            ("execute", "done"),
+            ("self-review", "done"),
+            ("complete", "done"),
+            ("external-review", "in_progress"),
+        ],
+        // EnterRemediation: external review produced findings, so the
+        // external-review stage closes (done) and remediate opens
+        // (in_progress).
+        MilestoneEvent::EnterRemediation => {
+            vec![("external-review", "done"), ("remediate", "in_progress")]
+        }
+        // ExitRemediation: remediation landed, the milestone is back in
+        // the review queue waiting on the re-review pass. remediate closes,
+        // re-review opens.
+        MilestoneEvent::ExitRemediation => {
+            vec![("remediate", "done"), ("re-review", "in_progress")]
+        }
+        // Cancel: every non-done stage flips to skipped. hand-off is
+        // excluded explicitly so a cancelled milestone never auto-advances
+        // to hand-off (AC-11 contract).
+        MilestoneEvent::Cancel => {
+            let mut updates: Vec<(&str, &str)> = Vec::new();
+            for slug in MP_FLOW_STAGE_KEYS {
+                if *slug == "hand-off" {
+                    continue;
+                }
+                let current = flow_stages
+                    .get(*slug)
+                    .map(|s| s.status.as_str())
+                    .unwrap_or("pending");
+                if current != "done" {
+                    updates.push((slug, "skipped"));
+                }
+            }
+            updates
+        }
+        // Every other event leaves the stage map untouched: Sync
+        // (recompute legacy projections), Reopen (back to in_progress),
+        // Block / Unblock / Defer / Resume (overlay flips, stage graph
+        // doesn't care), SetNeedsRegrooming (a re-groom hint, not a
+        // transition), MigrateRaw (migration escape hatch).
+        MilestoneEvent::Sync
+        | MilestoneEvent::Reopen
+        | MilestoneEvent::Block
+        | MilestoneEvent::Unblock
+        | MilestoneEvent::Defer
+        | MilestoneEvent::Resume
+        | MilestoneEvent::SetNeedsRegrooming(_)
+        | MilestoneEvent::MigrateRaw(_) => Vec::new(),
+    };
+    let mut result: Vec<(String, String)> = Vec::with_capacity(raw_updates.len());
+    for (slug, status) in raw_updates {
+        flow_stages.insert(
+            slug.to_string(),
+            FlowStage {
+                status: status.to_string(),
+                at: Some(at.to_string()),
+            },
+        );
+        result.push((slug.to_string(), status.to_string()));
+    }
+    result
 }
 
 impl MilestoneFile {
@@ -1826,6 +2007,7 @@ mod tests {
             target_version: String::new(),
             executed_by: String::new(),
             remediation_pre_state: None,
+            flow_stages: BTreeMap::new(),
         }
     }
 
@@ -2242,5 +2424,278 @@ mod tests {
         // re-route planning-stage transitions.
         let meta = MilestoneMeta::default();
         assert_eq!(from_meta_phase(&meta), MilestonePhase::Draft);
+    }
+
+    // ─── M202: apply_flow_stages_for_event coverage ──────────────────────
+    //
+    // The apply function is the single auto-advance graph for the
+    // 12-stage mp-flow timeline. Every `MilestoneEvent` variant is
+    // exercised; hand-off is pinned to NEVER auto-advance (AC-11).
+    // Without these pins a future refactor could silently widen the
+    // event table to include hand-off, breaking the "explicit-only"
+    // contract documented in the SKILL.md hand-off protocol.
+
+    fn assert_hand_off_pending(stages: &BTreeMap<String, FlowStage>) {
+        match stages.get("hand-off") {
+            None => {}
+            Some(s) => assert_ne!(
+                s.status, "done",
+                "hand-off must never auto-advance to done (AC-11); got: {s:?}"
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    fn assert_no_hand_off_in_updates(updates: &[(String, String)]) {
+        for (slug, _) in updates {
+            assert_ne!(slug, "hand-off", "hand-off must never appear in event-driven updates (AC-11)");
+        }
+    }
+
+    #[test]
+    fn apply_flow_stages_groom_marks_draft_and_groom_done() {
+        let mut stages = BTreeMap::new();
+        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Groom, "2026-09-01T00:00:00Z");
+        let slugs: Vec<&str> = updates.iter().map(|(s, _)| s.as_str()).collect();
+        assert_eq!(updates, vec![("draft".to_string(), "done".to_string()), ("groom".to_string(), "done".to_string())]);
+        assert_eq!(slugs, vec!["draft", "groom"]);
+        assert_eq!(stages["draft"].status, "done");
+        assert_eq!(stages["draft"].at.as_deref(), Some("2026-09-01T00:00:00Z"));
+        assert_eq!(stages["groom"].status, "done");
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_approve_marks_specify_and_approve_done() {
+        let mut stages = BTreeMap::new();
+        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-01T00:00:00Z");
+        assert_eq!(
+            updates,
+            vec![
+                ("specify".to_string(), "done".to_string()),
+                ("approve".to_string(), "done".to_string())
+            ]
+        );
+        assert_eq!(stages["specify"].status, "done");
+        assert_eq!(stages["approve"].status, "done");
+        assert_no_hand_off_in_updates(&updates);
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_start_marks_execute_in_progress() {
+        let mut stages = BTreeMap::new();
+        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Start, "2026-09-01T00:00:00Z");
+        assert_eq!(updates, vec![("execute".to_string(), "in_progress".to_string())]);
+        assert_eq!(stages["execute"].status, "in_progress");
+        assert!(stages.get("self-review").is_none());
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_finish_execution_marks_execute_and_self_review_done() {
+        let mut stages = BTreeMap::new();
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::FinishExecution,
+            "2026-09-01T00:00:00Z",
+        );
+        assert_eq!(
+            updates,
+            vec![
+                ("execute".to_string(), "done".to_string()),
+                ("self-review".to_string(), "done".to_string())
+            ]
+        );
+        assert_eq!(stages["execute"].status, "done");
+        assert_eq!(stages["self-review"].status, "done");
+        // Complete stage must stay pending until Complete fires.
+        assert!(stages.get("complete").is_none() || stages["complete"].status == "pending");
+        assert_no_hand_off_in_updates(&updates);
+    }
+
+    #[test]
+    fn apply_flow_stages_complete_marks_execute_self_review_complete_done_and_external_in_progress() {
+        let mut stages = BTreeMap::new();
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::Complete,
+            "2026-09-01T00:00:00Z",
+        );
+        assert_eq!(
+            updates,
+            vec![
+                ("execute".to_string(), "done".to_string()),
+                ("self-review".to_string(), "done".to_string()),
+                ("complete".to_string(), "done".to_string()),
+                ("external-review".to_string(), "in_progress".to_string()),
+            ]
+        );
+        assert_eq!(stages["execute"].status, "done");
+        assert_eq!(stages["self-review"].status, "done");
+        assert_eq!(stages["complete"].status, "done");
+        assert_eq!(stages["external-review"].status, "in_progress");
+        assert_no_hand_off_in_updates(&updates);
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_enter_remediation_marks_external_done_and_remediate_in_progress() {
+        let mut stages = BTreeMap::new();
+        // Pre-seed external-review as in_progress (Complete set it).
+        stages.insert(
+            "external-review".to_string(),
+            FlowStage {
+                status: "in_progress".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::EnterRemediation,
+            "2026-09-02T00:00:00Z",
+        );
+        assert_eq!(
+            updates,
+            vec![
+                ("external-review".to_string(), "done".to_string()),
+                ("remediate".to_string(), "in_progress".to_string()),
+            ]
+        );
+        assert_eq!(stages["external-review"].status, "done");
+        assert_eq!(stages["external-review"].at.as_deref(), Some("2026-09-02T00:00:00Z"));
+        assert_eq!(stages["remediate"].status, "in_progress");
+        assert_no_hand_off_in_updates(&updates);
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_exit_remediation_marks_remediate_done_and_re_review_in_progress() {
+        let mut stages = BTreeMap::new();
+        stages.insert(
+            "remediate".to_string(),
+            FlowStage {
+                status: "in_progress".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::ExitRemediation,
+            "2026-09-02T00:00:00Z",
+        );
+        assert_eq!(
+            updates,
+            vec![
+                ("remediate".to_string(), "done".to_string()),
+                ("re-review".to_string(), "in_progress".to_string()),
+            ]
+        );
+        assert_eq!(stages["remediate"].status, "done");
+        assert_eq!(stages["re-review"].status, "in_progress");
+        assert_no_hand_off_in_updates(&updates);
+        assert_hand_off_pending(&stages);
+    }
+
+    #[test]
+    fn apply_flow_stages_cancel_marks_remaining_skipped_and_skips_done_stages() {
+        let mut stages = BTreeMap::new();
+        // Pre-mark a couple of stages done so Cancel must NOT clobber them.
+        stages.insert(
+            "draft".to_string(),
+            FlowStage {
+                status: "done".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        stages.insert(
+            "groom".to_string(),
+            FlowStage {
+                status: "done".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        stages.insert(
+            "approve".to_string(),
+            FlowStage {
+                status: "done".to_string(),
+                at: Some("2026-09-01T00:00:00Z".to_string()),
+            },
+        );
+        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Cancel, "2026-09-03T00:00:00Z");
+        // The 3 done stages must stay done; everything else must skip.
+        for (slug, status) in &updates {
+            assert_eq!(
+                status, "skipped",
+                "non-done stages must flip to skipped on Cancel; got {slug}={status}"
+            );
+        }
+        // Verify hand-off is absent from updates and not flipped in the map.
+        assert_no_hand_off_in_updates(&updates);
+        assert_hand_off_pending(&stages);
+        assert!(stages.get("hand-off").is_none(), "Cancel must not create hand-off entry");
+        // Verify done stages stayed done (Cancel must NOT clobber).
+        assert_eq!(stages["draft"].status, "done");
+        assert_eq!(stages["groom"].status, "done");
+        assert_eq!(stages["approve"].status, "done");
+        // Verify a previously-pending stage got skipped.
+        assert_eq!(stages["execute"].status, "skipped");
+        assert_eq!(stages["complete"].status, "skipped");
+        assert_eq!(stages["external-review"].status, "skipped");
+        // Verify document / hand-off stay untouched.
+        assert!(
+            stages.get("document").is_none() || stages["document"].status == "skipped",
+            "document was pending so it should be skipped"
+        );
+    }
+
+    #[test]
+    fn apply_flow_stages_pass_through_events_are_no_ops() {
+        // Every event variant NOT in the auto-advance table must leave the
+        // stage map untouched and return an empty updates vec. Without this
+        // pin a future widening of the table could silently start
+        // auto-advancing hand-off or document.
+        let pass_through_events = [
+            MilestoneEvent::Sync,
+            MilestoneEvent::Reopen,
+            MilestoneEvent::Block,
+            MilestoneEvent::Unblock,
+            MilestoneEvent::Defer,
+            MilestoneEvent::Resume,
+            MilestoneEvent::SetNeedsRegrooming(true),
+            MilestoneEvent::SetNeedsRegrooming(false),
+            MilestoneEvent::MigrateRaw(MilestonePhase::Approved),
+        ];
+        for event in pass_through_events {
+            let mut stages = BTreeMap::new();
+            let updates = apply_flow_stages_for_event(
+                &mut stages,
+                event,
+                "2026-09-01T00:00:00Z",
+            );
+            assert!(
+                updates.is_empty(),
+                "event {event:?} must not auto-advance any stage; got {updates:?}"
+            );
+            assert!(
+                stages.is_empty(),
+                "event {event:?} must not write any flow_stages entries; got {stages:?}"
+            );
+            assert_no_hand_off_in_updates(&updates);
+        }
+    }
+
+    #[test]
+    fn apply_flow_stages_overwrites_existing_at_timestamp() {
+        // When a stage fires twice (e.g. Approve then Approve after a
+        // Reopen), the second write must overwrite the `at` timestamp —
+        // not silently keep the stale value. Pin so a future change
+        // can't accidentally switch to insert-only.
+        let mut stages = BTreeMap::new();
+        apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-01T00:00:00Z");
+        assert_eq!(stages["approve"].at.as_deref(), Some("2026-09-01T00:00:00Z"));
+        apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-05T00:00:00Z");
+        assert_eq!(stages["approve"].at.as_deref(), Some("2026-09-05T00:00:00Z"));
+        assert_eq!(stages["approve"].status, "done");
     }
 }

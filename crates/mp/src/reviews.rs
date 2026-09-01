@@ -322,6 +322,15 @@ pub fn record_review_pass(
     // when the env var is unset (e.g. agent ran `mp` from a plain
     // shell), the helper is a no-op and the lifecycle poll in `mp
     // watch` is the fallback (M149 behavior).
+    //
+    // M202 S4.1: every successful `reviews pass --verdict ok` also
+    // closes the external-review stage (the reviewer just passed the
+    // milestone). When remediate was already done before this pass —
+    // i.e. the milestone is on the second pass through external-review
+    // after remediation — the re-review stage closes too. The hook
+    // lives here rather than as a `MilestoneEvent` because "reviews
+    // pass" is the reviews-registry's verb, not a lifecycle state
+    // machine event. Hand-off stays pending either way (AC-11).
     if verdict == "ok" {
         let lc = m.milestone.lifecycle.as_str();
         let spec = effective_spec_status(&m);
@@ -356,6 +365,48 @@ pub fn record_review_pass(
             store::write_milestone(&path, &m)?;
             crate::watch::emit_stage_done_best_effort("reviews-pass", Some(&id));
         }
+        // M202 S4.1: close the external-review stage on every
+        // successful `verdict=ok` (whether or not the auto-promote
+        // above fired). The Complete transition would otherwise leave
+        // external-review at `in_progress` (the milestone is sitting
+        // in the review queue); the reviewer's passing verdict is the
+        // signal that closes the stage. We persist this mutation
+        // explicitly because the auto-promote path above writes to
+        // disk BEFORE this hook fires — without an unconditional write
+        // an already-complete milestone would silently lose the
+        // external-review close.
+        m.milestone.flow_stages.insert(
+            "external-review".to_string(),
+            crate::model::FlowStage {
+                status: "done".to_string(),
+                at: Some(crate::store::now_rfc3339()),
+            },
+        );
+        // Re-review closes only when remediate was already done
+        // before this pass landed. A first-time review of a healthy
+        // milestone never touches re-review (it stayed `pending`
+        // throughout).
+        if m.milestone
+            .flow_stages
+            .get("remediate")
+            .map(|s| s.status == "done")
+            .unwrap_or(false)
+        {
+            m.milestone.flow_stages.insert(
+                "re-review".to_string(),
+                crate::model::FlowStage {
+                    status: "done".to_string(),
+                    at: Some(crate::store::now_rfc3339()),
+                },
+            );
+        }
+        // M202: persist the flow_stages update so the external-review
+        // close actually lands on disk. The auto-promote branch above
+        // also wrote a (pre-hook) copy; the second write is idempotent
+        // for flow_stages (the BTreeMap gets the same keys with the
+        // same status + a fresh at timestamp).
+        m.milestone.updated = store::today();
+        store::write_milestone(&path, &m)?;
     }
 
     let record = ReviewRecord {
