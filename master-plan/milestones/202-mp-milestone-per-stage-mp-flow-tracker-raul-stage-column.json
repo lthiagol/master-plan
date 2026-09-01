@@ -154,22 +154,22 @@
       "id": "AC-14",
       "description": "raul MilestoneDetail shows a Stages section listing all 12 mp-flow stages in canonical order with status icon (`✓ done`, `● in_progress`, `○ pending`, `⊘ skipped`) and per-stage timestamp (or relative `started Xh ago` for `in_progress`). The section sits between Meta and G14.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/stages_section_renders_twelve_rows|stages_section_order_is_canonical|stages_section_sits_between_meta_and_g14|status_icons_match_enum|skipped_icon_for_cancelled_stages/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "stages_section_renders_twelve_rows + stages_section_order_is_canonical + stages_section_sits_between_meta_and_g14 + status_icons_match_enum + skipped_icon_for_cancelled_stages + detail_header_shows_stage_cell_not_lifecycle_badge tests pass"
     },
     {
       "id": "AC-15",
       "description": "For a cancelled milestone, the Stages section shows all non-`done` stages with `⊘ skipped` and the current-stage row carries the sub-line `└─ lifecycle overlay: cancelled`. Same pattern for `remediation` and `blocked` overlays. Normal (no-overlay) milestones show no sub-line.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/cancelled_overlay_subline_appears|blocked_overlay_subline_appears|remediation_overlay_subline_appears|no_overlay_no_subline/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cancelled_overlay_subline_appears + blocked_overlay_subline_appears + remediation_overlay_subline_appears + no_overlay_no_subline tests pass"
     },
     {
       "id": "AC-16",
       "description": "raul Dashboard lifecycle grid rolls up milestones by their current mp-flow stage (12 buckets in canonical order) instead of by the 8-state lifecycle. Each bucket label includes its `<N>/12` ordinal marker. Title changes from `Lifecycle` to `Lifecycle (current mp-flow stage)` so the meaning shift is explicit.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E 'test(/grid_renders_twelve_buckets|grid_order_is_canonical_mp_flow|bucket_labels_include_n_over_twelve|title_includes_mp_flow_disambiguation/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "grid_renders_twelve_buckets + grid_order_is_canonical_mp_flow + bucket_labels_include_n_over_twelve + title_includes_mp_flow_disambiguation tests pass in tests/tui_lifecycle_column.rs"
     },
     {
       "id": "AC-17",
@@ -678,7 +678,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/stages_section_renders_twelve_rows|stages_section_order_is_canonical|stages_section_sits_between_meta_and_g14|status_icons_match_enum|skipped_icon_for_cancelled_stages/)",
       "done_when": "All 5 named tests pass; Stages section renders between Meta and G14",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-14"
       ],
@@ -698,7 +698,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/cancelled_overlay_subline_appears|blocked_overlay_subline_appears|remediation_overlay_subline_appears|no_overlay_no_subline/)",
       "done_when": "All 4 named tests pass; sub-line only appears when an overlay is set",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-15"
       ],
@@ -718,7 +718,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/detail_header_shows_stage_cell_not_lifecycle_badge/)",
       "done_when": "detail_header_shows_stage_cell_not_lifecycle_badge test passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-14"
       ],
@@ -738,7 +738,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_column --no-fail-fast -E test(/grid_renders_twelve_buckets|grid_order_is_canonical_mp_flow|bucket_labels_include_n_over_twelve|title_includes_mp_flow_disambiguation/)",
       "done_when": "All 4 named tests pass; grid renders 12 buckets with ordinal markers and the new title",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-16"
       ],

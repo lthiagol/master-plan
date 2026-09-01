@@ -80,25 +80,41 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
     )]));
     lines.push(Line::from(""));
 
-    // Lifecycle badge (with legacy fallback pre-M100).
+    // M202 S19: replace the lifecycle badge with the Stage cell
+    // (`<N>/12 · <Label>`). The Stage cell already carries position
+    // so a separate badge would be redundant. Effort + Risk stay
+    // on the same line for layout continuity.
+    let header_stage_map: std::collections::BTreeMap<String, String> = detail["milestone"]["flow_stages"]
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(slug, stage)| {
+                    stage
+                        .get("status")
+                        .and_then(|s| s.as_str())
+                        .map(|s| (slug.clone(), s.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let (stage_slug, stage_label) = crate::tui::progress::current_mp_flow_stage(&header_stage_map);
+    let stage_idx = crate::tui::progress::MP_FLOW_STAGE_KEYS
+        .iter()
+        .position(|s| *s == stage_slug)
+        .unwrap_or(crate::tui::progress::MP_FLOW_STAGE_KEYS.len() - 1);
+    let stage_text = format!(
+        "{}/{} · {}",
+        stage_idx + 1,
+        crate::tui::progress::MP_FLOW_STAGE_KEYS.len(),
+        stage_label,
+    );
     let mut meta_spans: Vec<Span> = Vec::new();
-    if !lifecycle.is_empty() {
-        meta_spans.push(Span::styled(
-            format!(" {lifecycle} "),
-            status_badge_style(&lifecycle, palette).add_modifier(Modifier::BOLD),
-        ));
-    } else if !legacy_spec.is_empty() {
-        meta_spans.push(Span::styled(
-            format!(" {legacy_spec} "),
-            status_badge_style(&legacy_spec, palette).add_modifier(Modifier::BOLD),
-        ));
-        if !legacy_exec.is_empty() {
-            meta_spans.push(Span::styled(
-                format!(" {legacy_exec} "),
-                status_badge_style(&legacy_exec, palette).add_modifier(Modifier::BOLD),
-            ));
-        }
-    }
+    meta_spans.push(Span::styled(
+        format!(" {stage_text} "),
+        Style::default()
+            .fg(palette.accent)
+            .add_modifier(Modifier::BOLD),
+    ));
     meta_spans.push(Span::raw("  "));
     meta_spans.push(Span::styled(
         "Effort: ",
@@ -241,6 +257,124 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
             remediation_pre_state,
             app,
         );
+    }
+
+    // ===== Stages (M202 S17) =====
+    //
+    // Sits between Meta and G14 per the AC-14 contract. Renders all
+    // 12 mp-flow stages in canonical order with status icon,
+    // label, and timestamp (or relative `started Xh ago` for
+    // `in_progress`). Stages 1-12 are the same keys the mp-flow
+    // skill documents; the table reads them from the milestone's
+    // `flow_stages` field. Pre-M202 milestones carry an empty
+    // map; every stage renders as `○ pending (unknown)` until
+    // the next lifecycle transition auto-populates it.
+    let flow_stages_obj = detail["milestone"]["flow_stages"].as_object();
+    let flow_stages_loaded = flow_stages_obj.is_some();
+    let mut current_stage_slug: Option<&'static str> = None;
+    if let Some(obj) = flow_stages_obj {
+        let owned: std::collections::BTreeMap<String, String> = obj
+            .iter()
+            .filter_map(|(slug, stage)| {
+                stage
+                    .get("status")
+                    .and_then(|s| s.as_str())
+                    .map(|s| (slug.clone(), s.to_string()))
+            })
+            .collect();
+        current_stage_slug = Some(crate::tui::progress::current_mp_flow_stage(&owned).0);
+    }
+    lines.push(Line::from(""));
+    section_rows.push(lines.len() as u16);
+    lines.extend_from_slice(&section_header("Stages", None, app, Some(md_width)));
+    let render_stage_row = |slug: &str,
+                            icon: &str,
+                            icon_style: Style,
+                            status_text: &str,
+                            at_text: &str,
+                            lines: &mut Vec<Line>| {
+        lines.push(Line::from(vec![
+            Span::styled(format!("{icon}  "), icon_style),
+            Span::styled(format!("{slug:>3}"), Style::default().fg(palette.foreground)),
+            Span::styled(
+                format!("  {}  ", crate::tui::progress::mp_flow_stage_label(slug)),
+                Style::default().fg(palette.foreground),
+            ),
+            Span::styled(
+                format!("{status_text} ({at_text})"),
+                Style::default().fg(palette.dim),
+            ),
+        ]));
+    };
+    if !flow_stages_loaded {
+        for slug in crate::tui::progress::MP_FLOW_STAGE_KEYS {
+            let label = crate::tui::progress::mp_flow_stage_label(slug);
+            lines.push(Line::from(vec![
+                Span::styled("○  ", Style::default().fg(palette.dim)),
+                Span::styled(format!("{slug:>3}"), Style::default().fg(palette.dim)),
+                Span::styled(format!("  {label}  "), Style::default().fg(palette.dim)),
+                Span::styled("pending (unknown)", Style::default().fg(palette.dim)),
+            ]));
+        }
+    } else {
+        let obj = flow_stages_obj.unwrap();
+        for slug in crate::tui::progress::MP_FLOW_STAGE_KEYS {
+            let entry = obj.get(*slug);
+            let (icon, status_text) = match entry
+                .and_then(|e| e.get("status"))
+                .and_then(|s| s.as_str())
+            {
+                Some("done") => ("✓", "done"),
+                Some("in_progress") => ("●", "in_progress"),
+                Some("skipped") => ("⊘", "skipped"),
+                _ => ("○", "pending"),
+            };
+            let icon_style = match status_text {
+                "done" => Style::default().fg(palette.success),
+                "in_progress" => Style::default().fg(palette.accent),
+                "skipped" => Style::default()
+                    .fg(palette.dim)
+                    .add_modifier(Modifier::CROSSED_OUT),
+                _ => Style::default().fg(palette.dim),
+            };
+            let at_text = entry
+                .and_then(|e| e.get("at"))
+                .and_then(|a| a.as_str())
+                .map(crate::tui::humanize::humanize_relative)
+                .unwrap_or_else(|| "—".to_string());
+            render_stage_row(slug, icon, icon_style, status_text, &at_text, &mut lines);
+        }
+    }
+
+    // M202 S18: overlay sub-line. When the milestone carries a
+    // non-empty lifecycle overlay (cancelled, blocked,
+    // remediation), render an indented sub-line under the
+    // current-stage row reading `└─ lifecycle overlay: <state>`.
+    // Skipped when no overlay is set so a normal milestone shows
+    // no extra row.
+    let mut overlay_state: Option<&'static str> = None;
+    if m["cancelled"].as_bool().unwrap_or(false) {
+        overlay_state = Some("cancelled");
+    } else if m["remediation_pre_state"].as_str().is_some() {
+        overlay_state = Some("remediation");
+    } else if m["blocked"].as_bool().unwrap_or(false) {
+        overlay_state = Some("blocked");
+    }
+    if let Some(state) = overlay_state {
+        if current_stage_slug.is_some() {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "      └─ lifecycle overlay: ",
+                    Style::default().fg(palette.warn),
+                ),
+                Span::styled(
+                    state,
+                    Style::default()
+                        .fg(palette.warn)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]));
+        }
     }
 
     // G14 approval indicator (preserved pre-M167 contract)

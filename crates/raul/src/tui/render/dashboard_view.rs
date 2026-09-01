@@ -231,49 +231,63 @@ fn render_work_queues_lines(app: &App, compact: bool) -> Vec<Line<'static>> {
     ]
 }
 
-/// M181 S6: build the lifecycle grid lines. All nine buckets,
-/// including zeros, in canonical order. Display-only per AC-04 —
-/// no focus, no drill-down.
+/// M181 S6 + M202 S20: build the lifecycle grid lines. Twelve
+/// mp-flow buckets (canonical `draft` → `hand-off`) including
+/// zeros, in canonical order. Display-only per AC-04 (no focus,
+/// no drill-down). The title is `Lifecycle (current mp-flow
+/// stage)` so the meaning shift from the legacy 8-state lifecycle
+/// grid is explicit on screen.
 ///
-/// `compact=true` lays the grid out in two rows of 4+5 buckets
-/// with shorter labels; `compact=false` uses three rows of three
-/// buckets with full labels. All nine buckets always render in both
-/// modes.
+/// `compact=true` lays the grid out in two rows of 6 buckets with
+/// shorter labels; `compact=false` uses three rows of 4 buckets
+/// with full labels. All twelve buckets always render in both
+/// modes (AC-16). The bucket count is sourced from the
+/// `overview` snapshot's `mp_flow_stage_counts` field (added by
+/// the mp side per M202); absent counts collapse to zero so a
+/// pre-M202 snapshot still renders cleanly.
 fn render_lifecycle_grid_lines(app: &App, compact: bool) -> Vec<Line<'static>> {
     let snap = &app.overview;
     let palette = app.effective_palette();
-    let lc = &snap.lifecycle;
-    let buckets: [(&str, u64); 9] = [
-        ("draft", lc.draft),
-        ("groomed", lc.groomed),
-        ("approved", lc.approved),
-        ("in-progress", lc.in_progress),
-        ("done", lc.done),
-        ("self-reviewed", lc.self_reviewed),
-        ("reviewed", lc.reviewed),
-        ("complete", lc.complete),
-        ("remediation", lc.remediation),
+    let bucket_labels: [(&'static str, &'static str); 12] = [
+        ("1/12 draft", "draft"),
+        ("2/12 groom", "groom"),
+        ("3/12 specify", "specify"),
+        ("4/12 approve", "approve"),
+        ("5/12 execute", "execute"),
+        ("6/12 self-review", "self-review"),
+        ("7/12 complete", "complete"),
+        ("8/12 external-review", "external-review"),
+        ("9/12 remediate", "remediate"),
+        ("10/12 re-review", "re-review"),
+        ("11/12 document", "document"),
+        ("12/12 hand-off", "hand-off"),
     ];
+    let counts = snap.mp_flow_stage_counts.as_ref();
+    let count_for = |slug: &str| -> u64 {
+        counts
+            .and_then(|c| c.get(slug).copied())
+            .unwrap_or(0)
+    };
     let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(Span::styled(
-        "Lifecycle",
+        "Lifecycle (current mp-flow stage)",
         Style::default().fg(palette.dim),
     )));
-    let cols = if compact { 5 } else { 3 };
-    for chunk in buckets.chunks(cols) {
+    let cols = if compact { 6 } else { 4 };
+    for chunk in bucket_labels.chunks(cols) {
         let mut spans: Vec<Span<'static>> = Vec::new();
-        for (i, (name, count)) in chunk.iter().enumerate() {
+        for (i, (label, slug)) in chunk.iter().enumerate() {
             if i > 0 {
                 spans.push(Span::raw(" "));
             }
-            let pad = if compact { 11 } else { 13 };
+            let pad = if compact { 15 } else { 17 };
             spans.push(Span::styled(
-                format!("{:<width$}", name, width = pad),
+                format!("{:<width$}", label, width = pad),
                 Style::default().fg(palette.dim),
             ));
             spans.push(Span::styled(
-                count.to_string(),
-                if *count > 0 {
+                count_for(slug).to_string(),
+                if count_for(slug) > 0 {
                     Style::default().fg(palette.accent)
                 } else {
                     Style::default()

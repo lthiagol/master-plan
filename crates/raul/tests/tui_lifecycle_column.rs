@@ -316,3 +316,147 @@ fn format_iso(secs: i64) -> String {
     let ss = sod % 60;
     format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hh, mm, ss)
 }
+
+// ─── M202 S20: lifecycle grid renders 12 mp-flow buckets ───────────────
+
+#[test]
+fn grid_renders_twelve_buckets() {
+    let mut app = App::new();
+    app.select_lane(Lane::Overview);
+    let backend = TestBackend::new(140, 60);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    // All 12 canonical bucket labels (with their ordinal marker
+    // prefix `<N>/12 `) must appear in the grid.
+    for label in [
+        "1/12 draft",
+        "2/12 groom",
+        "3/12 specify",
+        "4/12 approve",
+        "5/12 execute",
+        "6/12 self-review",
+        "7/12 complete",
+        "8/12 external-review",
+        "9/12 remediate",
+        "10/12 re-review",
+        "11/12 document",
+        "12/12 hand-off",
+    ] {
+        assert!(
+            flat.contains(label),
+            "lifecycle grid must include {label}; got: {flat}"
+        );
+    }
+}
+
+#[test]
+fn grid_order_is_canonical_mp_flow() {
+    // The 12 buckets must appear in canonical order (1/12 first,
+    // 12/12 last) so the operator can scan top-to-bottom.
+    let mut app = App::new();
+    app.select_lane(Lane::Overview);
+    let backend = TestBackend::new(140, 60);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    let labels = [
+        "1/12 draft", "2/12 groom", "3/12 specify", "4/12 approve",
+        "5/12 execute", "6/12 self-review", "7/12 complete",
+        "8/12 external-review", "9/12 remediate", "10/12 re-review",
+        "11/12 document", "12/12 hand-off",
+    ];
+    let mut last: Option<usize> = None;
+    for label in labels {
+        let pos = flat.find(label).expect(&format!("{label} missing"));
+        if let Some(p) = last {
+            assert!(pos > p, "{label} must come after the previous canonical stage");
+        }
+        last = Some(pos);
+    }
+}
+
+#[test]
+fn bucket_labels_include_n_over_twelve() {
+    // AC-16: every bucket label includes its `<N>/12` ordinal
+    // marker so the operator can spot the canonical stage at a
+    // glance.
+    let mut app = App::new();
+    app.select_lane(Lane::Overview);
+    let backend = TestBackend::new(140, 60);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    for n in 1..=12 {
+        let prefix = format!("{n}/12 ");
+        assert!(
+            flat.contains(&prefix),
+            "bucket ordinal {n}/12 must appear; got: {flat}"
+        );
+    }
+}
+
+#[test]
+fn title_includes_mp_flow_disambiguation() {
+    // AC-16: the grid title is `Lifecycle (current mp-flow
+    // stage)` so the operator sees the meaning shift from the
+    // legacy 8-state lifecycle.
+    let mut app = App::new();
+    app.select_lane(Lane::Overview);
+    let backend = TestBackend::new(140, 60);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    assert!(
+        flat.contains("Lifecycle (current mp-flow stage)"),
+        "grid title must disambiguate from the legacy 8-state lifecycle; got: {flat}"
+    );
+}

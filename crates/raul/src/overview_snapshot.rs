@@ -57,6 +57,13 @@ pub struct OverviewSnapshot {
     pub inbox: Vec<InboxItem>,
     #[serde(default)]
     pub activity: Vec<ActivityEvent>,
+    /// M202 S20: 12-stage mp-flow rollup. Each bucket counts the
+    /// milestones currently at that stage. `Option` so a pre-M202
+    /// `mp overview` snapshot without the field renders cleanly
+    /// (every bucket collapses to 0). When `Some`, keys are the
+    /// canonical `MP_FLOW_STAGE_KEYS` slugs.
+    #[serde(default)]
+    pub mp_flow_stage_counts: Option<std::collections::HashMap<String, u64>>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
