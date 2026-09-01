@@ -41,7 +41,7 @@ fn fixture_env() -> (TempDir, MpRunner) {
 }
 
 fn open_settings_lane(app: &mut App, runner: &MpRunner) {
-    let idx = Lane::ordered()
+    let idx = Lane::ordered_visible(app.show_watch_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();
@@ -67,7 +67,7 @@ fn jump_lane_opens_settings_and_loads_config() {
 #[test]
 fn ctrl_o_from_normal_jumps_to_settings_lane() {
     let app = App::new();
-    let idx = Lane::ordered()
+    let idx = Lane::ordered_visible(app.show_watch_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();

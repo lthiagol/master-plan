@@ -64,7 +64,7 @@ fn sample_ms() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "02".into(),
@@ -77,7 +77,7 @@ fn sample_ms() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]
 }
@@ -602,9 +602,10 @@ fn apply_action_settings_lane_quit_still_works() {
 #[test]
 fn normal_handler_tab_lane_jump_emits_jump_action() {
     let app = App::new();
-    let n = Lane::ordered().len();
-    // M164: the upper bound follows `Lane::ordered().len()` (currently 5),
-    // so 1..=N emit a `JumpLane(idx)`, anything above is a no-op.
+    // M198: digits index into the VISIBLE lane list (Watch omitted
+    // when `ui.show_watch_tab` is off — the App::new() default), so
+    // the upper bound follows `ordered_visible(app.show_watch_tab)`.
+    let n = Lane::ordered_visible(app.show_watch_tab).len();
     assert_eq!(
         modes::normal::handle_key(key(KeyCode::Char('1')), &app),
         vec![Action::JumpLane(0)]
@@ -617,7 +618,7 @@ fn normal_handler_tab_lane_jump_emits_jump_action() {
     assert_eq!(
         modes::normal::handle_key(key(KeyCode::Char(last_digit)), &app),
         vec![Action::JumpLane(n - 1)],
-        "digit {} must jump to the last lane index {}",
+        "digit {} must jump to the last visible lane index {}",
         last_digit,
         n - 1
     );

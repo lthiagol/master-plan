@@ -15,9 +15,9 @@
 //!   AC-33 delta_section_only_when_change_kind_delta
 //!   AC-35 empty_sections_omit_headers_and_placeholders
 
-use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
+use std::collections::BTreeMap;
 
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::render;
@@ -96,10 +96,10 @@ fn meta_subblock_all_fields_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     load_detail(&mut app, base_detail());
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(
         s.contains("Effort: S"),
         "Meta sub-block missing Effort; output:\n{s}"
@@ -130,7 +130,7 @@ fn cancelled_deferred_overlays_render_only_when_set() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["milestone"]["cancelled"] = serde_json::json!(true);
@@ -138,7 +138,7 @@ fn cancelled_deferred_overlays_render_only_when_set() {
     j["milestone"]["deferred_reason"] = serde_json::json!("waiting on review");
     j["milestone"]["target_version"] = serde_json::json!("v2.1");
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("CANCELLED"));
     assert!(s.contains("DEFERRED — waiting on review"));
     assert!(s.contains("Target version: v2.1"));
@@ -160,7 +160,7 @@ fn design_decisions_section_visible_when_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["design_decisions"] = serde_json::json!([
@@ -168,7 +168,7 @@ fn design_decisions_section_visible_when_present() {
           "rationale": "modern primitives" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(
         s.contains("Design Decisions"),
         "missing design decisions header"
@@ -194,7 +194,7 @@ fn open_questions_section_visible_when_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["open_questions"] = serde_json::json!([
@@ -202,7 +202,7 @@ fn open_questions_section_visible_when_present() {
           "status": "resolved", "answer": "yes" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Open Questions"));
     assert!(s.contains("Q-01"));
     assert!(s.contains("Are tests in scope?"));
@@ -225,7 +225,7 @@ fn work_packages_visible_when_present_and_steps_flat() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["work_packages"] = serde_json::json!([
@@ -239,7 +239,7 @@ fn work_packages_visible_when_present_and_steps_flat() {
         { "id": "S3", "action": "Third", "status": "done", "work_package": "WP1" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Work Packages"));
     assert!(s.contains("WP1 — Naming"));
     // Steps must NOT be nested under WP1 — they appear once each in
@@ -270,7 +270,7 @@ fn acceptance_criteria_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["acceptance_criteria"] = serde_json::json!([
@@ -283,7 +283,7 @@ fn acceptance_criteria_two_line_per_item() {
         }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Acceptance Criteria"));
     assert!(s.contains("AC-01"));
     assert!(s.contains("all tests pass"));
@@ -307,7 +307,7 @@ fn steps_section_progress_bar_and_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["steps"] = serde_json::json!([
@@ -318,7 +318,7 @@ fn steps_section_progress_bar_and_two_line_per_item() {
         { "id": "S2", "action": "Wire it up", "status": "in-progress" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Steps"));
     // Section header shows done/total (1/2 in progress is "1/2" once normalized,
     // not "0" — the test only checks that the badge labels appear).
@@ -345,7 +345,7 @@ fn findings_open_first_by_severity_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["findings"] = serde_json::json!([
@@ -355,7 +355,7 @@ fn findings_open_first_by_severity_two_line_per_item() {
           "description": "high-pri open" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Findings"));
     // Open findings appear first (F-02 then F-01) regardless of input order.
     let f02_pos = s.find("F-02").unwrap();
@@ -381,7 +381,7 @@ fn verification_section_only_when_field_set() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["verification"] = serde_json::json!({
@@ -390,7 +390,7 @@ fn verification_section_only_when_field_set() {
         "evidence": "cargo nextest exit 0"
     });
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Verification"));
     assert!(s.contains("date: 2026-07-05"));
     assert!(s.contains("branch: main"));
@@ -400,7 +400,7 @@ fn verification_section_only_when_field_set() {
     let mut j2 = base_detail();
     j2["verification"] = serde_json::json!({});
     load_detail(&mut app, j2);
-    let s2 = render_full(&app, 160, 60);
+    let s2 = render_full(&app, 160, 120);
     assert!(
         !s2.contains("Verification"),
         "verification header must NOT render when section is empty"
@@ -423,7 +423,7 @@ fn delta_section_only_when_change_kind_delta() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["milestone"]["change_kind"] = serde_json::json!("delta");
@@ -437,7 +437,7 @@ fn delta_section_only_when_change_kind_delta() {
         "removed": [{ "id": "AC-02", "statement": "removed criterion" }]
     });
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     assert!(s.contains("Delta"));
     assert!(s.contains("spec from v1"));
     assert!(s.contains("+ AC-99"));
@@ -449,7 +449,7 @@ fn delta_section_only_when_change_kind_delta() {
     let mut j2 = base_detail();
     j2["milestone"]["change_kind"] = serde_json::json!("greenfield");
     load_detail(&mut app, j2);
-    let s2 = render_full(&app, 160, 60);
+    let s2 = render_full(&app, 160, 120);
     assert!(!s2.contains("Delta"));
 }
 
@@ -477,7 +477,7 @@ fn finding_severity_bars_render_with_counts_when_mixed() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["findings"] = serde_json::json!([
@@ -488,7 +488,7 @@ fn finding_severity_bars_render_with_counts_when_mixed() {
         { "id": "F-05", "severity": "low",    "status": "open",     "description": "l1" }
     ]);
     load_detail(&mut app, j);
-    let s = render_full(&app, 160, 60);
+    let s = render_full(&app, 160, 120);
     // Header line in this section carries the open/total counts;
     // bars line carries the per-bucket counts in brackets.
     assert!(

@@ -37,7 +37,7 @@ fn path_lane_footer_is_one_row_tall() {
     // only the globals row.
     let mut app = App::new();
     app.select_lane(Lane::Path);
-    let area = ratatui::layout::Rect::new(0, 0, 80, 24);
+    let area = ratatui::layout::Rect::new(0, 0, 100, 24);
     let view = view_state::compute_view(&app, area);
     assert_eq!(
         view.footer_area.height, 1,
@@ -45,7 +45,10 @@ fn path_lane_footer_is_one_row_tall() {
         view.footer_area.height
     );
 
-    let buf = render_to_buffer(&app, 80, 24);
+    // The globals row is width-constrained: the full six-token
+    // string is ~83 cols, so render at 100 cols so `:refresh`
+    // is not truncated (M199 D-06 truncates overflow).
+    let buf = render_to_buffer(&app, 100, 24);
     let globals_y = view.footer_area.y;
     let globals = row_text(&buf, globals_y);
     assert!(

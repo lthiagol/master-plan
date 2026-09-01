@@ -8,13 +8,48 @@
 //!   * S19: Help / Settings / Edit-field overlays render without
 //!     `bg(Color::DarkGray)` and without `BorderType::Double`.
 
-use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::process::Command;
+
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
+use std::collections::BTreeMap;
 
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::render;
 use raul::tui::view_state;
+
+/// M201: the Settings renderer needs the `mp config schema` cache;
+/// with schema=None it draws "Schema unavailable" instead of the key
+/// list. Seed a schema parsed from the real `mp config schema` output
+/// (bootstrap a scratch project since `mp config schema` requires a
+/// plan directory).
+fn fixture_schema() -> Option<raul::tui::modes::settings::schema::SettingsSchema> {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let candidates = [
+        manifest.join("../../target/release/mp"),
+        manifest.join("../../target/debug/mp"),
+    ];
+    let bin = candidates
+        .into_iter()
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from("mp"));
+    let scratch = std::env::temp_dir().join(format!("{}-schema-fixture", std::process::id()));
+    if !scratch.join("master-plan/plan.json").exists() {
+        let _ = std::fs::remove_dir_all(&scratch);
+        std::fs::create_dir_all(&scratch).ok()?;
+        let _ = Command::new(&bin)
+            .args(["init", "--profile", "full", "--format", "json"])
+            .current_dir(&scratch)
+            .status();
+    }
+    let out = Command::new(bin)
+        .args(["config", "schema", "--project-root"])
+        .arg(&scratch)
+        .output()
+        .ok()?;
+    raul::tui::modes::settings::schema::SettingsSchema::from_json(&out.stdout).ok()
+}
 
 fn render_full(app: &App, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
@@ -57,7 +92,7 @@ fn lane_tab_bar_uses_ratatui_tabs_widget() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     // Use width=120 to ensure the bar uses full labels (not compact).
     let s = render_full(&app, 120, 24);
@@ -94,7 +129,7 @@ fn list_highlight_style_sole_painter_in_settings_review_annotation() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     // Manually set the active mode to ReviewMenu and check the
     // chrome (the test doesn't try to drive the dispatcher). The
@@ -135,7 +170,7 @@ fn table_highlight_style_sole_painter_in_milestones_backlog() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     // The render must not panic.
     let _ = render_full(&app, 120, 24);
@@ -158,7 +193,7 @@ fn help_settings_drop_floating_chrome() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     // Open Help and confirm it renders with plain border.
     app.active_mode = raul::tui::mode::Mode::Help;
@@ -172,7 +207,10 @@ fn help_settings_drop_floating_chrome() {
     // Settings lane: same plain-border chrome contract.
     app.active_mode = raul::tui::mode::Mode::Normal;
     app.select_lane(Lane::Settings);
-    app.settings = Some(raul::tui::mode::SettingsState::new(serde_json::json!({})));
+    app.settings = Some(raul::tui::mode::SettingsState::new_with_schema(
+        serde_json::json!({}),
+        fixture_schema(),
+    ));
     let s_set = render_full(&app, 120, 60);
     assert!(s_set.contains("ui.color"));
     assert!(!s_set.contains("║"));
@@ -182,7 +220,10 @@ fn help_settings_drop_floating_chrome() {
 fn settings_footer_affordance_and_list_highlight_style() {
     let mut app = App::new();
     app.select_lane(Lane::Settings);
-    app.settings = Some(raul::tui::mode::SettingsState::new(serde_json::json!({})));
+    app.settings = Some(raul::tui::mode::SettingsState::new_with_schema(
+        serde_json::json!({}),
+        fixture_schema(),
+    ));
     let s = render_full(&app, 120, 40);
     assert!(
         s.contains("[Save (s)]"),

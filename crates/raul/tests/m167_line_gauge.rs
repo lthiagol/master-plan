@@ -44,7 +44,7 @@ fn base_app() -> App {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.load_milestone_detail(serde_json::json!({
         "milestone": {

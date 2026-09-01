@@ -29,7 +29,7 @@ fn make_app_with_milestones() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M01".into(),
@@ -45,7 +45,7 @@ fn make_app_with_milestones() -> App {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -61,7 +61,7 @@ fn make_app_with_milestones() -> App {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app
@@ -170,7 +170,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -186,7 +186,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -199,7 +199,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     let ids = visible_ids(&app);
@@ -230,7 +230,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M2".into(),
@@ -246,7 +246,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M1".into(),
@@ -259,7 +259,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -295,7 +295,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -311,7 +311,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -324,7 +324,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -361,7 +361,7 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -377,7 +377,7 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -393,7 +393,7 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M04".into(),
@@ -409,7 +409,7 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M05".into(),
@@ -425,7 +425,7 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -457,7 +457,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M01".into(),
@@ -473,7 +473,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -489,7 +489,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             cancelled_at: None,
 
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);

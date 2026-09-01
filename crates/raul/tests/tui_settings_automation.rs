@@ -44,7 +44,9 @@ fn config_path(tmp: &TempDir) -> PathBuf {
 }
 
 fn open_settings_lane(app: &mut App, runner: &MpRunner) {
-    let idx = Lane::ordered()
+    // M198: JumpLane resolves against the VISIBLE lane list (Watch
+    // hidden by default); Settings is the last visible lane.
+    let idx = Lane::ordered_visible(app.show_watch_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();

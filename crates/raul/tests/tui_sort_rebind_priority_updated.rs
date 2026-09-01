@@ -50,7 +50,7 @@ fn parse_via_helper(data: &serde_json::Value) -> Vec<MilestoneSummary> {
                     cancelled: m["cancelled"].as_bool().unwrap_or(false),
                     cancelled_at: m["cancelled_at"].as_str().map(String::from),
                     cancel_reason: m["cancel_reason"].as_str().map(String::from),
-                flow_stages: BTreeMap::new(),
+                    flow_stages: BTreeMap::new(),
                 })
                 .collect()
         })

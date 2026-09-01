@@ -54,7 +54,15 @@ fn select_settings_lane_loads_settings_state() {
     let (_tmp, runner) = fixture_runner();
     let mut app = App::new();
     app.select_lane(Lane::Settings);
-    apply_action(&mut app, &runner, Action::JumpLane(6)).expect("jump");
+    // M198: JumpLane indices are resolved against the VISIBLE lane
+    // list (Watch omitted when `ui.show_watch_tab` is off, which is
+    // the App::new() default). With Watch hidden, Settings is the
+    // last of 6 visible lanes → index 5.
+    let idx = Lane::ordered_visible(app.show_watch_tab)
+        .iter()
+        .position(|l| *l == Lane::Settings)
+        .unwrap();
+    apply_action(&mut app, &runner, Action::JumpLane(idx)).expect("jump");
     assert_eq!(app.active_lane, Lane::Settings);
     assert!(app.settings.is_some());
     assert_eq!(app.active_mode, raul::tui::mode::Mode::Normal);
@@ -64,7 +72,11 @@ fn select_settings_lane_loads_settings_state() {
 fn esc_on_settings_lane_is_noop_without_active_edit() {
     let (_tmp, runner) = fixture_runner();
     let mut app = App::new();
-    apply_action(&mut app, &runner, Action::JumpLane(6)).unwrap();
+    let idx = Lane::ordered_visible(app.show_watch_tab)
+        .iter()
+        .position(|l| *l == Lane::Settings)
+        .unwrap();
+    apply_action(&mut app, &runner, Action::JumpLane(idx)).unwrap();
     let actions = modes::settings::handle_key(key(KeyCode::Esc), &app);
     assert!(actions.is_empty());
     assert_eq!(app.active_lane, Lane::Settings);
@@ -72,8 +84,11 @@ fn esc_on_settings_lane_is_noop_without_active_edit() {
 
 #[test]
 fn jump_lane_index_6_is_settings() {
-    // M184: 7 lanes; Settings is at index 6
+    // M184: the FULL lane list has 7 lanes; Settings is at index 6
     // (Overview, Milestones, Path, Backlog, Ideas, Watch, Settings).
     let lanes = Lane::ordered();
     assert_eq!(lanes.get(6), Some(&Lane::Settings));
+    // M198: the VISIBLE list (Watch hidden) puts Settings at index 5.
+    let visible = Lane::ordered_visible(false);
+    assert_eq!(visible.get(5), Some(&Lane::Settings));
 }

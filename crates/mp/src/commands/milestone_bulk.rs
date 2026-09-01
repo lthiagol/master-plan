@@ -460,7 +460,8 @@ fn apply_add_depends_on(
                 before: before_value.clone(),
                 after: before_value,
                 error: None,
-                reason: None,            });
+                reason: None,
+            });
         }
     }
     let mut prospective = before_vec.clone().unwrap_or_default();
@@ -473,7 +474,8 @@ fn apply_add_depends_on(
             error: Some(format!(
                 "adding depends_on={dep} on {id} would create a cycle"
             )),
-            reason: None,        });
+            reason: None,
+        });
     }
     match milestone::add_depends_on_with_graph(ctx, id, dep, commit) {
         Ok(m) => Ok(ApplyOutcome {
@@ -481,13 +483,15 @@ fn apply_add_depends_on(
             before: before_value,
             after: Some(json!(m.milestone.depends_on)),
             error: None,
-            reason: None,        }),
+            reason: None,
+        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before_vec.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
-            reason: None,        }),
+            reason: None,
+        }),
     }
 }
 
@@ -505,13 +509,15 @@ fn apply_remove_depends_on(
             before: before_value,
             after: Some(json!(m.milestone.depends_on)),
             error: None,
-            reason: None,        }),
+            reason: None,
+        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before_value,
             after: None,
             error: Some(format!("{e}")),
-            reason: None,        }),
+            reason: None,
+        }),
     }
 }
 
@@ -548,13 +554,15 @@ fn apply_set_lifecycle(
             before: before.map(|v| json!(v)),
             after: Some(json!(m.milestone.lifecycle)),
             error: None,
-            reason: None,        }),
+            reason: None,
+        }),
         Err(e) => Ok(ApplyOutcome {
             ok: false,
             before: before.map(|v| json!(v)),
             after: None,
             error: Some(format!("{e}")),
-            reason: None,        }),
+            reason: None,
+        }),
     }
 }
 
@@ -580,7 +588,8 @@ fn apply_set_stage(
                 before: None,
                 after: None,
                 error: Some(format!("{e}")),
-                reason: None,            });
+                reason: None,
+            });
         }
     };
     let mut m = store::load_milestone(&path)?;
@@ -609,7 +618,8 @@ fn apply_set_stage(
             before: Some(json!({ "stage": stage, "status": before_status })),
             after: Some(json!({ "stage": stage, "status": status })),
             error: None,
-            reason: None,        });
+            reason: None,
+        });
     }
     m.milestone.flow_stages.insert(
         stage.to_string(),
@@ -625,7 +635,8 @@ fn apply_set_stage(
         before: Some(json!({ "stage": stage, "status": before_status })),
         after: Some(json!({ "stage": stage, "status": status })),
         error: None,
-        reason: None,    })
+        reason: None,
+    })
 }
 
 #[cfg(test)]

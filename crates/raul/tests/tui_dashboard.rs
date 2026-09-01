@@ -310,14 +310,20 @@ fn overview_narrow_terminal_keeps_full_hierarchy_visible() {
         full.contains("Lifecycle"),
         "full mode must show Lifecycle grid"
     );
-    assert!(full.contains("draft"), "full mode must show draft bucket");
+    // M202 S20: the grid is keyed by the 12 mp-flow stage buckets
+    // (`<N>/12 <slug>`), so the bucket names are the stage slugs
+    // (`remediate`, `re-review`, `hand-off`, …).
     assert!(
-        full.contains("complete"),
+        full.contains("1/12 draft"),
+        "full mode must show draft bucket"
+    );
+    assert!(
+        full.contains("7/12 complete"),
         "full mode must show complete bucket"
     );
     assert!(
-        full.contains("remediation"),
-        "full mode must show remediation bucket"
+        full.contains("9/12 remediate"),
+        "full mode must show remediate bucket"
     );
     assert!(full.contains("Next"), "full mode must show path Next");
     assert!(
@@ -401,17 +407,18 @@ fn overview_narrow_terminal_keeps_full_hierarchy_visible() {
         compact.contains("Lifecycle"),
         "compact mode must show Lifecycle grid"
     );
+    // M202 S20: compact grid uses `<N>/12 <slug>` labels too.
     assert!(
-        compact.contains("draft"),
+        compact.contains("1/12 draft"),
         "compact mode must show draft bucket"
     );
     assert!(
-        compact.contains("complete"),
+        compact.contains("7/12 complete"),
         "compact mode must show complete bucket"
     );
     assert!(
-        compact.contains("remediation"),
-        "compact mode must show remediation bucket"
+        compact.contains("9/12 remediate"),
+        "compact mode must show remediate bucket"
     );
     assert!(compact.contains("Next"), "compact mode must show path Next");
     assert!(

@@ -103,6 +103,11 @@ fn backlog_default_sort_is_numeric_id() {
 }
 
 /// M187: column header carries a `▼` marker on the active sort column.
+/// M202 S16: the Milestones table's sortable columns are now
+/// ID / Title / Pri / Since (the Lifecycle column was replaced by
+/// the read-only Stage column, which is not sortable). This test
+/// pins the marker on the Since header (a sortable column) and the
+/// absence on the read-only Stage header.
 #[test]
 fn milestones_header_marks_active_sort_column_with_arrow() {
     let mut app = App::new();
@@ -117,11 +122,10 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.select_lane(Lane::Milestones);
-    app.lane_sort_key
-        .insert(Lane::Milestones, SortKey::Lifecycle);
+    app.lane_sort_key.insert(Lane::Milestones, SortKey::Updated);
 
     let backend = TestBackend::new(120, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -134,10 +138,12 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
     let buf = terminal.backend().buffer();
 
     // The header row sits a couple of rows below the tab bar. Walk the
-    // buffer and confirm the Lifecycle column header carries a ▼ while
-    // the ID column header does not.
-    let mut lifecycle_marked = false;
+    // buffer and confirm the Since column header carries a ▼ while
+    // the ID column header does not (and the read-only Stage header
+    // never carries the marker).
+    let mut since_marked = false;
     let mut id_marked = false;
+    let mut stage_marked = false;
     for y in 0..buf.area().height {
         let mut row = String::new();
         let mut row_has_reversed_or_bold = false;
@@ -148,23 +154,30 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
                 row_has_reversed_or_bold = true;
             }
         }
-        if row_has_reversed_or_bold && row.contains("Lifecycle") {
-            // Find the "Lifecycle ▼" run on this row.
-            if row.contains("Lifecycle ▼") || row.contains("Lifecycle▼") {
-                lifecycle_marked = true;
+        if row_has_reversed_or_bold && row.contains("Since") {
+            // Find the "Since ▼" run on this row.
+            if row.contains("Since ▼") || row.contains("Since▼") {
+                since_marked = true;
             }
         }
         if row_has_reversed_or_bold && row.contains("ID ▼") {
             id_marked = true;
         }
+        if row_has_reversed_or_bold && row.contains("Stage ▼") {
+            stage_marked = true;
+        }
     }
     assert!(
-        lifecycle_marked,
-        "Lifecycle header must carry ▼ when it's the active sort"
+        since_marked,
+        "Since header must carry ▼ when it's the active sort"
     );
     assert!(
         !id_marked,
-        "ID header must NOT carry ▼ when Lifecycle is the active sort"
+        "ID header must NOT carry ▼ when Since is the active sort"
+    );
+    assert!(
+        !stage_marked,
+        "read-only Stage header must never carry the sort marker"
     );
 }
 

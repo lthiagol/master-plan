@@ -1,8 +1,6 @@
 //! Data-loading and subprocess side-effect helpers shared by the action reducer,
 //! mode handlers, and integration tests.
 
-use std::collections::BTreeMap;
-
 use anyhow::Result;
 
 use crate::mp_runner::MpRunner;
@@ -792,9 +790,20 @@ fn parse_mp_response(
 /// is non-fatal: the lane still opens, the renderer surfaces a
 /// clear warning, and the user can update `mp` (the hint names
 /// `mp --version` per AC-08).
+/// M201: fetch `mp config schema` through the runner and parse it
+/// into the typed `SettingsSchema`. Lives in the runner layer (not
+/// the per-mode handler tree) so per-mode handlers stay pure.
+fn fetch_settings_schema(
+    runner: &MpRunner,
+) -> Result<super::modes::settings::schema::SettingsSchema, String> {
+    let raw = runner
+        .run_raw("config", &["schema"])
+        .map_err(|e| format!("mp config schema unavailable: {e}"))?;
+    super::modes::settings::schema::SettingsSchema::from_json(&raw)
+}
+
 pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
     use super::mode::SettingsState;
-    use super::modes::settings::schema;
     if app.settings.is_some() {
         return Ok(());
     }
@@ -806,7 +815,9 @@ pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
 
     // M201: fetch and cache the schema once. Failure is non-fatal —
     // the renderer surfaces a clear error and the lane stays usable.
-    let (cached_schema, warning) = match schema::fetch_schema(runner) {
+    // The fetch lives here (the runner layer), NOT in the per-mode
+    // handler tree — per-mode handlers must stay pure (no MpRunner).
+    let (cached_schema, warning) = match fetch_settings_schema(runner) {
         Ok(s) => (Some(s), None),
         Err(e) => (None, Some(e)),
     };
@@ -1027,7 +1038,10 @@ mod tests {
         // present as a status string.
         assert_eq!(flow.len(), 8, "got: {flow:?}");
         assert_eq!(flow.get("draft").map(String::as_str), Some("done"));
-        assert_eq!(flow.get("external-review").map(String::as_str), Some("in_progress"));
+        assert_eq!(
+            flow.get("external-review").map(String::as_str),
+            Some("in_progress")
+        );
         // Hand-off is absent from the on-disk payload — the parser
         // must not invent it.
         assert!(flow.get("hand-off").is_none());

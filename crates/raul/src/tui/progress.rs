@@ -57,7 +57,9 @@ pub fn mp_flow_stage_label(slug: &str) -> &'static str {
 /// `pending` stage (the milestone is past the last completed rung).
 /// Falls back to stage 12 (`hand-off`) plus its label when every
 /// earlier stage is `done`, matching the AC-13 contract.
-pub fn current_mp_flow_stage(flow_stages: &BTreeMap<String, String>) -> (&'static str, &'static str) {
+pub fn current_mp_flow_stage(
+    flow_stages: &BTreeMap<String, String>,
+) -> (&'static str, &'static str) {
     // First pass: look for any in_progress stage (canonical-order priority).
     for slug in MP_FLOW_STAGE_KEYS {
         let status = flow_stages
@@ -90,10 +92,7 @@ pub fn current_mp_flow_stage(flow_stages: &BTreeMap<String, String>) -> (&'stati
 /// one. Falls back to the after-everything sentinel when the
 /// milestone is past stage 12 (caller can override via the
 /// explicit `mp milestone stage set <id> hand-off done`).
-pub fn stage_cell_line(
-    flow_stages: &BTreeMap<String, String>,
-    palette: &Palette,
-) -> Line<'static> {
+pub fn stage_cell_line(flow_stages: &BTreeMap<String, String>, palette: &Palette) -> Line<'static> {
     let (slug, label) = current_mp_flow_stage(flow_stages);
     let idx = MP_FLOW_STAGE_KEYS
         .iter()
@@ -105,10 +104,7 @@ pub fn stage_cell_line(
             format!("{}/{} · ", idx + 1, MP_FLOW_STAGE_KEYS.len()),
             Style::default().fg(ordinal_color),
         ),
-        Span::styled(
-            label.to_string(),
-            Style::default().fg(palette.foreground),
-        ),
+        Span::styled(label.to_string(), Style::default().fg(palette.foreground)),
     ])
 }
 

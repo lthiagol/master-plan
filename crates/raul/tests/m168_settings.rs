@@ -37,13 +37,53 @@ fn render_full(app: &App, width: u16, height: u16) -> String {
 fn app_with_settings(config: serde_json::Value) -> App {
     let mut app = App::new();
     app.select_lane(Lane::Settings);
-    let mut state = SettingsState::new(config);
+    // M201: the Settings renderer requires the `mp config schema`
+    // cache — with schema=None it draws the "Schema unavailable"
+    // error instead of the key list. Seed a schema from the real
+    // `mp config schema` output (probed from the manifest build
+    // dir, same as `mp_bin()`).
+    let schema = fixture_schema();
+    let mut state = SettingsState::new_with_schema(config, schema);
     state.selected_idx = SETTINGS_KEYS
         .iter()
         .position(|(_, k)| *k == "workflow.profile")
         .expect("workflow.profile must exist");
     app.settings = Some(state);
     app
+}
+
+/// M201: fetch the real `mp config schema` JSON once per test and
+/// parse it into the typed `SettingsSchema` the renderer consumes.
+/// Returns `None` only when the probe fails (then the renderer's
+/// schema-unavailable path is exercised instead).
+fn fixture_schema() -> Option<raul::tui::modes::settings::schema::SettingsSchema> {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let candidates = [
+        manifest.join("../../target/release/mp"),
+        manifest.join("../../target/debug/mp"),
+    ];
+    let bin = candidates
+        .into_iter()
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from("mp"));
+    // `mp config schema` requires a plan directory; the tests run
+    // from the crate dir (no project). Bootstrap a scratch project
+    // once and point the schema fetch at it.
+    let scratch = std::env::temp_dir().join(format!("{}-schema-fixture", std::process::id()));
+    if !scratch.join("master-plan/plan.json").exists() {
+        let _ = std::fs::remove_dir_all(&scratch);
+        std::fs::create_dir_all(&scratch).ok()?;
+        let _ = Command::new(&bin)
+            .args(["init", "--profile", "full", "--format", "json"])
+            .current_dir(&scratch)
+            .status();
+    }
+    let out = Command::new(bin)
+        .args(["config", "schema", "--project-root"])
+        .arg(&scratch)
+        .output()
+        .ok()?;
+    raul::tui::modes::settings::schema::SettingsSchema::from_json(&out.stdout).ok()
 }
 
 fn mp_bin() -> PathBuf {
@@ -77,7 +117,7 @@ fn fixture_env() -> (TempDir, MpRunner) {
 }
 
 fn open_settings_lane(app: &mut App, runner: &MpRunner) {
-    let idx = Lane::ordered()
+    let idx = Lane::ordered_visible(app.show_watch_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .expect("Settings lane");
@@ -114,8 +154,8 @@ fn flat_list_groups_by_section() {
     );
     for section in &["ui", "workflow", "git", "next", "agent", "keybinds"] {
         assert!(
-            s.contains(&format!("--- {section} ---")),
-            "missing `--- {section} ---` header row; got:\n{s}"
+            s.contains(&format!("▾ {section} ")),
+            "missing `▾ {section}` section header row; got:\n{s}"
         );
     }
 }
@@ -149,7 +189,7 @@ fn s_opens_settings_lane_once() {
     assert_ne!(app.active_lane, Lane::Settings);
 
     let actions = raul::tui::modes::normal::handle_key(ctrl_o(), &app);
-    let idx = Lane::ordered()
+    let idx = Lane::ordered_visible(app.show_watch_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();

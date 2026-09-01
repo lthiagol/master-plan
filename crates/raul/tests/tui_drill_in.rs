@@ -16,7 +16,7 @@ fn drill_into_milestone_from_list() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     assert_eq!(app.content, ContentState::MilestoneDetail);
@@ -40,7 +40,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "42".into(),
@@ -53,7 +53,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "43".into(),
@@ -66,7 +66,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.hide_done = true;

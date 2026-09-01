@@ -1948,7 +1948,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1961,7 +1961,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1974,7 +1974,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
         ]
     }

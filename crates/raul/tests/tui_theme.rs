@@ -190,7 +190,7 @@ fn tui_render_respects_color_enabled_toggle() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
 
     let Color::Rgb(ar, ag, ab) = MOCHA.accent else {

@@ -42,12 +42,12 @@ fn bulk_set_stage_skips_cancelled() {
     let active = create(&env, "active-target");
     let cancelled = create(&env, "cancelled-target");
     // Cancel the second milestone.
-    let approve = lib_api::run(
-        &env,
-        &["milestone", "approve", &cancelled],
-    );
+    let approve = lib_api::run(&env, &["milestone", "approve", &cancelled]);
     assert!(approve.status.success());
-    let start = lib_api::run(&env, &["milestone", "set-status", &cancelled, "in-progress"]);
+    let start = lib_api::run(
+        &env,
+        &["milestone", "set-status", &cancelled, "in-progress"],
+    );
     assert!(start.status.success());
     let cancel = lib_api::run(&env, &["milestone", "set-status", &cancelled, "cancelled"]);
     assert!(
@@ -78,7 +78,10 @@ fn bulk_set_stage_skips_cancelled() {
     );
     let payload: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(payload["ok"], true);
-    assert_eq!(payload["succeeded"], 2, "cancelled target is skipped, not failed; got {payload}");
+    assert_eq!(
+        payload["succeeded"], 2,
+        "cancelled target is skipped, not failed; got {payload}"
+    );
     assert_eq!(payload["failed"], 0);
     // Cancelled target must appear with reason cancelled.
     let cancelled_row = payload["results"]
@@ -87,7 +90,10 @@ fn bulk_set_stage_skips_cancelled() {
         .iter()
         .find(|r| r["id"] == json!(cancelled))
         .expect("cancelled row missing");
-    assert_eq!(cancelled_row["ok"], true, "cancelled must be skipped, not failed");
+    assert_eq!(
+        cancelled_row["ok"], true,
+        "cancelled must be skipped, not failed"
+    );
     assert_eq!(
         cancelled_row["reason"], "cancelled",
         "cancelled row must carry reason=cancelled; got: {cancelled_row}"
@@ -111,10 +117,7 @@ fn bulk_set_stage_skips_cancelled() {
         .expect("flow_stages present after bulk set-stage");
     assert_eq!(flow["external-review"]["status"], "done");
     // Cancelled target must NOT have been mutated.
-    let show_cancelled = lib_api::run(
-        &env,
-        &["show", "milestone", &cancelled, "--format", "raw"],
-    );
+    let show_cancelled = lib_api::run(&env, &["show", "milestone", &cancelled, "--format", "raw"]);
     let cdoc: serde_json::Value = serde_json::from_slice(&show_cancelled.stdout).unwrap();
     let cflow = cdoc["milestone"]["flow_stages"].as_object();
     assert!(

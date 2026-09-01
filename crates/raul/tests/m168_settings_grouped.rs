@@ -36,7 +36,8 @@ fn down_skips_section_headers_lands_on_next_key() {
 #[test]
 fn down_from_last_key_of_section_jumps_to_first_key_of_next() {
     let mut app = open_settings();
-    set_selected(&mut app, "ui.hide_done");
+    // M198: `ui.show_watch_tab` is the last key of the ui section.
+    set_selected(&mut app, "ui.show_watch_tab");
     app.move_down();
     assert_eq!(selected_key(&app), "workflow.profile");
 }

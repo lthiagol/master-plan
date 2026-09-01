@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::io::{stdout, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::time::{Duration, Instant};
@@ -1044,6 +1043,8 @@ mod tests {
     //! dirty-signal contract for the List-path focus flip without needing
     //! a full `run_loop` integration.
 
+    use std::collections::BTreeMap;
+
     use super::*;
 
     /// M167: pressing Esc on a `ContentState::List` is a no-op (the
@@ -1126,7 +1127,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1139,7 +1140,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1152,7 +1153,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             },
         ]);
         app
@@ -1329,7 +1330,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+                flow_stages: BTreeMap::new(),
             })
             .collect();
         app.load_milestones(ms);

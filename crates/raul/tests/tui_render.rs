@@ -7,7 +7,7 @@ use raul::tui::render;
 use raul::tui::view_state;
 
 fn render_to_string(app: &App) -> String {
-    let backend = TestBackend::new(100, 40);
+    let backend = TestBackend::new(100, 80);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
         .draw(|frame| {
@@ -46,7 +46,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "02".to_string(),
@@ -59,7 +59,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "03".to_string(),
@@ -72,7 +72,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]
 }

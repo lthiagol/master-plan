@@ -8,9 +8,9 @@
 //! re-pins the AC contracts against the current code so `mp validate`
 //! passes and the M54 evidence strings remain accurate.
 
-use std::collections::BTreeMap;
 use raul::config::{color_enabled, set_color_enabled};
 use raul::theme::{Palette, ALL};
+use std::collections::BTreeMap;
 
 // ---- AC-01: --color on/off + ui.color roundtrip ---------------------
 
@@ -74,7 +74,7 @@ fn m54_ac03_terminal_width_drives_list_columns() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     for width in [80, 120, 160] {
         let backend = TestBackend::new(width, 30);
@@ -186,7 +186,7 @@ fn m54_ac09_milestone_detail_renders_lifecycle_palette() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -201,7 +201,7 @@ fn m54_ac09_milestone_detail_renders_lifecycle_palette() {
         }
     }));
 
-    let backend = TestBackend::new(120, 30);
+    let backend = TestBackend::new(120, 60);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
         .draw(|frame| {
@@ -216,8 +216,12 @@ fn m54_ac09_milestone_detail_renders_lifecycle_palette() {
             out.push_str(buffer[(x, y)].symbol());
         }
     }
+    // M202 S19: the detail header now shows the Stage cell
+    // (`<N>/12 · <Label>`) instead of the legacy lifecycle badge.
+    // A fresh milestone (empty flow_stages) renders
+    // `1/12 · Define outcome`.
     assert!(
-        out.contains("in-progress"),
-        "milestone detail must show the lifecycle string (theme-aware)"
+        out.contains("1/12") && out.contains("Define outcome"),
+        "milestone detail must show the Stage cell (1/12 · Define outcome) in the header"
     );
 }

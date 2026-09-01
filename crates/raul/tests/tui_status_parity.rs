@@ -78,7 +78,7 @@ fn render_with_detail(detail: &Value) -> String {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(detail.clone());
@@ -134,9 +134,12 @@ fn parity_post_m100_canonical_lifecycle_field() {
     );
 
     let output = render_with_detail(&minimal_detail(&milestone));
+    // M202 S19: the header badge is gone; the Stage cell renders
+    // `<N>/12 · <Label>` instead. For a milestone with no
+    // flow_stages, the stage cell shows 1/12 · Define outcome.
     assert!(
-        output.contains("in-progress"),
-        "rendered badge must show the helper-derived lifecycle; output:\n{output}"
+        output.contains("1/12") && output.contains("Define outcome"),
+        "rendered header must show the Stage cell; output:\n{output}"
     );
 }
 
@@ -160,9 +163,10 @@ fn parity_pre_m100_legacy_spec_exec_derive_lifecycle() {
     );
 
     let output = render_with_detail(&minimal_detail(&milestone));
+    // M202 S19: header badge → Stage cell.
     assert!(
-        output.contains("complete"),
-        "rendered badge must show the helper-derived lifecycle; output:\n{output}"
+        output.contains("1/12") && output.contains("Define outcome"),
+        "rendered header must show the Stage cell; output:\n{output}"
     );
 }
 
@@ -182,9 +186,12 @@ fn parity_legacy_exec_in_progress_overrides_spec_verified() {
     assert_eq!(expected, "in-progress", "ER-7: exec-in-progress wins");
 
     let output = render_with_detail(&minimal_detail(&milestone));
+    // M202 S19: the header badge is gone; the Stage cell renders
+    // `<N>/12 · <Label>` instead. For a milestone with no
+    // flow_stages, the stage cell shows 1/12 · Define outcome.
     assert!(
-        output.contains("in-progress"),
-        "rendered badge must show the helper-derived lifecycle; output:\n{output}"
+        output.contains("1/12") && output.contains("Define outcome"),
+        "rendered header must show the Stage cell; output:\n{output}"
     );
 }
 

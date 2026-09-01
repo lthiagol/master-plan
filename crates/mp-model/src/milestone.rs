@@ -43,12 +43,7 @@ pub const MP_FLOW_STAGE_KEYS: &[&str] = &[
 /// M202: legal `FlowStage.status` values. Used by the `mp milestone stage
 /// set` CLI guard (AC-08). Hand-off and document use the same 4-value
 /// enum as every other stage — they just never auto-advance.
-pub const MP_FLOW_STAGE_STATUSES: &[&str] = &[
-    "pending",
-    "in_progress",
-    "done",
-    "skipped",
-];
+pub const MP_FLOW_STAGE_STATUSES: &[&str] = &["pending", "in_progress", "done", "skipped"];
 
 /// M202: human-readable label per stage slug. The Stage cell renders
 /// `N/12 · <Label>` (AC-13); the Stages section row labels come from
@@ -2472,16 +2467,26 @@ mod tests {
 
     fn assert_no_hand_off_in_updates(updates: &[(String, String)]) {
         for (slug, _) in updates {
-            assert_ne!(slug, "hand-off", "hand-off must never appear in event-driven updates (AC-11)");
+            assert_ne!(
+                slug, "hand-off",
+                "hand-off must never appear in event-driven updates (AC-11)"
+            );
         }
     }
 
     #[test]
     fn apply_flow_stages_groom_marks_draft_and_groom_done() {
         let mut stages = BTreeMap::new();
-        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Groom, "2026-09-01T00:00:00Z");
+        let updates =
+            apply_flow_stages_for_event(&mut stages, MilestoneEvent::Groom, "2026-09-01T00:00:00Z");
         let slugs: Vec<&str> = updates.iter().map(|(s, _)| s.as_str()).collect();
-        assert_eq!(updates, vec![("draft".to_string(), "done".to_string()), ("groom".to_string(), "done".to_string())]);
+        assert_eq!(
+            updates,
+            vec![
+                ("draft".to_string(), "done".to_string()),
+                ("groom".to_string(), "done".to_string())
+            ]
+        );
         assert_eq!(slugs, vec!["draft", "groom"]);
         assert_eq!(stages["draft"].status, "done");
         assert_eq!(stages["draft"].at.as_deref(), Some("2026-09-01T00:00:00Z"));
@@ -2492,7 +2497,11 @@ mod tests {
     #[test]
     fn apply_flow_stages_approve_marks_specify_and_approve_done() {
         let mut stages = BTreeMap::new();
-        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-01T00:00:00Z");
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::Approve,
+            "2026-09-01T00:00:00Z",
+        );
         assert_eq!(
             updates,
             vec![
@@ -2509,8 +2518,12 @@ mod tests {
     #[test]
     fn apply_flow_stages_start_marks_execute_in_progress() {
         let mut stages = BTreeMap::new();
-        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Start, "2026-09-01T00:00:00Z");
-        assert_eq!(updates, vec![("execute".to_string(), "in_progress".to_string())]);
+        let updates =
+            apply_flow_stages_for_event(&mut stages, MilestoneEvent::Start, "2026-09-01T00:00:00Z");
+        assert_eq!(
+            updates,
+            vec![("execute".to_string(), "in_progress".to_string())]
+        );
         assert_eq!(stages["execute"].status, "in_progress");
         assert!(stages.get("self-review").is_none());
         assert_hand_off_pending(&stages);
@@ -2539,7 +2552,8 @@ mod tests {
     }
 
     #[test]
-    fn apply_flow_stages_complete_marks_execute_self_review_complete_done_and_external_in_progress() {
+    fn apply_flow_stages_complete_marks_execute_self_review_complete_done_and_external_in_progress()
+    {
         let mut stages = BTreeMap::new();
         let updates = apply_flow_stages_for_event(
             &mut stages,
@@ -2587,7 +2601,10 @@ mod tests {
             ]
         );
         assert_eq!(stages["external-review"].status, "done");
-        assert_eq!(stages["external-review"].at.as_deref(), Some("2026-09-02T00:00:00Z"));
+        assert_eq!(
+            stages["external-review"].at.as_deref(),
+            Some("2026-09-02T00:00:00Z")
+        );
         assert_eq!(stages["remediate"].status, "in_progress");
         assert_no_hand_off_in_updates(&updates);
         assert_hand_off_pending(&stages);
@@ -2646,7 +2663,11 @@ mod tests {
                 at: Some("2026-09-01T00:00:00Z".to_string()),
             },
         );
-        let updates = apply_flow_stages_for_event(&mut stages, MilestoneEvent::Cancel, "2026-09-03T00:00:00Z");
+        let updates = apply_flow_stages_for_event(
+            &mut stages,
+            MilestoneEvent::Cancel,
+            "2026-09-03T00:00:00Z",
+        );
         // The 3 done stages must stay done; everything else must skip.
         for (slug, status) in &updates {
             assert_eq!(
@@ -2657,7 +2678,10 @@ mod tests {
         // Verify hand-off is absent from updates and not flipped in the map.
         assert_no_hand_off_in_updates(&updates);
         assert_hand_off_pending(&stages);
-        assert!(stages.get("hand-off").is_none(), "Cancel must not create hand-off entry");
+        assert!(
+            stages.get("hand-off").is_none(),
+            "Cancel must not create hand-off entry"
+        );
         // Verify done stages stayed done (Cancel must NOT clobber).
         assert_eq!(stages["draft"].status, "done");
         assert_eq!(stages["groom"].status, "done");
@@ -2692,11 +2716,7 @@ mod tests {
         ];
         for event in pass_through_events {
             let mut stages = BTreeMap::new();
-            let updates = apply_flow_stages_for_event(
-                &mut stages,
-                event,
-                "2026-09-01T00:00:00Z",
-            );
+            let updates = apply_flow_stages_for_event(&mut stages, event, "2026-09-01T00:00:00Z");
             assert!(
                 updates.is_empty(),
                 "event {event:?} must not auto-advance any stage; got {updates:?}"
@@ -2717,9 +2737,15 @@ mod tests {
         // can't accidentally switch to insert-only.
         let mut stages = BTreeMap::new();
         apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-01T00:00:00Z");
-        assert_eq!(stages["approve"].at.as_deref(), Some("2026-09-01T00:00:00Z"));
+        assert_eq!(
+            stages["approve"].at.as_deref(),
+            Some("2026-09-01T00:00:00Z")
+        );
         apply_flow_stages_for_event(&mut stages, MilestoneEvent::Approve, "2026-09-05T00:00:00Z");
-        assert_eq!(stages["approve"].at.as_deref(), Some("2026-09-05T00:00:00Z"));
+        assert_eq!(
+            stages["approve"].at.as_deref(),
+            Some("2026-09-05T00:00:00Z")
+        );
         assert_eq!(stages["approve"].status, "done");
     }
 
@@ -2761,9 +2787,7 @@ mod tests {
         assert_eq!(stages["self-review"].status, "done");
         assert_eq!(stages["complete"].status, "done");
         // Updates vec must NOT include external-review (it was a no-op).
-        let external_in_updates = updates
-            .iter()
-            .any(|(slug, _)| slug == "external-review");
+        let external_in_updates = updates.iter().any(|(slug, _)| slug == "external-review");
         assert!(
             !external_in_updates,
             "skipped override mutations must not appear in the updates audit; got {updates:?}"
@@ -2786,11 +2810,8 @@ mod tests {
         );
         // Start would normally flip execute from pending→in_progress.
         // With the skipped override, it must stay skipped.
-        let updates = apply_flow_stages_for_event(
-            &mut stages,
-            MilestoneEvent::Start,
-            "2026-09-02T00:00:00Z",
-        );
+        let updates =
+            apply_flow_stages_for_event(&mut stages, MilestoneEvent::Start, "2026-09-02T00:00:00Z");
         assert_eq!(
             stages["execute"].status, "skipped",
             "Start must not promote a skipped stage back to in_progress"

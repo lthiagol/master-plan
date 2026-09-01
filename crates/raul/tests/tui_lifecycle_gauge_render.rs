@@ -64,7 +64,7 @@ fn stage_cell_line_renders_n_over_twelve_and_label() {
     let p = Palette::default_palette();
     // Empty map → first pending stage is stage 1 (draft).
     let stages = stages_with(&[]);
-    let line = raul::tui::progress::stage_cell_line(&stages, &p);
+    let line = raul::tui::progress::stage_cell_line(&stages, p);
     let plain = stage_cell_plain(&stages);
     assert_eq!(
         plain, "1/12",
@@ -139,11 +139,11 @@ fn stage_cell_line_renders_n_over_twelve_and_label() {
 
 #[test]
 fn stage_column_shows_n_over_twelve_and_label() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
     use raul::tui::app::{App, Lane, MilestoneSummary};
     use raul::tui::render;
     use raul::tui::view_state;
-    use ratatui::backend::TestBackend;
-    use ratatui::Terminal;
 
     let mut app = App::new();
     let mut stages = BTreeMap::new();
@@ -197,11 +197,11 @@ fn stage_column_shows_n_over_twelve_and_label() {
 
 #[test]
 fn gauge_column_is_gone() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
     use raul::tui::app::{App, Lane, MilestoneSummary};
     use raul::tui::render;
     use raul::tui::view_state;
-    use ratatui::backend::TestBackend;
-    use ratatui::Terminal;
 
     let mut app = App::new();
     app.load_milestones(vec![MilestoneSummary {
@@ -253,11 +253,11 @@ fn gauge_column_is_gone() {
 
 #[test]
 fn lifecycle_text_column_is_gone() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
     use raul::tui::app::{App, Lane, MilestoneSummary};
     use raul::tui::render;
     use raul::tui::view_state;
-    use ratatui::backend::TestBackend;
-    use ratatui::Terminal;
 
     let mut app = App::new();
     app.load_milestones(vec![MilestoneSummary {
@@ -295,11 +295,11 @@ fn lifecycle_text_column_is_gone() {
 
 #[test]
 fn selected_row_highlight_stays() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
     use raul::tui::app::{App, Lane, MilestoneSummary};
     use raul::tui::render;
     use raul::tui::view_state;
-    use ratatui::backend::TestBackend;
-    use ratatui::Terminal;
 
     let mut app = App::new();
     app.load_milestones(vec![

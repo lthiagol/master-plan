@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use crossterm::event::KeyCode;
 
 use super::app::{App, InboxLine};
@@ -89,6 +87,8 @@ fn navigate_milestone_inbox_item(app: &mut App, item: &InboxLine) -> InboxNavFol
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::tui::app::ContentState;
     use crate::tui::app::MilestoneSummary;
@@ -142,7 +142,7 @@ mod tests {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         }]);
         let item = InboxLine {
             id: "86".into(),
@@ -174,7 +174,7 @@ mod tests {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         }]);
         let item = InboxLine {
             id: "91".into(),

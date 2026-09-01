@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use raul::tui::app::{App, ContentState, Lane};
+use std::collections::BTreeMap;
 
 #[test]
 fn new_app_starts_in_status_lane_with_list_content() {
@@ -83,7 +83,7 @@ fn enter_and_exit_milestone_detail() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
 
     app.enter_milestone_detail(Some(0));
@@ -110,7 +110,7 @@ fn drill_to_annotation_thread_and_back() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_thread();
@@ -138,7 +138,7 @@ fn review_menu_does_not_change_content_state() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_review_menu();

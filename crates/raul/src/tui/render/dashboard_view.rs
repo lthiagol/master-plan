@@ -263,11 +263,7 @@ fn render_lifecycle_grid_lines(app: &App, compact: bool) -> Vec<Line<'static>> {
         ("12/12 hand-off", "hand-off"),
     ];
     let counts = snap.mp_flow_stage_counts.as_ref();
-    let count_for = |slug: &str| -> u64 {
-        counts
-            .and_then(|c| c.get(slug).copied())
-            .unwrap_or(0)
-    };
+    let count_for = |slug: &str| -> u64 { counts.and_then(|c| c.get(slug).copied()).unwrap_or(0) };
     let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(Span::styled(
         "Lifecycle (current mp-flow stage)",

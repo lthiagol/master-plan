@@ -48,7 +48,7 @@ pub fn note_add(
             // failure or a non-complete lifecycle is a no-op. Hand-off
             // is intentionally not touched (AC-11).
             if let Some(ms_id) = milestone_id {
-                let _ = apply_document_done_hook(ctx, ms_id);
+                apply_document_done_hook(ctx, ms_id);
             }
             Ok(NoteAddReport {
                 ok: true,

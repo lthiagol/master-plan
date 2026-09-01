@@ -416,7 +416,10 @@ fn note_add_accepts_milestone_id() {
     let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(
         doc["milestone"]["flow_stages"].is_null()
-            || doc["milestone"]["flow_stages"].as_object().map(|o| o.is_empty()).unwrap_or(true),
+            || doc["milestone"]["flow_stages"]
+                .as_object()
+                .map(|o| o.is_empty())
+                .unwrap_or(true),
         "fresh milestone must have empty flow_stages"
     );
 

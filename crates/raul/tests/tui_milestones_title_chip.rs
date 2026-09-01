@@ -40,7 +40,7 @@ fn chip_all_and_filtered() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".into(),
@@ -53,7 +53,7 @@ fn chip_all_and_filtered() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);
@@ -147,9 +147,18 @@ fn stages_section_renders_twelve_rows() {
     );
     // Every 12 stage slugs must appear.
     for slug in [
-        "draft", "groom", "specify", "approve", "execute",
-        "self-review", "complete", "external-review", "remediate",
-        "re-review", "document", "hand-off",
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+        "external-review",
+        "remediate",
+        "re-review",
+        "document",
+        "hand-off",
     ] {
         assert!(
             flat.contains(slug),
@@ -220,10 +229,23 @@ fn stages_section_order_is_canonical() {
         }
         flat.push('\n');
     }
-    let slugs = ["draft", "groom", "specify", "approve", "execute", "self-review", "complete", "external-review", "remediate", "re-review", "document", "hand-off"];
+    let slugs = [
+        "draft",
+        "groom",
+        "specify",
+        "approve",
+        "execute",
+        "self-review",
+        "complete",
+        "external-review",
+        "remediate",
+        "re-review",
+        "document",
+        "hand-off",
+    ];
     let mut last_pos: Option<usize> = None;
     for slug in slugs {
-        let pos = flat.find(slug).expect(&format!("{slug} missing"));
+        let pos = flat.find(slug).unwrap_or_else(|| panic!("{slug} missing"));
         if let Some(p) = last_pos {
             assert!(
                 pos > p,
@@ -416,7 +438,10 @@ fn skipped_icon_for_cancelled_stages() {
         }
         flat.push('\n');
     }
-    assert!(flat.contains('⊘'), "cancelled milestone stages must show ⊘; got: {flat}");
+    assert!(
+        flat.contains('⊘'),
+        "cancelled milestone stages must show ⊘; got: {flat}"
+    );
 }
 
 #[test]

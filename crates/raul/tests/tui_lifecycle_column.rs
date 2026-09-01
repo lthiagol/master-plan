@@ -37,8 +37,9 @@ fn render_to_string(app: &App, width: u16, height: u16) -> String {
 }
 
 #[test]
-fn milestones_table_renders_lifecycle_column() {
-    // M185: Table has a Lifecycle column + Gauge column.
+fn milestones_table_renders_stage_column() {
+    // M202 S16: the table has a Stage column (`<N>/12 · <Label>`);
+    // the legacy 8-cell Gauge + Lifecycle text columns are gone.
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
     app.load_milestones(vec![MilestoneSummary {
@@ -52,21 +53,27 @@ fn milestones_table_renders_lifecycle_column() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
 
     let output = render_to_string(&app, 120, 30);
     assert!(
-        output.contains("Lifecycle"),
-        "Lifecycle column header missing; got:\n{output}"
+        output.contains("Stage"),
+        "Stage column header missing; got:\n{output}"
     );
     assert!(
-        output.contains("Gauge") || output.contains('▮'),
-        "gauge column missing; got:\n{output}"
+        !output.contains("Lifecycle"),
+        "legacy Lifecycle column must be gone; got:\n{output}"
     );
     assert!(
-        output.contains("in-progress"),
-        "rendered buffer missing lifecycle value; got:\n{output}"
+        !output.contains("Gauge") && !output.contains('▮'),
+        "legacy gauge column must be gone; got:\n{output}"
+    );
+    // Stage cell renders the ordinal + label for a fresh milestone
+    // (empty flow_stages → 1/12 · Define outcome).
+    assert!(
+        output.contains("1/12") && output.contains("Define outcome"),
+        "Stage cell must render 1/12 · Define outcome; got:\n{output}"
     );
 }
 
@@ -88,7 +95,7 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -136,7 +143,7 @@ fn since_cell_falls_back_to_since_updated_when_lifecycle_at_none() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -202,7 +209,7 @@ fn cancelled_milestone_renders_badge_in_title_column() {
         cancelled: true,
         cancelled_at: Some("2026-07-15T00:00:00Z".into()),
         cancel_reason: Some("Work shipped via M169-rev".into()),
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     };
     let cancelled_no_reason = MilestoneSummary {
         id: "175".into(),
@@ -215,7 +222,7 @@ fn cancelled_milestone_renders_badge_in_title_column() {
         cancelled: true,
         cancelled_at: Some("2026-07-15T00:00:00Z".into()),
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     };
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
@@ -263,7 +270,7 @@ fn non_cancelled_milestone_renders_no_cancellation_badge() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
@@ -385,16 +392,29 @@ fn grid_order_is_canonical_mp_flow() {
         flat.push('\n');
     }
     let labels = [
-        "1/12 draft", "2/12 groom", "3/12 specify", "4/12 approve",
-        "5/12 execute", "6/12 self-review", "7/12 complete",
-        "8/12 external-review", "9/12 remediate", "10/12 re-review",
-        "11/12 document", "12/12 hand-off",
+        "1/12 draft",
+        "2/12 groom",
+        "3/12 specify",
+        "4/12 approve",
+        "5/12 execute",
+        "6/12 self-review",
+        "7/12 complete",
+        "8/12 external-review",
+        "9/12 remediate",
+        "10/12 re-review",
+        "11/12 document",
+        "12/12 hand-off",
     ];
     let mut last: Option<usize> = None;
     for label in labels {
-        let pos = flat.find(label).expect(&format!("{label} missing"));
+        let pos = flat
+            .find(label)
+            .unwrap_or_else(|| panic!("{label} missing"));
         if let Some(p) = last {
-            assert!(pos > p, "{label} must come after the previous canonical stage");
+            assert!(
+                pos > p,
+                "{label} must come after the previous canonical stage"
+            );
         }
         last = Some(pos);
     }

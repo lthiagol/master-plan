@@ -56,7 +56,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".to_string(),
@@ -69,7 +69,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "03".to_string(),
@@ -82,7 +82,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-        flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::new(),
         },
     ]);
     app
@@ -185,18 +185,21 @@ fn view_state_lists_tabs() {
         !view.tab_hit_areas.is_empty(),
         "expected at least one tab hit area, got none"
     );
-    let lanes = Lane::ordered();
+    // M198: the tab bar renders the FILTERED lane list
+    // (`ordered_visible(app.show_watch_tab)` — Watch omitted when
+    // the flag is off). The hit areas must match the visible set.
+    let lanes = Lane::ordered_visible(app.show_watch_tab);
     assert_eq!(
         view.tab_hit_areas.len(),
         lanes.len(),
-        "wide mode should emit one hit area per Lane (got {} areas, {} lanes)",
+        "wide mode should emit one hit area per visible Lane (got {} areas, {} visible lanes)",
         view.tab_hit_areas.len(),
         lanes.len()
     );
     for (i, hit) in view.tab_hit_areas.iter().enumerate() {
         assert_eq!(
             hit.id, lanes[i],
-            "tab hit area {i} id must be Lane::ordered()[{i}] ({:?} vs {:?})",
+            "tab hit area {i} id must be ordered_visible()[{i}] ({:?} vs {:?})",
             hit.id, lanes[i]
         );
         assert!(
@@ -305,7 +308,9 @@ fn tab_click_hits_rendered_tab() {
     let app = milestones_app();
     let (buf, view) = render_to_buffer(&app, 100, 30);
 
-    let lanes = Lane::ordered();
+    // M198: hit areas use the FILTERED lane list (Watch omitted
+    // when `ui.show_watch_tab` is off).
+    let lanes = Lane::ordered_visible(app.show_watch_tab);
     for (i, hit) in view.tab_hit_areas.iter().enumerate() {
         assert_eq!(hit.id, lanes[i], "tab hit area {i} id mismatch");
 

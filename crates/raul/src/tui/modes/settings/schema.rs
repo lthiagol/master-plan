@@ -97,13 +97,13 @@ impl SettingsSchema {
 }
 
 /// M201: fetch the schema from `mp config schema` and parse it.
-/// `runner` is the standard `MpRunner`; the schema subcommand lives
-/// on `mp` itself (no `ral`-side knowledge required).
-pub fn fetch_schema(runner: &crate::mp_runner::MpRunner) -> Result<SettingsSchema, String> {
-    let raw = runner
-        .run_raw("config", &["schema"])
-        .map_err(|e| format!("mp config schema unavailable: {e}"))?;
-    SettingsSchema::from_json(&raw)
+/// Parse the raw `mp config schema` payload into a typed
+/// `SettingsSchema`. Pure — no subprocess, no `MpRunner`. The
+/// subprocess fetch lives in `tui::runner_helpers::fetch_settings_schema`
+/// (per-mode handlers must stay pure; the fetch happens once at
+/// lane-open in the runner layer).
+pub fn parse_schema(raw: &[u8]) -> Result<SettingsSchema, String> {
+    SettingsSchema::from_json(raw)
 }
 
 #[cfg(test)]

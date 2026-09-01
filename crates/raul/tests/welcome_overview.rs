@@ -1,6 +1,5 @@
 //! Welcome / plan overview lane (M89).
 
-use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::mp_runner::MpRunner;
@@ -11,6 +10,7 @@ use raul::tui::app::{
 use raul::tui::dashboard;
 use raul::tui::render;
 use raul::tui::view_state;
+use std::collections::BTreeMap;
 
 fn render_to_string(app: &App) -> String {
     // M183: footer is two rows (was one); keep enough height for the
@@ -294,6 +294,13 @@ fn welcome_render_shows_rollup_and_grouped_inbox() {
     app.overview.health.planning_state = "in-execution".into();
     app.overview.lifecycle.complete = 82;
     app.overview.lifecycle.approved = 3;
+    // M202 S20: the lifecycle grid now rolls up by mp-flow stage.
+    // Seed the per-stage counts so the grid shows the values this
+    // test pins (complete=82, approved=3 land on stages 7 and 4).
+    let mut flow_counts = std::collections::HashMap::new();
+    flow_counts.insert("complete".to_string(), 82u64);
+    flow_counts.insert("approve".to_string(), 3u64);
+    app.overview.mp_flow_stage_counts = Some(flow_counts);
     app.overview.queues.pending_reviews = 5;
     app.overview.totals.milestones = 88;
     app.overview.path = vec![raul::overview_snapshot::PathItem {
@@ -333,20 +340,24 @@ fn welcome_render_shows_rollup_and_grouped_inbox() {
     assert!(output.contains("Inbox"), "Inbox section");
     assert!(output.contains("Recent activity"), "Activity section");
     assert!(output.contains("autonomous"), "execution mode");
-    // M181: the typed snapshot drives the new lifecycle grid.
-    // complete=82, approved=3 → "complete ... 82" and "approved ... 3"
-    // rows appear in the rendered grid. The grid uses left-padded
-    // column names ({:<13}), so we look for the names + values as
-    // substrings rather than as a single contiguous string.
-    assert!(output.contains("complete"), "lifecycle complete name");
+    // M181 + M202 S20: the typed snapshot drives the new lifecycle
+    // grid, keyed by the 12 mp-flow stage buckets. complete=82 lands
+    // on the `7/12 complete` bucket, approved=3 on `4/12 approve`.
+    assert!(
+        output.contains("7/12 complete"),
+        "lifecycle complete bucket label"
+    );
     assert!(
         output.contains("82"),
         "lifecycle complete value (rendered somewhere in the grid)"
     );
-    assert!(output.contains("approved"), "lifecycle approved name");
+    assert!(
+        output.contains("4/12 approve"),
+        "lifecycle approve bucket label"
+    );
     assert!(
         output.contains(" 3 ") || output.contains("3\n") || output.contains("3│"),
-        "lifecycle approved value (3) rendered next to its label"
+        "lifecycle approve value (3) rendered next to its label"
     );
     // Suggested path preview carries the M180 supplied display
     // string (one of the 3..5 items).
@@ -425,7 +436,7 @@ fn navigate_from_inbox_milestone_enters_detail_when_found() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
-    flow_stages: BTreeMap::new(),
+        flow_stages: BTreeMap::new(),
     }]);
     let item = InboxLine {
         id: "86".into(),

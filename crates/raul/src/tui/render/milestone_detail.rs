@@ -30,9 +30,9 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
     // M173 S7: route lifecycle / spec_status / execution_status reads
     // through the shared helpers in `crate::tui::status`. Direct field
     // reads here would be a finding (AC-07).
-    let lifecycle = effective_lifecycle(m);
-    let legacy_spec = effective_spec_status(m);
-    let legacy_exec = effective_execution_status(m);
+    let _lifecycle = effective_lifecycle(m);
+    let _legacy_spec = effective_spec_status(m);
+    let _legacy_exec = effective_execution_status(m);
     let effort = m["effort"].as_str().unwrap_or("?");
     let risk = m["risk"].as_str().unwrap_or("?");
     let change_kind = m["change_kind"].as_str().unwrap_or("");
@@ -84,7 +84,8 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
     // (`<N>/12 · <Label>`). The Stage cell already carries position
     // so a separate badge would be redundant. Effort + Risk stay
     // on the same line for layout continuity.
-    let header_stage_map: std::collections::BTreeMap<String, String> = detail["milestone"]["flow_stages"]
+    let header_stage_map: std::collections::BTreeMap<String, String> = detail["milestone"]
+        ["flow_stages"]
         .as_object()
         .map(|obj| {
             obj.iter()
@@ -295,7 +296,10 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
                             lines: &mut Vec<Line>| {
         lines.push(Line::from(vec![
             Span::styled(format!("{icon}  "), icon_style),
-            Span::styled(format!("{slug:>3}"), Style::default().fg(palette.foreground)),
+            Span::styled(
+                format!("{slug:>3}"),
+                Style::default().fg(palette.foreground),
+            ),
             Span::styled(
                 format!("  {}  ", crate::tui::progress::mp_flow_stage_label(slug)),
                 Style::default().fg(palette.foreground),
@@ -320,15 +324,13 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
         let obj = flow_stages_obj.unwrap();
         for slug in crate::tui::progress::MP_FLOW_STAGE_KEYS {
             let entry = obj.get(*slug);
-            let (icon, status_text) = match entry
-                .and_then(|e| e.get("status"))
-                .and_then(|s| s.as_str())
-            {
-                Some("done") => ("✓", "done"),
-                Some("in_progress") => ("●", "in_progress"),
-                Some("skipped") => ("⊘", "skipped"),
-                _ => ("○", "pending"),
-            };
+            let (icon, status_text) =
+                match entry.and_then(|e| e.get("status")).and_then(|s| s.as_str()) {
+                    Some("done") => ("✓", "done"),
+                    Some("in_progress") => ("●", "in_progress"),
+                    Some("skipped") => ("⊘", "skipped"),
+                    _ => ("○", "pending"),
+                };
             let icon_style = match status_text {
                 "done" => Style::default().fg(palette.success),
                 "in_progress" => Style::default().fg(palette.accent),

@@ -7,7 +7,9 @@ use anyhow::{Context, Result};
 use serde_json::json;
 
 use crate::ac_verify;
-use crate::cli::{CriterionCmd, DesignDecisionCmd, MilestoneCmd, OutputFormat as Fmt, QuestionCmd, StageCmd};
+use crate::cli::{
+    CriterionCmd, DesignDecisionCmd, MilestoneCmd, OutputFormat as Fmt, QuestionCmd, StageCmd,
+};
 use crate::commands::challenge as cmd_challenge_mod;
 use crate::commands::common::{
     emit, emit_gate_failure, milestone_summary, prose_verification_warn, read_evidence,
@@ -1261,10 +1263,8 @@ fn handle_stage_cmd(ctx: &PlanContext, cmd: StageCmd, format: Fmt) -> Result<()>
                     .unwrap_or_else(|| ("pending".to_string(), "—".to_string()));
                 rows.push((slug.to_string(), status, at));
             }
-            let known: std::collections::HashSet<&str> = mp_model::MP_FLOW_STAGE_KEYS
-                .iter()
-                .copied()
-                .collect();
+            let known: std::collections::HashSet<&str> =
+                mp_model::MP_FLOW_STAGE_KEYS.iter().copied().collect();
             for (slug, stage) in &m.milestone.flow_stages {
                 if !known.contains(slug.as_str()) {
                     rows.push((
@@ -1294,10 +1294,7 @@ fn handle_stage_cmd(ctx: &PlanContext, cmd: StageCmd, format: Fmt) -> Result<()>
             match format {
                 Fmt::Json => emit(format, &value),
                 _ => {
-                    let header = format!(
-                        "{:<14} {:<12} {}",
-                        "STAGE", "STATUS", "AT"
-                    );
+                    let header = format!("{:<14} {:<12} {}", "STAGE", "STATUS", "AT");
                     let mut out = String::new();
                     out.push_str(&header);
                     out.push('\n');

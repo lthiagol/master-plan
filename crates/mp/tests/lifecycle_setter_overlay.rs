@@ -816,8 +816,7 @@ fn groom_marks_draft_and_groom_done() {
     );
     // AC-11 negative: hand-off must NOT auto-advance on any event.
     assert!(
-        flow.get("hand-off").is_none()
-            || flow["hand-off"]["status"] != "done",
+        flow.get("hand-off").is_none() || flow["hand-off"]["status"] != "done",
         "groom must never auto-advance hand-off; got: {}",
         flow.get("hand-off").cloned().unwrap_or_default()
     );
@@ -1183,8 +1182,7 @@ fn hand_off_only_advances_via_explicit_set() {
         .expect("flow_stages present after complete");
     let hand_off = flow.get("hand-off");
     assert!(
-        hand_off.is_none()
-            || hand_off.unwrap()["status"] != "done",
+        hand_off.is_none() || hand_off.unwrap()["status"] != "done",
         "hand-off must NOT auto-advance on complete; got: {hand_off:?}"
     );
 
@@ -1295,14 +1293,7 @@ fn explicit_stage_set_survives_subsequent_lifecycle_transition() {
     approve_and_start(&env, &id);
 
     // Step 1: explicit set on external-review → done.
-    let explicit = env.run(&[
-        "milestone",
-        "stage",
-        "set",
-        &id,
-        "external-review",
-        "done",
-    ]);
+    let explicit = env.run(&["milestone", "stage", "set", &id, "external-review", "done"]);
     assert!(
         explicit.status.success(),
         "stage set external-review done failed: {}",

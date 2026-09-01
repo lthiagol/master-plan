@@ -384,15 +384,16 @@ fn complete_marks_external_review_in_progress() {
     assert!(complete.status.success());
 
     let m = read_milestone(&env, &id);
-    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    let flow = m["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages map");
     // After complete: execute + self-review + complete all done;
     // external-review sits in_progress (the review queue).
     assert_eq!(flow["execute"]["status"], "done");
     assert_eq!(flow["self-review"]["status"], "done");
     assert_eq!(flow["complete"]["status"], "done");
     assert_eq!(
-        flow["external-review"]["status"],
-        "in_progress",
+        flow["external-review"]["status"], "in_progress",
         "complete must land external-review at in_progress (AC-19)"
     );
 }
@@ -425,10 +426,11 @@ fn reviews_pass_marks_external_review_done() {
     );
 
     let m = read_milestone(&env, &id);
-    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    let flow = m["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages map");
     assert_eq!(
-        flow["external-review"]["status"],
-        "done",
+        flow["external-review"]["status"], "done",
         "reviews pass --verdict ok must close external-review (AC-19)"
     );
     assert!(
@@ -497,17 +499,17 @@ fn enter_remediation_marks_external_review_done() {
 
     let m = read_milestone(&env, &id);
     assert_eq!(m["milestone"]["lifecycle"], "remediation");
-    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    let flow = m["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages map");
     // EnterRemediation: external-review closes (done), remediate opens
     // (in_progress).
     assert_eq!(
-        flow["external-review"]["status"],
-        "done",
+        flow["external-review"]["status"], "done",
         "EnterRemediation must close external-review (AC-19)"
     );
     assert_eq!(
-        flow["remediate"]["status"],
-        "in_progress",
+        flow["remediate"]["status"], "in_progress",
         "EnterRemediation must open remediate (S3 contract)"
     );
 }
@@ -559,11 +561,12 @@ fn reviews_pass_after_remediation_closes_re_review() {
     assert!(out.status.success());
 
     let m = read_milestone(&env, &id);
-    let flow = m["milestone"]["flow_stages"].as_object().expect("flow_stages map");
+    let flow = m["milestone"]["flow_stages"]
+        .as_object()
+        .expect("flow_stages map");
     assert_eq!(flow["external-review"]["status"], "done");
     assert_eq!(
-        flow["re-review"]["status"],
-        "done",
+        flow["re-review"]["status"], "done",
         "post-remediation pass must close re-review too (S4.1)"
     );
 }
@@ -639,8 +642,7 @@ fn note_add_after_complete_marks_document_done() {
         "AC-10: note add post-complete must flip flow_stages.document=done"
     );
     assert!(
-        flow["document"]["at"].is_string()
-            && !flow["document"]["at"].as_str().unwrap().is_empty(),
+        flow["document"]["at"].is_string() && !flow["document"]["at"].as_str().unwrap().is_empty(),
         "document.at must be set"
     );
     // Idempotency: a second note add must NOT advance the at timestamp.
