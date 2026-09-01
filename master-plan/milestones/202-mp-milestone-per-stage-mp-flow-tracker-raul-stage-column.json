@@ -147,8 +147,8 @@
       "id": "AC-13",
       "description": "raul Milestones list shows a Stage column with `<N>/12 · <Stage Label>` content (e.g. `5/12 · Claim & execute`). The 8-cell Gauge column is gone. The lifecycle text column is gone (the Stage cell carries position). Selected-row highlight still readable.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/stage_column_shows_n_over_twelve_and_label|gauge_column_is_gone|lifecycle_text_column_is_gone|selected_row_highlight_stays/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "stage_column_shows_n_over_twelve_and_label + gauge_column_is_gone + lifecycle_text_column_is_gone + selected_row_highlight_stays tests pass in tests/tui_lifecycle_gauge_render.rs"
     },
     {
       "id": "AC-14",
@@ -617,7 +617,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/parse_milestone_summaries_populates_flow_stages/)",
       "done_when": "parse_milestone_summaries_populates_flow_stages test passes; MilestoneSummary carries flow_stages",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-13"
       ],
@@ -637,7 +637,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/stage_cell_line_renders_n_over_twelve_and_label/)",
       "done_when": "stage_cell_line_renders_n_over_twelve_and_label test passes for all 13 reachable states (12 stages plus the after-hand-off sentinel)",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-13"
       ],
@@ -657,7 +657,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/stage_column_shows_n_over_twelve_and_label|gauge_column_is_gone|lifecycle_text_column_is_gone|selected_row_highlight_stays/)",
       "done_when": "All 4 named tests pass; the Milestones list no longer renders the gauge column or the lifecycle text column",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-13"
       ],

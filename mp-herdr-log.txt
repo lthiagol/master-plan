@@ -185,3 +185,199 @@ milestone" milestone. The matrix, the orchestrator verification
 discipline, the tightened reviewer prompt, and the `make clean`
 between milestones together form the working test pattern.
 
+
+---
+
+## 2026-09-01 — log purpose: design input for the new mp watch system
+
+This log is the **design input** for the future "Drive milestone" milestone
+that will replace the manual orchestration we've been doing in this test.
+It is not a story of what happened — it's a structured record of what
+the next system has to do, edge cases it must handle, and failure modes
+it must defend against.
+
+### What the future mp watch / Drive milestone MUST support
+
+(Each item is a hard requirement derived from this test's lessons.)
+
+#### 1. Topology parameter
+`mp watch` MUST accept `--topology 1-agent|2-agent-runner|2-agent-reviewer|2-agent-planner|3-agent` (or `--lanes planner,runner,reviewer`).
+- Default: 3-agent for full milestones, 1-agent for trivial/tracks.
+- Role-collapse allowed: orchestrator absorbs planner/runner/reviewer
+  roles as needed for resource-constrained runs.
+- Topology can change at runtime (user may add/remove panes via raul).
+
+#### 2. Cycle-count governance
+- Default: 2 cycles (review → fix → re-review → pass).
+- Soft cap: 3 cycles. Tightened reviewer prompt ("blockers only")
+  kicks in at cycle 2 (NOT cycle 3 — M201 showed cycle 2 was already
+  mostly passing; tightening earlier catches drift faster).
+- Hard limit: 4 cycles. After cycle 4, escalate regardless of pass/fail.
+- Lower topology = lower cycle budget (less independence = fewer
+  trust-cycles needed).
+
+#### 3. Decision matrix (post-review)
+```
+on review:
+  if cycle >= 4:                       escalate
+  if drift_ratio >= 0.8 and cycle >= 2: ship_with_backlog
+  if high severity or correctness-medium: cycle_next
+  if low_count >= 3:                   cycle_next (with tightened prompt)
+  if low_count <= 2:                   ship_with_backlog
+  else:                                cycle_next
+```
+
+#### 4. Lane notification contract (push-based)
+- Each lane notifies the orchestrator via `herdr agent prompt <ORCH_PANE_ID> "<role>: <summary>"`.
+- The command must execute as a SHELL COMMAND via the lane's bash tool
+  — NOT a printed message. Opencode agents interpret "notify the
+  orchestrator" as "print the message" by default; the prompt must
+  show the exact command.
+- Notification format: `<role>: cycle N done. Filed <count> findings:
+  <ids or none>. Pass: <yes|no>. Lifecycle: <state>.`
+
+#### 5. Orchestrator verification protocol (mandatory)
+Before accepting a lane's "done" notification, the orchestrator MUST
+verify state via:
+```
+state = mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status
+acts  = grep '"subject": "<id>"' master-plan/activity.json | tail -3
+assert state.lifecycle in {executed, complete}
+assert state.execution_status == "done"
+assert len(acts) > 0
+if any check fails: REJECT the report, send the lane back.
+```
+This catches the M201 cycle-1 fabricated notification bug.
+
+#### 6. Per-step discipline (runner contract)
+- The runner MUST call `mp milestone step done <id> <step>` for every step.
+- The orchestrator verifies this on completion; missing step-done
+  calls trigger either manual completion (orchestrator) or reject+resend.
+- Per-step status is part of the audit trail — skipping it breaks it.
+
+#### 7. AC verification regex semantics
+- `test(/.../)` matches test FUNCTION names.
+- `binary(/.../)` matches test BINARY names.
+- The nextest filter form must match what the AC claims to verify.
+- Verify with `cargo nextest list -E "..."` that the filter actually
+  matches something. A regex that matches 0 tests is a silent pass.
+- This was the F-06 of M200 regression (broken regex masked 14+ M198-era
+  failures).
+
+#### 8. mp verify executor constraints
+- Rejects `&&`, `;`, and newlines in AC verification fields.
+- Each line in a verification field must be a self-contained command.
+- `--skip-verify` is debt, not a shortcut. Use it only as last resort
+  and document why in commit message.
+- The future Drive milestone SHOULD fix the verifier to handle `&&`
+  chains (split AC-06 verification into a single cargo nextest
+  invocation that covers both crates — see M200 F-04 fix).
+
+#### 9. Build-cleanliness discipline
+- `make clean` before each review cycle that involves validation.
+  Removes stale cargo artifacts that can mask source-level regressions.
+- 28.8 GiB / 772k files took ~30s to clean in M201 cycle 3.
+- Cold build after clean: ~10 min for raul + mp test binaries.
+- Establish as a routine: every milestone cycle starts with a clean build.
+
+#### 10. Per-AC evidence discipline
+- Evidence must be a per-AC command + exit code + test count, NOT a
+  generic string.
+- Cycle 1 of M200 had `evidence: "All 5 reviewer findings (F-01..F-05)
+  resolved. All 6 AC verifications + 8 step tests pass honestly
+  without --skip-verify."` — useless for reproduction.
+- Future skill template: per-AC evidence MUST include the actual
+  command, exit code, and pass count.
+
+#### 11. Reviewer contract
+- Reviewer does NOT edit crates/. Writes limited to `mp reviews *`.
+- Reviewer activation: by orchestrator prompt (not lifecycle gate).
+  This avoids the M200 problem of the milestone being approved but
+  not done, blocking the gate.
+- Reviewer response: same notification contract as runner.
+
+#### 12. TUI caveat (from M201 ID-01/ID-11 incident)
+- `mp idea create --body @file` stores the body as a path reference
+  (TUI doesn't render those — the idea is invisible in the TUI tab).
+- Use `--body "$(cat file)"` for inline storage.
+- Future: file as TUI bug.
+
+#### 13. Lifecycle state model (M196)
+- States: approved → in-progress → executed → complete (with
+  remediation as a side-state from open findings).
+- `mp milestone complete` → `executed` (terminal from executor side).
+- `mp reviews pass --verdict ok` → `complete` (terminal).
+- `executed` does NOT auto-promote to `complete`. The reviewer pass is
+  required for the final transition.
+- `lifecycle=executed` is the M196 terminal state, replacing the older
+  `lifecycle=done`. Code that gates on `lifecycle=done` will break.
+
+#### 14. herdr integration quirks
+- `herdr pane read` defaults to `--source recent` which returns EMPTY.
+  Always pass `--source visible` to see current screen.
+- `herdr agent prompt --wait --until idle` matches the FIRST observed
+  turn boundary after submission. Doesn't distinguish "did nothing"
+  from "finished". For multi-turn, use `--until working` first.
+- The opencode bridge never reports `agent_status=done` reliably
+  (M149 review finding). Use `mp show milestone` lifecycle polling,
+  NOT herdr agent status, for completion gating.
+- `target/debug/mp` is the freshly built binary; `/opt/homebrew/bin/mp`
+  is the installed (possibly stale) one. For source-level fixes,
+  rebuild and use target/debug/mp or `make install` first.
+
+#### 15. Log file fragility
+- mp-herdr-log.txt at the repo root has been truncated multiple times
+  during this test (cause unknown; not pursued).
+- Substantive test state lives in git + plan.json + activity.json, not
+  in this narrative log.
+- The future Drive milestone should:
+  (a) Move the orchestration log INTO master-plan/ as a structured
+      record (probably under reviews/ or as a new orchestrator_log.json).
+  (b) Use git commits to preserve history (commit log entries
+      alongside milestones).
+  (c) Surface log entries via `mp` commands so they're discoverable
+      from the plan zone.
+
+### What this test did NOT validate
+
+(These are gaps in our knowledge for the future redesign.)
+
+- **raul UX layer.** The whole test was opencode-driven, not raul-driven.
+  The Drive milestone must build the "Drive" button + topology chooser
+  + status view + pause/cancel/steer controls. No design work yet.
+- **Planner lane.** The planner role was used briefly (M200 cycle 0)
+  and dropped. We never tested spec-grill from a separate lane.
+- **Concurrent milestones.** We drove M200, M201, M202 sequentially.
+  No test of multiple milestones in parallel.
+- **`mp watch` integration.** `mp watch M200` was never run. We
+  hand-rolled the orchestration instead. The future milestone needs
+  to actually USE `mp watch` (or its successor).
+- **Failure recovery.** We didn't test pause/cancel/steer from raul.
+- **Production binary path.** We used `target/debug/mp` after cycle 3
+  of M201 because the installed binary was stale. Production needs
+  to handle this cleanly.
+
+### Migration plan: log → master-plan/
+
+The current mp-herdr-log.txt is fragile. The future Drive milestone
+should include:
+
+1. Define an `orchestration_log.json` schema (or use reviews/challenges/<id>.json).
+2. Every orchestrator event (cycle start/end, finding filed/resolved,
+   state transition, decision made) gets an entry there.
+3. The log is queryable via `mp orchestration log M200` (or similar).
+4. The log is git-tracked so it survives truncations.
+
+For NOW (until the future milestone lands):
+- The current mp-herdr-log.txt is the best we have. It's incomplete
+  (truncation events) but covers the major lessons.
+- Keep appending after every meaningful cycle.
+- If a milestone's lessons are critical, ALSO write them to
+  master-plan/decisions.json or similar for durability.
+
+
+## Tab cleanup
+
+- Closed w12:t6 (orchestration-test, M200 panes) — M200 complete
+- Closed w12:t7 (orchestration-test-201, M201 panes) — M201 complete
+- w12:t9 (orchestration-test-202) stays alive — M202 in flight

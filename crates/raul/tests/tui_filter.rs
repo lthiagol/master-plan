@@ -1,4 +1,5 @@
 use raul::tui::app::{App, BacklogLine, ContentState, Lane, MilestoneSummary};
+use std::collections::BTreeMap;
 
 fn milestones() -> Vec<MilestoneSummary> {
     vec![
@@ -13,6 +14,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".into(),
@@ -25,6 +27,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "03".into(),
@@ -37,6 +40,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "04".into(),
@@ -49,6 +53,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]
 }

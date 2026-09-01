@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crossterm::event::KeyCode;
 
 use super::app::{App, InboxLine};
@@ -140,6 +142,7 @@ mod tests {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         }]);
         let item = InboxLine {
             id: "86".into(),
@@ -171,6 +174,7 @@ mod tests {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         }]);
         let item = InboxLine {
             id: "91".into(),

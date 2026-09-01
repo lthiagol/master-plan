@@ -4,6 +4,7 @@ use raul::mp_runner::MpRunner;
 use raul::tui::action::{apply_action, Action};
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::mode::Mode;
+use std::collections::BTreeMap;
 
 fn ms(id: &str, title: &str) -> MilestoneSummary {
     MilestoneSummary {
@@ -17,6 +18,7 @@ fn ms(id: &str, title: &str) -> MilestoneSummary {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+        flow_stages: BTreeMap::new(),
     }
 }
 

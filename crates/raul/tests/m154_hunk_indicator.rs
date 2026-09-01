@@ -13,6 +13,7 @@
 //! the renderer; the test asserts that the chip's presence /
 //! absence is gated on this single boolean.
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
@@ -126,6 +127,7 @@ fn milestone_detail_hunk_indicator_when_review_hunk_enabled() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.review_hunk_enabled = true;
     load_detail(&mut app, detail_with_findings(findings_fixture()));
@@ -156,6 +158,7 @@ fn milestone_detail_hunk_indicator_hidden_when_review_hunk_disabled() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     // Explicit: do NOT enable hunk.
     app.review_hunk_enabled = false;
@@ -197,6 +200,7 @@ fn milestone_detail_hunk_indicator_counts_only_anchored_findings() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.review_hunk_enabled = true;
     let all_unanchored = serde_json::json!([

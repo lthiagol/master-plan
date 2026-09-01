@@ -9,6 +9,7 @@ use raul::tui::app::{App, BacklogLine, Lane, SortKey};
 use raul::tui::modes;
 use raul::tui::render;
 use raul::tui::view_state;
+use std::collections::BTreeMap;
 
 fn ms(id: &str, title: &str) -> raul::tui::app::MilestoneSummary {
     raul::tui::app::MilestoneSummary {
@@ -22,6 +23,7 @@ fn ms(id: &str, title: &str) -> raul::tui::app::MilestoneSummary {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+        flow_stages: BTreeMap::new(),
     }
 }
 

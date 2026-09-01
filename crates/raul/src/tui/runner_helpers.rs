@@ -1,6 +1,8 @@
 //! Data-loading and subprocess side-effect helpers shared by the action reducer,
 //! mode handlers, and integration tests.
 
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 
 use crate::mp_runner::MpRunner;
@@ -211,6 +213,26 @@ fn parse_milestone_summaries(data: &serde_json::Value) -> Vec<MilestoneSummary> 
                     cancelled: m["cancelled"].as_bool().unwrap_or(false),
                     cancelled_at: m["cancelled_at"].as_str().map(String::from),
                     cancel_reason: m["cancel_reason"].as_str().map(String::from),
+                    // M202 S14: parse the 12-stage mp-flow timeline
+                    // out of the projection. We keep only the
+                    // status string (not the `at` timestamp) — the
+                    // lane view only needs status to render the
+                    // Stage cell. Pre-M202 milestones emit `{}`
+                    // here (the list projection always emits the
+                    // key, even when the underlying map is empty).
+                    flow_stages: m["flow_stages"]
+                        .as_object()
+                        .map(|obj| {
+                            obj.iter()
+                                .filter_map(|(slug, stage)| {
+                                    stage
+                                        .get("status")
+                                        .and_then(|s| s.as_str())
+                                        .map(|s| (slug.clone(), s.to_string()))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 })
                 .collect()
         })
@@ -957,4 +979,81 @@ fn find_verify_ac_payload_in_stream(stream: &[u8]) -> Option<serde_json::Value> 
         .split(|byte| *byte == b'\n')
         .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line.trim_ascii()).ok())
         .find(|value| value.get("acs").and_then(|acs| acs.as_array()).is_some())
+}
+
+#[cfg(test)]
+mod tests {
+    //! M202 unit tests. The `parse_milestone_summaries` helper is
+    //! the single chokepoint for converting `mp list milestones`
+    //! JSON rows into `MilestoneSummary` values; its flow_stages
+    //! parsing pin lives here so a regression in the helper is
+    //! caught by the model-side test instead of by the lane
+    //! renderer's surface.
+    use super::parse_milestone_summaries;
+    use std::collections::BTreeMap;
+
+    fn payload_with(milestone: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({ "milestones": [milestone] })
+    }
+
+    #[test]
+    fn parse_milestone_summaries_populates_flow_stages() {
+        let payload = payload_with(serde_json::json!({
+            "id": "01",
+            "title": "Sample",
+            "lifecycle": "complete",
+            "lifecycle_at": "2026-09-01T00:00:00Z",
+            "depends_on": [],
+            "priority": "normal",
+            "updated": "2026-09-01",
+            "cancelled": false,
+            "cancelled_at": null,
+            "cancel_reason": null,
+            "flow_stages": {
+                "draft": {"status": "done", "at": "2026-08-01T00:00:00Z"},
+                "groom": {"status": "done", "at": "2026-08-02T00:00:00Z"},
+                "specify": {"status": "done", "at": "2026-08-03T00:00:00Z"},
+                "approve": {"status": "done", "at": "2026-08-04T00:00:00Z"},
+                "execute": {"status": "done", "at": "2026-08-05T00:00:00Z"},
+                "self-review": {"status": "done", "at": "2026-08-06T00:00:00Z"},
+                "complete": {"status": "done", "at": "2026-08-07T00:00:00Z"},
+                "external-review": {"status": "in_progress", "at": "2026-08-08T00:00:00Z"}
+            }
+        }));
+        let summaries = parse_milestone_summaries(&payload);
+        assert_eq!(summaries.len(), 1);
+        let flow = &summaries[0].flow_stages;
+        // Every canonical stage slug from the projection must be
+        // present as a status string.
+        assert_eq!(flow.len(), 8, "got: {flow:?}");
+        assert_eq!(flow.get("draft").map(String::as_str), Some("done"));
+        assert_eq!(flow.get("external-review").map(String::as_str), Some("in_progress"));
+        // Hand-off is absent from the on-disk payload — the parser
+        // must not invent it.
+        assert!(flow.get("hand-off").is_none());
+    }
+
+    #[test]
+    fn parse_milestone_summaries_treats_empty_flow_stages_as_empty_map() {
+        // Pre-M202 fixtures always emit `flow_stages: {}`. The
+        // helper must return an empty BTreeMap (the default) so the
+        // lane renderer falls back to `pending` for every stage.
+        let payload = payload_with(serde_json::json!({
+            "id": "01",
+            "title": "Legacy pre-M202",
+            "lifecycle": "complete",
+            "lifecycle_at": null,
+            "depends_on": [],
+            "priority": "normal",
+            "updated": "2026-06-01",
+            "cancelled": false,
+            "cancelled_at": null,
+            "cancel_reason": null,
+            "flow_stages": {}
+        }));
+        let summaries = parse_milestone_summaries(&payload);
+        assert_eq!(summaries.len(), 1);
+        let expected: BTreeMap<String, String> = BTreeMap::new();
+        assert_eq!(summaries[0].flow_stages, expected);
+    }
 }

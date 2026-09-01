@@ -8,6 +8,7 @@
 //! re-pins the AC contracts against the current code so `mp validate`
 //! passes and the M54 evidence strings remain accurate.
 
+use std::collections::BTreeMap;
 use raul::config::{color_enabled, set_color_enabled};
 use raul::theme::{Palette, ALL};
 
@@ -73,6 +74,7 @@ fn m54_ac03_terminal_width_drives_list_columns() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     for width in [80, 120, 160] {
         let backend = TestBackend::new(width, 30);
@@ -184,6 +186,7 @@ fn m54_ac09_milestone_detail_renders_lifecycle_palette() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({

@@ -8,6 +8,7 @@
 //! stream. None of them shell out to `mp`, so the suite stays hermetic
 //! even on machines without the `mp` binary installed.
 
+use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::thread;
@@ -137,6 +138,7 @@ fn app_with_n_milestones(n: usize) -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         })
         .collect();
     app.load_milestones(milestones);

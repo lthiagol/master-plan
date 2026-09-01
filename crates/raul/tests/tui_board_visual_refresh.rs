@@ -15,6 +15,7 @@
 //! dispatch is gated on a future milestone that adds a `show_board`
 //! user toggle).
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::tui::app::{App, Lane, MilestoneSummary};
@@ -53,6 +54,7 @@ fn sample_milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".into(),
@@ -65,6 +67,7 @@ fn sample_milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "03".into(),
@@ -77,6 +80,7 @@ fn sample_milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "04".into(),
@@ -89,6 +93,7 @@ fn sample_milestones() -> Vec<MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]
 }

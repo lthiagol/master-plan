@@ -7,6 +7,7 @@ use raul::tui::action::{apply_action, Action};
 use raul::tui::app::{App, BacklogLine, Lane, SortKey};
 use raul::tui::render;
 use raul::tui::view_state;
+use std::collections::BTreeMap;
 
 fn bl(id: &str, title: &str, priority: &str, status: &str) -> BacklogLine {
     BacklogLine {
@@ -116,6 +117,7 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.select_lane(Lane::Milestones);
     app.lane_sort_key

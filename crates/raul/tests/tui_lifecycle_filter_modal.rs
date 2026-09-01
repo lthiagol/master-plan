@@ -6,6 +6,7 @@ use raul::tui::action::{apply_action, Action};
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::mode::Mode;
 use raul::tui::modes;
+use std::collections::BTreeMap;
 
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::empty())
@@ -28,6 +29,7 @@ fn seed(app: &mut App) {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".into(),
@@ -40,6 +42,7 @@ fn seed(app: &mut App) {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "03".into(),
@@ -52,6 +55,7 @@ fn seed(app: &mut App) {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     app.select_lane(Lane::Milestones);

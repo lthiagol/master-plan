@@ -1,6 +1,7 @@
 //! M186 AC-02: substring match (case-insensitive) on id + title.
 
 use raul::tui::app::{App, Lane, MilestoneSummary};
+use std::collections::BTreeMap;
 
 fn ms(id: &str, title: &str) -> MilestoneSummary {
     MilestoneSummary {
@@ -14,6 +15,7 @@ fn ms(id: &str, title: &str) -> MilestoneSummary {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+        flow_stages: BTreeMap::new(),
     }
 }
 

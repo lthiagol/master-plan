@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::cell::Cell;
+use std::collections::BTreeMap;
 
 use ratatui::text::Line;
 
@@ -406,6 +407,16 @@ pub struct MilestoneSummary {
     /// `None` for milestones that were never cancelled or predate
     /// the audit fields.
     pub cancel_reason: Option<String>,
+    /// M202: per-stage status of the 12-stage mp-flow timeline.
+    /// Keyed by stage slug (`draft`, `groom`, …, `hand-off`); values
+    /// are the status string (`done`, `in_progress`, `pending`,
+    /// `skipped`). Carries only the status (not the `at` timestamp)
+    /// because the lane view only needs the status to render the
+    /// Stage cell. Pre-M202 milestones parse as an empty map (the
+    /// `mp list milestones` projection emits `{}` for them); the
+    /// `stage_cell_line` helper treats empty / missing entries as
+    /// `pending` (the stage hasn't fired yet).
+    pub flow_stages: BTreeMap<String, String>,
 }
 
 impl MilestoneSummary {
@@ -430,6 +441,7 @@ impl MilestoneSummary {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+            flow_stages: BTreeMap::new(),
         }
     }
 }
@@ -1936,6 +1948,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1948,6 +1961,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1960,6 +1974,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
         ]
     }

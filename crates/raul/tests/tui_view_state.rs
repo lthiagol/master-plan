@@ -15,6 +15,7 @@
 //! AC-05 (regression: `cargo test -p raul` exits 0) is verified by S6
 //! running the full suite.
 
+use std::collections::BTreeMap;
 use std::fs;
 
 use ratatui::backend::TestBackend;
@@ -55,6 +56,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "02".to_string(),
@@ -67,6 +69,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "03".to_string(),
@@ -79,6 +82,7 @@ fn milestones_app() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     app

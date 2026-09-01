@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use raul::tui::app::{App, ContentState, Lane};
 
 fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
@@ -13,6 +14,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "02".to_string(),
@@ -25,6 +27,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "03".to_string(),
@@ -37,6 +40,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]
 }

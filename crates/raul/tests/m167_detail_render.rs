@@ -15,6 +15,7 @@
 //!   AC-33 delta_section_only_when_change_kind_delta
 //!   AC-35 empty_sections_omit_headers_and_placeholders
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
@@ -95,6 +96,7 @@ fn meta_subblock_all_fields_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     load_detail(&mut app, base_detail());
     let s = render_full(&app, 160, 60);
@@ -128,6 +130,7 @@ fn cancelled_deferred_overlays_render_only_when_set() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["milestone"]["cancelled"] = serde_json::json!(true);
@@ -157,6 +160,7 @@ fn design_decisions_section_visible_when_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["design_decisions"] = serde_json::json!([
@@ -190,6 +194,7 @@ fn open_questions_section_visible_when_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["open_questions"] = serde_json::json!([
@@ -220,6 +225,7 @@ fn work_packages_visible_when_present_and_steps_flat() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["work_packages"] = serde_json::json!([
@@ -264,6 +270,7 @@ fn acceptance_criteria_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["acceptance_criteria"] = serde_json::json!([
@@ -300,6 +307,7 @@ fn steps_section_progress_bar_and_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["steps"] = serde_json::json!([
@@ -337,6 +345,7 @@ fn findings_open_first_by_severity_two_line_per_item() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["findings"] = serde_json::json!([
@@ -372,6 +381,7 @@ fn verification_section_only_when_field_set() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["verification"] = serde_json::json!({
@@ -413,6 +423,7 @@ fn delta_section_only_when_change_kind_delta() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["milestone"]["change_kind"] = serde_json::json!("delta");
@@ -466,6 +477,7 @@ fn finding_severity_bars_render_with_counts_when_mixed() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let mut j = base_detail();
     j["findings"] = serde_json::json!([

@@ -283,26 +283,32 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
         .fg(app.effective_palette().accent)
         .add_modifier(Modifier::BOLD);
     let active_sort = app.lane_sort_key(app.active_lane);
+    // M202: replace the 8-cell Gauge + Lifecycle pair with the
+    // single Stage column (`<N>/12 · <Label>`). The Stage cell
+    // carries position (the ordinal) and label together, so the
+    // Lifecycle text column is gone (AC-13: the Stage cell already
+    // carries position).
     let header = Row::new(vec![
         Cell::new(Span::styled(String::new(), header_style)),
         header_cell("ID", active_sort == SortKey::Id, header_style),
         header_cell("Title", active_sort == SortKey::Title, header_style),
         header_cell("Pri", active_sort == SortKey::Priority, header_style),
-        header_cell("Gauge", false, header_style),
-        header_cell("Lifecycle", active_sort == SortKey::Lifecycle, header_style),
+        header_cell("Stage", false, header_style),
         header_cell("Since", active_sort == SortKey::Updated, header_style),
     ])
     .style(header_style)
     .height(1);
 
+    // M202: column widths rebalanced around the Stage cell.
+    // Stage needs room for `12/12 · Hand-off` (longest label) so
+    // bump it from the legacy 8-cell gauge (GAUGE_W=8) to 24 cells.
     const INDENT_W: u16 = 4;
     const ID_W: u16 = 6;
     const PRI_W: u16 = 8;
-    const GAUGE_W: u16 = 8;
-    const LIFECYCLE_W: u16 = 12;
+    const STAGE_W: u16 = 24;
     const SINCE_W: u16 = 12;
     const COL_SPACING: u16 = 1;
-    let fixed = INDENT_W + ID_W + PRI_W + GAUGE_W + LIFECYCLE_W + SINCE_W + COL_SPACING * 6;
+    let fixed = INDENT_W + ID_W + PRI_W + STAGE_W + SINCE_W + COL_SPACING * 5;
     let title_w = area.width.saturating_sub(2).saturating_sub(fixed).max(8) as usize;
 
     let depths = depends_on_depths(&visible);
@@ -344,18 +350,18 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
             .as_deref()
             .map(crate::tui::humanize::humanize_relative)
             .unwrap_or_else(|| "since updated".to_string());
-        let gauge = progress::lifecycle_gauge_line(&m.lifecycle, app.effective_palette());
+        // M202: Stage cell replaces the 8-cell Gauge + Lifecycle
+        // text pair. Render `<N>/12 · <Label>` for this milestone's
+        // current mp-flow stage (derived from flow_stages via the
+        // canonical-order helper).
+        let stage = progress::stage_cell_line(&m.flow_stages, app.effective_palette());
 
         rows.push(Row::new(vec![
             Cell::from(indent),
             Cell::from(format!("M{}", m.id)),
             Cell::from(Span::styled(title, title_style)),
             Cell::from(Span::styled(priority, priority_style(&m.priority, app))),
-            Cell::from(gauge),
-            Cell::from(Span::styled(
-                m.lifecycle.clone(),
-                Style::default().fg(row_color),
-            )),
+            Cell::from(stage),
             Cell::from(Span::styled(since, Style::default().fg(row_color))),
         ]));
     }
@@ -365,8 +371,7 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
         Constraint::Length(ID_W),
         Constraint::Fill(1),
         Constraint::Length(PRI_W),
-        Constraint::Length(GAUGE_W),
-        Constraint::Length(LIFECYCLE_W),
+        Constraint::Length(STAGE_W),
         Constraint::Length(SINCE_W),
     ];
 

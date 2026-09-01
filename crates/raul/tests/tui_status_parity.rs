@@ -16,6 +16,7 @@ use raul::tui::render;
 use raul::tui::status::{effective_execution_status, effective_lifecycle, effective_spec_status};
 use raul::tui::view_state;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 #[test]
 fn legacy_matrix_delegates_to_mp_model() {
@@ -77,6 +78,7 @@ fn render_with_detail(detail: &Value) -> String {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(detail.clone());

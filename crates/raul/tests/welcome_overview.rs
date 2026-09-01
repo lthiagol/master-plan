@@ -1,5 +1,6 @@
 //! Welcome / plan overview lane (M89).
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::mp_runner::MpRunner;
@@ -424,6 +425,7 @@ fn navigate_from_inbox_milestone_enters_detail_when_found() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let item = InboxLine {
         id: "86".into(),

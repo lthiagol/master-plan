@@ -6,6 +6,7 @@ use ratatui::Terminal;
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::render;
 use raul::tui::view_state;
+use std::collections::BTreeMap;
 
 fn ms(id: &str) -> MilestoneSummary {
     MilestoneSummary {
@@ -19,6 +20,7 @@ fn ms(id: &str) -> MilestoneSummary {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+        flow_stages: BTreeMap::new(),
     }
 }
 

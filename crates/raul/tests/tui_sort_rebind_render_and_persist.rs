@@ -14,6 +14,7 @@
 //! - The sort-rebind choice survives a "restart" — i.e. loading from
 //!   config.json produces the same in-memory state.
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::tui::app::{App, Lane, MilestoneSummary, SortKey};
@@ -34,6 +35,7 @@ fn make_app_with_milestones() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -46,6 +48,7 @@ fn make_app_with_milestones() -> App {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     app
@@ -120,6 +123,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -132,6 +136,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     // Same priority → numeric-id tie-breaker → M01 < M02 still.
@@ -156,6 +161,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -168,6 +174,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     let _visible = app.visible_milestones();
@@ -254,6 +261,7 @@ fn m182_s5_choice_survives_simulated_restart() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -266,6 +274,7 @@ fn m182_s5_choice_survives_simulated_restart() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     let output = render_milestones_lane_to_string(&app_session2);

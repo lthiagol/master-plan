@@ -8,6 +8,8 @@
 //!     Pre-M172 the per-row color carrier fed the Table; post-M172
 //!     the id span carries the lifecycle color.
 
+use std::collections::BTreeMap;
+
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::tui::app::{App, Lane, MilestoneSummary};
@@ -50,6 +52,7 @@ fn milestones_table_renders_lifecycle_column() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
 
     let output = render_to_string(&app, 120, 30);
@@ -85,6 +88,7 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -132,6 +136,7 @@ fn since_cell_falls_back_to_since_updated_when_lifecycle_at_none() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.load_milestone_detail(serde_json::json!({
@@ -197,6 +202,7 @@ fn cancelled_milestone_renders_badge_in_title_column() {
         cancelled: true,
         cancelled_at: Some("2026-07-15T00:00:00Z".into()),
         cancel_reason: Some("Work shipped via M169-rev".into()),
+    flow_stages: BTreeMap::new(),
     };
     let cancelled_no_reason = MilestoneSummary {
         id: "175".into(),
@@ -209,6 +215,7 @@ fn cancelled_milestone_renders_badge_in_title_column() {
         cancelled: true,
         cancelled_at: Some("2026-07-15T00:00:00Z".into()),
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     };
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
@@ -256,6 +263,7 @@ fn non_cancelled_milestone_renders_no_cancellation_badge() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;

@@ -8,6 +8,7 @@
 //!   * S19: Help / Settings / Edit-field overlays render without
 //!     `bg(Color::DarkGray)` and without `BorderType::Double`.
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
@@ -56,6 +57,7 @@ fn lane_tab_bar_uses_ratatui_tabs_widget() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     // Use width=120 to ensure the bar uses full labels (not compact).
     let s = render_full(&app, 120, 24);
@@ -92,6 +94,7 @@ fn list_highlight_style_sole_painter_in_settings_review_annotation() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     // Manually set the active mode to ReviewMenu and check the
     // chrome (the test doesn't try to drive the dispatcher). The
@@ -132,6 +135,7 @@ fn table_highlight_style_sole_painter_in_milestones_backlog() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     // The render must not panic.
     let _ = render_full(&app, 120, 24);
@@ -154,6 +158,7 @@ fn help_settings_drop_floating_chrome() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     // Open Help and confirm it renders with plain border.
     app.active_mode = raul::tui::mode::Mode::Help;

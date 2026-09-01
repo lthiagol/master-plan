@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::tui::app::App;
@@ -44,6 +46,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "02".to_string(),
@@ -56,6 +59,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "03".to_string(),
@@ -68,6 +72,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]
 }

@@ -24,6 +24,7 @@
 //! unit test there that drives a real track click through
 //! `handle_mouse`.
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -122,6 +123,7 @@ fn ac01_view_state_reserves_gutter_on_milestones_list() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         });
     }
     app.load_milestones(ms);
@@ -177,6 +179,7 @@ fn ac01_view_state_reserves_gutter_on_detail_screens() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         });
     }
     app.load_milestones(ms);
@@ -210,6 +213,7 @@ fn ac01_view_state_reserves_gutter_on_annotation_thread() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         });
     }
     app.load_milestones(ms);
@@ -276,6 +280,7 @@ fn ac01_list_item_width_excludes_gutter() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         })
         .collect();
     app.load_milestones(ms);
@@ -527,6 +532,7 @@ fn integration_milestones_scroll_updates_scroll_rect() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         })
         .collect();
     app.load_milestones(ms);

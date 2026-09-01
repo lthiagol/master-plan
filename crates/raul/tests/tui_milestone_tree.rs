@@ -3,6 +3,7 @@
 
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::render::lane_lists::depends_on_depths;
+use std::collections::BTreeMap;
 
 fn ms(id: &str, deps: &[&str]) -> MilestoneSummary {
     MilestoneSummary {
@@ -16,6 +17,7 @@ fn ms(id: &str, deps: &[&str]) -> MilestoneSummary {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+        flow_stages: BTreeMap::new(),
     }
 }
 

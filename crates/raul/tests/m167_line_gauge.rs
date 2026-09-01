@@ -8,6 +8,7 @@ use ratatui::Terminal;
 use raul::tui::app::{App, Lane, MilestoneSummary};
 use raul::tui::render;
 use raul::tui::view_state;
+use std::collections::BTreeMap;
 
 fn render_full(app: &App, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
@@ -43,6 +44,7 @@ fn base_app() -> App {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.load_milestone_detail(serde_json::json!({
         "milestone": {

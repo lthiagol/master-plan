@@ -8,6 +8,7 @@
 //!   - Content still fills the area below the tab bar.
 //!   - At narrow widths the bar uses `Lane::compact_label()`.
 
+use std::collections::BTreeMap;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use raul::tui::app::{App, Lane};
@@ -707,6 +708,7 @@ fn s8_milestone_list_drill_opens_milestone_detail() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     assert_eq!(app.content, ContentState::MilestoneDetail);
@@ -774,6 +776,7 @@ fn s8_overview_inbox_drill_resolves_to_target_detail() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     let item = raul::tui::app::InboxLine {
         id: "M01".into(),
@@ -822,6 +825,7 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "20".into(),
@@ -834,6 +838,7 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]);
     app.hide_done = true;
@@ -1016,6 +1021,7 @@ fn s7_page_down_advances_by_page_size_and_clamps() {
             cancelled_at: None,
 
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         })
         .collect();
     app.load_milestones(items);
@@ -1050,6 +1056,7 @@ fn s7_page_up_recedes_by_page_size_and_clamps() {
             cancelled_at: None,
 
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         })
         .collect();
     app.load_milestones(items);

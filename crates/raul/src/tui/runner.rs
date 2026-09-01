@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::{stdout, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::time::{Duration, Instant};
@@ -1125,6 +1126,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "02".to_string(),
@@ -1137,6 +1139,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
             MilestoneSummary {
                 id: "03".to_string(),
@@ -1149,6 +1152,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             },
         ]);
         app
@@ -1325,6 +1329,7 @@ mod tests {
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
+            flow_stages: BTreeMap::new(),
             })
             .collect();
         app.load_milestones(ms);

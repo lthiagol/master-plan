@@ -8,6 +8,7 @@
 //! `input_buffer`, `show_review_menu`) remain on `App` *as visible
 //! fields*. The mode enum + actions are the only surface.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -63,6 +64,7 @@ fn sample_ms() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
         raul::tui::app::MilestoneSummary {
             id: "02".into(),
@@ -75,6 +77,7 @@ fn sample_ms() -> Vec<raul::tui::app::MilestoneSummary> {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+        flow_stages: BTreeMap::new(),
         },
     ]
 }

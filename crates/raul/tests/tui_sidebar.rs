@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use raul::tui::app::{App, ContentState, Lane};
 
 #[test]
@@ -82,6 +83,7 @@ fn enter_and_exit_milestone_detail() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
 
     app.enter_milestone_detail(Some(0));
@@ -108,6 +110,7 @@ fn drill_to_annotation_thread_and_back() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_thread();
@@ -135,6 +138,7 @@ fn review_menu_does_not_change_content_state() {
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
+    flow_stages: BTreeMap::new(),
     }]);
     app.enter_milestone_detail(Some(0));
     app.open_review_menu();
@@ -182,6 +186,8 @@ fn co_approval_enters_from_annotation_thread() {
 
 #[cfg(test)]
 mod render_tests {
+    use std::collections::BTreeMap;
+
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
     use raul::tui::app::{App, Lane};
@@ -261,6 +267,7 @@ mod render_tests {
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
+            flow_stages: BTreeMap::new(),
         }]);
 
         let output = render_to_string(&app);
