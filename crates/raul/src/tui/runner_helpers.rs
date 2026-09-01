@@ -762,8 +762,17 @@ fn parse_mp_response(
 /// `mp config show` subprocess. Re-entering the lane from another lane
 /// is still a fresh load because `select_lane` clears `app.settings`
 /// when leaving Settings.
+///
+/// **M201:** also fetch `mp config schema` once at lane-open and cache
+/// the parsed result on `SettingsState.schema`. The schema is the
+/// single source of truth for per-key type, default, allowed, and
+/// description — see `modes::settings::schema`. A failed schema fetch
+/// is non-fatal: the lane still opens, the renderer surfaces a
+/// clear warning, and the user can update `mp` (the hint names
+/// `mp --version` per AC-08).
 pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
     use super::mode::SettingsState;
+    use super::modes::settings::schema;
     if app.settings.is_some() {
         return Ok(());
     }
@@ -772,7 +781,23 @@ pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         .get("config")
         .cloned()
         .unwrap_or_else(|| serde_json::json!({}));
-    app.settings = Some(SettingsState::new(config));
+
+    // M201: fetch and cache the schema once. Failure is non-fatal —
+    // the renderer surfaces a clear error and the lane stays usable.
+    let (cached_schema, warning) = match schema::fetch_schema(runner) {
+        Ok(s) => (Some(s), None),
+        Err(e) => (None, Some(e)),
+    };
+
+    app.settings = Some(SettingsState {
+        config,
+        schema: cached_schema,
+        selected_idx: 0,
+        focus: super::mode::SettingsFocus::Fields,
+        edit: None,
+        staged_edits: std::collections::BTreeMap::new(),
+        schema_warning: warning,
+    });
     app.content = super::app::ContentState::List;
     app.touch();
     Ok(())

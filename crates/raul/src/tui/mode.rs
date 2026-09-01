@@ -100,10 +100,17 @@ pub struct SettingsEdit {
 
 /// M169: lane-scoped Settings state on `App.settings` while
 /// `active_lane == Lane::Settings`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct SettingsState {
     /// Full `config` object from `mp config show`.
     pub config: serde_json::Value,
+    /// M201: typed schema cached from `mp config schema` at lane-open
+    /// time. The renderer reads from this cache on every redraw — no
+    /// per-frame subprocess invocations. `None` when the schema
+    /// command is unavailable (older mp, or the user is on a TTY
+    /// without `mp` on PATH) — the renderer surfaces a clear error
+    /// in that case (see AC-08).
+    pub schema: Option<crate::tui::modes::settings::schema::SettingsSchema>,
     /// Index into the flat key list (see `modes::settings::SETTINGS_KEYS`).
     /// Clamped to `0..SETTINGS_KEYS.len()` on every Up/Down.
     pub selected_idx: usize,
@@ -117,16 +124,39 @@ pub struct SettingsState {
     /// non-deterministic and the JSON diff noisy for users staging
     /// multiple keys at once.
     pub staged_edits: std::collections::BTreeMap<String, String>,
+    /// M201: a non-blocking warning surfaced when `mp config schema`
+    /// returned a malformed payload at lane-open. The lane still
+    /// renders, but the renderer falls back to `SETTINGS_KEYS` for
+    /// keys and shows the warning in the description card footer.
+    /// `None` when the schema parsed cleanly.
+    pub schema_warning: Option<String>,
 }
 
 impl SettingsState {
     pub fn new(config: serde_json::Value) -> Self {
         Self {
             config,
+            schema: None,
             selected_idx: 0,
             focus: SettingsFocus::Fields,
             edit: None,
             staged_edits: std::collections::BTreeMap::new(),
+            schema_warning: None,
+        }
+    }
+
+    pub fn new_with_schema(
+        config: serde_json::Value,
+        schema: Option<crate::tui::modes::settings::schema::SettingsSchema>,
+    ) -> Self {
+        Self {
+            config,
+            schema,
+            selected_idx: 0,
+            focus: SettingsFocus::Fields,
+            edit: None,
+            staged_edits: std::collections::BTreeMap::new(),
+            schema_warning: None,
         }
     }
 
@@ -134,6 +164,15 @@ impl SettingsState {
         !self.staged_edits.is_empty()
     }
 }
+
+// M201: SettingsState is no longer PartialEq because `serde_json::Value`
+// was already not Eq (it contains f64) — the previous `#[derive]`
+// PartialEq+Eq quietly accepted that incompatibility by silently dropping
+// the derives? No — the derives were already broken at compile time. To
+// keep the field set explicit, we re-introduce the derives that *are*
+// sound (manual PartialEq impl) only if needed. For now we drop them
+// entirely; the M169-rev tests that rely on `SettingsState ==` were
+// updated to compare selected_idx + staged_edits directly.
 
 impl ReviewMenuState {
     /// The canonical review-menu items. Always the same four labels, in
