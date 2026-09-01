@@ -3,9 +3,9 @@
     "id": "202",
     "title": "mp milestone per-stage mp-flow tracker + raul Stage column",
     "slug": "mp-milestone-per-stage-mp-flow-tracker-raul-stage-column",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,8 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "runner-202",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-01T21:53:38.768971+00:00"
+    "lifecycle_at": "2026-09-01T22:32:33.963871+00:00"
   },
   "intent": {
     "outcome": "Every milestone carries a per-stage map of the 12 mp-flow stages. The raul Milestones list replaces the 8-cell lifecycle gauge with a single Stage column (`5/12 · Claim & execute`); the MilestoneDetail view gains a Stages checklist. Lifecycle writers auto-derive the canonical stage transitions; agents can override via `mp milestone stage set`. After this lands, a handoff agent can read `mp show milestone <id>` and know exactly which mp-flow stage the milestone is in."
@@ -895,22 +894,22 @@
       "severity": "low",
       "category": "scope-creep",
       "description": "Undeclared out-of-scope changes bundled into M202 commits: crates/raul/src/tui/render/tab_bar.rs lane-index fix (labeled 'M198 follow-up') and the M201 settings-schema fetch refactor (crates/raul/src/tui/modes/settings/schema.rs + runner_helpers.rs) both landed in commit 9580636 without any M202 step covering them and without a declared-drift finding. Neither relates to flow_stages/Stage column.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "814599c",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-10",
       "severity": "low",
       "category": "spec-drift",
       "description": "S13 done_when claims 'manual: mp list milestones --fields flow_stages returns the map per row' — that command errors ('unknown path: flow_stages'; --fields on mp list rejects top-level keys, confirmed with target/debug/mp). The actual pinned surface is the default JSON row field plus --select flow_stages (list_projection_flags.rs:418). Step done_when wording should match the real command.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "256b926",
       "created": "2026-09-01",
-      "resolved": ""
+      "resolved": "2026-09-01"
     },
     {
       "id": "F-11",
