@@ -2455,13 +2455,11 @@ mod tests {
     // contract documented in the SKILL.md hand-off protocol.
 
     fn assert_hand_off_pending(stages: &BTreeMap<String, FlowStage>) {
-        match stages.get("hand-off") {
-            None => {}
-            Some(s) => assert_ne!(
+        if let Some(s) = stages.get("hand-off") {
+            assert_ne!(
                 s.status, "done",
                 "hand-off must never auto-advance to done (AC-11); got: {s:?}"
-            ),
-            _ => unreachable!(),
+            );
         }
     }
 
@@ -2525,7 +2523,7 @@ mod tests {
             vec![("execute".to_string(), "in_progress".to_string())]
         );
         assert_eq!(stages["execute"].status, "in_progress");
-        assert!(stages.get("self-review").is_none());
+        assert!(!stages.contains_key("self-review"));
         assert_hand_off_pending(&stages);
     }
 
@@ -2547,7 +2545,7 @@ mod tests {
         assert_eq!(stages["execute"].status, "done");
         assert_eq!(stages["self-review"].status, "done");
         // Complete stage must stay pending until Complete fires.
-        assert!(stages.get("complete").is_none() || stages["complete"].status == "pending");
+        assert!(!stages.contains_key("complete") || stages["complete"].status == "pending");
         assert_no_hand_off_in_updates(&updates);
     }
 
@@ -2679,7 +2677,7 @@ mod tests {
         assert_no_hand_off_in_updates(&updates);
         assert_hand_off_pending(&stages);
         assert!(
-            stages.get("hand-off").is_none(),
+            !stages.contains_key("hand-off"),
             "Cancel must not create hand-off entry"
         );
         // Verify done stages stayed done (Cancel must NOT clobber).
@@ -2692,7 +2690,7 @@ mod tests {
         assert_eq!(stages["external-review"].status, "skipped");
         // Verify document / hand-off stay untouched.
         assert!(
-            stages.get("document").is_none() || stages["document"].status == "skipped",
+            !stages.contains_key("document") || stages["document"].status == "skipped",
             "document was pending so it should be skipped"
         );
     }

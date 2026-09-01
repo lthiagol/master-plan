@@ -175,8 +175,8 @@
       "id": "AC-17",
       "description": "`cargo fmt --all -- --check` exits 0. `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0. `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0. `cargo nextest run -p mp --no-fail-fast` exits 0. `cargo nextest run -p raul --no-fail-fast` exits 0. `mp validate` exits 0.",
       "verification": "make test",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make test exit 0 (3267 tests pass + fmt check); cargo clippy -p mp --tests --no-deps -D warnings exit 0; cargo clippy -p raul --tests --no-deps -D warnings exit 0; mp validate exit 0"
     },
     {
       "id": "AC-18",
@@ -760,7 +760,7 @@
       ],
       "tests": "make test",
       "done_when": "All ACs have non-prose evidence; fmt + clippy + nextest + mp validate all exit 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-17"
       ],
