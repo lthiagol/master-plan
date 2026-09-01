@@ -98,9 +98,14 @@ pub fn build_overview(ctx: &PlanContext) -> Result<OverviewSnapshot> {
 
 /// M202 / AC-16: count milestones by their current mp-flow stage.
 /// The current stage is derived via
-/// `mp_model::current_mp_flow_stage` — the SAME single-source
-/// derivation the raul Stage cell uses (F-01 / F-11), so the
-/// dashboard grid and the list column can never disagree.
+/// `mp_model::mp_flow_stage_bucket_for_milestone` — the SAME
+/// single-source derivation family the raul Stage cell uses
+/// (F-01 / F-11), so the dashboard grid and the list column can
+/// never disagree. Legacy milestones (empty flow_stages map) roll
+/// up under the stage their legacy lifecycle maps to (F-12: NOT the
+/// draft bucket — the Migration design decision says pre-existing
+/// complete milestones show under Complete until their next
+/// transition).
 ///
 /// Every one of the 12 canonical slugs appears in the output with a
 /// count (zero when empty) so the grid renders a full 12-bucket
@@ -113,7 +118,10 @@ fn rollup_mp_flow_stages(
         .map(|slug| (slug.to_string(), 0usize))
         .collect();
     for (_, m) in milestones {
-        let slug = mp_model::current_mp_flow_stage(&m.milestone.flow_stages);
+        let slug = mp_model::mp_flow_stage_bucket_for_milestone(
+            &m.milestone.flow_stages,
+            &m.milestone.lifecycle,
+        );
         *counts.entry(slug.to_string()).or_insert(0) += 1;
     }
     counts

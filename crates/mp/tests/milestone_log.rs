@@ -732,3 +732,106 @@ fn overview_mp_flow_stage_counts_reflect_cancelled_milestone() {
     );
     assert_eq!(counts["hand-off"], 0);
 }
+
+#[test]
+fn overview_mp_flow_stage_counts_bucket_legacy_milestones_by_lifecycle() {
+    // F-12 regression pin: pre-M202 milestones (empty flow_stages
+    // map) must roll up under the stage their legacy lifecycle maps
+    // to — NOT under draft. The Migration design decision says
+    // "pre-existing complete milestones roll up under Complete until
+    // their next transition".
+    let env = TestEnv::new();
+    // Write two legacy-shaped milestone files directly: one with
+    // lifecycle=complete, one with lifecycle=approved, neither with
+    // a flow_stages field (the pre-M202 on-disk shape).
+    let milestones_dir = env.tmp.path().join("master-plan/milestones");
+    std::fs::create_dir_all(&milestones_dir).unwrap();
+    std::fs::write(
+        milestones_dir.join("01-legacy-complete.json"),
+        r#"{
+            "milestone": {
+                "id": "01",
+                "title": "Legacy complete",
+                "slug": "legacy-complete",
+                "lifecycle": "complete",
+                "spec_status": "",
+                "execution_status": "",
+                "blocked": false,
+                "needs_regrooming": false,
+                "cancelled": false,
+                "deferred": false,
+                "depends_on": [],
+                "effort": "S",
+                "risk": "low",
+                "change_kind": "",
+                "priority": "normal",
+                "created": "2026-01-01",
+                "updated": "2026-01-02"
+            },
+            "intent": {"outcome": "x"},
+            "problem": {"description": "y"},
+            "scope": {"in_scope": [], "out_of_scope": []},
+            "acceptance_criteria": [],
+            "design_decisions": [],
+            "open_questions": [],
+            "work_packages": [],
+            "steps": [],
+            "findings": []
+        }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        milestones_dir.join("02-legacy-approved.json"),
+        r#"{
+            "milestone": {
+                "id": "02",
+                "title": "Legacy approved",
+                "slug": "legacy-approved",
+                "lifecycle": "approved",
+                "spec_status": "",
+                "execution_status": "",
+                "blocked": false,
+                "needs_regrooming": false,
+                "cancelled": false,
+                "deferred": false,
+                "depends_on": [],
+                "effort": "S",
+                "risk": "low",
+                "change_kind": "",
+                "priority": "normal",
+                "created": "2026-01-01",
+                "updated": "2026-01-02"
+            },
+            "intent": {"outcome": "x"},
+            "problem": {"description": "y"},
+            "scope": {"in_scope": [], "out_of_scope": []},
+            "acceptance_criteria": [],
+            "design_decisions": [],
+            "open_questions": [],
+            "work_packages": [],
+            "steps": [],
+            "findings": []
+        }"#,
+    )
+    .unwrap();
+
+    let payload = run_mp_json(&env, &["overview"]);
+    let counts = payload["mp_flow_stage_counts"]
+        .as_object()
+        .expect("counts object");
+    // Legacy complete milestone → bucket "complete" (7/12).
+    assert_eq!(
+        counts["complete"], 1,
+        "legacy complete milestone must roll up under complete (F-12); got: {counts:?}"
+    );
+    // Legacy approved milestone → bucket "approve" (4/12).
+    assert_eq!(
+        counts["approve"], 1,
+        "legacy approved milestone must roll up under approve (F-12); got: {counts:?}"
+    );
+    // Neither may fall into the draft bucket.
+    assert_eq!(
+        counts["draft"], 0,
+        "legacy milestones must NOT bucket as draft (F-12); got: {counts:?}"
+    );
+}

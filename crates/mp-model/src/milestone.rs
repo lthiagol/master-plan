@@ -135,6 +135,68 @@ pub fn mp_flow_stage_index(slug: &str) -> Option<usize> {
     MP_FLOW_STAGE_KEYS.iter().position(|s| *s == slug)
 }
 
+/// M202 F-12: map a LEGACY milestone lifecycle value to the mp-flow
+/// stage bucket it should roll up under. The Migration design
+/// decision ("serde-default only — no code-side backfill") says
+/// pre-existing milestones (empty `flow_stages` map) roll up under
+/// the stage corresponding to their legacy lifecycle until their
+/// next transition touches the field — NOT under `draft` (which the
+/// empty-map default would produce and which the F-01 writer
+/// incorrectly used, showing 195 complete milestones as "1/12
+/// Define outcome").
+///
+/// Mapping:
+///   - `complete`        → "complete"   (7/12 — terminal delivery)
+///   - `approved`        → "approve"    (4/12 — spec locked)
+///   - `in-progress`     → "execute"    (5/12 — work underway)
+///   - `executed`/`done` → "execute"    (5/12 — work finished, review pending)
+///   - `self-reviewed`   → "self-review"(6/12)
+///   - `reviewed`        → "external-review" (8/12 — passed the review queue)
+///   - `remediation`     → "remediate"  (9/12)
+///   - `cancelled`       → "approve"    (4/12 — closed before/at approval;
+///                                        the last stage a legacy cancel
+///                                        could meaningfully reach)
+///   - `draft` / empty / anything else → "draft" (1/12)
+pub fn legacy_lifecycle_to_mp_flow_stage(lifecycle: &str) -> &'static str {
+    match lifecycle {
+        "complete" => "complete",
+        "approved" => "approve",
+        "in-progress" => "execute",
+        "executed" | "done" => "execute",
+        "self-reviewed" => "self-review",
+        "reviewed" => "external-review",
+        "remediation" => "remediate",
+        "cancelled" => "approve",
+        _ => "draft",
+    }
+}
+
+/// M202 F-12: derive the mp-flow stage bucket for a milestone
+/// regardless of whether it has run the new pipeline. Milestones
+/// WITH a non-empty `flow_stages` map use the canonical
+/// [`current_mp_flow_stage`] derivation (first non-done/non-skipped,
+/// last-done fallback). Legacy milestones (empty map — the field was
+/// introduced in M202 and only populates on the next lifecycle
+/// transition) roll up under the stage their legacy lifecycle maps
+/// to via [`legacy_lifecycle_to_mp_flow_stage`], so the dashboard
+/// grid does not dump every pre-M202 milestone into the draft bucket.
+///
+/// This is the single entry point the mp-side overview rollup uses;
+/// raul's Stage cell keeps using [`current_mp_flow_stage`] (the list
+/// already carries the legacy lifecycle string in `m.lifecycle` but
+/// the cell's contract is flow_stages-driven — F-12 scoped the fix
+/// to the rollup).
+pub fn mp_flow_stage_bucket_for_milestone(
+    flow_stages: &BTreeMap<String, FlowStage>,
+    lifecycle: &str,
+) -> &'static str {
+    if flow_stages.is_empty() {
+        legacy_lifecycle_to_mp_flow_stage(lifecycle)
+    } else {
+        current_mp_flow_stage(flow_stages)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MilestoneFile {
     pub milestone: MilestoneMeta,
@@ -3012,5 +3074,96 @@ mod tests {
         assert_eq!(mp_flow_stage_index("execute"), Some(4));
         assert_eq!(mp_flow_stage_index("hand-off"), Some(11));
         assert_eq!(mp_flow_stage_index("bogus"), None);
+    }
+
+    // ─── M202 F-12: legacy-lifecycle bucket mapping ────────────────────
+    //
+    // Pre-existing milestones (empty flow_stages map) must roll up
+    // under the stage their legacy lifecycle maps to — NOT under
+    // draft (the empty-map default). The Migration design decision
+    // says "pre-existing complete milestones roll up under Complete
+    // until their next transition".
+
+    #[test]
+    fn legacy_lifecycle_maps_to_expected_stage() {
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("complete"), "complete");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("approved"), "approve");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("in-progress"), "execute");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("executed"), "execute");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("done"), "execute");
+        assert_eq!(
+            legacy_lifecycle_to_mp_flow_stage("self-reviewed"),
+            "self-review"
+        );
+        assert_eq!(
+            legacy_lifecycle_to_mp_flow_stage("reviewed"),
+            "external-review"
+        );
+        assert_eq!(
+            legacy_lifecycle_to_mp_flow_stage("remediation"),
+            "remediate"
+        );
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("cancelled"), "approve");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("draft"), "draft");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage(""), "draft");
+        assert_eq!(legacy_lifecycle_to_mp_flow_stage("bogus"), "draft");
+    }
+
+    #[test]
+    fn bucket_for_legacy_complete_milestone_is_complete_not_draft() {
+        // F-12 regression pin: a pre-M202 complete milestone (empty
+        // flow_stages map) must bucket under `complete`, NOT `draft`.
+        let stages = BTreeMap::new();
+        assert_eq!(
+            mp_flow_stage_bucket_for_milestone(&stages, "complete"),
+            "complete",
+            "legacy complete milestone must roll up under Complete (F-12)"
+        );
+    }
+
+    #[test]
+    fn bucket_for_legacy_approved_milestone_is_approve() {
+        let stages = BTreeMap::new();
+        assert_eq!(
+            mp_flow_stage_bucket_for_milestone(&stages, "approved"),
+            "approve"
+        );
+    }
+
+    #[test]
+    fn bucket_for_legacy_remediation_milestone_is_remediate() {
+        let stages = BTreeMap::new();
+        assert_eq!(
+            mp_flow_stage_bucket_for_milestone(&stages, "remediation"),
+            "remediate"
+        );
+    }
+
+    #[test]
+    fn bucket_for_non_empty_flow_stages_uses_pipeline_derivation() {
+        // Milestones that HAVE run the new pipeline use the canonical
+        // derivation — the legacy lifecycle is ignored.
+        let stages = stage_map(&[
+            ("draft", "done"),
+            ("groom", "done"),
+            ("specify", "done"),
+            ("approve", "done"),
+            ("execute", "in_progress"),
+        ]);
+        assert_eq!(
+            mp_flow_stage_bucket_for_milestone(&stages, "complete"),
+            "execute",
+            "non-empty flow_stages wins over the legacy lifecycle (F-12)"
+        );
+    }
+
+    #[test]
+    fn bucket_for_empty_map_and_empty_lifecycle_is_draft() {
+        let stages = BTreeMap::new();
+        assert_eq!(
+            mp_flow_stage_bucket_for_milestone(&stages, ""),
+            "draft",
+            "brand-new milestone (no lifecycle, no flow_stages) buckets as draft"
+        );
     }
 }
