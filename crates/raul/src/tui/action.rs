@@ -62,9 +62,7 @@ pub enum Action {
     /// Left / Right on a focused `choice` key — cycle through `allowed`.
     /// `forward = true` moves Right (next), `false` moves Left (prev).
     /// The change is staged; no editor opens.
-    SettingsCycleChoice {
-        forward: bool,
-    },
+    SettingsCycleChoice { forward: bool },
 
     // ---- tab bar focus ------------------------------------------------------
     /// Move to the previous lane in `Lane::ordered()` (Left / h).
@@ -788,14 +786,15 @@ fn apply_settings_toggle_bool(app: &mut App, runner: &MpRunner) -> Result<()> {
         .as_ref()
         .and_then(|s| s.staged_edits.get(key).cloned())
         .or_else(|| {
-            app.settings
-                .as_ref()
-                .and_then(|s| s.config.pointer(&format!("/{}", key.replace('.', "/")))
+            app.settings.as_ref().and_then(|s| {
+                s.config
+                    .pointer(&format!("/{}", key.replace('.', "/")))
                     .and_then(|v| match v {
                         serde_json::Value::Bool(b) => Some(b.to_string()),
                         serde_json::Value::String(s) => Some(s.clone()),
                         _ => None,
-                    }))
+                    })
+            })
         })
         .unwrap_or_else(|| entry.default.clone());
     let next = if matches!(current.as_str(), "true" | "1" | "yes") {
@@ -809,11 +808,7 @@ fn apply_settings_toggle_bool(app: &mut App, runner: &MpRunner) -> Result<()> {
 /// M201 S7: choice editor — Left/Right cycles through `allowed`. The
 /// new value is dry-run through `mp config set` first; only valid
 /// choice strings reach `staged_edits`. No editor opens.
-fn apply_settings_cycle_choice(
-    app: &mut App,
-    runner: &MpRunner,
-    forward: bool,
-) -> Result<()> {
+fn apply_settings_cycle_choice(app: &mut App, runner: &MpRunner, forward: bool) -> Result<()> {
     let Some(state) = app.settings.as_ref() else {
         return Ok(());
     };
@@ -870,8 +865,7 @@ fn stage_setting_via_dry_run(
     key: &str,
     value: &str,
 ) -> Result<()> {
-    let dry_stdout = runner
-        .run_raw_allow_failure("config", &["set", key, value, "--dry-run"])?;
+    let dry_stdout = runner.run_raw_allow_failure("config", &["set", key, value, "--dry-run"])?;
     let dry: serde_json::Value = serde_json::from_slice(&dry_stdout).unwrap_or_else(|_| {
         serde_json::json!({
             "ok": false,
@@ -900,7 +894,9 @@ fn stage_setting_via_dry_run(
         return Ok(());
     }
     if let Some(state) = app.settings.as_mut() {
-        state.staged_edits.insert(key.to_string(), value.to_string());
+        state
+            .staged_edits
+            .insert(key.to_string(), value.to_string());
         state.edit = None;
         state.focus = crate::tui::mode::SettingsFocus::Fields;
         app.touch();

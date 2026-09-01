@@ -4,14 +4,15 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 
+use crate::theme::Palette as ThemePalette;
 use crate::tui::app::{App, CoApprovalAction, CoApprovalState};
 use crate::tui::key_combo::{format_key_combo, KeyCombo};
 use crate::tui::mode::Mode;
-#[allow(unused_imports)] // keybind_default_label + value_for_key are used inside nested fns below
+#[allow(unused_imports)]
+// keybind_default_label + value_for_key are used inside nested fns below
 use crate::tui::modes::settings::{keybind_default_label, value_for_key, SETTINGS_KEYS};
 use crate::tui::render::modal::centered_popup_rect;
 use crate::tui::view_state::ViewState;
-use crate::theme::Palette as ThemePalette;
 
 /// First formatted combo in a binding, or empty when unbound. Mirrors the
 /// private `Keybinds::primary` helper so overlays can render a one-key
@@ -361,11 +362,7 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
 
     let Some(state) = app.settings.as_ref() else {
         let msg = Paragraph::new("Loading settings…")
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(LANE_SETTINGS),
-            )
+            .block(Block::default().borders(Borders::ALL).title(LANE_SETTINGS))
             .alignment(Alignment::Center)
             .style(Style::default().fg(palette.dim));
         frame.render_widget(msg, overlay_area);
@@ -703,8 +700,8 @@ fn per_type_hint(ty: &str, editing: bool) -> String {
         return "Enter: commit · Esc: revert".to_string();
     }
     match ty {
-        "bool" => "Space/Enter: toggle · s: save · Esc: back".to_string(),
-        "choice" => "←/→/Enter: cycle · s: save · Esc: revert".to_string(),
+        "bool" => "Space: toggle · Enter: edit · s: save · Esc: back".to_string(),
+        "choice" => "←/→: cycle · Enter: edit · s: save · Esc: revert".to_string(),
         "integer" => "Enter: edit · s: save · Esc: revert".to_string(),
         "string" | "path" => "Enter: edit · s: save · Esc: revert".to_string(),
         "keybind" => "Enter: edit (e.g. Ctrl+R, Enter, Left) · s: save".to_string(),
@@ -729,7 +726,9 @@ fn render_settings_schema_unavailable(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let warn = Style::default().fg(palette.warn).add_modifier(Modifier::BOLD);
+    let warn = Style::default()
+        .fg(palette.warn)
+        .add_modifier(Modifier::BOLD);
     let dim = Style::default().fg(palette.dim);
 
     let detail = state

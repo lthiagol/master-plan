@@ -63,16 +63,22 @@ fn single_key_char(s: &str) -> Option<char> {
 /// string is malformed (empty part, two non-modifier tokens, unknown `fN`,
 /// unknown multi-char name).
 ///
+/// Both `+` and `-` are accepted as token separators (M201 fix: the
+/// `KEYBIND_DEFAULTS` table canonicalizes chords like `Ctrl-R` and the
+/// `Left, BackTab` alias uses `-` for the back-tab name). To bind the
+/// literal `-` key, use the named keyword `minus`.
+///
 /// See the module docs for the full accepted grammar.
 pub fn parse_key_combo(s: &str) -> Option<KeyCombo> {
-    let parts: Vec<&str> = s.split('+').collect();
+    let parts: Vec<&str> = split_combo(s);
     let mut modifiers = KeyModifiers::empty();
     let mut key_str: Option<&str> = None;
 
     for part in &parts {
-        // A truly empty part comes from a stray `+` ("ctrl+", "+a", "a++b")
-        // and is always malformed. A whitespace-only part, by contrast, is
-        // the literal space key (`" "`), which we must not trim away.
+        // A truly empty part comes from a stray separator ("ctrl+", "+a",
+        // "ctrl-", "a--b") and is always malformed. A whitespace-only part,
+        // by contrast, is the literal space key (`" "`), which we must not
+        // trim away.
         if part.is_empty() {
             return None;
         }
@@ -100,11 +106,14 @@ pub fn parse_key_combo(s: &str) -> Option<KeyCombo> {
             KeyCode::BackTab
         }
         "tab" => KeyCode::Tab,
+        "backtab" | "shift+tab" => KeyCode::BackTab,
         "backspace" | "bs" => KeyCode::Backspace,
         "left" => KeyCode::Left,
         "right" => KeyCode::Right,
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
+        "pageup" | "page_up" | "pgup" => KeyCode::PageUp,
+        "pagedown" | "page_down" | "pgdn" => KeyCode::PageDown,
         "minus" => KeyCode::Char('-'),
         "comma" => KeyCode::Char(','),
         "period" => KeyCode::Char('.'),
@@ -132,6 +141,39 @@ pub fn parse_key_combo(s: &str) -> Option<KeyCombo> {
     };
 
     Some(normalize_key_combo((code, modifiers)))
+}
+
+/// Split a combo string on `+` or `-`. Each separator must have non-empty
+/// content on both sides (so a leading `-` is NOT a separator — it leaves
+/// the literal `-` char token alone, which the caller routes to the `minus`
+/// named key).
+fn split_combo(s: &str) -> Vec<&str> {
+    let bytes = s.as_bytes();
+    let mut parts: Vec<&str> = Vec::new();
+    let mut start = 0usize;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'+' || b == b'-' {
+            // Reject stray leading/trailing/consecutive separators by
+            // splitting but letting the empty-part check in `parse_key_combo`
+            // catch them. Allow a single `-` token at the very start or end
+            // (the caller treats it as the literal minus char token).
+            if start < i {
+                parts.push(&s[start..i]);
+                start = i + 1;
+            } else {
+                // Empty left half (e.g. "-R" or "--") — keep the separator as
+                // part of the next token so the empty-part check fires.
+                start = i;
+                i += 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    parts.push(&s[start..]);
+    parts
 }
 
 /// Canonicalize a combo so equality comparisons are robust:
@@ -222,5 +264,118 @@ fn format_key_code(code: KeyCode) -> String {
         KeyCode::PageDown => "PgDn".to_string(),
         KeyCode::F(n) => format!("F{n}"),
         other => format!("{other:?}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // M201 F-02: parse_key_combo must accept every default keybind chord
+    // emitted by `mp config schema` (the KEYBIND_DEFAULTS table uses both
+    // `+` and `-` separators, plus the named keys `PageUp`/`PageDown`/
+    // `BackTab`). A pre-validation gate in the Settings keybind editor
+    // (S9) runs the user's buffer through this parser on commit; if any
+    // canonical chord fails to parse, the user sees a "not a valid key
+    // combo" error on the very defaults shipped by the schema.
+
+    #[test]
+    fn parse_key_combo_accepts_dash_separator() {
+        assert_eq!(
+            parse_key_combo("Ctrl-R"),
+            parse_key_combo("Ctrl+R"),
+            "dash and plus separators must be equivalent"
+        );
+        // `Ctrl-r` (lowercase) → CONTROL + Char('r'), no SHIFT.
+        assert_eq!(
+            parse_key_combo("Ctrl-r"),
+            Some((KeyCode::Char('r'), KeyModifiers::CONTROL)),
+            "lowercase r with Ctrl produces CONTROL only (no SHIFT)"
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_pageup_pagedown() {
+        // Default values for keybinds.page_up / keybinds.page_down.
+        assert_eq!(
+            parse_key_combo("PageUp"),
+            Some((KeyCode::PageUp, KeyModifiers::empty()))
+        );
+        assert_eq!(
+            parse_key_combo("PageDown"),
+            Some((KeyCode::PageDown, KeyModifiers::empty()))
+        );
+        assert_eq!(
+            parse_key_combo("pageup"),
+            Some((KeyCode::PageUp, KeyModifiers::empty())),
+            "case-insensitive"
+        );
+        assert_eq!(
+            parse_key_combo("pgup"),
+            Some((KeyCode::PageUp, KeyModifiers::empty())),
+            "PgUp alias"
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_backtab() {
+        // Default value for keybinds.previous_lane: "Left, BackTab".
+        // The Settings keybind editor splits on `,` first, then runs each
+        // chord through parse_key_combo. "BackTab" alone must parse.
+        assert_eq!(
+            parse_key_combo("BackTab"),
+            Some((KeyCode::BackTab, KeyModifiers::empty())),
+            "BackTab must parse without a `shift+tab` workaround"
+        );
+        assert_eq!(
+            parse_key_combo("shift+tab"),
+            Some((KeyCode::BackTab, KeyModifiers::empty())),
+            "shift+tab still normalizes to BackTab"
+        );
+    }
+
+    #[test]
+    fn parse_key_combo_accepts_all_keybind_defaults() {
+        // Exercise every chord in KEYBIND_DEFAULTS at parser level so a
+        // future change cannot silently drop one. The schema emits these
+        // as the `default` for each keybind row.
+        let defaults: &[&str] = &[
+            "q", "Q", "Up", "k", "Down", "j", "PageUp", "PageDown", "Enter", "Esc", "?", "f", "h",
+            "A", "r", "R", "p", "m", "Ctrl-O", "Left", "BackTab", "Right", "l", "Tab", "Ctrl-R",
+            "]", "[", "n", "F", "g", "/", "o",
+        ];
+        for chord in defaults {
+            assert!(
+                parse_key_combo(chord).is_some(),
+                "KEYBIND_DEFAULTS chord `{chord}` failed to parse"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_key_combo_still_rejects_garbage() {
+        assert!(parse_key_combo("zzznotreal").is_none());
+        assert!(parse_key_combo("ctrl+").is_none(), "stray separator");
+        assert!(parse_key_combo("+a").is_none(), "leading separator");
+        assert!(parse_key_combo("a+b").is_none(), "two key tokens");
+    }
+
+    #[test]
+    fn parse_key_combo_split_combo_handles_dash_and_plus() {
+        // The internal split_combo helper is exercised through parse_key_combo;
+        // pin the boundary cases that motivated the dash-separator support.
+        // Lowercase final key → no SHIFT modifier added.
+        assert_eq!(
+            parse_key_combo("Ctrl-Alt-r").map(|c| c.1),
+            Some(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        );
+        assert_eq!(
+            parse_key_combo("Ctrl-Alt-r").map(|c| c.0),
+            Some(KeyCode::Char('r'))
+        );
+        // Mixed separators (Ctrl+Alt-Del style) — note: 'Del' is not a
+        // recognized named key in this build, so we only assert the
+        // parsing path; the actual result is `None` for unknown keys.
+        assert!(parse_key_combo("Ctrl+Alt-r").is_some());
     }
 }

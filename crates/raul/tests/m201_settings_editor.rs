@@ -93,10 +93,7 @@ fn settings_editor_bool_space_toggles_in_place() {
         Some(&"true".to_string()),
         "Space on a false bool must stage `true`"
     );
-    assert!(
-        state.edit.is_none(),
-        "bool toggle must not open the editor"
-    );
+    assert!(state.edit.is_none(), "bool toggle must not open the editor");
     assert_eq!(state.focus, SettingsFocus::Fields);
 }
 
@@ -273,7 +270,14 @@ fn settings_editor_string_backspace_deletes_char_before_caret() {
     select_key(&mut app, "workflow.plan.location");
     apply_action(&mut app, &runner(), Action::Enter).unwrap();
     apply_action(&mut app, &runner(), Action::PopInputChar).unwrap();
-    let edit = app.settings.as_ref().unwrap().edit.as_ref().unwrap().clone();
+    let edit = app
+        .settings
+        .as_ref()
+        .unwrap()
+        .edit
+        .as_ref()
+        .unwrap()
+        .clone();
     assert_eq!(edit.buffer, "master-pla");
 }
 
@@ -337,14 +341,51 @@ fn settings_editor_keybind_pre_validates_combo_strings() {
     // Direct test of the parse-gate: feed an invalid combo string to
     // the editor buffer and call Esc/Enter; Enter must surface a parse
     // error in `state.edit.errors`, NOT reach the mp layer.
+    //
+    // M201 F-02: every chord in KEYBIND_DEFAULTS must parse — these are
+    // the values the schema ships as `default` for the keybind rows. If
+    // a future change drops one, the user would see "not a valid key
+    // combo" on the very defaults they're trying to keep.
     use raul::tui::key_combo::parse_key_combo;
     assert!(parse_key_combo("Ctrl+S").is_some());
     assert!(parse_key_combo("Enter").is_some());
     assert!(parse_key_combo("Left").is_some());
     assert!(parse_key_combo("Up").is_some());
     assert!(parse_key_combo("Backspace").is_some());
-    assert!(parse_key_combo("zzznotreal").is_none(), "garbage is invalid");
-    assert!(parse_key_combo("PageUp").is_none(), "PageUp is not a recognized combo in this build");
+    // Keybind defaults that use dash separator or named page/back-tab keys.
+    assert!(parse_key_combo("Ctrl-R").is_some());
+    assert!(parse_key_combo("Ctrl-O").is_some());
+    assert!(parse_key_combo("PageUp").is_some());
+    assert!(parse_key_combo("PageDown").is_some());
+    assert!(parse_key_combo("BackTab").is_some());
+    assert!(
+        parse_key_combo("zzznotreal").is_none(),
+        "garbage is invalid"
+    );
+}
+
+#[test]
+fn settings_editor_keybind_on_commit_with_valid_default_succeeds() {
+    // M201 F-02 regression guard: the schema's default for keybinds.refresh
+    // is `Ctrl-R` (dash separator). Pressing Enter to keep the default
+    // must NOT surface a "not a valid key combo" parse error.
+    let mut app = app_with_schema();
+    select_key(&mut app, "keybinds.refresh");
+    apply_action(&mut app, &runner(), Action::Enter).unwrap();
+    // Buffer pre-populated with the schema default `Ctrl-R`. Press Enter
+    // to commit without modifying — this is the round-trip the user does
+    // when opening the editor and confirming the default.
+    apply_action(&mut app, &runner(), Action::Enter).unwrap();
+    let state = app.settings.as_ref().unwrap();
+    let edit = state
+        .edit
+        .as_ref()
+        .expect("editor must remain open if dry-run rejects (it shouldn't here)");
+    assert!(
+        edit.errors.is_empty(),
+        "Ctrl-R default must parse cleanly: got errors={:?}",
+        edit.errors
+    );
 }
 
 #[test]
@@ -362,7 +403,10 @@ fn settings_editor_keybind_on_commit_with_invalid_string_surfaces_parse_error() 
     // Enter to commit — the pre-validate gate must reject it.
     apply_action(&mut app, &runner(), Action::Enter).unwrap();
     let state = app.settings.as_ref().unwrap();
-    let edit = state.edit.as_ref().expect("editor must remain open on parse error");
+    let edit = state
+        .edit
+        .as_ref()
+        .expect("editor must remain open on parse error");
     assert!(
         !edit.errors.is_empty(),
         "parse error must surface in edit.errors"
@@ -450,7 +494,9 @@ fn settings_editor_staging_is_deterministic_btreemap() {
     {
         let state = app.settings.as_mut().unwrap();
         state.staged_edits.insert("ui.theme".into(), "latte".into());
-        state.staged_edits.insert("git.auto_commit".into(), "true".into());
+        state
+            .staged_edits
+            .insert("git.auto_commit".into(), "true".into());
         state
             .staged_edits
             .insert("workflow.plan.location".into(), "docs/plan".into());
@@ -485,7 +531,14 @@ fn settings_editor_inline_buffer_prefills_prefilled_from_staged_not_from_disk() 
             .insert("workflow.plan.location".into(), "docs/plan".into());
     }
     apply_action(&mut app, &runner(), Action::Enter).unwrap();
-    let edit = app.settings.as_ref().unwrap().edit.as_ref().unwrap().clone();
+    let edit = app
+        .settings
+        .as_ref()
+        .unwrap()
+        .edit
+        .as_ref()
+        .unwrap()
+        .clone();
     assert_eq!(
         edit.buffer, "docs/plan",
         "re-Enter on a staged key must prefill the editor with the staged value"

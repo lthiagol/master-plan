@@ -38,51 +38,345 @@ fn render_full(app: &App, width: u16, height: u16) -> String {
 fn build_test_schema() -> SettingsSchema {
     let entries: Vec<SchemaEntry> = [
         ("ui", "ui.color", "bool", "true", None, "ANSI color toggle."),
-        ("ui", "ui.icons", "choice", "unicode", Some("none|ascii|unicode"), "Icon set."),
-        ("ui", "ui.theme", "choice", "mocha", Some("mocha|latte|frappe"), "Theme name."),
-        ("ui", "ui.hide_done", "bool", "false", None, "Hide done milestones."),
-        ("ui", "ui.show_watch_tab", "bool", "false", None, "Show Watch tab."),
-        ("workflow", "workflow.profile", "choice", "full", Some("full|hybrid|session"), "Workflow profile."),
-        ("workflow", "workflow.plan.location", "path", "master-plan", None, "Plan dir location."),
-        ("workflow", "workflow.plan.in_repo", "bool", "true", None, "Plan in repo."),
-        ("workflow", "workflow.gates.strictness", "choice", "relaxed", Some("relaxed|full"), "Gate strictness."),
-        ("workflow", "workflow.steps.code_review", "bool", "true", None, "Run external review."),
-        ("git", "git.auto_commit", "bool", "false", None, "Auto-commit on step."),
-        ("git", "git.commit_on_milestone_complete", "bool", "false", None, "Commit on milestone done."),
-        ("git", "git.auto_push", "bool", "false", None, "Push after commit."),
-        ("next", "next.prefer", "choice", "milestone", Some("milestone|track"), "Lane preference."),
-        ("agent", "agent.automation.commit_after_execute", "bool", "false", None, "Commit after execute."),
-        ("agent", "agent.automation.push_after_review", "bool", "false", None, "Push after review."),
-        ("agent", "agent.automation.branch_strategy", "choice", "current", Some("per-milestone|current|none"), "Branch strategy."),
-        ("agent", "agent.automation.auto_remediate", "choice", "none", Some("none|low|medium|high|all"), "Auto-remediate."),
+        (
+            "ui",
+            "ui.icons",
+            "choice",
+            "unicode",
+            Some("none|ascii|unicode"),
+            "Icon set.",
+        ),
+        (
+            "ui",
+            "ui.theme",
+            "choice",
+            "mocha",
+            Some("mocha|latte|frappe"),
+            "Theme name.",
+        ),
+        (
+            "ui",
+            "ui.hide_done",
+            "bool",
+            "false",
+            None,
+            "Hide done milestones.",
+        ),
+        (
+            "ui",
+            "ui.show_watch_tab",
+            "bool",
+            "false",
+            None,
+            "Show Watch tab.",
+        ),
+        (
+            "workflow",
+            "workflow.profile",
+            "choice",
+            "full",
+            Some("full|hybrid|session"),
+            "Workflow profile.",
+        ),
+        (
+            "workflow",
+            "workflow.plan.location",
+            "path",
+            "master-plan",
+            None,
+            "Plan dir location.",
+        ),
+        (
+            "workflow",
+            "workflow.plan.in_repo",
+            "bool",
+            "true",
+            None,
+            "Plan in repo.",
+        ),
+        (
+            "workflow",
+            "workflow.gates.strictness",
+            "choice",
+            "relaxed",
+            Some("relaxed|full"),
+            "Gate strictness.",
+        ),
+        (
+            "workflow",
+            "workflow.steps.code_review",
+            "bool",
+            "true",
+            None,
+            "Run external review.",
+        ),
+        (
+            "git",
+            "git.auto_commit",
+            "bool",
+            "false",
+            None,
+            "Auto-commit on step.",
+        ),
+        (
+            "git",
+            "git.commit_on_milestone_complete",
+            "bool",
+            "false",
+            None,
+            "Commit on milestone done.",
+        ),
+        (
+            "git",
+            "git.auto_push",
+            "bool",
+            "false",
+            None,
+            "Push after commit.",
+        ),
+        (
+            "next",
+            "next.prefer",
+            "choice",
+            "milestone",
+            Some("milestone|track"),
+            "Lane preference.",
+        ),
+        (
+            "agent",
+            "agent.automation.commit_after_execute",
+            "bool",
+            "false",
+            None,
+            "Commit after execute.",
+        ),
+        (
+            "agent",
+            "agent.automation.push_after_review",
+            "bool",
+            "false",
+            None,
+            "Push after review.",
+        ),
+        (
+            "agent",
+            "agent.automation.branch_strategy",
+            "choice",
+            "current",
+            Some("per-milestone|current|none"),
+            "Branch strategy.",
+        ),
+        (
+            "agent",
+            "agent.automation.auto_remediate",
+            "choice",
+            "none",
+            Some("none|low|medium|high|all"),
+            "Auto-remediate.",
+        ),
         // 27 keybinds
-        ("keybinds", "keybinds.quit", "keybind", "q, Q", None, "Quit."),
+        (
+            "keybinds",
+            "keybinds.quit",
+            "keybind",
+            "q, Q",
+            None,
+            "Quit.",
+        ),
         ("keybinds", "keybinds.up", "keybind", "Up, k", None, "Up."),
-        ("keybinds", "keybinds.down", "keybind", "Down, j", None, "Down."),
-        ("keybinds", "keybinds.page_up", "keybind", "PageUp", None, "Page up."),
-        ("keybinds", "keybinds.page_down", "keybind", "PageDown", None, "Page down."),
-        ("keybinds", "keybinds.enter", "keybind", "Enter", None, "Enter."),
-        ("keybinds", "keybinds.escape", "keybind", "Esc", None, "Esc."),
+        (
+            "keybinds",
+            "keybinds.down",
+            "keybind",
+            "Down, j",
+            None,
+            "Down.",
+        ),
+        (
+            "keybinds",
+            "keybinds.page_up",
+            "keybind",
+            "PageUp",
+            None,
+            "Page up.",
+        ),
+        (
+            "keybinds",
+            "keybinds.page_down",
+            "keybind",
+            "PageDown",
+            None,
+            "Page down.",
+        ),
+        (
+            "keybinds",
+            "keybinds.enter",
+            "keybind",
+            "Enter",
+            None,
+            "Enter.",
+        ),
+        (
+            "keybinds",
+            "keybinds.escape",
+            "keybind",
+            "Esc",
+            None,
+            "Esc.",
+        ),
         ("keybinds", "keybinds.help", "keybind", "?", None, "Help."),
-        ("keybinds", "keybinds.filter", "keybind", "f", None, "Filter."),
-        ("keybinds", "keybinds.hide_done", "keybind", "h", None, "Hide done."),
-        ("keybinds", "keybinds.create_annotation", "keybind", "A", None, "Annotate."),
-        ("keybinds", "keybinds.resolve", "keybind", "r", None, "Resolve."),
-        ("keybinds", "keybinds.reopen", "keybind", "R", None, "Reopen."),
-        ("keybinds", "keybinds.approve", "keybind", "p", None, "Approve."),
-        ("keybinds", "keybinds.review_menu", "keybind", "m", None, "Review menu."),
-        ("keybinds", "keybinds.open_settings", "keybind", "Ctrl-O", None, "Open settings."),
-        ("keybinds", "keybinds.previous_lane", "keybind", "Left, BackTab", None, "Previous lane."),
-        ("keybinds", "keybinds.next_lane", "keybind", "Right, l, Tab", None, "Next lane."),
-        ("keybinds", "keybinds.refresh", "keybind", "Ctrl-R", None, "Refresh."),
-        ("keybinds", "keybinds.next_section", "keybind", "]", None, "Next section."),
-        ("keybinds", "keybinds.prev_section", "keybind", "[", None, "Prev section."),
-        ("keybinds", "keybinds.next_item", "keybind", "n", None, "Next item."),
-        ("keybinds", "keybinds.prev_item", "keybind", "p", None, "Prev item."),
-        ("keybinds", "keybinds.lifecycle_filter", "keybind", "F", None, "Lifecycle filter."),
-        ("keybinds", "keybinds.grooming_preset", "keybind", "g", None, "Grooming preset."),
-        ("keybinds", "keybinds.search", "keybind", "/", None, "Search."),
-        ("keybinds", "keybinds.cycle_sort", "keybind", "o", None, "Cycle sort."),
+        (
+            "keybinds",
+            "keybinds.filter",
+            "keybind",
+            "f",
+            None,
+            "Filter.",
+        ),
+        (
+            "keybinds",
+            "keybinds.hide_done",
+            "keybind",
+            "h",
+            None,
+            "Hide done.",
+        ),
+        (
+            "keybinds",
+            "keybinds.create_annotation",
+            "keybind",
+            "A",
+            None,
+            "Annotate.",
+        ),
+        (
+            "keybinds",
+            "keybinds.resolve",
+            "keybind",
+            "r",
+            None,
+            "Resolve.",
+        ),
+        (
+            "keybinds",
+            "keybinds.reopen",
+            "keybind",
+            "R",
+            None,
+            "Reopen.",
+        ),
+        (
+            "keybinds",
+            "keybinds.approve",
+            "keybind",
+            "p",
+            None,
+            "Approve.",
+        ),
+        (
+            "keybinds",
+            "keybinds.review_menu",
+            "keybind",
+            "m",
+            None,
+            "Review menu.",
+        ),
+        (
+            "keybinds",
+            "keybinds.open_settings",
+            "keybind",
+            "Ctrl-O",
+            None,
+            "Open settings.",
+        ),
+        (
+            "keybinds",
+            "keybinds.previous_lane",
+            "keybind",
+            "Left, BackTab",
+            None,
+            "Previous lane.",
+        ),
+        (
+            "keybinds",
+            "keybinds.next_lane",
+            "keybind",
+            "Right, l, Tab",
+            None,
+            "Next lane.",
+        ),
+        (
+            "keybinds",
+            "keybinds.refresh",
+            "keybind",
+            "Ctrl-R",
+            None,
+            "Refresh.",
+        ),
+        (
+            "keybinds",
+            "keybinds.next_section",
+            "keybind",
+            "]",
+            None,
+            "Next section.",
+        ),
+        (
+            "keybinds",
+            "keybinds.prev_section",
+            "keybind",
+            "[",
+            None,
+            "Prev section.",
+        ),
+        (
+            "keybinds",
+            "keybinds.next_item",
+            "keybind",
+            "n",
+            None,
+            "Next item.",
+        ),
+        (
+            "keybinds",
+            "keybinds.prev_item",
+            "keybind",
+            "p",
+            None,
+            "Prev item.",
+        ),
+        (
+            "keybinds",
+            "keybinds.lifecycle_filter",
+            "keybind",
+            "F",
+            None,
+            "Lifecycle filter.",
+        ),
+        (
+            "keybinds",
+            "keybinds.grooming_preset",
+            "keybind",
+            "g",
+            None,
+            "Grooming preset.",
+        ),
+        (
+            "keybinds",
+            "keybinds.search",
+            "keybind",
+            "/",
+            None,
+            "Search.",
+        ),
+        (
+            "keybinds",
+            "keybinds.cycle_sort",
+            "keybind",
+            "o",
+            None,
+            "Cycle sort.",
+        ),
     ]
     .into_iter()
     .map(|(_k, key, ty, default, allowed, desc)| {
@@ -167,15 +461,39 @@ fn settings_layout_renders_bordered_list_and_framed_card_at_80x24() {
     let out = render_full(&app, 80, 24);
     // Both borders must be present: the list uses `─` and `│` chars,
     // the card uses `┌`/`┐` corners (Plain border type).
-    assert!(out.contains("─"), "list/card borders missing at 80x24:\n{out}");
-    assert!(out.contains("│"), "list/card vertical borders missing at 80x24");
-    assert!(out.contains("ui.color"), "focused key name missing in card title:\n{out}");
-    assert!(out.contains("Type"), "card body label `Type` missing:\n{out}");
-    assert!(out.contains("Default"), "card body label `Default` missing:\n{out}");
-    assert!(out.contains("Value"), "card body label `Value` missing:\n{out}");
-    assert!(out.contains("Description"), "card body label `Description` missing:\n{out}");
+    assert!(
+        out.contains("─"),
+        "list/card borders missing at 80x24:\n{out}"
+    );
+    assert!(
+        out.contains("│"),
+        "list/card vertical borders missing at 80x24"
+    );
+    assert!(
+        out.contains("ui.color"),
+        "focused key name missing in card title:\n{out}"
+    );
+    assert!(
+        out.contains("Type"),
+        "card body label `Type` missing:\n{out}"
+    );
+    assert!(
+        out.contains("Default"),
+        "card body label `Default` missing:\n{out}"
+    );
+    assert!(
+        out.contains("Value"),
+        "card body label `Value` missing:\n{out}"
+    );
+    assert!(
+        out.contains("Description"),
+        "card body label `Description` missing:\n{out}"
+    );
     // Type badge from the new layout.
-    assert!(out.contains("[bool]"), "type badge missing in list row:\n{out}");
+    assert!(
+        out.contains("[bool]"),
+        "type badge missing in list row:\n{out}"
+    );
 }
 
 #[test]
@@ -202,9 +520,15 @@ fn settings_layout_shows_section_headers() {
     let out = render_full(&app, 120, 40);
     // Section headers use `▾ ui`, `▾ workflow`, etc. (M201 layout).
     assert!(out.contains("ui"), "section header `ui` missing:\n{out}");
-    assert!(out.contains("workflow"), "section header `workflow` missing:\n{out}");
+    assert!(
+        out.contains("workflow"),
+        "section header `workflow` missing:\n{out}"
+    );
     assert!(out.contains("git"), "section header `git` missing:\n{out}");
-    assert!(out.contains("keybinds"), "section header `keybinds` missing:\n{out}");
+    assert!(
+        out.contains("keybinds"),
+        "section header `keybinds` missing:\n{out}"
+    );
 }
 
 #[test]

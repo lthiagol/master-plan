@@ -135,7 +135,10 @@ mod tests {
         assert_eq!(refresh.default, "Ctrl-R");
 
         let theme = schema.get("ui.theme").unwrap();
-        assert_eq!(theme.allowed.as_deref(), Some(&["mocha".to_string(), "latte".to_string()][..]));
+        assert_eq!(
+            theme.allowed.as_deref(),
+            Some(&["mocha".to_string(), "latte".to_string()][..])
+        );
 
         let color = schema.get("ui.color").unwrap();
         assert!(color.allowed.is_none(), "bool row must not carry `allowed`");

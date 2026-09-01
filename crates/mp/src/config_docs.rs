@@ -358,12 +358,11 @@ pub const WORKFLOW_PROFILES: &[&str] = &["full", "hybrid", "session"];
 /// for non-keybinds and `KEYBIND_DEFAULTS` for keybinds. `allowed` is
 /// populated only for `choice` rows.
 pub fn build_schema_report() -> ConfigSchemaReport {
-    use crate::config::{KEYBIND_DEFAULTS, ProjectConfig};
+    use crate::config::{ProjectConfig, KEYBIND_DEFAULTS};
     use std::collections::BTreeMap;
 
     let cfg = ProjectConfig::default();
-    let keybind_defaults: BTreeMap<&str, &str> =
-        KEYBIND_DEFAULTS.iter().copied().collect();
+    let keybind_defaults: BTreeMap<&str, &str> = KEYBIND_DEFAULTS.iter().copied().collect();
 
     // Sort by key — `KEY_DESCRIPTIONS` may list keys in any order; the
     // emitted schema must be deterministic across runs.
@@ -379,7 +378,11 @@ pub fn build_schema_report() -> ConfigSchemaReport {
                 .unwrap_or(fallback)
                 .to_string(),
             "bool" => match key {
-                "ui.color" => cfg.ui.color.unwrap_or(false).to_string(),
+                // Each branch MUST match the `unwrap_or` accessor used by
+                // `config_cmd::config_get` for the same key — see
+                // `schema_bool_defaults_match_project_config_default` in the
+                // tests below for the regression guard.
+                "ui.color" => cfg.ui.color.unwrap_or(true).to_string(),
                 "ui.hide_done" => cfg.ui.hide_done.unwrap_or(false).to_string(),
                 "ui.show_watch_tab" => cfg.ui.show_watch_tab.unwrap_or(false).to_string(),
                 "git.auto_commit" => cfg.git.auto_commit.unwrap_or(false).to_string(),
@@ -555,6 +558,129 @@ mod tests {
                     entry.key
                 ),
             }
+        }
+    }
+
+    // M201 AC-05 regression guard (cycle 2 F-03): assert that the schema's
+    // emitted `default` values come from the canonical tables, not from
+    // hardcoded fallback strings. The `KEY_DESCRIPTIONS` row carries a
+    // fallback (typed `default` column in the source); the emit path in
+    // `build_schema_report` MUST override that fallback for bool rows
+    // (from `ProjectConfig::default()`) and for keybind rows (from
+    // `KEYBIND_DEFAULTS`). If a future change drops either override, this
+    // test catches it at unit-test time.
+    //
+    // Without this guard, a future change that hardcodes `default = "true"`
+    // in `KEY_DESCRIPTIONS` would silently drift from
+    // `ProjectConfig::default()` (e.g. after the next flag flip in the
+    // `UiConfig` defaults) and the schema would lie about what the
+    // canonical default is.
+    #[test]
+    fn schema_bool_defaults_match_project_config_default() {
+        use crate::config::ProjectConfig;
+        let report = build_schema_report();
+        let cfg = ProjectConfig::default();
+
+        // Pin the bool defaults the schema claims come from ProjectConfig::default().
+        // Each (key, expected_default_str) tuple must match ProjectConfig::default().
+        let expected: &[(&str, &str)] = &[
+            ("ui.color", &cfg.ui.color.unwrap_or(true).to_string()),
+            ("ui.hide_done", &cfg.ui.hide_done.unwrap_or(false).to_string()),
+            (
+                "ui.show_watch_tab",
+                &cfg.ui.show_watch_tab.unwrap_or(false).to_string(),
+            ),
+            (
+                "git.auto_commit",
+                &cfg.git.auto_commit.unwrap_or(false).to_string(),
+            ),
+            (
+                "git.commit_on_milestone_complete",
+                &cfg.git.commit_on_milestone_complete.unwrap_or(false).to_string(),
+            ),
+            (
+                "git.auto_push",
+                &cfg.git.auto_push.unwrap_or(false).to_string(),
+            ),
+            (
+                "agent.automation.commit_after_execute",
+                &cfg.agent.automation.commit_after_execute.unwrap_or(false).to_string(),
+            ),
+            (
+                "agent.automation.push_after_review",
+                &cfg.agent.automation.push_after_review.unwrap_or(false).to_string(),
+            ),
+            (
+                "workflow.plan.in_repo",
+                &cfg.workflow.plan.in_repo.unwrap_or(true).to_string(),
+            ),
+            (
+                "workflow.steps.code_review",
+                &cfg.workflow.steps.code_review.unwrap_or(false).to_string(),
+            ),
+        ];
+
+        let by_key: std::collections::BTreeMap<&str, &str> = report
+            .keys
+            .iter()
+            .map(|e| (e.key.as_str(), e.default.as_str()))
+            .collect();
+        for (key, want) in expected {
+            let got = by_key
+                .get(key)
+                .unwrap_or_else(|| panic!("schema missing bool row for {key}"));
+            assert_eq!(
+                got, want,
+                "schema default for bool key {key} drifted from ProjectConfig::default(); \
+                 the build_schema_report bool override was lost"
+            );
+        }
+    }
+
+    #[test]
+    fn schema_keybind_defaults_match_keybind_defaults_table() {
+        use crate::config::KEYBIND_DEFAULTS;
+        use std::collections::BTreeMap;
+
+        let report = build_schema_report();
+        let table: BTreeMap<&str, &str> = KEYBIND_DEFAULTS.iter().copied().collect();
+
+        // Every keybind row in the schema must pull its default from the
+        // canonical KEYBIND_DEFAULTS table. Build a map of the schema's
+        // emitted defaults and assert equality for every keybind row.
+        let schema_keybinds: BTreeMap<&str, &str> = report
+            .keys
+            .iter()
+            .filter(|e| e.ty == "keybind")
+            .map(|e| (e.key.as_str(), e.default.as_str()))
+            .collect();
+
+        // First sanity check: the schema must cover every KEYBIND_DEFAULTS row
+        // (modulo the action-name prefix).
+        let expected_actions: Vec<&str> = table.keys().copied().collect();
+        for action in &expected_actions {
+            let full_key = format!("keybinds.{action}");
+            assert!(
+                schema_keybinds.contains_key(full_key.as_str()),
+                "schema missing keybind row for {full_key}"
+            );
+        }
+
+        // Now the actual regression guard: each schema keybind default must
+        // equal the canonical KEYBIND_DEFAULTS chord (no hardcoded fallback
+        // slipped through).
+        for (key, got) in &schema_keybinds {
+            let action = key
+                .strip_prefix("keybinds.")
+                .unwrap_or_else(|| panic!("keybind row {key} missing `keybinds.` prefix"));
+            let want = table.get(action).unwrap_or_else(|| {
+                panic!("KEYBIND_DEFAULTS table missing action `{action}` (schema row {key})")
+            });
+            assert_eq!(
+                got, want,
+                "schema default for {key} drifted from KEYBIND_DEFAULTS; \
+                 the build_schema_report keybind override was lost"
+            );
         }
     }
 }
