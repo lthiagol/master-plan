@@ -984,6 +984,42 @@
       "type": "lifecycle-transition",
       "subject": "206",
       "summary": "lifecycle: approved → executed"
+    },
+    {
+      "timestamp": "2026-09-02T02:43:23.997071+00:00",
+      "type": "validation-state",
+      "subject": "",
+      "summary": "validation state errors (0 → 2 errors)",
+      "data": {
+        "cur_count": 2,
+        "cur_ok": false,
+        "prev_count": 0,
+        "prev_ok": true
+      }
+    },
+    {
+      "timestamp": "2026-09-02T02:47:10.183135+00:00",
+      "type": "validation-state",
+      "subject": "",
+      "summary": "validation state recovered (2 → 0 errors)",
+      "data": {
+        "cur_count": 0,
+        "cur_ok": true,
+        "prev_count": 2,
+        "prev_ok": false
+      }
+    },
+    {
+      "timestamp": "2026-09-02T02:48:50.281788+00:00",
+      "type": "lifecycle-transition",
+      "subject": "206",
+      "summary": "lifecycle: executed → remediation"
+    },
+    {
+      "timestamp": "2026-09-02T03:02:06.426762+00:00",
+      "type": "lifecycle-transition",
+      "subject": "206",
+      "summary": "lifecycle: remediation → executed"
     }
   ]
 }

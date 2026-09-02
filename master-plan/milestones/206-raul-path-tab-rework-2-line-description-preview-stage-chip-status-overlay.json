@@ -17,7 +17,7 @@
     "effort": "S",
     "risk": "low",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-08-29",
     "updated": "2026-09-02",
     "blocked_at": "",
@@ -25,15 +25,23 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T02:27:53.859278+00:00",
+    "lifecycle_at": "2026-09-02T03:02:06.421312+00:00",
     "flow_stages": {
       "execute": {
         "status": "done",
-        "at": "2026-09-02T02:27:53.859283+00:00"
+        "at": "2026-09-02T03:06:31.255573+00:00"
+      },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-02T03:02:06.421314+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-02T03:02:06.421314+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-02T02:27:53.859283+00:00"
+        "at": "2026-09-02T03:06:31.255573+00:00"
       }
     }
   },
@@ -72,84 +80,84 @@
       "description": "Every milestone in the Path tree renders as 2 visual lines: title line + preview line. Preview is the first line of intent.outcome, truncated to ~80 chars, dim, with ↳ prefix.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-02",
       "description": "Stage chip text derives from `flow_stages` (current mp-flow stage) using the same logic as M202's Stage column. Format: `[N/12]` where N is the position in MP_FLOW_STAGE_KEYS canonical order. Falls back to the milestone's `lifecycle` text when `flow_stages` is empty.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-03",
       "description": "Status overlay chip renders on the title line when the milestone has blocked / cancelled / deferred set. Precedence when multiple overlays: blocked > cancelled > deferred (blocked wins). Color: blocked uses danger; cancelled uses warn; deferred uses dim.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins/)' exit 0 (4/4 pass)"
     },
     {
       "id": "AC-04",
       "description": "Title line shows id, title, stage chip, priority glyph, age (relative time). Priority glyph: `⚑high` / `⚑urgent` for high+urgent, `─norm` for normal, `─low` for low. Age: relative time via humanize (e.g. `2d`, `5h`). Missing fields render as `—` (em-dash).",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-05",
       "description": "Preview line uses `↳` prefix in dim color. Truncated text is plain (no extra formatting). When `intent.outcome` is empty or whitespace-only, the preview line renders only the `↳` prefix.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-06",
       "description": "Blocked items still show `blocker: M<n>` on the title line (existing behavior preserved). The annotation appears alongside the status overlay chip.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-07",
       "description": "The `◀ next` indicator stays on the first execution item only (existing behavior preserved). Style: warn color + bold.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-08",
       "description": "Tree structure is preserved. The `├─` / `└─` / `│` / `●` connector logic stays. Spines between trunk items stay. Blocked fork at the blocker (grouped by `depends_on`) stays.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved|blocked_fork_at_blocker_preserved/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved|blocked_fork_at_blocker_preserved/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-09",
       "description": "Branch headers (BLOCKED / AWAITING-APPROVAL / GROOMING / REVIEW) keep their bold color and item-count suffix. Color uses the existing `lane_color_for_tui` mapping.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-10",
       "description": "Whitespace-only intent.outcome is treated as empty: the preview line renders only the ↳ prefix (same as a missing outcome). No (no description) placeholder.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-11",
       "description": "Compact-mode handling: same 2-line layout at narrower terminal widths. Preview truncation kicks in earlier due to less horizontal space. Tree structure (spines, connectors) stays.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)'",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-12",
       "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
       "verification": "make test",
       "status": "passed",
-      "evidence": "milestone complete"
+      "evidence": "make test exit 0 (3316 tests pass on cold-cache run; 1/3316 failed on retry due to pre-existing flaky mp::watch::bridge::tests::run_herdr_with_timeout_kills_entire_process_group unrelated to M206; standalone cargo nextest run -p mp --no-fail-fast exit 0 (2272/2272 pass), cargo nextest run -p raul --no-fail-fast exit 0 (950/950 pass), cargo fmt --all -- --check exit 0, cargo clippy -p mp --tests --no-deps -- -D warnings exit 0, cargo clippy -p raul --tests --no-deps -- -D warnings exit 0, mp validate exit 0 with W44 review-pending warning)"
     }
   ],
   "design_decisions": [
@@ -249,7 +257,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars|preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty|next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold|preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)'",
       "done_when": "trunk_item_line emits 2 visual lines with preview from intent.outcome; empty/whitespace outcome is prefix-only; next indicator preserved",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-05",
@@ -272,7 +280,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved/)'",
       "done_when": "Both named tests pass; tree structure intact",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -292,7 +300,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip|blocked_lines_emits_two_visual_lines|blocked_fork_at_blocker_preserved/)'",
       "done_when": "All 4 named tests pass; blocked items use the 2-line format with blocker annotation + overlay chip + preview line",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06",
         "AC-08"
@@ -313,7 +321,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix|flat_branch_emits_two_visual_lines/)'",
       "done_when": "All 3 named tests pass; flat branches use the 2-line format with enriched title + preview; branch headers preserve existing style",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-09"
       ],
@@ -333,7 +341,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)'",
       "done_when": "All 3 named tests pass; compact mode renders 2 lines with narrower columns and earlier truncation",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-11"
       ],
@@ -353,7 +361,7 @@
       ],
       "tests": "make test",
       "done_when": "All 12 ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-12"
       ],
@@ -374,7 +382,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve|blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins|title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)'",
       "done_when": "Title line shows stage chip, priority, age, overlay; tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-03",
@@ -393,5 +401,40 @@
     "date": "2026-09-02",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "evidence-discipline",
+      "description": "Per-AC evidence discipline failure (third occurrence). Runner set all 12 ACs evidence to generic 'milestone complete' string instead of per-AC command + exit code + test count. Same defect pattern as M200 F-12 and M201 F-05. Reviewer restored per-AC evidence via mp milestone criterion pass as side-effect: AC-01..AC-11 carry 'cargo nextest run ... exit 0 (N/N pass)'; AC-12 carries 'make test exit 0 (3316 tests pass cold-cache; 1/3316 failed on retry due to pre-existing flaky mp::watch::bridge::tests::run_herdr_with_timeout_kills_entire_process_group unrelated to M206; standalone cargo nextest run -p mp --no-fail-fast exit 0 (2272/2272 pass), cargo nextest run -p raul --no-fail-fast exit 0 (950/950 pass)'. Recommend guardrail: mp could refuse 'milestone complete' as evidence and require verification command + exit code + count - backlog item.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "ef5696c",
+      "created": "2026-09-02",
+      "resolved": "2026-09-02"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "spec-drift",
+      "description": "Detail field placement contradicts spec. Spec (S1.1 action + design_decisions 'Detail field placement') says 'Detail field stays on the title line after the status overlay chip.' Implementation in trunk_item_rows (crates/raul/src/tui/path_view.rs:461-466), flat_branch_lines (crates/raul/src/tui/path_view.rs:541-546), and blocked_lines (crates/raul/src/tui/path_view.rs:628-633) places the detail BEFORE the overlay chip. Order in trunk_item_rows is: label → stage chip → priority → age → detail → overlay chip → ◀ next; spec says detail should come after overlay chip. No AC or test exercises this ordering, so the drift is spec-implementation mismatch without behavior coverage gap. The visual difference is small but the spec text is explicit.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "4b7f73e",
+      "created": "2026-09-02",
+      "resolved": "2026-09-02"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "category": "dead-code",
+      "description": "Two dead pub functions with WRONG color mappings contradict AC-03. crates/raul/src/tui/path_view.rs:311-335 overlay_chip: spec (AC-03) wants blocked=danger, cancelled=warn, deferred=dim; code returns blocked=danger, cancelled=danger, deferred=warn. Function is pub, never called from production or tests, and contains dead code 'let m = item[\"milestone\"].clone(); let _ = m;' (no-op clone). crates/raul/src/tui/path_view.rs:339-350 overlay_chip_color: same wrong mapping (danger/danger/warn) and a misleading 'We carry two channels' comment that describes an API surface that does not exist. The correct version is overlay_chip_pair (path_view.rs:355-371) which is what the row emitters actually call. Either delete the dead functions or fix their color mappings and comments. Currently they sit next to the correct code and will burn any future caller who picks the shorter-named version.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "74898d0",
+      "created": "2026-09-02",
+      "resolved": "2026-09-02"
+    }
+  ]
 }
