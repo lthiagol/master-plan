@@ -1887,6 +1887,14 @@
       "reviewed_at": "2026-09-02",
       "notes": "Cycle 2 review. F-01 fixed via extracted testable seam apply_persisted_sort_value (crates/raul/src/tui/runner_helpers.rs:632-675) — runner pulled the per-lane match out of load_persisted_sort_keys into a pub fn that takes the parsed value and writes to app.lane_sort_key, returning bool for testability. The integration loader now delegates to this seam. 7 new tests in crates/raul/tests/m205_sort_cycle.rs cover: (1) 'lifecycle' fallback to default for Milestones/Backlog/Ideas; (2) garbage strings (5 variants incl. case+whitespace mutations) fall back; (3) empty value is silent default (no eprintln); (4) all 5 new M205 keys (created/resolved-at/tags/status/title) round-trip; (5) all 4 legacy keys (id/stage/priority/updated) round-trip. The unknown-arm of the match is now genuinely exercised — a future change that re-adds 'lifecycle' to the recognized labels will fail load_persisted_sort_keys_unknown_value_falls_back_to_default_for_*.\n\nAC verification (all 9 commands pass): AC-01=4/4, AC-02=2/2, AC-03=4/4, AC-04=3/3, AC-05=4/4, AC-06=5/5, AC-07=3/3, AC-08=10/10 (3 original + 7 new per the updated evidence), AC-09=3415/3415 in --profile ci --no-fail-fast. No regressions: 3415/3415 across mp+raul (up from 3401 in cycle 1 — net +14 tests from the path-include dup of the 7 new tests). cargo fmt --all --check clean; cargo clippy -p mp/raul --tests --no-deps -- -D warnings clean. Behavior preservation verified: the only observable change is that empty values no longer hit the eprintln (preserved old 'silent' policy via !value.is_empty() gate).\n\nNo HIGH-severity findings. TIGHTENED cycle-2 filter applied (no spec-drift, no record-keeping, no polish filings). All 1 prior finding resolved (F-01 fixed_in=7231a8c). Passing verdict ok.",
       "milestone_completed_at": "2026-09-02"
+    },
+    {
+      "milestone_id": "204",
+      "verdict": "ok",
+      "reviewer": "reviewer-204",
+      "reviewed_at": "2026-09-02",
+      "notes": "",
+      "milestone_completed_at": "2026-09-02"
     }
   ],
   "comments": [

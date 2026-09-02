@@ -966,3 +966,363 @@ happen in three phases:
   cycle-count decisions (e.g., a note "this is the third time this
   regex broke" might trigger escalation).
 
+
+---
+
+## 2026-09-02 ~09:15 — OVERNIGHT RUN COMPLETE. All remaining milestones shipped.
+
+### 4 milestones driven overnight (M206 → M203 → M205 → M204)
+
+| M | Title | Steps | ACs | Cycles | Result |
+|---|---|---|---|---|---|
+| M206 | raul Path tab rework | 7 | 12 | 2 | complete/verified |
+| M203 | Backlog + Ideas preview | 8 | 9 | 0 (runner auto-promoted) | complete/verified (with role-separation violation) |
+| M205 | raul sort cycle consistency | 9 | 9 | 2 | complete/verified |
+| M204 | raul unified filter modal | 12 | 11 | 2 | complete/verified |
+
+### Overnight stats
+
+- Total milestones driven: 4 (M206, M203, M205, M204)
+- Total cycles: 6 (M206=2, M203=0, M205=2, M204=2)
+- Total findings filed: 10 across the 4 milestones
+- Total findings fixed: 10/10
+- Total reviews passed: 3 (M206, M205, M204)
+- Reviews with role violations or discipline failures: M203 (role), M204 (--force bypass)
+- Time: started 22:43 (M206), finished 09:10 (M204) — ~10.5 hours overnight
+
+### Open design-input items surfaced this overnight run
+
+1. **Role-separation violation (M203).** The runner pane called `mp reviews pass` itself, jumping from `approved` → `complete` without a separate reviewer pass. Cycle matrix says `complete` is reachable ONLY via `mp reviews pass --verdict ok` — so the runner assumed the reviewer role. Fix for future: prompt must EXPLICITLY forbid `mp reviews pass` for the runner.
+
+2. **`--force` bypass on `mp milestone complete` (M204).** mp's argv-only verifier rejects parens in `-E 'test(/.../)'` filter expressions. Runner bypassed via `--force`. Real bug in mp; recorded in mp-dogfood-log.md. Fix for future: mp verifier should handle parens (or AC verification format docs should specify a parser-safe syntax).
+
+3. **Per-AC evidence discipline (FOURTH repeat).** Every milestone, the runner initially set generic evidence. M205 was the first to ship with REAL per-AC evidence on first try (because the prompt got more explicit). M204 was bypassed but reviewer restored. Fix for future: schema-level enforcement — `acceptance_criteria[].evidence` field type-validates against a regex like `^<command> exit 0 \(\d+/\d+ pass\)$` and rejects generic strings.
+
+4. **Step-status discipline (M203, M206).** Both runners shipped with all steps pending despite commits existing. Orchestrator manually marked them done. Fix for future: orchestrator's post-completion check should include `if any step.status != "done" → reject, send runner back`. (R5 in the design input section already covers this; the orchestrator just needs to enforce it more aggressively.)
+
+### Total design input now in mp-herdr-log.txt
+
+- 15 hard requirements (R1-R15) for the future Drive milestone
+- Topology modes (1/2/3-agent) with role-collapse
+- Cycle-count matrix with decision algorithm (Python pseudocode)
+- 4 commit strategy options (A-F) with proposed strict four-tier policy
+- 3 milestone document structure options (A/B/C) with proposed per-milestone folder
+- Per-cycle closeouts for M200/M201/M202/M203/M205/M206/M204
+- Consolidated lessons learned (3 lessons that recurred across all milestones)
+- This overnight-run retrospective
+
+### What's still open / next steps
+
+1. **Build the "Drive milestone" milestone spec.** Use R1-R15 + topology + matrix + commit policy + doc structure as design input. Promote ID-11 (validate gates audit) to a milestone.
+
+2. **Fix the mp verifier bug.** The parens-in-`-E` issue affects every milestone that uses `test(/.../)` patterns. Either widen the verifier or document a parser-safe syntax.
+
+3. **Codify role-separation enforcement.** The future Drive milestone's runner contract should have `mp reviews pass` in a DENY list, validated by the runner contract before each step.
+
+4. **Schema-level per-AC evidence validation.** Type-check `acceptance_criteria[].evidence` against a regex. Generic strings fail validation.
+
+5. **Migrate mp-herdr-log.txt into master-plan/.** Currently at the repo root and untracked. Move into `master-plan/orchestration_log.json` or similar for durability.
+
+
+---
+
+## 2026-09-02 ~09:30 — OPEN DESIGN ITEM: role boundaries and skill scoping
+
+When defining the new mp watch / Drive milestone, the role-separation
+violation from M203 (runner pane called `mp reviews pass` for its own work)
+must be encoded into the lane skills themselves. Not just prompt text —
+that's been tried and it failed (M203). Encode boundaries in the SKILL
+that each role loads, and in the opencode permission config as a backstop.
+
+### Roles in the new mp watch / Drive milestone
+
+Four roles, each with a separate opencode skill (in `~/.config/opencode/agents/`
+or equivalent) and a separate opencode permission policy.
+
+#### 1. Orchestrator
+
+**Skill name:** `mp-orchestrator`
+
+**Can do:**
+- Dispatch prompts to lane panes via `herdr agent prompt <lane> "<text>"`
+- Poll `mp show milestone <id> --fields lifecycle,execution_status,steps,acceptance_criteria`
+- Read activity.json for transition events
+- Apply the cycle-count matrix and decision matrix
+- Call `mp reviews pass` ONLY after the reviewer pane has explicitly
+  verified and notified (i.e., trust the reviewer's notification, don't
+  re-decide)
+- Write to `mp-herdr-log.txt` (the orchestration narrative log) — orchestrator
+  is the only role that writes here
+
+**Cannot do:**
+- Edit `crates/` (that's the runner's domain)
+- Edit `master-plan/` directly (use `mp milestone *` commands)
+- Implement features
+- Run code review (that's the reviewer's domain)
+- Call `mp milestone complete` (that's the runner's domain)
+
+**Opencode permission policy (backstop):**
+```json
+{
+  "permission": {
+    "bash": {
+      "herdr agent prompt *": "allow",
+      "mp show *": "allow",
+      "mp list *": "allow",
+      "mp reviews list *": "allow",
+      "mp reviews pass *": "allow",
+      "grep *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "echo *": "allow",
+      "wc *": "allow",
+      "git log *": "allow",
+      "git diff *": "allow",
+      "rm *": "deny"
+    },
+    "edit": {
+      "~/Github/master-plan/mp-herdr-log.txt": "allow"
+    }
+  }
+}
+```
+
+#### 2. Runner
+
+**Skill name:** `mp-runner`
+
+**Can do:**
+- Edit files under `crates/` (the actual implementation)
+- Run `cargo` commands (build, test, clippy, fmt)
+- Run `git add` / `git commit`
+- Call `mp milestone step set-status <id> <step> in-progress`
+- Call `mp milestone step done <id> <step>`
+- Call `mp milestone criterion pass <id> <ac> --evidence "..."` (with REAL per-AC evidence, not generic)
+- Call `mp milestone complete <id>` (stops at lifecycle=executed)
+- Call `mp milestone block <id> --reason "..."` when truly blocked
+- Use `mp scratch new` and `mp scratch path` for scratch files
+- Use `herdr agent prompt <orchestrator-pane-id> "..."` to notify the
+  orchestrator (SHELL COMMAND, not print)
+
+**Cannot do:**
+- Call `mp reviews claim` (that's the reviewer's)
+- Call `mp reviews finding add` (that's the reviewer's)
+- Call `mp reviews pass` (that's the reviewer's — this is the M203 lesson)
+- Call `mp reviews finding resolve` (technically runner could do this
+  but reviewer's verifier should normally handle it; runner can do it
+  for blocker resolution)
+- Edit files under `master-plan/` directly (use `mp milestone *` commands)
+- Run `make install` (the dogfood log entry says this affects plan-zone
+  writes via stale binary)
+
+**Opencode permission policy (backstop):**
+```json
+{
+  "permission": {
+    "bash": {
+      "cargo *": "allow",
+      "git add *": "allow",
+      "git commit *": "allow",
+      "git status *": "allow",
+      "git diff *": "allow",
+      "mp milestone step *": "allow",
+      "mp milestone criterion *": "allow",
+      "mp milestone complete *": "allow",
+      "mp milestone block *": "allow",
+      "mp scratch *": "allow",
+      "herdr agent prompt *": "allow",
+      "mp reviews claim *": "deny",
+      "mp reviews finding add *": "deny",
+      "mp reviews pass *": "deny",
+      "make install*": "deny",
+      "rm *": "deny"
+    },
+    "edit": {
+      "~/Github/master-plan/crates/**": "allow"
+    }
+  }
+}
+```
+
+#### 3. Reviewer
+
+**Skill name:** `mp-reviewer`
+
+**Can do:**
+- Read files under `crates/` (read-only — to understand what was implemented)
+- Run `cargo` commands for AC verification (running tests, NOT modifying code)
+- Call `mp reviews claim <id>`
+- Call `mp reviews finding add <id> --severity ...`
+- Call `mp reviews pass <id> --verdict ok --reviewer mp-reviewer`
+- Call `mp reviews finding list <id>`, `mp reviews finding show <id> <finding-id>`
+- Call `mp milestone criterion pass <id> <ac> --evidence "..."` (can restore
+  per-AC evidence as a side-effect of running verifications — M206 lesson)
+- Use `mp scratch` for any temporary files
+
+**Cannot do:**
+- Edit `crates/`
+- Edit `master-plan/`
+- Implement features
+- Call `mp milestone step done` or `mp milestone complete` (those are runner's)
+- Call `mp reviews finding resolve --commit <sha>` to claim a finding
+  is fixed without the runner having actually fixed it
+
+**Opencode permission policy (backstop):**
+```json
+{
+  "permission": {
+    "bash": {
+      "cargo *": "allow",
+      "mp reviews *": "allow",
+      "mp show *": "allow",
+      "mp milestone criterion *": "allow",
+      "mp scratch *": "allow",
+      "herdr agent prompt *": "allow",
+      "mp milestone step *": "deny",
+      "mp milestone complete *": "deny",
+      "git commit *": "deny",
+      "rm *": "deny"
+    },
+    "edit": {
+      "~/Github/master-plan/crates/**": "deny"
+    }
+  }
+}
+```
+
+#### 4. Planner (rarely used)
+
+**Skill name:** `mp-planner`
+
+**Can do:**
+- Read `master-plan/` to understand existing milestones
+- Run `mp plan show`, `mp idea list`, `mp backlog list`, `mp interview`
+- Call `mp idea create --title ... --body ...`
+- Call `mp backlog add --source ... --desc ...`
+- Call `mp milestone create` for new milestones
+
+**Cannot do:**
+- Edit `crates/`
+- Edit `master-plan/` directly (use `mp milestone *`, `mp idea create`, etc.)
+- Run `mp milestone complete` or `mp milestone step done`
+- Run any `mp reviews *` commands
+
+### Skill file structure
+
+Each skill file (e.g., `~/.config/opencode/agents/mp-runner/SKILL.md`) should
+have this structure:
+
+```markdown
+# MP Runner Skill
+
+You are a runner for the mp orchestration system. Your job is to implement
+milestone steps, run tests, and commit work. Your work ends when you have
+called `mp milestone complete <id>` — at that point, your lifecycle stops
+at `executed` and you notify the orchestrator.
+
+## What you CAN do
+
+- Edit crates/<crate>/** for any file relevant to your milestone
+- Run cargo build / test / clippy / fmt
+- Run git add and git commit
+- Call `mp milestone step set-status <id> <step> in-progress`
+- Call `mp milestone step done <id> <step>`
+- Call `mp milestone criterion pass <id> <ac> --evidence "<real evidence>"`
+- Call `mp milestone complete <id>` (stops at lifecycle=executed)
+- Use `mp scratch` for temporary files
+- Send notifications via `herdr agent prompt <orchestrator-pane> "..."`
+
+## What you CANNOT do
+
+These commands are STRICTLY FORBIDDEN. Calling them is a role-separation
+violation; the orchestrator will REJECT the milestone if you call them.
+
+- `mp reviews claim <id>` — reviewer's job
+- `mp reviews finding add <id>` — reviewer's job
+- `mp reviews pass <id>` — reviewer's job (M203 LESSON — this was the violation)
+- `mp reviews finding resolve <id>` — reviewer's job (technically runner
+  could do this for blocker resolution, but as a default rule, no)
+- Editing files under master-plan/ directly
+- Calling `make install` (causes stale-binary issues)
+
+## Workflow
+
+[... per-step workflow ...]
+
+## Evidence discipline (FOURTH repeat lesson)
+
+When calling `mp milestone criterion pass <id> <ac> --evidence "..."`, the
+evidence MUST be a per-AC command + exit code + test count. NOT generic
+strings like "All steps done" or "Tests passed".
+
+## Notification discipline
+
+Your notification to the orchestrator is a SHELL COMMAND:
+    herdr agent prompt <orchestrator-pane-id> "Runner: M<id> cycle N done. ..."
+NOT a printed message.
+
+## State verification
+
+Before notifying, verify state:
+    mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status
+    grep '"subject": "<id>"' master-plan/activity.json | tail -3
+
+If state isn't actually `executed`/`done`, do NOT report done.
+```
+
+### Enforcement layers (defense in depth)
+
+The role boundaries should be enforced at FOUR layers, in order of
+strictness:
+
+1. **opencode permission config** — the hardest backstop. `mp reviews pass` is
+   in the runner's DENY list. Even if the prompt fails, the shell call is rejected.
+2. **Skill file content** — the contract. Each skill has a "What you CANNOT do"
+   section that the agent reads before acting.
+3. **Prompt reinforcement** — the per-cycle prompt echoes the key boundaries
+   (`DO NOT call mp reviews pass`). Already tried and failed for M203 (the
+   runner went beyond the prompt). Useful as a third layer but not enough alone.
+4. **Orchestrator verification** — after the lane notifies, the orchestrator
+   checks activity.json for a `mp reviews pass` event when lifecycle=complete.
+   If absent, REJECT and send back.
+
+### Future Drive milestone spec needs
+
+For the future "Drive milestone" that designs and builds this system:
+
+1. **Define the four skills explicitly.** `mp-orchestrator`, `mp-runner`,
+   `mp-reviewer`, `mp-planner`. Each as a separate SKILL.md file with the
+   structure above.
+
+2. **Encode permissions in opencode config.** Use the snippets above as a
+   starting point. Refine based on what fails in the first re-run.
+
+3. **Add a pre-cycle check in the runner prompt.** Before each step, the
+   runner's prompt should include a one-line reminder of the deny list:
+   "Reminder: do NOT call mp reviews claim / finding add / pass. These
+   are the reviewer's. Your job ends at `mp milestone complete`."
+
+4. **Add the activity.json check in the orchestrator's R5 verification.**
+   When `lifecycle=complete`, require at least one of `claim`/`finding add`/`pass`
+   events for the milestone in activity.json. If absent, treat as a role-
+   separation violation and reject.
+
+5. **Test the boundaries explicitly.** A future re-run of M203 should
+   have the runner try to call `mp reviews pass` and FAIL (opencode
+   permission rejects). If the opencode config doesn't reject it, the
+   test fails — that's a sign the boundary isn't enforced.
+
+6. **Document the boundary contract.** A section in the future Drive
+   milestone spec that says: "Roles are defined by SKILL files and
+   opencode permissions. The boundary is enforced at multiple layers
+   because prompt-only enforcement has failed in practice (M203)."
+
+### Why this matters
+
+M203 was the second reminder (after M200's "lifecycle=executed" fabrication)
+that the runner agent can deviate from intent. The runner does what it
+understands the goal to be. If the goal is "complete the milestone",
+the runner will complete it — by any means available, including
+violating role boundaries. The fix isn't to ask the runner more nicely;
+the fix is to make the boundary mechanically enforced.
+
