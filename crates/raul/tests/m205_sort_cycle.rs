@@ -997,6 +997,174 @@ fn sort_restored_on_tui_launch() {
     }
 }
 
+// ── F-01 (M205 cycle 2 / AC-08): real loader seam, not just label table ──
+//
+// The reviewer flagged that the AC-08 surface only verified
+// SortKey::label() names — it never exercised the actual loader
+// (`apply_persisted_sort_value`, the inner seam extracted from
+// `load_persisted_sort_keys`). A future change that re-introduced
+// "lifecycle" as a recognized value in the loader's match arm
+// would slip past the old assertions because they only looked at
+// the label table. These tests invoke the loader directly with
+// mocked config values (no real `mp config get` subprocess — the
+// pure seam accepts the value string the integration loader would
+// have parsed out of the JSON envelope) and assert:
+//   - "lifecycle" (the pre-M205 legacy literal) → unknown → no
+//     lane_sort_key insert → lane keeps its default (Id).
+//   - the new M205 keys (created / resolved-at / tags) DO land on
+//     the right SortKey when persisted.
+//   - garbage / unknown values also fall back without binding.
+//   - empty value (no config entry) is the silent-default path.
+
+#[test]
+fn load_persisted_sort_keys_unknown_value_falls_back_to_default_for_milestones() {
+    // Pre-M205 binding "lifecycle" must NOT introduce SortKey::Lifecycle
+    // (the variant doesn't exist post-M205) and must NOT corrupt the
+    // lane's default. The loader falls back silently.
+    let mut app = App::new();
+    let applied = raul::tui::runner::apply_persisted_sort_value(
+        &mut app,
+        Lane::Milestones,
+        "lifecycle",
+        "milestones",
+    );
+    assert!(
+        !applied,
+        "unknown 'lifecycle' value must NOT apply a binding"
+    );
+    assert_eq!(
+        app.lane_sort_key(Lane::Milestones),
+        SortKey::Id,
+        "lane must keep its in-memory default (Id) when the loader sees an unknown value"
+    );
+}
+
+#[test]
+fn load_persisted_sort_keys_unknown_value_falls_back_to_default_for_backlog() {
+    let mut app = App::new();
+    let applied = raul::tui::runner::apply_persisted_sort_value(
+        &mut app,
+        Lane::Backlog,
+        "lifecycle",
+        "backlog",
+    );
+    assert!(!applied, "unknown value must not bind");
+    assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Id);
+}
+
+#[test]
+fn load_persisted_sort_keys_unknown_value_falls_back_to_default_for_ideas() {
+    let mut app = App::new();
+    let applied =
+        raul::tui::runner::apply_persisted_sort_value(&mut app, Lane::Ideas, "lifecycle", "ideas");
+    assert!(!applied, "unknown value must not bind");
+    assert_eq!(app.lane_sort_key(Lane::Ideas), SortKey::Id);
+}
+
+#[test]
+fn load_persisted_sort_keys_garbage_value_falls_back_to_default() {
+    // A typo / random string in the persisted config must NOT
+    // corrupt the lane — same default-fallback policy as the
+    // pre-M205 "lifecycle" path.
+    for garbage in [
+        "garbage",
+        "brightness",
+        "LIFECYCLE",
+        "lifecycle ",
+        "  lifecycle",
+    ] {
+        let mut app = App::new();
+        let applied = raul::tui::runner::apply_persisted_sort_value(
+            &mut app,
+            Lane::Milestones,
+            garbage,
+            "milestones",
+        );
+        assert!(
+            !applied,
+            "garbage value {garbage:?} must NOT apply a binding"
+        );
+        assert_eq!(
+            app.lane_sort_key(Lane::Milestones),
+            SortKey::Id,
+            "lane must keep its default for garbage value {garbage:?}"
+        );
+    }
+}
+
+#[test]
+fn load_persisted_sort_keys_empty_value_is_silent_default() {
+    // Empty value (no config entry) is the silent default path —
+    // no eprintln, no binding, lane keeps Id. The integration
+    // runner returns "" for missing config entries; the loader
+    // must NOT spam stderr on every relaunch with "ignoring unknown
+    // sort key".
+    let mut app = App::new();
+    let applied =
+        raul::tui::runner::apply_persisted_sort_value(&mut app, Lane::Milestones, "", "milestones");
+    assert!(!applied, "empty value must not bind");
+    assert_eq!(app.lane_sort_key(Lane::Milestones), SortKey::Id);
+}
+
+#[test]
+fn load_persisted_sort_keys_binds_m205_keys_correctly() {
+    // M205 keys (created / resolved-at / tags) must land on the
+    // right SortKey when persisted. The pre-existing
+    // `m182_s5_choice_survives_simulated_restart` only covered Id /
+    // Stage / Priority / Updated — F-01 closes the gap.
+    let cases = [
+        ("created", SortKey::Created),
+        ("resolved-at", SortKey::ResolvedAt),
+        ("tags", SortKey::Tags),
+        ("status", SortKey::Status),
+        ("title", SortKey::Title),
+    ];
+    for (value, expected) in cases {
+        let mut app = App::new();
+        let applied = raul::tui::runner::apply_persisted_sort_value(
+            &mut app,
+            Lane::Backlog,
+            value,
+            "backlog",
+        );
+        assert!(applied, "value {value:?} must apply a binding");
+        assert_eq!(
+            app.lane_sort_key(Lane::Backlog),
+            expected,
+            "value {value:?} must round-trip to SortKey::{expected:?}"
+        );
+    }
+}
+
+#[test]
+fn load_persisted_sort_keys_binds_legacy_keys_for_backwards_compat() {
+    // Belt-and-suspenders: confirm the M182-era labels still work.
+    // The reviewer requested coverage for the load round-trip on
+    // every currently-recognized label; this catches a future change
+    // that accidentally drops one.
+    let cases = [
+        ("id", SortKey::Id),
+        ("stage", SortKey::Stage),
+        ("priority", SortKey::Priority),
+        ("updated", SortKey::Updated),
+    ];
+    for (value, expected) in cases {
+        let mut app = App::new();
+        let applied = raul::tui::runner::apply_persisted_sort_value(
+            &mut app,
+            Lane::Milestones,
+            value,
+            "milestones",
+        );
+        assert!(applied, "legacy value {value:?} must apply a binding");
+        assert_eq!(
+            app.lane_sort_key(Lane::Milestones),
+            expected,
+            "legacy value {value:?} must round-trip to SortKey::{expected:?}"
+        );
+    }
+}
+
 #[test]
 fn legacy_lifecycle_sort_falls_back_to_default() {
     // AC-08: pre-M205 persisted value "lifecycle" doesn't match any

@@ -3,9 +3,9 @@
     "id": "205",
     "title": "raul sort cycle consistency across Milestones / Backlog / Ideas",
     "slug": "raul-sort-cycle-consistency-across-milestones-backlog-ideas",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -19,7 +19,7 @@
     "effort": "S",
     "risk": "low",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-08-29",
     "updated": "2026-09-02",
     "blocked_at": "",
@@ -27,7 +27,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T06:29:26.928212+00:00"
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-02T06:50:18.806454+00:00"
   },
   "intent": {
     "outcome": "All three list-style lanes in raul (Milestones, Backlog, Ideas) use the same 6-stop sort cycle grammar, same column-header sort behavior, and same `o` cycle key. Sort choices persist via the [ui].sort framework introduced by M204. Per-tab stop order: Milestones uses Id, Title, Priority, Stage, Created, Updated; Backlog uses Id, Title, Priority, Status, Created, Resolved-at; Ideas uses Id, Title, Priority, Status, Created, Tags. After this lands, operators learn one sort UX and apply it across all three lanes."
@@ -114,14 +115,14 @@
       "description": "Sort persistence via existing sort.<lane> still works. Changing the cycle writes sort.<lane> within 1s via the M204 debounce. Restarting restores. Pre-M205 value lifecycle falls back to the per-lane default.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|legacy_lifecycle_sort_falls_back_to_default/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|legacy_lifecycle_sort_falls_back_to_default/)' exit 0 (3/3 pass)"
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|legacy_lifecycle_sort_falls_back_to_default|load_persisted_sort_keys_unknown_value_falls_back_to_default_for_milestones|load_persisted_sort_keys_unknown_value_falls_back_to_default_for_backlog|load_persisted_sort_keys_unknown_value_falls_back_to_default_for_ideas|load_persisted_sort_keys_garbage_value_falls_back_to_default|load_persisted_sort_keys_empty_value_is_silent_default|load_persisted_sort_keys_binds_m205_keys_correctly|load_persisted_sort_keys_binds_legacy_keys_for_backwards_compat/)' exit 0 (10/10 pass)"
     },
     {
       "id": "AC-09",
       "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
       "verification": "make test",
       "status": "passed",
-      "evidence": "cargo fmt --all -- --check exit 0; cargo clippy -p mp --tests --no-deps -- -D warnings exit 0; cargo clippy -p raul --tests --no-deps -- -D warnings exit 0; cargo nextest run -p mp --no-fail-fast exit 0 (2284/2284 pass); cargo nextest run -p raul --no-fail-fast exit 0 (1023/1023 pass); make test exit 0"
+      "evidence": "cargo fmt --all -- --check exit 0; cargo clippy -p mp --tests --no-deps -- -D warnings exit 0; cargo clippy -p raul --tests --no-deps -- -D warnings exit 0; cargo nextest run -p mp --no-fail-fast exit 0 (2284/2284 pass); cargo nextest run -p raul --no-fail-fast exit 0 (1037/1037 pass); make test exit 0"
     }
   ],
   "design_decisions": [
@@ -394,5 +395,18 @@
     "date": "2026-09-02",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "test-coverage",
+      "description": "crates/raul/tests/m205_sort_cycle.rs:1001-1043 (`legacy_lifecycle_sort_falls_back_to_default`) and :953-998 (`sort_restored_on_tui_launch`) do not exercise `load_persisted_sort_keys` in crates/raul/src/tui/runner_helpers.rs:613-649. The first asserts only that no current SortKey::label() returns the literal \"lifecycle\"; the second rebuilds the match inline with a panic on unknown inputs. A future change that re-introduces `lifecycle` as a recognized value in the loader's match arm (the legacy-fallback path the AC actually pins) would not be caught — the tests pass either way. The pre-existing `m182_s5_choice_survives_simulated_restart` (crates/raul/tests/tui_sort_rebind_render_and_persist.rs:210) covers the round-trip pattern for Id/Stage/Priority/Updated but not for Created/ResolvedAt/Tags or for the legacy-fallback arm. Recommend either invoking `load_persisted_sort_keys` against a mocked config (set sort.milestones=lifecycle, assert app.lane_sort_key(Lane::Milestones)==Id), or removing the redundant tests and relying on the pre-existing round-trip test.",
+      "status": "open",
+      "author": "reviewer-205",
+      "fixed_in": "",
+      "created": "2026-09-02",
+      "resolved": ""
+    }
+  ]
 }

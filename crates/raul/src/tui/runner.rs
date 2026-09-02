@@ -26,11 +26,11 @@ use crate::mp_runner::MpRunner;
 // `pub use` keeps the pre-M136 `raul::tui::runner::co_approval_approve`
 // (etc.) call sites in the integration tests working unchanged.
 pub use super::runner_helpers::{
-    check_approval_status, co_approval_approve, create_annotation, create_approval_annotation,
-    execute_review_action, invalidate_after_lifecycle_write, load_annotations, load_backlog,
-    load_backlog_detail, load_dashboard, load_data_for_lane, load_milestone_detail,
-    load_milestones, load_path_data, mp_dir_for_runner, navigate_from_inbox_item,
-    parse_mp_ok_response, reopen_annotation, resolve_annotation,
+    apply_persisted_sort_value, check_approval_status, co_approval_approve, create_annotation,
+    create_approval_annotation, execute_review_action, invalidate_after_lifecycle_write,
+    load_annotations, load_backlog, load_backlog_detail, load_dashboard, load_data_for_lane,
+    load_milestone_detail, load_milestones, load_path_data, mp_dir_for_runner,
+    navigate_from_inbox_item, parse_mp_ok_response, reopen_annotation, resolve_annotation,
 };
 
 #[derive(Debug, Clone, Default)]

@@ -611,45 +611,67 @@ pub fn load_persisted_sort_keys(runner: &MpRunner, app: &mut App) -> Result<()> 
         // empty-value path (lane stays on its default).
         let raw = runner.run_raw("config", &["get", &key]).unwrap_or_default();
         let value = parse_config_get_value(&raw).unwrap_or_default();
-        let sort_key = match value.as_str() {
-            "id" => crate::tui::app::SortKey::Id,
-            // M205: pre-M205 bindings persisted as "lifecycle" — the
-            // Stage sort replaces the legacy Lifecycle variant
-            // (Stage column owns that signal now). The "stage"
-            // label is the canonical post-M205 spelling; pre-M205
-            // "lifecycle" values fall through to the unknown branch
-            // below and silently fall back to the per-lane default
-            // (per AC-08 — legacy migration must not break existing
-            // users).
-            "stage" => crate::tui::app::SortKey::Stage,
-            "priority" => crate::tui::app::SortKey::Priority,
-            "updated" => crate::tui::app::SortKey::Updated,
-            // M205: cross-lane Created sort.
-            "created" => crate::tui::app::SortKey::Created,
-            // Backlog-shaped sort key (status ranks backlog/ideas rows).
-            "status" => crate::tui::app::SortKey::Status,
-            // M205: Backlog-only ResolvedAt sort.
-            "resolved-at" => crate::tui::app::SortKey::ResolvedAt,
-            // M205: Ideas-only Tags sort.
-            "tags" => crate::tui::app::SortKey::Tags,
-            // Alphabetical title sort (cross-lane).
-            "title" => crate::tui::app::SortKey::Title,
-            "" => continue,
-            other => {
-                // Unknown sort key — the lane stays on its default.
-                // A future config-cleanup milestone can prune stale
-                // sort.* entries; we don't write back here so a
-                // transient typo can't clobber the user's real choice.
-                // Pre-M205 "lifecycle" values land here silently — the
-                // per-lane default (Id) is the M182 S3 fallback
-                // (AC-08: legacy lifecycle sort falls back to default).
-                eprintln!("raul: ignoring unknown sort key for lane {lane_key}: {other:?}");
-                continue;
-            }
-        };
-        app.lane_sort_key.insert(lane, sort_key);
+        apply_persisted_sort_value(app, lane, &value, lane_key);
     }
     Ok(())
+}
+
+/// M205 cycle 2 / F-01: pure, testable seam for the per-lane sort
+/// binding logic. Translates a persisted `mp config get sort.<lane>`
+/// `value` string into a `SortKey` and writes it into
+/// `app.lane_sort_key`. Unknown / unrecognized values (incl. the
+/// pre-M205 `lifecycle` literal) fall back to the per-lane default
+/// (no lane_sort_key insert) so the lane keeps its in-memory default
+/// (Id). Returns `true` when a binding was applied, `false` when the
+/// value was empty / unknown.
+///
+/// Extracted from `load_persisted_sort_keys` so the F-01 test
+/// surface can exercise the unknown-fallback arm without a real
+/// `mp config get` subprocess — the integration `load_persisted_sort_keys`
+/// remains the production entry point.
+pub fn apply_persisted_sort_value(app: &mut App, lane: Lane, value: &str, lane_key: &str) -> bool {
+    let sort_key = match value {
+        "id" => crate::tui::app::SortKey::Id,
+        // M205: pre-M205 bindings persisted as "lifecycle" — the
+        // Stage sort replaces the legacy Lifecycle variant
+        // (Stage column owns that signal now). The "stage"
+        // label is the canonical post-M205 spelling; pre-M205
+        // "lifecycle" values fall through to the unknown branch
+        // below and silently fall back to the per-lane default
+        // (per AC-08 — legacy migration must not break existing
+        // users).
+        "stage" => crate::tui::app::SortKey::Stage,
+        "priority" => crate::tui::app::SortKey::Priority,
+        "updated" => crate::tui::app::SortKey::Updated,
+        // M205: cross-lane Created sort.
+        "created" => crate::tui::app::SortKey::Created,
+        // Backlog-shaped sort key (status ranks backlog/ideas rows).
+        "status" => crate::tui::app::SortKey::Status,
+        // M205: Backlog-only ResolvedAt sort.
+        "resolved-at" => crate::tui::app::SortKey::ResolvedAt,
+        // M205: Ideas-only Tags sort.
+        "tags" => crate::tui::app::SortKey::Tags,
+        // Alphabetical title sort (cross-lane).
+        "title" => crate::tui::app::SortKey::Title,
+        // Empty / unknown values (incl. legacy "lifecycle") — fall
+        // back to the per-lane default (no insert). The lane keeps
+        // its in-memory default (Id), per the M182 S3 / M205 AC-08
+        // migration policy: pre-M205 bindings must not break
+        // existing users.
+        _ => {
+            // Surface the unknown value to stderr (same policy the
+            // pre-extraction loader followed) so the operator can
+            // see why a binding didn't take. Empty values stay
+            // silent — they're the default state and would only
+            // spam the log on every relaunch.
+            if !value.is_empty() {
+                eprintln!("raul: ignoring unknown sort key for lane {lane_key}: {value:?}");
+            }
+            return false;
+        }
+    };
+    app.lane_sort_key.insert(lane, sort_key);
+    true
 }
 
 /// Parse `mp config get <key>` output. The command returns
