@@ -134,8 +134,8 @@
       "id": "AC-11",
       "description": "If M201 schema descriptions are present, keybinds.filter / keybinds.lifecycle_filter / keybinds.grooming_preset descriptions describe the unified filter modal (F on list lanes; g opens grooming preset on Milestones only), not the pre-M204 Milestones-only lifecycle filter.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_keybind_help|grooming_preset_help|lifecycle_filter_help/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E test(/filter_keybind_help|grooming_preset_help|lifecycle_filter_help/) exit 0 (3/3 pass)"
     }
   ],
   "design_decisions": [
@@ -489,7 +489,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_keybind_help|grooming_preset_help|lifecycle_filter_help/)'",
       "done_when": "Filter keybind help describes F on list lanes and g as grooming preset on Milestones only",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-11"
       ],

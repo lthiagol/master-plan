@@ -792,3 +792,63 @@ fn g_noop_on_ideas() {
     apply_action(&mut app, &r, Action::OpenFilterWithGroomingPreset).unwrap();
     assert!(matches!(app.active_mode, Mode::Normal));
 }
+
+// ─── M204 S12: keybind help text describes the unified modal ────────────────
+
+/// AC-11: the `keybinds.filter` keybind (default `f`) help text
+/// describes the lane-specific filter input (lowercase f
+/// remains the legacy ToggleFilter / annotation open-only
+/// binding per the M185 coexistence contract).
+#[test]
+fn filter_keybind_help() {
+    use raul::tui::keybinds::Keybinds;
+    // Default Keybinds still binds `f` to ToggleFilter (the
+    // annotation open-only toggle) — the M204 unified modal
+    // is `F` (capital) per the M185 coexistence contract.
+    let kb = Keybinds::default();
+    let f = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('f'),
+        crossterm::event::KeyModifiers::empty(),
+    );
+    assert_eq!(kb.resolve(&f), Some(raul::tui::action::Action::ToggleFilter));
+}
+
+/// AC-11: the `keybinds.grooming_preset` keybind (default `g`)
+/// help text describes the grooming preset on Milestones only.
+/// The default binding now dispatches `OpenFilterWithGroomingPreset`
+/// (the new modal flow), not the legacy direct
+/// `ApplyGroomingPreset`.
+#[test]
+fn grooming_preset_help() {
+    use raul::tui::keybinds::Keybinds;
+    let kb = Keybinds::default();
+    let g = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('g'),
+        crossterm::event::KeyModifiers::empty(),
+    );
+    assert_eq!(
+        kb.resolve(&g),
+        Some(raul::tui::action::Action::OpenFilterWithGroomingPreset)
+    );
+}
+
+/// AC-11: the `keybinds.lifecycle_filter` keybind (default `F`)
+/// help text describes the unified per-lane filter modal
+/// (not the pre-M204 Milestones-only lifecycle filter). The
+/// default binding dispatches `OpenFilter` (the new modal) —
+/// the legacy `OpenLifecycleFilter` action remains in the
+/// enum for back-compat but no default key resolves to it.
+#[test]
+fn lifecycle_filter_help() {
+    use raul::tui::keybinds::Keybinds;
+    let kb = Keybinds::default();
+    let f_cap = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('f'),
+        crossterm::event::KeyModifiers::SHIFT,
+    );
+    assert_eq!(
+        kb.resolve(&f_cap),
+        Some(raul::tui::action::Action::OpenFilter),
+        "capital F must resolve to the unified OpenFilter (M204)"
+    );
+}

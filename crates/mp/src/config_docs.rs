@@ -129,7 +129,7 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "keybind",
         "g",
         None,
-        "Cycle through the grooming presets on the Backlog lane.",
+        "Open the filter modal with the Grooming preset pre-toggled (Milestones lane only).",
     ),
     (
         "keybinds.help",
@@ -150,7 +150,7 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "keybind",
         "F",
         None,
-        "Open the multi-select lifecycle filter on the Milestones lane.",
+        "Open the unified per-lane filter modal on Milestones, Backlog, or Ideas (whichever list lane is active).",
     ),
     (
         "keybinds.next_item",
