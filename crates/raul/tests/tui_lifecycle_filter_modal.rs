@@ -186,3 +186,148 @@ fn modal_visual_style_consistent_across_lanes() {
     let ctrl_a = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert!(filter_modal::handle_key(ctrl_a).is_empty());
 }
+
+// ─── M204 S5: F key opens modal on all three lanes; c clears all ───────────
+
+/// F on Milestones opens the unified filter modal. The modal
+/// shape (Mode::Filter) is the new M204 variant; the legacy
+/// Mode::LifecycleFilter is no longer the default for capital F.
+#[test]
+fn filter_modal_opens_on_F_from_milestones() {
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilter).unwrap();
+    match &app.active_mode {
+        Mode::Filter(st) => {
+            assert_eq!(st.lane, Lane::Milestones);
+            // The Milestones modal must surface lifecycle +
+            // priority + age in that order.
+            assert_eq!(st.dimensions.len(), 3);
+            assert_eq!(st.dimensions[0].name, "lifecycle");
+            assert_eq!(st.dimensions[1].name, "priority");
+            assert_eq!(st.dimensions[2].name, "age");
+        }
+        other => panic!("expected Mode::Filter, got {other:?}"),
+    }
+}
+
+#[test]
+fn filter_modal_opens_on_F_from_backlog() {
+    let mut app = App::new();
+    app.select_lane(Lane::Backlog);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilter).unwrap();
+    match &app.active_mode {
+        Mode::Filter(st) => {
+            assert_eq!(st.lane, Lane::Backlog);
+            assert_eq!(st.dimensions.len(), 4);
+            let names: Vec<&str> = st.dimensions.iter().map(|d| d.name.as_str()).collect();
+            assert_eq!(names, vec!["priority", "status", "age", "source"]);
+        }
+        other => panic!("expected Mode::Filter, got {other:?}"),
+    }
+}
+
+#[test]
+fn filter_modal_opens_on_F_from_ideas() {
+    let mut app = App::new();
+    app.select_lane(Lane::Ideas);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilter).unwrap();
+    match &app.active_mode {
+        Mode::Filter(st) => {
+            assert_eq!(st.lane, Lane::Ideas);
+            assert_eq!(st.dimensions.len(), 4);
+            let names: Vec<&str> = st.dimensions.iter().map(|d| d.name.as_str()).collect();
+            assert_eq!(names, vec!["priority", "status", "age", "tags"]);
+        }
+        other => panic!("expected Mode::Filter, got {other:?}"),
+    }
+}
+
+#[test]
+fn milestones_modal_exposes_lifecycle_priority_age() {
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilter).unwrap();
+    let st = match &app.active_mode {
+        Mode::Filter(st) => st.clone(),
+        _ => panic!("expected Mode::Filter"),
+    };
+    // Lifecycle: 10 values (canonical M185 order).
+    assert_eq!(st.dimensions[0].values.len(), 10);
+    assert_eq!(st.dimensions[0].values[0], "draft");
+    assert_eq!(st.dimensions[0].values[8], "cancelled");
+    // Priority: 4 values.
+    assert_eq!(st.dimensions[1].values, vec!["urgent", "high", "normal", "low"]);
+    // Age: 3 preset chips.
+    assert_eq!(st.dimensions[2].values, vec![">7d", ">30d", ">90d"]);
+}
+
+#[test]
+fn backlog_modal_exposes_priority_status_age_source() {
+    use raul::tui::modes::filter_modal::spec as fspec;
+    let dims = fspec::backlog();
+    assert_eq!(dims[0].name, "priority");
+    assert_eq!(dims[1].name, "status");
+    assert_eq!(dims[2].name, "age");
+    assert_eq!(dims[3].name, "source");
+    // Source values are the four actionable-backlog prefixes.
+    let source_vals = &dims[3].values;
+    assert!(source_vals.contains(&"B-".to_string()));
+    assert!(source_vals.contains(&"BL-".to_string()));
+    assert!(source_vals.contains(&"TW-".to_string()));
+    assert!(source_vals.contains(&"BF-".to_string()));
+}
+
+#[test]
+fn ideas_modal_exposes_priority_status_age_tags() {
+    use raul::tui::modes::filter_modal::spec as fspec;
+    let dims = fspec::ideas();
+    assert_eq!(dims[0].name, "priority");
+    assert_eq!(dims[1].name, "status");
+    assert_eq!(dims[2].name, "age");
+    assert_eq!(dims[3].name, "tags");
+    // Tag-prefix values: alpha / beta / unblocked / spike.
+    let tag_vals = &dims[3].values;
+    assert!(tag_vals.contains(&"alpha".to_string()));
+    assert!(tag_vals.contains(&"beta".to_string()));
+    assert!(tag_vals.contains(&"unblocked".to_string()));
+    assert!(tag_vals.contains(&"spike".to_string()));
+}
+
+#[test]
+fn c_clears_all_active_filters() {
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    // Seed two dimensions of filters on the Milestones lane.
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut dims: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    dims.insert(
+        "lifecycle".to_string(),
+        BTreeSet::from(["approved".to_string()]),
+    );
+    dims.insert(
+        "priority".to_string(),
+        BTreeSet::from(["high".to_string()]),
+    );
+    app.lane_filters.insert(Lane::Milestones, dims);
+    assert!(!app.lifecycle_filter_set().is_empty());
+
+    // Press c on Milestones — must clear all filters.
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::ClearFilters).unwrap();
+    assert!(
+        app.lifecycle_filter_set().is_empty(),
+        "lifecycle dim must be cleared"
+    );
+    assert!(
+        app.lane_filters
+            .get(&Lane::Milestones)
+            .map(|d| d.is_empty())
+            .unwrap_or(true),
+        "lane entry must be empty or absent"
+    );
+}

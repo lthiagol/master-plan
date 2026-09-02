@@ -126,6 +126,10 @@ pub enum Action {
     // ---- M204: unified filter modal -----------------------------------------
     /// Open the unified filter modal (default capital `F`).
     OpenFilter,
+    /// Open the unified filter modal with the grooming preset
+    /// pre-toggled on the lifecycle dimension (default `g` on
+    /// Milestones only). Other lanes ignore this action.
+    OpenFilterWithGroomingPreset,
     /// Move the filter modal cursor up (Up / k).
     FilterPrev,
     /// Move the filter modal cursor down (Down / j).
@@ -136,6 +140,9 @@ pub enum Action {
     FilterCommit,
     /// Restore the prior filter state and close the modal (Esc).
     FilterCancel,
+    /// Clear all active filters for the active lane (default
+    /// `c` on a list lane).
+    ClearFilters,
     /// Move to the next lane in `Lane::ordered()` (Right / l).
     NextLane,
     /// Jump to a specific lane by `Lane::ordered()` index (digit keys 1..=N,
@@ -353,11 +360,38 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
                 );
             }
         }
+        Action::OpenFilterWithGroomingPreset => {
+            // S8: `g` on Milestones opens the modal with the
+            // grooming preset pre-toggled. Other lanes are
+            // no-ops (the dispatcher gate matches the legacy
+            // `ApplyGroomingPreset` policy).
+            if app.active_lane == Lane::Milestones
+                && app.content == ContentState::List
+            {
+                app.open_filter_modal(Lane::Milestones, true);
+            } else if app.active_lane != Lane::Milestones {
+                app.set_flash_message(
+                    "Grooming preset is only available on Milestones.",
+                );
+            }
+        }
         Action::FilterNext => app.filter_next(),
         Action::FilterPrev => app.filter_prev(),
         Action::FilterToggle => app.filter_toggle(),
         Action::FilterCommit => app.filter_commit(),
         Action::FilterCancel => app.filter_cancel(),
+        Action::ClearFilters => {
+            // AC-07: `c` clears all active filters on the active
+            // lane. List lanes only — other lanes are a no-op
+            // (no filter to clear, and `c` is used for the
+            // Watch lane's clear-queue action).
+            let lane = app.active_lane;
+            if app.content == ContentState::List
+                && matches!(lane, Lane::Milestones | Lane::Backlog | Lane::Ideas)
+            {
+                app.clear_lane_filters(lane);
+            }
+        }
 
         // M186: search input + cycle sort.
         Action::OpenSearch => {

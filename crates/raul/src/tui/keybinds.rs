@@ -147,13 +147,25 @@ pub struct Keybinds {
     /// M172 S5: cancel the open menu without binding.
     pub sort_rebind_cancel: Vec<KeyCombo>,
     /// M185: open lifecycle filter modal (default capital `F`).
+    /// M204: bound to `Action::OpenFilter` (the unified
+    /// per-lane modal). The legacy `Action::OpenLifecycleFilter`
+    /// remains in the enum so the M185-era tests can still
+    /// construct it; no default keybinding resolves to it.
     pub lifecycle_filter: Vec<KeyCombo>,
     /// M185: apply Grooming preset on Milestones (default `g`).
+    /// M204: bound to `Action::OpenFilterWithGroomingPreset`
+    /// (the modal pre-toggles the Grooming preset on the
+    /// lifecycle dimension).
     pub grooming_preset: Vec<KeyCombo>,
     /// M186: open search input (default `/`).
     pub search: Vec<KeyCombo>,
     /// M186: cycle sort key (default `o`).
     pub cycle_sort: Vec<KeyCombo>,
+    /// M204 / AC-07: clear all active filters on a list lane
+    /// (default `c`). Routes to `Action::ClearFilters`; on the
+    /// Watch lane the same key is shadowed by the per-lane
+    /// `WatchClearQueue` action (dispatcher in `modes/normal`).
+    pub clear_filters: Vec<KeyCombo>,
 }
 
 impl Default for Keybinds {
@@ -217,6 +229,7 @@ impl Default for Keybinds {
             grooming_preset: vec![plain(KeyCode::Char('g'))],
             search: vec![plain(KeyCode::Char('/'))],
             cycle_sort: vec![plain(KeyCode::Char('o'))],
+            clear_filters: vec![plain(KeyCode::Char('c'))],
         }
     }
 }
@@ -294,19 +307,36 @@ impl Keybinds {
         if any_matches(&self.sort_rebind, key) {
             return Some(Action::OpenSortRebind);
         }
-        // M185: capital F opens lifecycle filter; lowercase f remains
-        // ToggleFilter (checked above). g applies Grooming preset.
+        // M204: capital F opens the unified per-lane filter modal
+        // (Milestones / Backlog / Ideas). The legacy M185
+        // `OpenLifecycleFilter` is still dispatched through the
+        // keybinds so existing tests pass — `lifecycle_filter` is
+        // a back-compat alias for the modal-open action and the
+        // M185-era per-mode handler is reachable via
+        // `Action::OpenLifecycleFilter` (still defined in
+        // `action.rs` for downstream callers / tests).
         if any_matches(&self.lifecycle_filter, key) {
-            return Some(Action::OpenLifecycleFilter);
+            return Some(Action::OpenFilter);
         }
+        // M204: g now opens the modal with the grooming preset
+        // pre-toggled (Milestones only — `apply_action` lanes the
+        // binding). The legacy `Action::ApplyGroomingPreset` is
+        // kept for back-compat (existing M185 tests) — it's a
+        // one-shot direct apply (no modal), the modal path is
+        // `Action::OpenFilter` with `grooming_preset=true` set
+        // by the new `Action::OpenFilterWithGroomingPreset` arm
+        // in the dispatcher.
         if any_matches(&self.grooming_preset, key) {
-            return Some(Action::ApplyGroomingPreset);
+            return Some(Action::OpenFilterWithGroomingPreset);
         }
         if any_matches(&self.search, key) {
             return Some(Action::OpenSearch);
         }
         if any_matches(&self.cycle_sort, key) {
             return Some(Action::CycleSortNext);
+        }
+        if any_matches(&self.clear_filters, key) {
+            return Some(Action::ClearFilters);
         }
         None
     }
@@ -443,6 +473,7 @@ impl Keybinds {
             ("grooming_preset", &mut self.grooming_preset),
             ("search", &mut self.search),
             ("cycle_sort", &mut self.cycle_sort),
+            ("clear_filters", &mut self.clear_filters),
         ]
     }
 

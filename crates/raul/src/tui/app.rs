@@ -1612,6 +1612,16 @@ impl App {
         }
     }
 
+    /// M204 / AC-07: `c` clears all active filters for the
+    /// given lane. Marks the lane dirty so the debounced
+    /// flush writes the empty filter state to disk.
+    pub fn clear_lane_filters(&mut self, lane: Lane) {
+        self.lane_filters.remove(&lane);
+        self.selected_index = 0;
+        self.mark_filter_dirty(lane);
+        self.touch();
+    }
+
 
     /// M186: the active lane's committed search term (empty = no filter).
     pub fn lane_search_term(&self) -> &str {
