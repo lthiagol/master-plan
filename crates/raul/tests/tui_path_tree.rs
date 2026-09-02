@@ -1133,3 +1133,102 @@ fn age_uses_relative_time() {
         row = row_text(&buf, m10_y)
     );
 }
+
+// =========================================================================
+// M206 S2 — flat_branch_lines 2-line + branch header preservation (AC-09)
+// =========================================================================
+
+#[test]
+fn flat_branch_emits_two_visual_lines() {
+    // M30 (awaiting-approval branch, single item) must render as 2
+    // visual lines: title + preview.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let title_y = find_row_index(&buf, "M30 — Awaiting approval milestone");
+    // Find the preview row (carries the outcome text "Cancellation
+    // reason: superseded by M205.").
+    let mut preview_y = None;
+    for y in title_y + 1..buf.area.height {
+        if row_text_contains(&buf, y, "Cancellation reason: superseded by M205.") {
+            preview_y = Some(y);
+            break;
+        }
+    }
+    let preview_y = preview_y.expect("M30 preview row must exist");
+    assert_eq!(
+        preview_y - title_y,
+        1,
+        "M30 title + preview must be adjacent"
+    );
+}
+
+#[test]
+fn branch_headers_bold_color_preserved() {
+    // The Awaiting approval / Blocked / Grooming / Review branch
+    // headers carry the lane color in BOLD. We assert the BOLD
+    // modifier is set on the header label cells (e.g. `B` in
+    // "Blocked").
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let blocked_header_y = find_row_index(&buf, "Blocked");
+    // Find the first non-trivia cell of "Blocked" and check BOLD.
+    let mut row = String::new();
+    for x in 0..buf.area.width {
+        row.push_str(buf[(x, blocked_header_y)].symbol());
+    }
+    let mut found = false;
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, blocked_header_y)];
+        if cell.symbol() == "B" {
+            assert!(
+                cell.style().add_modifier.contains(ratatui::style::Modifier::BOLD),
+                "Blocked header label `B` must carry BOLD modifier; row: {row:?}"
+            );
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "could not locate B cell on Blocked header row");
+
+    // Also check Awaiting approval header
+    let awaiting_header_y = find_row_index(&buf, "Awaiting approval");
+    let mut found = false;
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, awaiting_header_y)];
+        if cell.symbol() == "A" {
+            assert!(
+                cell.style().add_modifier.contains(ratatui::style::Modifier::BOLD),
+                "Awaiting approval header label `A` must carry BOLD modifier"
+            );
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "could not locate A cell on Awaiting approval header row");
+}
+
+#[test]
+fn branch_headers_show_item_count_suffix() {
+    // Branch headers show " · <count>" suffix. Blocked has 1 item
+    // (M20), Awaiting approval has 1 (M30), Grooming has 1 (M40).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let blocked_header_y = find_row_index(&buf, "Blocked");
+    let blocked_row = row_text(&buf, blocked_header_y);
+    assert!(
+        blocked_row.contains("· 1"),
+        "Blocked header must show item count `· 1`; row: {blocked_row:?}"
+    );
+    let awaiting_header_y = find_row_index(&buf, "Awaiting approval");
+    let awaiting_row = row_text(&buf, awaiting_header_y);
+    assert!(
+        awaiting_row.contains("· 1"),
+        "Awaiting approval header must show item count `· 1`; row: {awaiting_row:?}"
+    );
+}
