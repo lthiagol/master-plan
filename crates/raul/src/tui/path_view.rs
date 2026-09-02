@@ -305,53 +305,11 @@ pub fn age_text(lifecycle_at: &str) -> String {
     }
 }
 
-/// Status overlay chip text — `BLOCKED` / `CANCELLED` / `DEFERRED`.
-/// Precedence (AC-03): `blocked` wins over `cancelled` wins over
-/// `deferred`. Returns `None` when none of the three are set.
-pub fn overlay_chip(item: &serde_json::Value) -> Option<(&'static str, Color)> {
-    let blocked = item["milestone"]["blocked"].as_bool().unwrap_or(false);
-    let cancelled = item["milestone"]["cancelled"].as_bool().unwrap_or(false);
-    let deferred = item["milestone"]["deferred"].as_bool().unwrap_or(false);
-    let m = item["milestone"].clone();
-    let _ = m;
-    if blocked {
-        Some((
-            "BLOCKED",
-            super::app::App::default().effective_palette().danger,
-        ))
-    } else if cancelled {
-        Some((
-            "CANCELLED",
-            super::app::App::default().effective_palette().danger,
-        ))
-    } else if deferred {
-        Some((
-            "DEFERRED",
-            super::app::App::default().effective_palette().warn,
-        ))
-    } else {
-        None
-    }
-}
-
-/// Color for a status overlay chip given the palette. Extracted so
-/// tests can verify the color without instantiating an `App`.
-pub fn overlay_chip_color(kind: &str, palette_helpers: &theme::Palette) -> Color {
-    match kind {
-        "BLOCKED" => palette_helpers.danger,
-        "CANCELLED" => palette_helpers.danger,
-        "DEFERRED" => palette_helpers.warn,
-        // AC-03: deferred uses dim per spec, even though the badge
-        // text uses warn. We carry two channels — text (warn so it
-        // stands out) and color (dim so it visually downgrades). The
-        // title-line color here is dim per AC-03.
-        _ => palette_helpers.dim,
-    }
-}
-
-/// AC-03: the spec calls for `danger/warn/dim` for blocked/cancelled/
-/// deferred respectively. Return that pair explicitly. Cancelled gets
-/// warn (not danger) — danger is reserved for blocked.
+/// Status overlay chip text + color — `BLOCKED` / `CANCELLED` /
+/// `DEFERRED`. Precedence (AC-03): `blocked` wins over `cancelled`
+/// wins over `deferred`. Returns `None` when none of the three are
+/// set. The color matches AC-03: blocked=danger, cancelled=warn,
+/// deferred=dim.
 pub fn overlay_chip_pair(
     item: &serde_json::Value,
     palette_helpers: &theme::Palette,
