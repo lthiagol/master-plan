@@ -41,6 +41,18 @@ pub struct ProjectConfig {
     /// shape.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub sort: std::collections::BTreeMap<String, String>,
+    /// M204: per-lane filter selections. The structure is
+    /// `lane → dimension → set of selected values` so each lane
+    /// (Milestones / Backlog / Ideas) carries its own multi-select
+    /// filter state with a stable, deterministic on-disk shape.
+    /// `mp` reads & writes the section through `mp config set
+    /// filter.<lane> ...` (single map shape — value is the
+    /// per-dimension BTreeMap), but never interprets the values
+    /// itself; raul is the sole consumer. Empty sections are
+    /// skipped on write so pre-M204 configs round-trip without an
+    /// empty `filter` block.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub filter: std::collections::BTreeMap<String, std::collections::BTreeMap<String, std::collections::BTreeSet<String>>>,
 }
 
 /// M154: review-side integrations. The two knobs here gate the hunk

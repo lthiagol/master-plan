@@ -130,6 +130,27 @@ pub fn config_get(ctx: &PlanContext, key: &str) -> Result<Value> {
             .map(|s| json!(s.clone()))
             .unwrap_or_else(|| json!("")));
     }
+    // M204: read per-lane filter selections as a JSON object
+    // `{dimension: [values...]}`. Empty / unset lane returns `{}`.
+    if let Some(rest) = key.strip_prefix("filter.") {
+        let lane = rest.split_once('.').map(|(l, _)| l).unwrap_or(rest);
+        return Ok(cfg
+            .filter
+            .get(lane)
+            .map(|dims| {
+                let obj: serde_json::Map<String, Value> = dims
+                    .iter()
+                    .map(|(d, vs)| {
+                        (
+                            d.clone(),
+                            Value::Array(vs.iter().cloned().map(Value::String).collect()),
+                        )
+                    })
+                    .collect();
+                Value::Object(obj)
+            })
+            .unwrap_or_else(|| Value::Object(serde_json::Map::new())));
+    }
     match key {
         "workflow.profile" => Ok(json!(cfg.workflow.profile)),
         "workflow.plan.location" => Ok(json!(cfg.plan_location())),
@@ -224,6 +245,67 @@ fn apply_config_set(cfg: &mut ProjectConfig, key: &str, value: &str) -> Result<(
             );
         }
         cfg.sort.insert(lane.to_string(), value.to_string());
+        return Ok(());
+    }
+    // M204: per-lane filter selection. The value is a JSON object
+    // `{dimension: [values...]}`. An empty `{}` clears the lane's
+    // filter. Unknown lanes surface a structured error; unknown
+    // dimensions / non-string values surface as well so a malformed
+    // payload can't slip past validate.
+    if let Some(rest) = key.strip_prefix("filter.") {
+        let lane = rest.split_once('.').map(|(l, _)| l).unwrap_or(rest);
+        let valid_lanes = [
+            "overview",
+            "milestones",
+            "path",
+            "tweaks",
+            "ideas",
+            "grooming",
+            "backlog",
+            "settings",
+        ];
+        if !valid_lanes.contains(&lane) {
+            bail!(
+                "unknown filter lane: {lane} (expected one of {})",
+                valid_lanes.join(", ")
+            );
+        }
+        let parsed: Value = serde_json::from_str(value).map_err(|e| {
+            anyhow::anyhow!(
+                "filter.{lane} value must be a JSON object {{dimension: [values...]}} (e.g. '{{\"lifecycle\":[\"approved\"]}}'): {e}"
+            )
+        })?;
+        let obj = parsed
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("filter.{lane} value must be a JSON object"))?;
+        let mut inner: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+            std::collections::BTreeMap::new();
+        for (dim, val) in obj {
+            let arr = val.as_array().ok_or_else(|| {
+                anyhow::anyhow!("filter.{lane}.{dim} must be a JSON array of strings")
+            })?;
+            let mut set: std::collections::BTreeSet<String> =
+                std::collections::BTreeSet::new();
+            for v in arr {
+                let s = v
+                    .as_str()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("filter.{lane}.{dim} entries must be strings")
+                    })?
+                    .to_string();
+                if !s.is_empty() {
+                    set.insert(s);
+                }
+            }
+            if !set.is_empty() {
+                inner.insert(dim.clone(), set);
+            }
+        }
+        if inner.is_empty() {
+            cfg.filter.remove(lane);
+        } else {
+            cfg.filter.insert(lane.to_string(), inner);
+        }
         return Ok(());
     }
     match key {

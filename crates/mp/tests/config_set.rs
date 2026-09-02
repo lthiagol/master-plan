@@ -506,3 +506,162 @@ fn validate_rejects_unknown_ui_theme() {
         v["errors"]
     );
 }
+
+// ─── M204 S1: filter field round-trip + sort preservation + ui keys ──────────
+
+/// M204 AC-01: setting `filter.<lane>` with a JSON-object value
+/// round-trips through `mp config set` and `mp config get`. The
+/// persisted section is a `lane → dimension → set-of-values` map.
+#[test]
+fn config_set_preserves_sort_and_filter() {
+    let env = TestEnv::new();
+    // Seed sort.<lane> so we can prove sort survives a filter write.
+    let sort_set = env.run(&[
+        "config",
+        "set",
+        "sort.milestones",
+        "priority",
+        "--format",
+        "json",
+    ]);
+    assert!(sort_set.status.success(), "seed sort must succeed");
+    // Write the per-lane filter — JSON object {dimension: [values...]}.
+    let filter_set = env.run(&[
+        "config",
+        "set",
+        "filter.milestones",
+        r#"{"lifecycle":["approved","in-progress"],"priority":["high"]}"#,
+        "--format",
+        "json",
+    ]);
+    assert!(
+        filter_set.status.success(),
+        "filter set must succeed: {}",
+        String::from_utf8_lossy(&filter_set.stderr)
+    );
+
+    // Filter section round-trips through `config get` with the
+    // expected {dimension: [values...]} JSON shape.
+    let got = env.run_json(&["config", "get", "filter.milestones", "--format", "json"]);
+    let obj = got["value"].as_object().expect("filter value must be object");
+    let lc = obj["lifecycle"]
+        .as_array()
+        .expect("lifecycle dim must be array");
+    assert_eq!(lc.len(), 2, "expected 2 lifecycle values; got {lc:?}");
+    assert!(lc.iter().any(|v| v.as_str() == Some("approved")));
+    assert!(lc.iter().any(|v| v.as_str() == Some("in-progress")));
+    let pri = obj["priority"]
+        .as_array()
+        .expect("priority dim must be array");
+    assert_eq!(pri.len(), 1);
+    assert_eq!(pri[0].as_str(), Some("high"));
+
+    // Sort value survives unchanged after the filter write.
+    let sort_got = env.run_json(&["config", "get", "sort.milestones", "--format", "json"]);
+    assert_eq!(
+        sort_got["value"].as_str(),
+        Some("priority"),
+        "sort.milestones must be preserved across filter set; got {:?}",
+        sort_got["value"]
+    );
+}
+
+/// M204 AC-01: a freshly-created config has no `filter` block, so
+/// `config get filter.<lane>` returns `{}` and `mp validate` does
+/// not error on the absent section. Loading `ProjectConfig::default()`
+/// then serializing it must NOT emit an empty `filter = {}` block
+/// (the field is `skip_serializing_if = "is_empty"`).
+#[test]
+fn round_trip_filter_section() {
+    let env = TestEnv::new();
+    let got = env.run_json(&["config", "get", "filter.milestones", "--format", "json"]);
+    let v = &got["value"];
+    assert!(
+        v.is_object(),
+        "absent filter section must read as JSON object; got {v:?}"
+    );
+    assert!(
+        v.as_object().unwrap().is_empty(),
+        "default filter must be empty {{}}; got {v:?}"
+    );
+
+    // Default ProjectConfig (no filter writes) must NOT serialize
+    // an empty `filter` block. Inspect the raw on-disk config.json.
+    let cfg_path = env.tmp.path().join("master-plan/config.json");
+    let body = fs::read_to_string(&cfg_path).unwrap();
+    assert!(
+        !body.contains("\"filter\""),
+        "default config.json must NOT carry a `filter` block (skip_serializing_if=is_empty); got: {body}"
+    );
+}
+
+/// M204 AC-01: an explicit `mp config set sort.<lane>` after a
+/// filter write must NOT mutate the filter section. The two
+/// sections are independent (each has its own lane-keyed BTreeMap)
+/// and the apply-time gate must keep them that way.
+#[test]
+fn sort_section_unchanged() {
+    let env = TestEnv::new();
+    // Seed a filter on milestones + backlog.
+    let f_ms = env.run(&[
+        "config",
+        "set",
+        "filter.milestones",
+        r#"{"lifecycle":["approved"]}"#,
+        "--format",
+        "json",
+    ]);
+    assert!(f_ms.status.success());
+    let f_bl = env.run(&[
+        "config",
+        "set",
+        "filter.backlog",
+        r#"{"status":["open","pending"]}"#,
+        "--format",
+        "json",
+    ]);
+    assert!(f_bl.status.success());
+
+    // Now write a sort.<lane> — filter sections must remain.
+    let sort_set = env.run(&[
+        "config",
+        "set",
+        "sort.milestones",
+        "priority",
+        "--format",
+        "json",
+    ]);
+    assert!(
+        sort_set.status.success(),
+        "sort set must succeed: {}",
+        String::from_utf8_lossy(&sort_set.stderr)
+    );
+
+    let ms = env.run_json(&["config", "get", "filter.milestones", "--format", "json"]);
+    let bl = env.run_json(&["config", "get", "filter.backlog", "--format", "json"]);
+    assert_eq!(
+        ms["value"]["lifecycle"][0].as_str(),
+        Some("approved"),
+        "filter.milestones.lifecycle must survive sort write; got {:?}",
+        ms["value"]
+    );
+    assert_eq!(
+        bl["value"]["status"].as_array().map(|a| a.len()),
+        Some(2),
+        "filter.backlog.status must survive sort write; got {:?}",
+        bl["value"]
+    );
+
+    // UI keys (color, icons, theme, hide_done, show_watch_tab)
+    // survive untouched. Default config has none of these on
+    // disk, but the schema/round-trip path must not drop them
+    // when filter is in play.
+    let cfg_path = env.tmp.path().join("master-plan/config.json");
+    let body = fs::read_to_string(&cfg_path).unwrap();
+    for key in ["ui.color", "ui.icons", "ui.theme", "ui.hide_done", "ui.show_watch_tab"] {
+        assert!(
+            !body.contains(&format!("{key} ")) && !body.contains(&format!("{key}:")),
+            "ui key {key} must not leak into config.json by default; got: {body}"
+        );
+    }
+}

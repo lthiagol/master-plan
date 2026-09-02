@@ -19,7 +19,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-29",
-    "updated": "2026-08-30",
+    "updated": "2026-09-02",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -64,8 +64,8 @@
       "id": "AC-01",
       "description": "ProjectConfig gains a top-level `filter` map (per-lane). The existing M182 `sort` map is unchanged. `[ui]` keys (color, icons, theme, hide_done, show_watch_tab) are untouched. Round-trip preserves sort + filter + ui.",
       "verification": "cargo nextest run -p mp --test config_set --no-fail-fast -E 'test(/config_set_preserves_sort_and_filter|round_trip_filter_section|sort_section_unchanged/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test config_set --no-fail-fast -E test(/config_set_preserves_sort_and_filter|round_trip_filter_section|sort_section_unchanged/) exit 0 (3/3 pass)"
     },
     {
       "id": "AC-02",
@@ -256,7 +256,7 @@
       ],
       "tests": "cargo nextest run -p mp --test config_set --no-fail-fast -E 'test(/config_set_preserves_sort_and_filter|round_trip_filter_section|sort_section_unchanged/)'",
       "done_when": "ProjectConfig.filter round-trips; ProjectConfig.sort unchanged; ui keys preserved",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
