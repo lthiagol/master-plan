@@ -298,7 +298,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/legacy_milestone_filter_field_dropped|no_milestone_filter_field_in_app_struct/)",
       "done_when": "milestone_filter no longer exists in App; named tests pass; TUI launches with no filter by default",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],

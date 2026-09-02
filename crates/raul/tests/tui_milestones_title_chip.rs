@@ -68,7 +68,7 @@ fn chip_all_and_filtered() {
         "empty filter chip; got {header:?}"
     );
 
-    app.milestone_filter.insert("approved".into());
+    app.set_lifecycle_filter(["approved".to_string()].into_iter().collect());
     let header = render_header(&app);
     assert!(
         header.contains("approved") && header.contains("(1)"),

@@ -129,7 +129,7 @@ fn m185_f03_title_chip_filter_segment_is_accent() {
     let mut app = App::new();
     app.load_milestones(vec![ms("01", "approved"), ms("02", "in-progress")]);
     app.select_lane(Lane::Milestones);
-    app.milestone_filter.insert("approved".into());
+    app.set_lifecycle_filter(["approved".to_string()].into_iter().collect());
 
     let backend = TestBackend::new(140, 20);
     let mut terminal = Terminal::new(backend).unwrap();

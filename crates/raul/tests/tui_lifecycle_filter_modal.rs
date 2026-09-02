@@ -81,8 +81,9 @@ fn open_toggle_commit_filters_visible() {
     apply_action(&mut app, &r, Action::LifecycleFilterCommit).unwrap();
 
     assert!(matches!(app.active_mode, Mode::Normal));
-    assert!(app.milestone_filter.contains("approved"));
-    assert!(app.milestone_filter.contains("in-progress"));
+    let lf = app.lifecycle_filter_set();
+    assert!(lf.contains("approved"));
+    assert!(lf.contains("in-progress"));
     let ids: Vec<_> = app
         .visible_milestones()
         .iter()
@@ -95,7 +96,7 @@ fn open_toggle_commit_filters_visible() {
 fn esc_reverts_prior_filter() {
     let mut app = App::new();
     seed(&mut app);
-    app.milestone_filter.insert("complete".into());
+    app.set_lifecycle_filter(["complete".to_string()].into_iter().collect());
     let r = runner();
     apply_action(&mut app, &r, Action::OpenLifecycleFilter).unwrap();
     // Toggle draft on then cancel
@@ -103,8 +104,9 @@ fn esc_reverts_prior_filter() {
     let actions = modes::lifecycle_filter::handle_key(key(KeyCode::Esc));
     assert_eq!(actions, vec![Action::LifecycleFilterCancel]);
     apply_action(&mut app, &r, Action::LifecycleFilterCancel).unwrap();
+    let lf = app.lifecycle_filter_set();
     assert_eq!(
-        app.milestone_filter.iter().collect::<Vec<_>>(),
+        lf.iter().collect::<Vec<_>>(),
         vec![&"complete".to_string()]
     );
 }

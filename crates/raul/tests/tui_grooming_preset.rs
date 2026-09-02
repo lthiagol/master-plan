@@ -1,4 +1,6 @@
 //! M185 AC-06: g applies Grooming preset on Milestones only.
+//! M204: the preset writes through the new `lane_filters` model
+//! (lifecycle dimension on the Milestones lane).
 
 use raul::mp_runner::MpRunner;
 use raul::tui::action::{apply_action, Action};
@@ -11,14 +13,11 @@ fn grooming_preset_sets_three_lifecycles() {
     app.select_lane(Lane::Milestones);
     let r = MpRunner::new().expect("mp");
     apply_action(&mut app, &r, Action::ApplyGroomingPreset).unwrap();
+    let lf = app.lifecycle_filter_set();
     for lc in GROOMING_PRESET {
-        assert!(
-            app.milestone_filter.contains(*lc),
-            "missing {lc} in {:?}",
-            app.milestone_filter
-        );
+        assert!(lf.contains(*lc), "missing {lc} in {lf:?}");
     }
-    assert_eq!(app.milestone_filter.len(), 3);
+    assert_eq!(lf.len(), 3);
 }
 
 #[test]
@@ -34,8 +33,11 @@ fn grooming_preset_noop_on_other_lanes() {
         Lane::Settings,
     ] {
         app.select_lane(lane);
-        app.milestone_filter.clear();
+        app.set_lifecycle_filter(Default::default());
         apply_action(&mut app, &r, Action::ApplyGroomingPreset).unwrap();
-        assert!(app.milestone_filter.is_empty(), "lane {lane:?} must no-op");
+        assert!(
+            app.lifecycle_filter_set().is_empty(),
+            "lane {lane:?} must no-op"
+        );
     }
 }

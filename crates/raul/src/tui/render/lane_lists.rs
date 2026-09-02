@@ -351,7 +351,7 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
                 "No matches for /{} — press Esc to clear.",
                 app.lane_search_term()
             )
-        } else if !app.milestone_filter.is_empty() {
+        } else if !app.lifecycle_filter_set().is_empty() {
             "No milestones match the lifecycle filter — press F to edit, g for Grooming preset."
                 .to_string()
         } else if app.hide_done {
@@ -505,10 +505,11 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
 }
 
 fn milestones_block_title(app: &App, count: usize) -> String {
-    if app.milestone_filter.is_empty() {
+    let lf = app.lifecycle_filter_set();
+    if lf.is_empty() {
         format!(" {} · All ({count}) ", crate::lanes::LANE_MILESTONES)
     } else {
-        let parts: Vec<&str> = app.milestone_filter.iter().map(String::as_str).collect();
+        let parts: Vec<&str> = lf.iter().map(String::as_str).collect();
         format!(
             " {} · {} ({count}) ",
             crate::lanes::LANE_MILESTONES,

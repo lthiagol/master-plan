@@ -227,7 +227,10 @@ pub struct LifecycleFilterState {
     pub selected: usize,
     /// Working set while the modal is open.
     pub draft: std::collections::BTreeSet<String>,
-    /// Snapshot of `app.milestone_filter` at open time (Esc restores).
+    /// Snapshot of the milestones-lane lifecycle filter at open time
+    /// (Esc restores). M204: sourced from
+    /// `app.lifecycle_filter_set()` (the unified
+    /// `lane_filters[Lane::Milestones]["lifecycle"]` model).
     pub prior: std::collections::BTreeSet<String>,
 }
 

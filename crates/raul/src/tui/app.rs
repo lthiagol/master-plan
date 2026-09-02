@@ -569,9 +569,6 @@ pub struct App {
     pub selected_annotation_index: usize,
     pub open_only: bool,
     pub hide_done: bool,
-    /// M185: multi-select lifecycle filter for the Milestones lane.
-    /// Empty = show all (subject to `hide_done`). Survives lane switches.
-    pub milestone_filter: std::collections::BTreeSet<String>,
     /// M186: per-lane substring search against id+title (empty = all).
     /// Survives lane switches; cleared on raul restart.
     pub lane_search: std::collections::HashMap<Lane, String>,
@@ -766,7 +763,6 @@ impl App {
             selected_annotation_index: 0,
             open_only: false,
             hide_done: false,
-            milestone_filter: std::collections::BTreeSet::new(),
             lane_search: std::collections::HashMap::new(),
             lane_filters: std::collections::HashMap::new(),
             review_hunk_enabled: false,
@@ -1391,13 +1387,49 @@ impl App {
         self.touch();
     }
 
-    /// M185: open the lifecycle filter modal (snapshots current filter).
+    /// M204: accessor for the active lane's lifecycle-filter
+    /// selection. Returns the `lifecycle` dimension of
+    /// `lane_filters[Lane::Milestones]` as a BTreeSet. Empty
+    /// when no filter is active. The unified `lane_filters`
+    /// model replaces the pre-M204 `App::milestone_filter`
+    /// field.
+    pub fn lifecycle_filter_set(&self) -> std::collections::BTreeSet<String> {
+        self.lane_filters
+            .get(&Lane::Milestones)
+            .and_then(|dims| dims.get("lifecycle"))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// M204: replace the active lane's lifecycle-filter selection
+    /// with `values`. Empty input clears the dimension. Called
+    /// from the legacy `LifecycleFilter` mode's commit/cancel arms
+    /// and from the new unified filter modal (S4/S5).
+    pub fn set_lifecycle_filter(&mut self, values: std::collections::BTreeSet<String>) {
+        let entry = self.lane_filters.entry(Lane::Milestones).or_default();
+        if values.is_empty() {
+            entry.remove("lifecycle");
+            if entry.is_empty() {
+                self.lane_filters.remove(&Lane::Milestones);
+            }
+        } else {
+            entry.insert("lifecycle".to_string(), values);
+        }
+        self.selected_index = 0;
+        self.touch();
+    }
+
+    /// M185: open the lifecycle filter modal (snapshots current
+    /// filter). M204 keeps the legacy single-dim modal alive
+    /// alongside the new unified one (`OpenFilter`); S4 retires
+    /// the old entry point.
     pub fn open_lifecycle_filter(&mut self) {
         use crate::tui::mode::LifecycleFilterState;
+        let cur = self.lifecycle_filter_set();
         self.active_mode = Mode::LifecycleFilter(LifecycleFilterState {
             selected: 0,
-            draft: self.milestone_filter.clone(),
-            prior: self.milestone_filter.clone(),
+            draft: cur.clone(),
+            prior: cur,
         });
         self.touch();
     }
@@ -1443,30 +1475,30 @@ impl App {
     pub fn lifecycle_filter_commit(&mut self) {
         use crate::tui::mode::Mode as M;
         if let M::LifecycleFilter(st) = &self.active_mode {
-            self.milestone_filter = st.draft.clone();
-            self.selected_index = 0;
+            let draft = st.draft.clone();
+            self.set_lifecycle_filter(draft);
             self.active_mode = Mode::Normal;
-            self.touch();
         }
     }
 
     pub fn lifecycle_filter_cancel(&mut self) {
         use crate::tui::mode::Mode as M;
-        if let M::LifecycleFilter(st) = &self.active_mode {
-            self.milestone_filter = st.prior.clone();
+        if let M::LifecycleFilter(_) = &self.active_mode {
             self.active_mode = Mode::Normal;
             self.touch();
         }
     }
 
     /// M185: Grooming preset — approved + in-progress + groomed.
+    /// M204: writes through the new `lane_filters` model
+    /// (lifecycle dimension for Milestones).
     pub fn apply_grooming_preset(&mut self) {
-        self.milestone_filter = crate::tui::progress::GROOMING_PRESET
-            .iter()
-            .map(|s| (*s).to_string())
-            .collect();
-        self.selected_index = 0;
-        self.touch();
+        let preset: std::collections::BTreeSet<String> =
+            crate::tui::progress::GROOMING_PRESET
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect();
+        self.set_lifecycle_filter(preset);
     }
 
     /// M186: the active lane's committed search term (empty = no filter).
@@ -1570,8 +1602,12 @@ impl App {
             self.milestones.iter().collect()
         };
         // M185: multi-select lifecycle filter (empty = all).
-        if !self.milestone_filter.is_empty() {
-            filtered.retain(|m| self.milestone_filter.contains(&m.lifecycle));
+        // M204: reads from `lane_filters[Milestones]["lifecycle"]`
+        // (the unified filter model). The helper returns a
+        // BTreeSet<String> so the retain logic is unchanged.
+        let lifecycle_filter = self.lifecycle_filter_set();
+        if !lifecycle_filter.is_empty() {
+            filtered.retain(|m| lifecycle_filter.contains(&m.lifecycle));
         }
         // M186: per-lane substring search against id+title.
         let term = self.lane_search_term();

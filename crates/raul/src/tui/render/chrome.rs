@@ -378,9 +378,12 @@ pub(super) fn list_lane_filter_chip(app: &App) -> Option<String> {
     }
     // Milestones-only: also carry lifecycle filter segment.
     let mut segments: Vec<String> = Vec::new();
-    if app.active_lane == Lane::Milestones && !app.milestone_filter.is_empty() {
-        let parts: Vec<&str> = app.milestone_filter.iter().map(String::as_str).collect();
-        segments.push(parts.join(", "));
+    if app.active_lane == Lane::Milestones {
+        let lf = app.lifecycle_filter_set();
+        if !lf.is_empty() {
+            let parts: Vec<&str> = lf.iter().map(String::as_str).collect();
+            segments.push(parts.join(", "));
+        }
     }
     let term = app.lane_search_term();
     if !term.is_empty() {

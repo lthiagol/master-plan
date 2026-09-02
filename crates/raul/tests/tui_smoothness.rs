@@ -175,6 +175,7 @@ fn watch_idle_deadline_ticks_without_input_or_end_of_stream() {
             }
             Ok(())
         },
+        |_app| {},
     )
     .unwrap();
 
@@ -241,6 +242,7 @@ fn rate_gate_caps_redraws_under_storm() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
     let elapsed = start.elapsed();
@@ -315,6 +317,7 @@ fn batch_drain_coalesces_pending_events() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
@@ -371,6 +374,7 @@ fn deferred_frame_paints_after_mutation_when_stream_ends() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
@@ -417,6 +421,7 @@ fn no_op_event_skips_redraw() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
@@ -464,6 +469,7 @@ fn mutation_in_batch_triggers_one_post_batch_redraw() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
@@ -538,6 +544,7 @@ fn run_loop_writes_sync_sequences_around_draw() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
@@ -595,6 +602,7 @@ fn quit_event_terminates_loop_without_extra_redraw() {
         &mut source,
         test_dispatch,
         |_app| Ok(()),
+        |_app| {},
     )
     .expect("loop");
 
