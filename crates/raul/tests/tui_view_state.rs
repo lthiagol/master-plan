@@ -420,7 +420,11 @@ fn list_row_click_hits_rendered_row() {
     let (_buf, view) = render_to_buffer(&app, 100, 30);
     assert_eq!(view.list_item_rects.len(), 3);
     for (i, hit) in view.list_item_rects.iter().enumerate() {
-        assert_eq!(hit.rect.height, 1, "backlog row {i} hit area is 1 row");
+        // M203: backlog rows now span 2 visual lines (title + preview).
+        assert_eq!(
+            hit.rect.height, 2,
+            "backlog row {i} hit area is 2 rows (title + preview); got {hit:?}"
+        );
     }
 
     let app = overview_app();

@@ -979,8 +979,7 @@ fn selected_row_highlight_spans_both_lines() {
     let sel_title_bg = sample_bg(sel_title_y, "R")
         .or_else(|| sample_bg(sel_title_y, "C"))
         .expect("selected title cell");
-    let sel_preview_bg = sample_bg(sel_preview_y, "↳")
-        .expect("selected preview cell");
+    let sel_preview_bg = sample_bg(sel_preview_y, "↳").expect("selected preview cell");
     assert_eq!(
         sel_title_bg, sel_preview_bg,
         "selected row highlight must span both visual rows; got title_bg={sel_title_bg:?} preview_bg={sel_preview_bg:?}"
@@ -991,7 +990,10 @@ fn selected_row_highlight_spans_both_lines() {
         .map(|x| buf[(x, sel_preview_y)].clone())
         .find(|c| c.symbol() == "↳")
         .expect("preview arrow cell");
-    let preview_fg = preview_cell.style().fg.unwrap_or(ratatui::style::Color::Reset);
+    let preview_fg = preview_cell
+        .style()
+        .fg
+        .unwrap_or(ratatui::style::Color::Reset);
     // Selected preview fg must differ from the unselected dim color
     // (we don't pin the exact RGB; just assert it's NOT the dim
     // color used for unselected previews).
@@ -1231,7 +1233,11 @@ fn sort_by_id_unchanged() {
     seed_backlog(&mut app);
     app.select_lane(Lane::Backlog);
     app.lane_sort_key.insert(Lane::Backlog, SortKey::Id);
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert_eq!(ids, vec!["BL-01", "BL-02", "BL-03", "BL-04"]);
 }
 
@@ -1244,7 +1250,11 @@ fn sort_by_title_unchanged() {
     // Title sort is case-insensitive ascending. The preview field
     // MUST NOT participate — these titles are alphabetical with
     // upper vs lower ordering (alpha < Beta < Mu < Zeta).
-    let titles: Vec<&str> = app.visible_backlog().iter().map(|b| b.title.as_str()).collect();
+    let titles: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.title.as_str())
+        .collect();
     assert_eq!(
         titles,
         vec!["alpha", "Beta", "Mu", "Zeta"],
@@ -1259,7 +1269,11 @@ fn sort_by_priority_unchanged() {
     app.select_lane(Lane::Backlog);
     app.lane_sort_key.insert(Lane::Backlog, SortKey::Priority);
     // Priority rank: high > medium > low. Ties break on id ascending.
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert_eq!(
         ids,
         vec!["BL-01", "BL-04", "BL-03", "BL-02"],
@@ -1274,7 +1288,11 @@ fn sort_by_status_unchanged() {
     app.select_lane(Lane::Backlog);
     app.lane_sort_key.insert(Lane::Backlog, SortKey::Status);
     // Status rank: open > resolved. Ties break on id ascending.
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert_eq!(
         ids,
         vec!["BL-01", "BL-03", "BL-02", "BL-04"],
@@ -1289,23 +1307,37 @@ fn search_matches_title_not_preview() {
     app.select_lane(Lane::Backlog);
     // Search term `alpha-preview` matches ONLY the preview text,
     // not the title. The filter must NOT pick this row up.
-    app.lane_search.insert(Lane::Backlog, "alpha-preview".to_string());
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    app.lane_search
+        .insert(Lane::Backlog, "alpha-preview".to_string());
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert!(
         ids.is_empty(),
         "search must NOT match against preview text; got {ids:?}"
     );
     // Search term `alpha` matches the title of BL-02 only.
     app.lane_search.insert(Lane::Backlog, "alpha".to_string());
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert_eq!(
         ids,
         vec!["BL-02"],
         "search must match title-only; got {ids:?}"
     );
     // And `mu-preview` (preview-only) must not match either.
-    app.lane_search.insert(Lane::Backlog, "mu-preview".to_string());
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    app.lane_search
+        .insert(Lane::Backlog, "mu-preview".to_string());
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     assert!(
         ids.is_empty(),
         "search must not match preview-only terms; got {ids:?}"
@@ -1318,7 +1350,11 @@ fn hide_done_respects_status() {
     seed_backlog(&mut app);
     app.select_lane(Lane::Backlog);
     app.hide_done = true;
-    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    let ids: Vec<&str> = app
+        .visible_backlog()
+        .iter()
+        .map(|b| b.id.as_str())
+        .collect();
     // Resolved rows (BL-02, BL-04) must be filtered out; open rows
     // (BL-01, BL-03) remain.
     assert_eq!(

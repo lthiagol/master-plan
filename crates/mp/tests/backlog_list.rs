@@ -164,17 +164,12 @@ fn list_backlog_items(env: &TestEnv) -> Vec<serde_json::Value> {
     v["backlog"].as_array().unwrap().clone()
 }
 
-fn find_backlog_item<'a>(
-    items: &'a [serde_json::Value],
-    needle: &str,
-) -> &'a serde_json::Value {
+fn find_backlog_item<'a>(items: &'a [serde_json::Value], needle: &str) -> &'a serde_json::Value {
     items
         .iter()
         .find(|i| i["description"].as_str().unwrap_or("").contains(needle))
         .unwrap_or_else(|| {
-            panic!(
-                "no backlog item with description containing {needle:?}; items: {items:?}"
-            )
+            panic!("no backlog item with description containing {needle:?}; items: {items:?}")
         })
 }
 
@@ -280,12 +275,7 @@ fn preview_for_resolved_item_collapses_to_resolution() {
 fn preview_for_resolved_collapses() {
     let env = TestEnv::new();
 
-    let add = env.run(&[
-        "backlog",
-        "add",
-        "--desc",
-        "M203 wont-fix row",
-    ]);
+    let add = env.run(&["backlog", "add", "--desc", "M203 wont-fix row"]);
     let id = crate::common::json_from_stdout(&add.stdout)["item"]["id"]
         .as_str()
         .unwrap()
@@ -321,12 +311,7 @@ fn preview_for_resolved_with_empty_resolution() {
     // collapses to the bare `resolved` token.
     let env = TestEnv::new();
 
-    let add = env.run(&[
-        "backlog",
-        "add",
-        "--desc",
-        "M203 resolved-empty row",
-    ]);
+    let add = env.run(&["backlog", "add", "--desc", "M203 resolved-empty row"]);
     let id = crate::common::json_from_stdout(&add.stdout)["item"]["id"]
         .as_str()
         .unwrap()
@@ -469,12 +454,7 @@ fn preview_uses_first_line_of_body() {
         "--body",
         "First line goes here\nSecond line\nThird line",
     ]);
-    env.run(&[
-        "idea",
-        "create",
-        "--title",
-        "M203 idea empty body",
-    ]);
+    env.run(&["idea", "create", "--title", "M203 idea empty body"]);
 
     let items = list_ideas_items(&env);
 

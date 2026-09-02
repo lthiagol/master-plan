@@ -1399,8 +1399,7 @@ fn backlog_item_serde_round_trip_with_created_field() {
         serialized["created"], "2026-09-02",
         "serialize must preserve `created`; got: {serialized}"
     );
-    let round: mp_model::BacklogItem =
-        serde_json::from_value(serialized).expect("deserialize");
+    let round: mp_model::BacklogItem = serde_json::from_value(serialized).expect("deserialize");
     assert_eq!(round.created, "2026-09-02");
     assert_eq!(round.id, "B-100");
 

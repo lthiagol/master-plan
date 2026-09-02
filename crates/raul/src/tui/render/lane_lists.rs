@@ -217,8 +217,8 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
             ))
         };
 
-        let row = Row::new(vec![id_cell, title_cell, pri_cell, status_cell])
-            .height(BACKLOG_ROW_HEIGHT);
+        let row =
+            Row::new(vec![id_cell, title_cell, pri_cell, status_cell]).height(BACKLOG_ROW_HEIGHT);
         let row = if is_selected {
             row.style(
                 Style::default()
