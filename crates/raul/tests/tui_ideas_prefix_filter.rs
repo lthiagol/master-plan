@@ -13,6 +13,7 @@ fn ideas_lane_keeps_id_only() {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
         BacklogLine {
             id: "ID-01".into(),
@@ -21,6 +22,7 @@ fn ideas_lane_keeps_id_only() {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
         BacklogLine {
             id: "ID-02".into(),
@@ -29,6 +31,7 @@ fn ideas_lane_keeps_id_only() {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
         BacklogLine {
             id: "BL-01".into(),
@@ -37,6 +40,7 @@ fn ideas_lane_keeps_id_only() {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
     ]);
     app.select_lane(Lane::Ideas);

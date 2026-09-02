@@ -80,8 +80,31 @@ pub(super) fn footer_for(app: &App) -> String {
     // their own entries (`_:annotate · _:resolve · _:reopen` and
     // `_:approve · _:menu` respectively).
     let settings_staged = app.settings.as_ref().is_some_and(|s| s.has_staged_edits());
-    app.keybinds
-        .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged)
+    let mut text =
+        app.keybinds
+            .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged);
+    // M205 AC-06: the per-tab footer carries a trailing
+    // `sort: <key> ▼` indicator on the three sort-bearing lanes
+    // (Milestones / Backlog / Ideas), showing the active sort
+    // key. The arrow matches the column-header arrow glyph used
+    // in `header_cell`, so the operator sees the same visual
+    // affordance on the column header and the footer.
+    if matches!(
+        app.active_lane,
+        Lane::Milestones | Lane::Backlog | Lane::Ideas
+    ) && app.content == ContentState::List
+    {
+        let key = app.lane_sort_key(app.active_lane);
+        let indicator = format!("sort: {} ▼", key.label());
+        if text.is_empty() {
+            text = format!(" {indicator} ");
+        } else {
+            // Append after the existing per-tab text — separator
+            // matches the existing `·` between affordances.
+            text.push_str(&format!("  ·  {indicator}"));
+        }
+    }
+    text
 }
 
 /// M183: first key glyph for a binding slot (width-constrained footer).

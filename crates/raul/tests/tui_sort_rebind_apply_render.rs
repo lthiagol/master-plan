@@ -4,7 +4,7 @@
 //! compare so the order is stable across binds.
 //!
 //! Tests cover:
-//! - Each of the 4 sort keys (id / lifecycle / priority / updated)
+//! - Each of the 4 sort keys (id / stage / priority / updated)
 //!   produces a distinct, correct order that differs from the
 //!   default SortKey::Id.
 //! - Re-binding changes the order immediately (regression vs.
@@ -26,6 +26,7 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -39,7 +40,7 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -55,7 +56,7 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -83,21 +84,26 @@ fn m182_s3_sort_key_id_orders_numerically() {
     assert_eq!(visible_ids(&app), vec!["M01", "M02", "M03"]);
 }
 
-/// AC-03: SortKey::Lifecycle sorts in-progress first, then approved,
+/// AC-03: SortKey::Stage sorts in-progress first, then approved,
 /// then draft (rank order: in-progress > approved > draft).
 /// The result must differ from the default id order — that's the
 /// load-bearing contract: re-binding changes the rendered order.
+/// M205: test now uses Stage sort (the Lifecycle alias is gone). With
+/// no `flow_stages` set, all milestones tie on Stage rank and fall
+/// back to numeric-id — the assertion still holds as a smoke test
+/// but no longer exercises the rank-order semantics. The
+/// `m182_f12_lifecycle_rank_complete_cancelled_remediation_draft`
+/// test below covers the rank ordering via flow_stages data.
 #[test]
-fn m182_s3_sort_key_lifecycle_orders_by_rank() {
+fn m182_s3_sort_key_stage_orders_by_rank() {
     let mut app = make_app_with_milestones();
     app.select_lane(Lane::Milestones);
-    app.lane_sort_key
-        .insert(Lane::Milestones, SortKey::Lifecycle);
+    app.lane_sort_key.insert(Lane::Milestones, SortKey::Stage);
     let ids = visible_ids(&app);
     assert_eq!(
         ids,
         vec!["M01", "M02", "M03"],
-        "lifecycle rank: in-progress (M01) > approved (M02) > draft (M03)"
+        "stage rank: in-progress (M01) > approved (M02) > draft (M03)"
     );
 }
 
@@ -164,7 +170,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -180,7 +186,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-12".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -196,6 +202,7 @@ fn m182_s3_rebind_changes_rendered_order_immediately() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -224,7 +231,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-15".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -240,7 +247,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -256,6 +263,7 @@ fn m182_s3_ties_break_by_numeric_id() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -289,7 +297,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -305,7 +313,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-16".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -321,6 +329,7 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -345,6 +354,10 @@ fn m182_s3_sort_applies_to_visible_filtered_list() {
 /// M182 F-12: lifecycle ranks must distinguish complete vs cancelled
 /// and put remediation below both (documented order:
 /// done > complete > cancelled > remediation > draft).
+/// M205: Stage sort reverses that order (draft = first stage, hand-off
+/// = last). The fixture now uses `flow_stages` to plant each milestone
+/// at a different current stage so the visible ordering intent is
+/// preserved (rank 12 > 11 > 10 > 9 > 8).
 #[test]
 fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
     let mut app = App::new();
@@ -358,10 +371,17 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::from([
+                ("draft".into(), "done".into()),
+                ("groom".into(), "done".into()),
+                ("specify".into(), "done".into()),
+                ("approve".into(), "done".into()),
+                ("execute".into(), "in_progress".into()),
+            ]),
         },
         MilestoneSummary {
             id: "M02".into(),
@@ -371,13 +391,16 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-11".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
 
             cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::from([
+                ("draft".into(), "done".into()),
+                ("groom".into(), "in_progress".into()),
+            ]),
         },
         MilestoneSummary {
             id: "M03".into(),
@@ -387,13 +410,17 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-12".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
 
             cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::from([
+                ("draft".into(), "done".into()),
+                ("groom".into(), "done".into()),
+                ("specify".into(), "in_progress".into()),
+            ]),
         },
         MilestoneSummary {
             id: "M04".into(),
@@ -403,13 +430,18 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-13".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
 
             cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::from([
+                ("draft".into(), "done".into()),
+                ("groom".into(), "done".into()),
+                ("specify".into(), "done".into()),
+                ("approve".into(), "in_progress".into()),
+            ]),
         },
         MilestoneSummary {
             id: "M05".into(),
@@ -419,22 +451,21 @@ fn m182_f12_lifecycle_rank_complete_cancelled_remediation_draft() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: "2026-07-14".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
 
             cancel_reason: None,
-            flow_stages: BTreeMap::new(),
+            flow_stages: BTreeMap::from([("draft".into(), "in_progress".into())]),
         },
     ]);
     app.select_lane(Lane::Milestones);
-    app.lane_sort_key
-        .insert(Lane::Milestones, SortKey::Lifecycle);
+    app.lane_sort_key.insert(Lane::Milestones, SortKey::Stage);
     assert_eq!(
         visible_ids(&app),
         vec!["M05", "M02", "M03", "M04", "M01"],
-        "done > complete > cancelled > remediation > draft"
+        "stage rank: draft (M05) > groom (M02) > specify (M03) > approve (M04) > execute (M01)"
     );
 }
 
@@ -454,6 +485,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -467,7 +499,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -483,7 +515,7 @@ fn m182_f11_selected_milestone_matches_sorted_visible_index() {
             depends_on: vec![],
             priority: "high".into(),
             updated: "2026-07-12".into(),
-
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,

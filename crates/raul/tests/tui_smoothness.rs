@@ -135,6 +135,7 @@ fn app_with_n_milestones(n: usize) -> App {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,

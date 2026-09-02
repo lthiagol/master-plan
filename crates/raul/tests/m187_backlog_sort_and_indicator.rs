@@ -17,11 +17,13 @@ fn bl(id: &str, title: &str, priority: &str, status: &str) -> BacklogLine {
         status: status.into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }
 }
 
 /// M187: backlog cycle-sort lands within the per-lane key set in
-/// column order (Id → Title → Priority → Status → Id).
+/// column order. M205: extended to 6 stops (Id → Title → Priority →
+/// Status → Created → ResolvedAt → Id) per the new M205 cycle.
 #[test]
 fn backlog_cycle_sort_uses_per_lane_key_set() {
     let mut app = App::new();
@@ -39,6 +41,10 @@ fn backlog_cycle_sort_uses_per_lane_key_set() {
     assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Priority);
     apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
     assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Status);
+    apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
+    assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Created);
+    apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
+    assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::ResolvedAt);
     apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
     assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Id);
 }
@@ -104,11 +110,13 @@ fn backlog_default_sort_is_numeric_id() {
 }
 
 /// M187: column header carries a `▼` marker on the active sort column.
-/// M202 S16: the Milestones table's sortable columns are now
-/// ID / Title / Pri / Since (the Lifecycle column was replaced by
-/// the read-only Stage column, which is not sortable). This test
-/// pins the marker on the Since header (a sortable column) and the
-/// absence on the read-only Stage header.
+/// M205: the Milestones table's Stage column IS now a sortable
+/// column (it carries position via flow_stages, and the Stage sort
+/// reuses that signal). This test pins the marker on the Since
+/// header (a sortable column) and the absence on the ID column
+/// (inactive for this test). The Stage column assertion is left
+/// out of the negative half — it's a sortable column now, so when
+/// Stage is the active sort key the arrow SHOULD render.
 #[test]
 fn milestones_header_marks_active_sort_column_with_arrow() {
     let mut app = App::new();
@@ -120,6 +128,7 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -140,8 +149,8 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
 
     // The header row sits a couple of rows below the tab bar. Walk the
     // buffer and confirm the Since column header carries a ▼ while
-    // the ID column header does not (and the read-only Stage header
-    // never carries the marker).
+    // the ID column header does not (Stage is now sortable but
+    // inactive for this test, so it shouldn't render ▼).
     let mut since_marked = false;
     let mut id_marked = false;
     let mut stage_marked = false;
@@ -178,7 +187,7 @@ fn milestones_header_marks_active_sort_column_with_arrow() {
     );
     assert!(
         !stage_marked,
-        "read-only Stage header must never carry the sort marker"
+        "Stage header (sortable but inactive) must NOT carry ▼"
     );
 }
 

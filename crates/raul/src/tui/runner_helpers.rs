@@ -93,6 +93,25 @@ fn parse_backlog_lines(data: &serde_json::Value) -> Vec<BacklogLine> {
                     // post-M203; the parser tolerates older payloads
                     // (no `preview`) by defaulting to "".
                     preview: item["preview"].as_str().unwrap_or("").to_string(),
+                    // M205: parse the timestamp fields straight from the
+                    // model payload (BacklogItem + IdeaEntry both
+                    // expose `created` and `resolved_at` /
+                    // `tags` — the JSON projection already includes
+                    // them via `serde_json::to_value`). Empty strings
+                    // for items predating the fields; the sort logic
+                    // treats "" as "unknown" and sinks those rows to
+                    // the bottom of Created / ResolvedAt under both
+                    // directions.
+                    created_at: item["created"].as_str().unwrap_or("").to_string(),
+                    resolved_at: item["resolved_at"].as_str().unwrap_or("").to_string(),
+                    tags: item["tags"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 })
                 .collect()
         })
@@ -204,6 +223,14 @@ fn parse_milestone_summaries(data: &serde_json::Value) -> Vec<MilestoneSummary> 
                     // bottom.
                     priority: m["priority"].as_str().unwrap_or("normal").to_string(),
                     updated: m["updated"].as_str().unwrap_or("").to_string(),
+                    // M205: parse the on-disk creation date from the
+                    // list-milestones projection (added in the same
+                    // step — the projection now emits `created`).
+                    // Empty for milestones predating the field; the
+                    // Created sort sinks those rows to the bottom
+                    // under both ascending and descending
+                    // directions.
+                    created: m["created"].as_str().unwrap_or("").to_string(),
                     // M174 fix: cancellation overlay + audit
                     // fields. `cancelled` defaults to false for
                     // pre-M174 milestones; the date / reason
@@ -586,11 +613,25 @@ pub fn load_persisted_sort_keys(runner: &MpRunner, app: &mut App) -> Result<()> 
         let value = parse_config_get_value(&raw).unwrap_or_default();
         let sort_key = match value.as_str() {
             "id" => crate::tui::app::SortKey::Id,
-            "lifecycle" => crate::tui::app::SortKey::Lifecycle,
+            // M205: pre-M205 bindings persisted as "lifecycle" — the
+            // Stage sort replaces the legacy Lifecycle variant
+            // (Stage column owns that signal now). The "stage"
+            // label is the canonical post-M205 spelling; pre-M205
+            // "lifecycle" values fall through to the unknown branch
+            // below and silently fall back to the per-lane default
+            // (per AC-08 — legacy migration must not break existing
+            // users).
+            "stage" => crate::tui::app::SortKey::Stage,
             "priority" => crate::tui::app::SortKey::Priority,
             "updated" => crate::tui::app::SortKey::Updated,
+            // M205: cross-lane Created sort.
+            "created" => crate::tui::app::SortKey::Created,
             // Backlog-shaped sort key (status ranks backlog/ideas rows).
             "status" => crate::tui::app::SortKey::Status,
+            // M205: Backlog-only ResolvedAt sort.
+            "resolved-at" => crate::tui::app::SortKey::ResolvedAt,
+            // M205: Ideas-only Tags sort.
+            "tags" => crate::tui::app::SortKey::Tags,
             // Alphabetical title sort (cross-lane).
             "title" => crate::tui::app::SortKey::Title,
             "" => continue,
@@ -599,6 +640,9 @@ pub fn load_persisted_sort_keys(runner: &MpRunner, app: &mut App) -> Result<()> 
                 // A future config-cleanup milestone can prune stale
                 // sort.* entries; we don't write back here so a
                 // transient typo can't clobber the user's real choice.
+                // Pre-M205 "lifecycle" values land here silently — the
+                // per-lane default (Id) is the M182 S3 fallback
+                // (AC-08: legacy lifecycle sort falls back to default).
                 eprintln!("raul: ignoring unknown sort key for lane {lane_key}: {other:?}");
                 continue;
             }

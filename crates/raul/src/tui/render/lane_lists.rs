@@ -387,12 +387,20 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
     // carries position (the ordinal) and label together, so the
     // Lifecycle text column is gone (AC-13: the Stage cell already
     // carries position).
+    //
+    // M205: each header cell renders ▼ when the active sort key
+    // matches that column. The Stage header was previously
+    // hardcoded to `false` (the M202 Stage cell didn't carry a
+    // sort affordance). With the M205 cycle including Stage +
+    // Created (in addition to the legacy Id/Title/Priority/
+    // Updated), the header cells now reflect the active key —
+    // matching AC-07.
     let header = Row::new(vec![
         Cell::new(Span::styled(String::new(), header_style)),
         header_cell("ID", active_sort == SortKey::Id, header_style),
         header_cell("Title", active_sort == SortKey::Title, header_style),
         header_cell("Pri", active_sort == SortKey::Priority, header_style),
-        header_cell("Stage", false, header_style),
+        header_cell("Stage", active_sort == SortKey::Stage, header_style),
         header_cell("Since", active_sort == SortKey::Updated, header_style),
     ])
     .style(header_style)

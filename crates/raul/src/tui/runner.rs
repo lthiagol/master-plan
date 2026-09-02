@@ -1124,6 +1124,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
@@ -1137,6 +1138,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
@@ -1150,6 +1152,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
@@ -1170,6 +1173,7 @@ mod tests {
                 status: "open".to_string(),
                 resolution: "".to_string(),
                 preview: "".to_string(),
+                ..Default::default()
             },
             BacklogLine {
                 id: "BL-02".to_string(),
@@ -1178,6 +1182,7 @@ mod tests {
                 status: "open".to_string(),
                 resolution: "".to_string(),
                 preview: "".to_string(),
+                ..Default::default()
             },
             BacklogLine {
                 id: "BL-03".to_string(),
@@ -1186,6 +1191,7 @@ mod tests {
                 status: "resolved".to_string(),
                 resolution: "shipped".to_string(),
                 preview: "resolved · shipped".to_string(),
+                ..Default::default()
             },
         ];
         app
@@ -1330,6 +1336,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,

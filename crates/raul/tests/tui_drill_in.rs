@@ -13,6 +13,7 @@ fn drill_into_milestone_from_list() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -37,6 +38,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -50,6 +52,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -63,6 +66,7 @@ fn drill_into_done_milestone_by_id_with_hide_done() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -93,6 +97,7 @@ fn drill_into_backlog_detail() {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }]);
     if let Some(b) = app.backlog.first() {
         app.selected_backlog_id = Some(b.id.clone());

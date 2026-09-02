@@ -21,8 +21,8 @@ fn tui_sort_rebind_opens_with_default_keys_for_milestones() {
     assert!(app.sort_rebind_open(), "menu must open");
     assert_eq!(
         app.sort_rebind_menu.as_ref().map(|k| k.len()),
-        Some(5),
-        "Milestones lane exposes 5 sort keys (Id/Title/Priority/Lifecycle/Updated)"
+        Some(6),
+        "Milestones lane exposes 6 sort keys (Id/Title/Priority/Stage/Created/Updated)"
     );
 }
 
@@ -30,13 +30,12 @@ fn tui_sort_rebind_opens_with_default_keys_for_milestones() {
 fn tui_sort_rebind_default_highlights_current_key() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
-    // Set the lane's sort key to Lifecycle before opening.
-    app.lane_sort_key
-        .insert(Lane::Milestones, SortKey::Lifecycle);
+    // Set the lane's sort key to Stage before opening.
+    app.lane_sort_key.insert(Lane::Milestones, SortKey::Stage);
     app.open_sort_rebind();
     assert_eq!(
         app.sort_rebind_highlight(),
-        Some(SortKey::Lifecycle),
+        Some(SortKey::Stage),
         "menu highlight defaults to the lane's current sort key"
     );
 }
@@ -72,7 +71,7 @@ fn tui_sort_rebind_confirm_writes_lane_preference() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
     app.open_sort_rebind();
-    // M187: cycle order is Id → Title → Priority → Lifecycle → Updated;
+    // M205: cycle order is Id → Title → Priority → Stage → Created → Updated;
     // one press highlights Title.
     app.cycle_sort_rebind_next(); // highlight = Title
     app.confirm_sort_rebind();
@@ -119,10 +118,10 @@ fn tui_sort_rebind_unsupported_lane_rejects_open() {
 #[test]
 fn tui_sort_rebind_per_lane_persistence() {
     // Bind Milestones to Title and Backlog to Priority. Each lane
-    // reads its own preference via `lane_sort_key`. M187: per-lane
+    // reads its own preference via `lane_sort_key`. M205: per-lane
     // key set is in column order — milestones cycle
-    // Id → Title → Priority → Lifecycle → Updated; backlog cycles
-    // Id → Title → Priority → Status.
+    // Id → Title → Priority → Stage → Created → Updated; backlog cycles
+    // Id → Title → Priority → Status → Created → ResolvedAt.
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
     app.open_sort_rebind();

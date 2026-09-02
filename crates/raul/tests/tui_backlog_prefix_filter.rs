@@ -21,6 +21,7 @@ fn bl(id: &str, title: &str) -> BacklogLine {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }
 }
 

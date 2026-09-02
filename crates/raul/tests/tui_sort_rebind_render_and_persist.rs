@@ -32,6 +32,7 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -45,6 +46,7 @@ fn make_app_with_milestones() -> App {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -120,6 +122,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-15".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -133,6 +136,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(), // bumped
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -158,6 +162,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "low".into(), // dropped
             updated: "2026-07-15".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -171,6 +176,7 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -204,21 +210,18 @@ fn m182_s5_rendered_order_changes_when_sort_key_changes() {
 fn m182_s5_choice_survives_simulated_restart() {
     use raul::tui::app::SortKey;
 
-    // "Session 1" — user binds Milestones → Lifecycle.
+    // "Session 1" — user binds Milestones → Stage.
     let mut app_session1 = App::new();
     app_session1
         .lane_sort_key
-        .insert(Lane::Milestones, SortKey::Lifecycle);
-    assert_eq!(
-        app_session1.lane_sort_key(Lane::Milestones),
-        SortKey::Lifecycle
-    );
+        .insert(Lane::Milestones, SortKey::Stage);
+    assert_eq!(app_session1.lane_sort_key(Lane::Milestones), SortKey::Stage);
 
     // Simulate persistence: write the binding to a (mocked) config
     // map. In production this is `mp config set sort.milestones
-    // lifecycle`. The mock keeps the test raul-only.
+    // stage`. The mock keeps the test raul-only.
     let mut persisted: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    persisted.insert("milestones".to_string(), "lifecycle".to_string());
+    persisted.insert("milestones".to_string(), "stage".to_string());
 
     // "Session 2" — fresh App, no in-memory state. The loader
     // simulates reading the persisted map and inserting into the
@@ -230,7 +233,7 @@ fn m182_s5_choice_survives_simulated_restart() {
     if let Some(value) = persisted.get("milestones") {
         let sort_key = match value.as_str() {
             "id" => SortKey::Id,
-            "lifecycle" => SortKey::Lifecycle,
+            "stage" => SortKey::Stage,
             "priority" => SortKey::Priority,
             "updated" => SortKey::Updated,
             _ => SortKey::Id,
@@ -241,14 +244,14 @@ fn m182_s5_choice_survives_simulated_restart() {
     }
     assert_eq!(
         app_session2.lane_sort_key(Lane::Milestones),
-        SortKey::Lifecycle,
+        SortKey::Stage,
         "M182 S5: bound sort key must survive a restart"
     );
 
     // And the render reflects it — the visible milestones sort by
-    // lifecycle rank, not id order. With M01 in-progress and M02
-    // approved, lifecycle puts M01 first (M01 in-progress > M02
-    // approved in the lifecycle_rank mapping).
+    // stage rank, not id order. With M01 in-progress and M02
+    // approved, stage puts M01 first (M01 in-progress > M02
+    // approved in the stage_rank mapping).
     app_session2.load_milestones(vec![
         MilestoneSummary {
             id: "M01".into(),
@@ -258,6 +261,7 @@ fn m182_s5_choice_survives_simulated_restart() {
             depends_on: vec![],
             priority: "low".into(),
             updated: "2026-07-15".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -271,6 +275,7 @@ fn m182_s5_choice_survives_simulated_restart() {
             depends_on: vec![],
             priority: "urgent".into(),
             updated: "2026-07-10".into(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -282,11 +287,11 @@ fn m182_s5_choice_survives_simulated_restart() {
     let pos_02 = output.find("M02").expect("M02");
     assert!(
         pos_01 < pos_02,
-        "lifecycle rank (in-progress > approved) places M01 before M02; got pos_01={pos_01} pos_02={pos_02}"
+        "stage rank (in-progress > approved) places M01 before M02; got pos_01={pos_01} pos_02={pos_02}"
     );
 }
 
-/// AC-05: lane_sort_key is per-lane — binding Milestones to Lifecycle
+/// AC-05: lane_sort_key is per-lane — binding Milestones to Stage
 /// doesn't affect Backlog / Ideas (which keep their default
 /// SortKey::Id). This is the cross-lane isolation regression: a
 /// future change that accidentally promoted a bind across all lanes

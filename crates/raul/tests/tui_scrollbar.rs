@@ -120,6 +120,7 @@ fn ac01_view_state_reserves_gutter_on_milestones_list() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -152,6 +153,7 @@ fn ac01_view_state_reserves_gutter_on_backlog_list() {
         status: "open".to_string(),
         resolution: "".to_string(),
         preview: "".to_string(),
+        ..Default::default()
     }];
     app.load_backlog(bl);
 
@@ -177,6 +179,7 @@ fn ac01_view_state_reserves_gutter_on_detail_screens() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -211,6 +214,7 @@ fn ac01_view_state_reserves_gutter_on_annotation_thread() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -246,6 +250,7 @@ fn ac01_view_state_reserves_gutter_on_backlog_detail() {
         status: "open".to_string(),
         resolution: "".to_string(),
         preview: "".to_string(),
+        ..Default::default()
     }];
     // Drive compute_view directly into the detail content state. The
     // production entry is `Action::OpenBacklogDetail` which requires
@@ -279,6 +284,7 @@ fn ac01_list_item_width_excludes_gutter() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -531,6 +537,7 @@ fn integration_milestones_scroll_updates_scroll_rect() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,

@@ -405,6 +405,13 @@ fn build_milestone_item(
         // which sorts to the bottom under ascending order.
         "priority": m.milestone.priority,
         "updated": m.milestone.updated,
+        // M205: emit the on-disk creation date so the raul TUI's
+        // Created sort can order milestones without a per-row
+        // `show` round-trip. Empty string when the milestone file
+        // predates the field (none in current practice — `created`
+        // has been mandatory on `MilestoneMeta` since M1 — but the
+        // empty fallback keeps the parser total).
+        "created": m.milestone.created,
         // M174 fix: emit the cancellation overlay + audit fields so the
         // TUI Milestones lane can show "cancelled (since YYYY-MM-DD: <reason>)"
         // for milestones like M174 where the work shipped via a different

@@ -20,6 +20,7 @@ fn ms(id: &str, title: &str) -> raul::tui::app::MilestoneSummary {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -35,6 +36,7 @@ fn bl(id: &str, title: &str) -> BacklogLine {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }
 }
 
@@ -63,8 +65,8 @@ fn s_keypress_opens_sort_rebind_modal() {
     assert!(app.sort_rebind_open(), "OpenSortRebind must open the menu");
 }
 
-/// #4: milestones cycle = Id → Title → Priority → Lifecycle → Updated → Id
-/// (column order, skipping Gauge which is a Lifecycle alias).
+/// #4: milestones cycle = Id → Title → Priority → Stage → Created → Updated → Id
+/// (column order; 6 stops in M205).
 #[test]
 fn milestones_cycle_sort_follows_column_order() {
     let mut app = App::new();
@@ -74,7 +76,8 @@ fn milestones_cycle_sort_follows_column_order() {
     let expected = [
         SortKey::Title,
         SortKey::Priority,
-        SortKey::Lifecycle,
+        SortKey::Stage,
+        SortKey::Created,
         SortKey::Updated,
         SortKey::Id,
     ];
@@ -88,8 +91,9 @@ fn milestones_cycle_sort_follows_column_order() {
     }
 }
 
-/// #4: backlog cycle = Id → Title → Priority → Status → Id (matches
-/// the 4 visible columns exactly).
+/// #4: backlog cycle = Id → Title → Priority → Status → Created →
+/// ResolvedAt → Id (M205 extended to 6 stops to match the
+/// M182 S3 / M187 cycle, plus M205's Created + ResolvedAt additions).
 #[test]
 fn backlog_cycle_sort_follows_column_order() {
     let mut app = App::new();
@@ -100,6 +104,8 @@ fn backlog_cycle_sort_follows_column_order() {
         SortKey::Title,
         SortKey::Priority,
         SortKey::Status,
+        SortKey::Created,
+        SortKey::ResolvedAt,
         SortKey::Id,
     ];
     for want in expected {

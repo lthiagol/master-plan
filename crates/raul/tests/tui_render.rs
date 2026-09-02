@@ -43,6 +43,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -56,6 +57,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -69,6 +71,7 @@ fn sample_milestones() -> Vec<raul::tui::app::MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -110,6 +113,7 @@ fn backlog_list_renders_table_columns() {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }]);
     let output = render_to_string(&app);
     assert!(output.contains("Backlog"), "should contain backlog header");

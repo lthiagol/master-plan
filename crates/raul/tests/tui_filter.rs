@@ -11,6 +11,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -24,6 +25,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -37,6 +39,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -50,6 +53,7 @@ fn milestones() -> Vec<MilestoneSummary> {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -111,6 +115,7 @@ fn hide_done_filters_resolved_backlog() {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
         BacklogLine {
             id: "BL-02".into(),
@@ -119,6 +124,7 @@ fn hide_done_filters_resolved_backlog() {
             status: "resolved".into(),
             resolution: "shipped".into(),
             preview: "resolved · shipped".into(),
+            ..Default::default()
         },
         BacklogLine {
             id: "BL-03".into(),
@@ -127,6 +133,7 @@ fn hide_done_filters_resolved_backlog() {
             status: "pending".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
         BacklogLine {
             id: "BL-04".into(),
@@ -135,6 +142,7 @@ fn hide_done_filters_resolved_backlog() {
             status: "archived".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         },
     ]);
     assert_eq!(app.visible_backlog().len(), 4);

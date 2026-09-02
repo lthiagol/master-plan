@@ -187,6 +187,7 @@ fn tui_render_respects_color_enabled_toggle() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,

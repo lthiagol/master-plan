@@ -37,6 +37,7 @@ fn chip_all_and_filtered() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -50,6 +51,7 @@ fn chip_all_and_filtered() {
             depends_on: vec![],
             priority: "normal".into(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -90,6 +92,7 @@ fn stages_section_renders_twelve_rows() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -181,6 +184,7 @@ fn stages_section_order_is_canonical() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -267,6 +271,7 @@ fn stages_section_sits_between_meta_and_g14() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -325,6 +330,7 @@ fn status_icons_match_enum() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -397,6 +403,7 @@ fn skipped_icon_for_cancelled_stages() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: true,
         cancelled_at: None,
         cancel_reason: None,
@@ -457,6 +464,7 @@ fn cancelled_overlay_subline_appears() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: true,
         cancelled_at: None,
         cancel_reason: Some("work shipped via different design".to_string()),
@@ -532,6 +540,7 @@ fn blocked_overlay_subline_appears() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -592,6 +601,7 @@ fn remediation_overlay_subline_appears() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -658,6 +668,7 @@ fn no_overlay_no_subline() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -720,6 +731,7 @@ fn detail_header_shows_stage_cell_not_lifecycle_badge() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -815,6 +827,7 @@ fn backlog_row_renders_two_visual_lines() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "Continuation detail here".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -823,6 +836,7 @@ fn backlog_row_renders_two_visual_lines() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "".to_string(),
+            ..Default::default()
         },
     ]);
     app.select_lane(Lane::Backlog);
@@ -870,6 +884,7 @@ fn preview_line_is_dim_with_arrow_prefix() {
         status: "open".to_string(),
         resolution: "".to_string(),
         preview: "some continuation text".to_string(),
+        ..Default::default()
     }]);
     app.select_lane(Lane::Backlog);
 
@@ -924,6 +939,7 @@ fn selected_row_highlight_spans_both_lines() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "Continuation detail".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -932,6 +948,7 @@ fn selected_row_highlight_spans_both_lines() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "Other continuation".to_string(),
+            ..Default::default()
         },
     ]);
     app.select_lane(Lane::Backlog);
@@ -1019,6 +1036,7 @@ fn selected_index_addresses_logical_rows() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "first preview".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -1027,6 +1045,7 @@ fn selected_index_addresses_logical_rows() {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "second preview".to_string(),
+            ..Default::default()
         },
     ]);
     app.select_lane(Lane::Backlog);
@@ -1119,6 +1138,7 @@ fn backlog_compact_row_renders_two_visual_lines() {
         status: "open".to_string(),
         resolution: "".to_string(),
         preview: "A continuation text".to_string(),
+        ..Default::default()
     }]);
     app.select_lane(Lane::Backlog);
 
@@ -1199,6 +1219,7 @@ fn seed_backlog(app: &mut App) {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "z-preview".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -1207,6 +1228,7 @@ fn seed_backlog(app: &mut App) {
             status: "resolved".to_string(),
             resolution: "shipped".to_string(),
             preview: "alpha-preview".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-03".to_string(),
@@ -1215,6 +1237,7 @@ fn seed_backlog(app: &mut App) {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "mu-preview".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-04".to_string(),
@@ -1223,6 +1246,7 @@ fn seed_backlog(app: &mut App) {
             status: "resolved".to_string(),
             resolution: "wont-fix".to_string(),
             preview: "beta-preview".to_string(),
+            ..Default::default()
         },
     ]);
 }
@@ -1376,6 +1400,7 @@ fn render_preview_visible_chars(preview: &str, w: u16, h: u16) -> String {
         status: "open".to_string(),
         resolution: "".to_string(),
         preview: preview.to_string(),
+        ..Default::default()
     }]);
     app.select_lane(Lane::Backlog);
     let backend = TestBackend::new(w, h);

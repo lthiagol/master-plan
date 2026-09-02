@@ -21,7 +21,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-29",
-    "updated": "2026-08-30",
+    "updated": "2026-09-02",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -64,8 +64,8 @@
       "id": "AC-01",
       "description": "All three list-style lanes (Milestones, Backlog, Ideas) have a 6-stop sort cycle. Per-lane order: Milestones = [Id, Title, Priority, Stage, Created, Updated]; Backlog = [Id, Title, Priority, Status, Created, ResolvedAt]; Ideas = [Id, Title, Priority, Status, Created, Tags]. `sort_keys_for(Lane)` is the single source of truth.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_keys_for_milestones_has_six_stops|sort_keys_for_backlog_has_six_stops|sort_keys_for_ideas_has_six_stops|per_lane_order_matches_spec/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_keys_for_milestones_has_six_stops|sort_keys_for_backlog_has_six_stops|sort_keys_for_ideas_has_six_stops|per_lane_order_matches_spec/)' exit 0 (4/4 pass)"
     },
     {
       "id": "AC-02",
@@ -237,7 +237,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/no_lifecycle_variant_in_sort_key_enum/)",
       "done_when": "No references to SortKey::Lifecycle remain; named test passes",
-      "status": "pending",
+      "status": "in-progress",
       "covers_ac": [
         "AC-01"
       ],
@@ -277,7 +277,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_keys_for_milestones_has_six_stops|sort_keys_for_backlog_has_six_stops|sort_keys_for_ideas_has_six_stops|per_lane_order_matches_spec/)",
       "done_when": "All 4 named tests pass; SortKey has 9 variants; sort_keys_for returns the right 6-stop list per lane",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],

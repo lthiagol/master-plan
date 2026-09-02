@@ -705,6 +705,7 @@ fn s8_milestone_list_drill_opens_milestone_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -727,6 +728,7 @@ fn s8_backlog_list_drill_opens_backlog_detail() {
         status: "open".into(),
         resolution: "".into(),
         preview: "".into(),
+        ..Default::default()
     }]);
     app.selected_backlog_id = Some("BL-01".into());
     app.detail_scroll = 0;
@@ -774,6 +776,7 @@ fn s8_overview_inbox_drill_resolves_to_target_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -823,6 +826,7 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -836,6 +840,7 @@ fn s8_hide_done_drills_by_id_survives_full_list_index_drift() {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -1017,6 +1022,7 @@ fn s7_page_down_advances_by_page_size_and_clamps() {
             priority: "normal".to_string(),
             updated: String::new(),
 
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,
@@ -1052,6 +1058,7 @@ fn s7_page_up_recedes_by_page_size_and_clamps() {
             priority: "normal".to_string(),
             updated: String::new(),
 
+            created: String::new(),
             cancelled: false,
 
             cancelled_at: None,

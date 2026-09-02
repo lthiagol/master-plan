@@ -923,10 +923,13 @@ pub(super) fn render_sort_rebind_overlay(frame: &mut Frame, app: &App, overlay_a
         let marker = if is_active_sort { "● " } else { "  " };
         let label = match k {
             SortKey::Id => "Id",
-            SortKey::Lifecycle => "Lifecycle",
+            SortKey::Stage => "Stage",
             SortKey::Priority => "Priority",
             SortKey::Updated => "Updated",
+            SortKey::Created => "Created",
             SortKey::Status => "Status",
+            SortKey::ResolvedAt => "ResolvedAt",
+            SortKey::Tags => "Tags",
             SortKey::Title => "Title",
         };
         let extra = if is_active_sort { "  (current)" } else { "" };

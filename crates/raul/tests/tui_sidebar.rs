@@ -80,6 +80,7 @@ fn enter_and_exit_milestone_detail() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -107,6 +108,7 @@ fn drill_to_annotation_thread_and_back() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -135,6 +137,7 @@ fn review_menu_does_not_change_content_state() {
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -264,6 +267,7 @@ mod render_tests {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -549,6 +553,7 @@ mod drill_in_tests {
             status: "open".into(),
             resolution: String::new(),
             preview: String::new(),
+            ..Default::default()
         }]
     }
 

@@ -18,6 +18,7 @@ fn ms(id: &str, title: &str) -> MilestoneSummary {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -33,6 +34,7 @@ fn bl(id: &str, title: &str) -> BacklogLine {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }
 }
 

@@ -45,23 +45,44 @@ pub enum Lane {
 
 /// M172 S5: sort key for the per-lane sort rebind menu.
 ///
-/// `Id` is the legacy alphabetical order; `Lifecycle` groups
-/// milestones by their canonical `lifecycle` value (in-progress →
-/// approved → done, etc.); `Priority` orders by backlog priority
+/// `Id` is the legacy alphabetical order; `Stage` groups milestones
+/// by their current mp-flow stage (the same derivation as the Stage
+/// column cell — first non-done, non-skipped stage in
+/// `MP_FLOW_STAGE_KEYS` canonical order). Replaces the pre-M205
+/// `Lifecycle` variant — the Stage column already owns that signal,
+/// so the sort reuses it. `Priority` orders by backlog priority
 /// (or "—" when the row has no priority); `Updated` orders by the
-/// `lifecycle_at` timestamp (most-recent first).
+/// `lifecycle_at` timestamp (most-recent first); `Created` orders
+/// by the on-disk `created` date (set at milestone creation —
+/// distinct from `lifecycle_at`, which tracks the last transition).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortKey {
     Id,
-    Lifecycle,
+    /// M205: Stage sort — replaces the M202-era `Lifecycle` variant.
+    /// Milestones-only (Backlog/Ideas substitute `Status`).
+    Stage,
     Priority,
+    /// M205: Updated = `lifecycle_at` (last lifecycle transition).
+    /// Milestones-only — Backlog/Ideas rows have no lifecycle_at.
     Updated,
-    /// Backlog-shaped equivalent of `Lifecycle` — sorts by the `status`
+    /// M205: Created = the on-disk `created` date (set at creation).
+    /// Cross-lane (Milestones, Backlog, Ideas).
+    Created,
+    /// Backlog-shaped equivalent of `Stage` — sorts by the `status`
     /// field (`open` > `pending` > `active` > `resolved` > `done` >
     /// `archived` …). Only valid on `Lane::Backlog` / `Ideas`.
     Status,
-    /// Alphabetical sort by title. Cross-lane (works on both milestone
-    /// and backlog rows). Cycle-sort sequence visits this after Id to
+    /// M205: ResolvedAt = `BacklogItem.resolved_at` RFC3339 timestamp.
+    /// Backlog-only. Unresolved items sort to the bottom under
+    /// ascending AND descending directions (per Q-01 resolution).
+    ResolvedAt,
+    /// M205: Tags = the first tag alphabetically, then subsequent
+    /// tags as a stable tiebreak. Ideas-only. Items with no tags
+    /// sort to the bottom under both directions (per Q-02
+    /// resolution).
+    Tags,
+    /// Alphabetical sort by title. Cross-lane (works on all three
+    /// list lanes). Cycle-sort sequence visits this after Id to
     /// match the visible column order.
     Title,
 }
@@ -70,10 +91,13 @@ impl SortKey {
     pub fn label(&self) -> &'static str {
         match self {
             SortKey::Id => "id",
-            SortKey::Lifecycle => "lifecycle",
+            SortKey::Stage => "stage",
             SortKey::Priority => "priority",
             SortKey::Updated => "updated",
+            SortKey::Created => "created",
             SortKey::Status => "status",
+            SortKey::ResolvedAt => "resolved-at",
+            SortKey::Tags => "tags",
             SortKey::Title => "title",
         }
     }
@@ -81,13 +105,18 @@ impl SortKey {
 
 /// Which sort keys apply to a given lane, in visible column order.
 /// `o` cycle-sort walks this list top-to-bottom so the user can predict
-/// the next stop from the column layout.
+/// the next stop from the column layout. M205: each lane is exactly
+/// 6 stops; the cycle is the single source of truth for the
+/// per-lane sort affordance.
 ///
-/// - `Milestones` — `Id → Title → Priority → Lifecycle → Updated → Id`
-///   (5 stops; Gauge and Since are visualizations of Lifecycle /
-///   Updated respectively, so cycle skips them as redundant stops).
-/// - `Backlog` / `Ideas` — `Id → Title → Priority → Status → Id`
-///   (4 stops; matches the visible column order).
+/// - `Milestones` — `Id → Title → Priority → Stage → Created → Updated`
+///   (6 stops; Stage already carries position in the column cell,
+///   Created sorts by `MilestoneMeta.created` — distinct from
+///   `Updated`, which sorts by `lifecycle_at`).
+/// - `Backlog` — `Id → Title → Priority → Status → Created → ResolvedAt`
+///   (6 stops; ResolvedAt on the resolved end of the cycle).
+/// - `Ideas` — `Id → Title → Priority → Status → Created → Tags`
+///   (6 stops; Tags on the exploratory end of the cycle).
 /// - `Path` / `Overview` / `Settings` / `Watch` — no sort menu (no
 ///   list to sort, or the sort surface is custom — Watch has its own
 ///   selection ordering by milestone id).
@@ -97,14 +126,25 @@ pub fn sort_keys_for(lane: Lane) -> Vec<SortKey> {
             SortKey::Id,
             SortKey::Title,
             SortKey::Priority,
-            SortKey::Lifecycle,
+            SortKey::Stage,
+            SortKey::Created,
             SortKey::Updated,
         ],
-        Lane::Backlog | Lane::Ideas => vec![
+        Lane::Backlog => vec![
             SortKey::Id,
             SortKey::Title,
             SortKey::Priority,
             SortKey::Status,
+            SortKey::Created,
+            SortKey::ResolvedAt,
+        ],
+        Lane::Ideas => vec![
+            SortKey::Id,
+            SortKey::Title,
+            SortKey::Priority,
+            SortKey::Status,
+            SortKey::Created,
+            SortKey::Tags,
         ],
         // Path / Overview / Settings / Watch: no sort menu.
         Lane::Path | Lane::Overview | Lane::Settings | Lane::Watch => Vec::new(),
@@ -126,35 +166,27 @@ fn priority_rank(priority: &str) -> u8 {
     }
 }
 
-/// M182 S3: lifecycle rank for `SortKey::Lifecycle`. Higher rank
-/// sorts first. Documented order (F-07 / F-12):
-/// in-progress > approved > groomed > done > self-reviewed >
-/// reviewed > complete > cancelled > remediation > draft.
-///
-/// `complete` and `cancelled` are distinct ranks (complete above
-/// cancelled). `remediation` sits below both terminal states so the
-/// sort matches the comment on `visible_milestones`. Unknown values
-/// and `draft` default to 0 (lowest).
-fn lifecycle_rank(lifecycle: &str) -> u8 {
-    match lifecycle {
-        "in-progress" => 9,
-        "approved" => 8,
-        "groomed" => 7,
-        "done" => 6,
-        "self-reviewed" => 5,
-        "reviewed" => 4,
-        "complete" => 3,
-        "cancelled" => 2,
-        "remediation" => 1,
-        _ => 0,
-    }
+/// M205: ordinal rank for `SortKey::Stage`. Returns the
+/// `MP_FLOW_STAGE_KEYS` index of the given stage slug (0-based).
+/// The Stage column cell renders `<N>/12` where N = idx + 1, so
+/// the natural list reading direction is **ascending** by stage
+/// ordinal: 1/12 (Define outcome) at the top, 12/12 (Hand-off)
+/// at the bottom. The `visible_milestones` comparator does
+/// `rank(a).cmp(&rank(b))` (ascending) — earliest stage first.
+/// Unrecognized stages sink to `u8::MAX` (bottom). The pre-M205
+/// `lifecycle_rank` helper is gone — the Stage cell owns that
+/// signal now, and Stage sort reuses the same derivation.
+fn mp_flow_stage_rank(slug: &str) -> u8 {
+    mp_model::mp_flow_stage_index(slug)
+        .map(|i| i as u8)
+        .unwrap_or(u8::MAX)
 }
 
 /// Status rank for `SortKey::Status` (Backlog/Ideas). Higher rank
 /// sorts first. Open / pending / active items surface above terminal
 /// (resolved / done / archived / dismissed / closed / cancelled) ones;
 /// unknown values default to 0 so malformed statuses sink rather than
-/// shadow a real row. Mirrors `lifecycle_rank`'s shape.
+/// shadow a real row.
 fn status_rank(status: &str) -> u8 {
     match status {
         "open" => 9,
@@ -200,6 +232,25 @@ fn compare_milestone_ids(a: &str, b: &str) -> std::cmp::Ordering {
         }
     }
     va.len().cmp(&vb.len())
+}
+
+/// M205: lexicographic compare on tag arrays for `SortKey::Tags`.
+/// Primary sort on `tags[0]` (case-insensitive); subsequent tags
+/// participate as a stable tiebreak (Q-02). Lists of unequal
+/// length: the shorter list loses when all preceding slots tie
+/// (stable "alpha" ordering on the joint prefix). The caller has
+/// already filtered out empty `tags` (those rows sort to the
+/// bottom under both directions — see the `SortKey::Tags` arm
+/// in `visible_backlog`).
+fn compare_tag_lists(a: &[String], b: &[String]) -> std::cmp::Ordering {
+    let len = a.len().min(b.len());
+    for i in 0..len {
+        let ord = a[i].to_ascii_lowercase().cmp(&b[i].to_ascii_lowercase());
+        if ord != std::cmp::Ordering::Equal {
+            return ord;
+        }
+    }
+    a.len().cmp(&b.len())
 }
 
 impl Lane {
@@ -351,7 +402,7 @@ pub struct InboxLine {
     pub action: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BacklogLine {
     pub id: String,
     pub title: String,
@@ -364,6 +415,21 @@ pub struct BacklogLine {
     /// just `resolved` for empty resolutions. Ideas: first line of `body`.
     /// Empty string when no preview is available.
     pub preview: String,
+    /// M205: on-disk creation date (YYYY-MM-DD or RFC3339) from
+    /// `BacklogItem.created` / `IdeaEntry.created`. Empty string
+    /// when the underlying record predates the field — sorts to the
+    /// bottom under ascending and descending directions.
+    pub created_at: String,
+    /// M205: resolved-at timestamp (RFC3339) from
+    /// `BacklogItem.resolved_at`. Empty string when the item is not
+    /// resolved — the ResolvedAt sort sinks unresolved items to the
+    /// bottom under both directions (Q-01).
+    pub resolved_at: String,
+    /// M205: tag list from `IdeaEntry.tags`. Empty for non-Idea
+    /// backlog rows. Used by the Tags sort (Ideas only) — primary
+    /// sort on the first tag alphabetically, subsequent tags as a
+    /// stable tiebreak (Q-02).
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -396,6 +462,12 @@ pub struct MilestoneSummary {
     /// option. Empty string means "unknown" — sinks to the bottom
     /// under ascending order.
     pub updated: String,
+    /// M205: on-disk creation date (YYYY-MM-DD or RFC3339) from
+    /// `MilestoneMeta.created`. Distinct from `lifecycle_at`/`updated`
+    /// — Created sorts by creation, Updated sorts by the last
+    /// lifecycle transition. Empty string means "unknown" — sinks
+    /// to the bottom under both ascending and descending directions.
+    pub created: String,
     /// M174 fix: cancellation overlay flag from `mp list milestones`.
     /// `true` for milestones like M174 where the work shipped via a
     /// different design and the milestone was closed without
@@ -444,6 +516,10 @@ impl MilestoneSummary {
             depends_on: Vec::new(),
             priority: "normal".to_string(),
             updated: String::new(),
+            // M205: created defaults to "" (unknown) — sinks to the
+            // bottom of the Created sort under both directions until
+            // the list projection emits the field.
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -1476,12 +1552,21 @@ impl App {
             SortKey::Id => {
                 filtered.sort_by(|a, b| compare_milestone_ids(&a.id, &b.id));
             }
-            SortKey::Lifecycle => {
-                // Lifecycle order: in-progress > approved > groomed >
-                // done > self-reviewed > reviewed > complete >
-                // cancelled > remediation > draft. Ties → numeric id.
+            SortKey::Stage => {
+                // M205: Stage sort — orders by the milestone's current
+                // mp-flow stage (the first non-done, non-skipped stage
+                // in canonical order, same derivation as the Stage
+                // column cell — `current_mp_flow_stage`). ASCENDING
+                // by stage ordinal so the list reads top-to-bottom
+                // in the same direction as the Stage cell (1/12 →
+                // 12/12). Pre-M202 milestones with an empty
+                // `flow_stages` map fall back to the canonical
+                // `draft` slug (rank 0) — matches the stage cell's
+                // behavior under F-05. Ties → numeric milestone id.
                 filtered.sort_by(|a, b| {
-                    let ord = lifecycle_rank(&b.lifecycle).cmp(&lifecycle_rank(&a.lifecycle));
+                    let slug_a = crate::tui::progress::current_mp_flow_stage(&a.flow_stages).0;
+                    let slug_b = crate::tui::progress::current_mp_flow_stage(&b.flow_stages).0;
+                    let ord = mp_flow_stage_rank(slug_a).cmp(&mp_flow_stage_rank(slug_b));
                     ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
                 });
             }
@@ -1497,17 +1582,29 @@ impl App {
                 });
             }
             SortKey::Updated => {
-                // Most recent first. Empty `updated` sinks to the
-                // bottom under ascending order.
+                // Most recent first (lifecycle_at timestamp). Empty
+                // `updated` sinks to the bottom under ascending order.
                 filtered.sort_by(|a, b| {
                     let ord = b.updated.cmp(&a.updated);
                     ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
                 });
             }
-            // Status is backlog-only; on Milestones it's a stale bind
-            // (defensive — should not happen via the S menu, which
-            // surfaces the per-lane key set). Fall back to id ordering.
-            SortKey::Status => {
+            SortKey::Created => {
+                // M205: Created sort — orders by on-disk creation
+                // date (`MilestoneMeta.created`), distinct from
+                // `Updated` which sorts by `lifecycle_at`. Earliest
+                // created first; empty `created` sinks to the
+                // bottom under ascending order.
+                filtered.sort_by(|a, b| {
+                    let ord = a.created.cmp(&b.created);
+                    ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
+                });
+            }
+            // Status / ResolvedAt / Tags are backlog/ideas-only keys;
+            // on Milestones they're a stale bind (defensive — should
+            // not happen via the S menu, which surfaces the per-lane
+            // key set). Fall back to id ordering.
+            SortKey::Status | SortKey::ResolvedAt | SortKey::Tags => {
                 filtered.sort_by(|a, b| compare_milestone_ids(&a.id, &b.id));
             }
             // Alphabetical by title, case-insensitive. Ties fall back to
@@ -1580,9 +1677,54 @@ impl App {
                     ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
                 });
             }
-            // Lifecycle/Updated don't apply to backlog rows — fall back
-            // to id ordering if a stale bind somehow lands here.
-            SortKey::Lifecycle | SortKey::Updated => {
+            SortKey::Created => {
+                // M205: cross-lane Created sort — earliest created
+                // first. Empty `created_at` (pre-M205 records) sinks
+                // to the bottom under ascending order.
+                filtered.sort_by(|a, b| {
+                    let ord = a.created_at.cmp(&b.created_at);
+                    ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
+                });
+            }
+            SortKey::ResolvedAt => {
+                // M205: ResolvedAt sort (Backlog-only). Unresolved
+                // items (`resolved_at == ""`) sort to the bottom
+                // under BOTH ascending and descending directions
+                // (Q-01: unreachable records stay grouped so the
+                // operator can scan what's still open). Earliest
+                // resolved first; ties → numeric id.
+                filtered.sort_by(|a, b| {
+                    let ord = match (a.resolved_at.is_empty(), b.resolved_at.is_empty()) {
+                        (true, true) => std::cmp::Ordering::Equal,
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, true) => std::cmp::Ordering::Less,
+                        (false, false) => a.resolved_at.cmp(&b.resolved_at),
+                    };
+                    ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
+                });
+            }
+            SortKey::Tags => {
+                // M205: Tags sort (Ideas-only). Primary sort on the
+                // first tag alphabetically; subsequent tags as a
+                // stable tiebreak (Q-02: secondary/tertiary tags
+                // participate as a stable lex compare so the row
+                // order doesn't randomize on re-sort). Items with
+                // no tags sink to the bottom under BOTH directions.
+                filtered.sort_by(|a, b| {
+                    let ord = match (a.tags.is_empty(), b.tags.is_empty()) {
+                        (true, true) => std::cmp::Ordering::Equal,
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, true) => std::cmp::Ordering::Less,
+                        (false, false) => compare_tag_lists(&a.tags, &b.tags),
+                    };
+                    ord.then_with(|| compare_milestone_ids(&a.id, &b.id))
+                });
+            }
+            // Stage / Updated are milestones-only keys; on Backlog /
+            // Ideas they're a stale bind (defensive — should not
+            // happen via the S menu, which surfaces the per-lane
+            // key set). Fall back to id ordering.
+            SortKey::Stage | SortKey::Updated => {
                 filtered.sort_by(|a, b| compare_milestone_ids(&a.id, &b.id));
             }
             // Alphabetical by title, case-insensitive.
@@ -1951,6 +2093,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
@@ -1964,6 +2107,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,
@@ -1977,6 +2121,7 @@ mod tests {
                 depends_on: vec![],
                 priority: "normal".to_string(),
                 updated: String::new(),
+                created: String::new(),
                 cancelled: false,
                 cancelled_at: None,
                 cancel_reason: None,

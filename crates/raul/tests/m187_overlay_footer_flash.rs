@@ -19,6 +19,7 @@ fn ms(id: &str) -> MilestoneSummary {
         depends_on: vec![],
         priority: "normal".into(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
@@ -34,6 +35,7 @@ fn bl(id: &str) -> BacklogLine {
         status: "open".into(),
         resolution: String::new(),
         preview: String::new(),
+        ..Default::default()
     }
 }
 
@@ -58,8 +60,9 @@ fn dump(app: &App, w: u16, h: u16) -> String {
 }
 
 /// #1: S menu opens and renders the per-lane key set with the cursor
-/// on the current key. Milestones shows 4 keys (Id/Lifecycle/Priority/
-/// Updated); Backlog shows 3 (Id/Status/Priority).
+/// on the current key. Milestones shows 6 keys (Id/Title/Priority/
+/// Stage/Created/Updated); Backlog shows 6 (Id/Title/Priority/
+/// Status/Created/ResolvedAt).
 #[test]
 fn sort_rebind_menu_renders_with_correct_keys_per_lane() {
     let mut app = App::new();
@@ -68,13 +71,20 @@ fn sort_rebind_menu_renders_with_correct_keys_per_lane() {
     app.open_sort_rebind();
     assert!(app.sort_rebind_open());
     let s = dump(&app, 100, 24);
+    // M205: Stage replaces the pre-M205 Lifecycle menu entry —
+    // the Stage column cell owns that signal now, and the Stage
+    // sort reuses the same derivation.
     assert!(
-        s.contains("Lifecycle"),
-        "milestones menu must list Lifecycle; got:\n{s}"
+        s.contains("Stage"),
+        "milestones menu must list Stage; got:\n{s}"
     );
     assert!(
         s.contains("Updated"),
         "milestones menu must list Updated; got:\n{s}"
+    );
+    assert!(
+        s.contains("Created"),
+        "milestones menu must list Created (M205 addition); got:\n{s}"
     );
     assert!(
         !s.contains("Status"),

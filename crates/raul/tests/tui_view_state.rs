@@ -53,6 +53,7 @@ fn milestones_app() -> App {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -66,6 +67,7 @@ fn milestones_app() -> App {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -79,6 +81,7 @@ fn milestones_app() -> App {
             depends_on: vec![],
             priority: "normal".to_string(),
             updated: String::new(),
+            created: String::new(),
             cancelled: false,
             cancelled_at: None,
             cancel_reason: None,
@@ -100,6 +103,7 @@ fn backlog_app() -> App {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -108,6 +112,7 @@ fn backlog_app() -> App {
             status: "open".to_string(),
             resolution: "".to_string(),
             preview: "".to_string(),
+            ..Default::default()
         },
         raul::tui::app::BacklogLine {
             id: "BL-03".to_string(),
@@ -116,6 +121,7 @@ fn backlog_app() -> App {
             status: "resolved".to_string(),
             resolution: "shipped in 1.4".to_string(),
             preview: "resolved · shipped in 1.4".to_string(),
+            ..Default::default()
         },
     ];
     app

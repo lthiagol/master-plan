@@ -14,6 +14,7 @@ fn ms(id: &str, deps: &[&str]) -> MilestoneSummary {
         depends_on: deps.iter().map(|s| (*s).to_string()).collect(),
         priority: "normal".into(),
         updated: String::new(),
+        created: String::new(),
         cancelled: false,
         cancelled_at: None,
         cancel_reason: None,
