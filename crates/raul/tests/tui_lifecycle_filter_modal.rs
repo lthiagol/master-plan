@@ -331,3 +331,277 @@ fn c_clears_all_active_filters() {
         "lane entry must be empty or absent"
     );
 }
+
+// ─── M204 S6: chip strip — every active dim is a chip with x; AND-combine ───
+
+use raul::tui::app::filter_dimensions_for;
+
+/// AC-05: filters AND-combine across dimensions. A row that
+/// satisfies every active dimension (lifecycle AND priority
+/// AND age) is kept; a row that fails any dimension is
+/// dropped. Empty dimensions are skipped (no narrowing). The
+/// pure seam is `App::visible_milestones` / `App::visible_backlog`.
+#[test]
+fn filters_and_combine() {
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut app = App::new();
+    app.load_milestones(vec![
+        raul::tui::app::MilestoneSummary {
+            id: "01".into(),
+            title: "approved high".into(),
+            lifecycle: "approved".into(),
+            lifecycle_at: None,
+            depends_on: vec![],
+            priority: "high".into(),
+            updated: String::new(),
+            created: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
+            flow_stages: BTreeMap::new(),
+        },
+        raul::tui::app::MilestoneSummary {
+            id: "02".into(),
+            title: "approved normal".into(),
+            lifecycle: "approved".into(),
+            lifecycle_at: None,
+            depends_on: vec![],
+            priority: "normal".into(),
+            updated: String::new(),
+            created: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
+            flow_stages: BTreeMap::new(),
+        },
+        raul::tui::app::MilestoneSummary {
+            id: "03".into(),
+            title: "in-progress high".into(),
+            lifecycle: "in-progress".into(),
+            lifecycle_at: None,
+            depends_on: vec![],
+            priority: "high".into(),
+            updated: String::new(),
+            created: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
+            flow_stages: BTreeMap::new(),
+        },
+    ]);
+    app.select_lane(Lane::Milestones);
+    // Filter: lifecycle=approved AND priority=high → only M01.
+    let mut dims: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    dims.insert(
+        "lifecycle".to_string(),
+        BTreeSet::from(["approved".to_string()]),
+    );
+    dims.insert(
+        "priority".to_string(),
+        BTreeSet::from(["high".to_string()]),
+    );
+    app.lane_filters.insert(Lane::Milestones, dims);
+    let ids: Vec<&str> = app
+        .visible_milestones()
+        .iter()
+        .map(|m| m.id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        vec!["01"],
+        "AND-combine must keep only the row that satisfies BOTH dimensions; got {ids:?}"
+    );
+}
+
+/// AC-05: the chip strip is built from the active filter
+/// state. The render function (private) consumes the same
+/// shape the chip renderer reads from. The pin asserts that
+/// every active dim × active value is present in the chip
+/// strip's text representation.
+#[test]
+fn chip_strip_shows_every_active_dimension() {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use raul::tui::render;
+    use raul::tui::view_state;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let mut app = App::new();
+    // Seed 2 dimensions of filters on Milestones.
+    let mut dims: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    dims.insert(
+        "lifecycle".to_string(),
+        BTreeSet::from(["approved".to_string(), "in-progress".to_string()]),
+    );
+    dims.insert(
+        "priority".to_string(),
+        BTreeSet::from(["high".to_string()]),
+    );
+    app.lane_filters.insert(Lane::Milestones, dims);
+    // Add at least one milestone so the lane renders (the
+    // empty-state path bypasses the chip strip).
+    app.load_milestones(vec![raul::tui::app::MilestoneSummary {
+        id: "01".into(),
+        title: "anchor".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "high".into(),
+        updated: String::new(),
+        created: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+        flow_stages: BTreeMap::new(),
+    }]);
+    app.select_lane(Lane::Milestones);
+
+    let backend = TestBackend::new(140, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    // Every active chip must be rendered with its dim + value.
+    assert!(flat.contains("lifecycle:"), "lifecycle dim label");
+    assert!(flat.contains("approved"), "lifecycle value: approved");
+    assert!(flat.contains("in-progress"), "lifecycle value: in-progress");
+    assert!(flat.contains("priority:"), "priority dim label");
+    assert!(flat.contains("high"), "priority value: high");
+    // The chip's "remove" glyph is present.
+    assert!(flat.contains("✕"), "chip x glyph");
+}
+
+/// AC-05: clicking the chip's `x` removes that single chip
+/// (the (dim, value) pair). After removal, the visible set
+/// reflects the new filter state immediately.
+#[test]
+fn chip_remove_updates_visible_set() {
+    let mut app = App::new();
+    app.load_milestones(vec![
+        raul::tui::app::MilestoneSummary {
+            id: "01".into(),
+            title: "a".into(),
+            lifecycle: "approved".into(),
+            lifecycle_at: None,
+            depends_on: vec![],
+            priority: "normal".into(),
+            updated: String::new(),
+            created: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
+            flow_stages: BTreeMap::new(),
+        },
+        raul::tui::app::MilestoneSummary {
+            id: "02".into(),
+            title: "b".into(),
+            lifecycle: "in-progress".into(),
+            lifecycle_at: None,
+            depends_on: vec![],
+            priority: "normal".into(),
+            updated: String::new(),
+            created: String::new(),
+            cancelled: false,
+            cancelled_at: None,
+            cancel_reason: None,
+            flow_stages: BTreeMap::new(),
+        },
+    ]);
+    app.select_lane(Lane::Milestones);
+    app.set_lifecycle_filter(
+        ["approved".to_string(), "in-progress".to_string()]
+            .into_iter()
+            .collect(),
+    );
+    // Both rows are visible (lifecycle=approved|in-progress
+    // is permissive across both).
+    let initial: Vec<&str> = app
+        .visible_milestones()
+        .iter()
+        .map(|m| m.id.as_str())
+        .collect();
+    assert_eq!(initial.len(), 2);
+
+    // Click "x" on the approved chip.
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(
+        &mut app,
+        &r,
+        Action::RemoveFilterChip {
+            dim: "lifecycle".to_string(),
+            value: "approved".to_string(),
+        },
+    )
+    .unwrap();
+    let after: Vec<&str> = app
+        .visible_milestones()
+        .iter()
+        .map(|m| m.id.as_str())
+        .collect();
+    assert_eq!(
+        after,
+        vec!["02"],
+        "removing the approved chip must hide the approved row; got {after:?}"
+    );
+}
+
+/// AC-07: empty filter state hides the chip strip entirely
+/// (no row reserved). The `render_active_filter_chips`
+/// helper returns 0 when the lane has no active filter.
+#[test]
+fn empty_filter_hides_chip_strip() {
+    let mut app = App::new();
+    app.load_milestones(vec![raul::tui::app::MilestoneSummary {
+        id: "01".into(),
+        title: "anchor".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "normal".into(),
+        updated: String::new(),
+        created: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+        flow_stages: BTreeMap::new(),
+    }]);
+    app.select_lane(Lane::Milestones);
+    // Lane has no filter; the chip strip must NOT reserve a row.
+    assert!(filter_dimensions_for(Lane::Milestones).len() > 0);
+    // Render and verify no chip glyph appears in the buffer.
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use raul::tui::render;
+    use raul::tui::view_state;
+    let backend = TestBackend::new(140, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    assert!(
+        !flat.contains("✕"),
+        "empty filter must not render the chip strip; got: {flat}"
+    );
+}

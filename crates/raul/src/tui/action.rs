@@ -143,6 +143,15 @@ pub enum Action {
     /// Clear all active filters for the active lane (default
     /// `c` on a list lane).
     ClearFilters,
+    /// M204 / AC-05: remove a single active filter chip.
+    /// The (dim, value) pair identifies the chip — the lane
+    /// is `app.active_lane`. A chip's `x` click is dispatched
+    /// through the mouse handler with this action; the lane
+    /// is read from the live `App` state.
+    RemoveFilterChip {
+        dim: String,
+        value: String,
+    },
     /// Move to the next lane in `Lane::ordered()` (Right / l).
     NextLane,
     /// Jump to a specific lane by `Lane::ordered()` index (digit keys 1..=N,
@@ -390,6 +399,17 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
                 && matches!(lane, Lane::Milestones | Lane::Backlog | Lane::Ideas)
             {
                 app.clear_lane_filters(lane);
+            }
+        }
+        Action::RemoveFilterChip { dim, value } => {
+            // AC-05: remove a single active filter chip from the
+            // active lane. The chip's `x` click is dispatched
+            // through the mouse handler with this action.
+            let lane = app.active_lane;
+            if app.content == ContentState::List
+                && matches!(lane, Lane::Milestones | Lane::Backlog | Lane::Ideas)
+            {
+                app.remove_filter_chip(lane, &dim, &value);
             }
         }
 

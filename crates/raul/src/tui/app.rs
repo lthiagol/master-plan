@@ -1622,6 +1622,35 @@ impl App {
         self.touch();
     }
 
+    /// M204 / AC-05: remove a single active filter chip.
+    /// `lane` is the lane the chip belongs to; `dim` is the
+    /// dimension name (`lifecycle`, `priority`, ...); `value`
+    /// is the value to drop. If the dimension's set becomes
+    /// empty, the dimension entry is removed; if the lane's
+    /// map becomes empty, the lane entry is removed too. A
+    /// no-op when the chip doesn't exist.
+    pub fn remove_filter_chip(&mut self, lane: Lane, dim: &str, value: &str) {
+        let mut changed = false;
+        if let Some(dims) = self.lane_filters.get_mut(&lane) {
+            if let Some(set) = dims.get_mut(dim) {
+                if set.remove(value) {
+                    changed = true;
+                }
+                if set.is_empty() {
+                    dims.remove(dim);
+                }
+            }
+            if dims.is_empty() {
+                self.lane_filters.remove(&lane);
+            }
+        }
+        if changed {
+            self.selected_index = 0;
+            self.mark_filter_dirty(lane);
+            self.touch();
+        }
+    }
+
 
     /// M186: the active lane's committed search term (empty = no filter).
     pub fn lane_search_term(&self) -> &str {
@@ -1723,13 +1752,25 @@ impl App {
         } else {
             self.milestones.iter().collect()
         };
-        // M185: multi-select lifecycle filter (empty = all).
-        // M204: reads from `lane_filters[Milestones]["lifecycle"]`
-        // (the unified filter model). The helper returns a
-        // BTreeSet<String> so the retain logic is unchanged.
-        let lifecycle_filter = self.lifecycle_filter_set();
-        if !lifecycle_filter.is_empty() {
-            filtered.retain(|m| lifecycle_filter.contains(&m.lifecycle));
+        // M204: AND-combine across every active dimension on
+        // the Milestones lane. The legacy lifecycle-only
+        // helper covers the historical case; the new
+        // `lane_filters` map is consulted for every dimension
+        // so a (priority=high) filter narrows to milestones
+        // satisfying that dimension. Age is handled in S7.
+        if let Some(dims) = self.lane_filters.get(&Lane::Milestones) {
+            // lifecycle (back-compat surface).
+            if let Some(lc) = dims.get("lifecycle") {
+                if !lc.is_empty() {
+                    filtered.retain(|m| lc.contains(&m.lifecycle));
+                }
+            }
+            // priority.
+            if let Some(pri) = dims.get("priority") {
+                if !pri.is_empty() {
+                    filtered.retain(|m| pri.contains(&m.priority));
+                }
+            }
         }
         // M186: per-lane substring search against id+title.
         let term = self.lane_search_term();
@@ -1853,6 +1894,42 @@ impl App {
                 .filter(|b| in_lane(b) && matches_search(b))
                 .collect()
         };
+        // M204: AND-combine across every active dimension on
+        // the Backlog/Ideas lane. Empty sets are skipped
+        // (no narrowing) so the per-lane defaults are
+        // preserved.
+        let active_lane = self.active_lane;
+        if let Some(dims) = self.lane_filters.get(&active_lane) {
+            // priority.
+            if let Some(pri) = dims.get("priority") {
+                if !pri.is_empty() {
+                    filtered.retain(|b| pri.contains(&b.priority));
+                }
+            }
+            // status.
+            if let Some(st) = dims.get("status") {
+                if !st.is_empty() {
+                    filtered.retain(|b| st.contains(&b.status));
+                }
+            }
+            // source (Backlog only — match the row's id prefix).
+            if let Some(src) = dims.get("source") {
+                if !src.is_empty() {
+                    filtered.retain(|b| src.iter().any(|p| b.id.starts_with(p)));
+                }
+            }
+            // tags (Ideas only — any-of: a row passes if any
+            // of its tags matches an active tag-prefix).
+            if let Some(tags) = dims.get("tags") {
+                if !tags.is_empty() {
+                    filtered.retain(|b| {
+                        b.tags
+                            .iter()
+                            .any(|t| tags.iter().any(|p| t == p))
+                    });
+                }
+            }
+        }
         // Apply the active lane's sort key. Mirrors `visible_milestones()` —
         // backlog rows sort by Id / Status / Priority (the per-lane key
         // set from `sort_keys_for`). Updated is not available (BacklogLine

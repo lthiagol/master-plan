@@ -17,9 +17,24 @@ fn header_cell(label: &str, is_active_sort: bool, header_style: Style) -> Cell<'
 }
 
 pub(super) fn render_lane_list(frame: &mut Frame, app: &App, area: Rect, view: &ViewState) {
+    // M204 / AC-05: render the active-filter chip strip at
+    // the top of the list area. The strip is 1 row tall (or
+    // absent entirely) and the table / list gets the
+    // remaining height.
+    let strip_h = render_active_filter_chips(frame, app, area, app.active_lane);
+    let inner = if strip_h > 0 && area.height > strip_h {
+        Rect {
+            x: area.x,
+            y: area.y.saturating_add(strip_h),
+            width: area.width,
+            height: area.height.saturating_sub(strip_h),
+        }
+    } else {
+        area
+    };
     match app.active_lane {
-        Lane::Milestones => render_milestones_table(frame, app, area, view),
-        Lane::Backlog | Lane::Ideas => render_backlog_list(frame, app, area, view),
+        Lane::Milestones => render_milestones_table(frame, app, inner, view),
+        Lane::Backlog | Lane::Ideas => render_backlog_list(frame, app, inner, view),
         // M179 S3-S6: the Watch lane has its own renderer
         // (picker + lifecycle graph + compact queue + log +
         // active-pane output). The renderer does not use the
@@ -338,6 +353,73 @@ fn build_title_cell(
         lines.push(Line::from(String::new()));
     }
     Some(Cell::from(Text::from(lines)))
+}
+
+/// M204 / AC-05: render the active-filter chip strip for the
+/// active lane. Returns the height consumed (0 when no chips;
+/// the strip is hidden entirely on an empty filter set per
+/// AC-07). The strip is one `Paragraph` line with the chip
+/// text + `x` glyphs; the chip click handler in the mouse
+/// dispatch translates `x` clicks to `Action::RemoveFilterChip`
+/// (the position-to-chip map is computed in
+/// `chip_strip_layout`).
+pub(super) fn render_active_filter_chips(
+    frame: &mut Frame,
+    app: &App,
+    area: Rect,
+    lane: Lane,
+) -> u16 {
+    let Some(dims) = app.lane_filters.get(&lane) else {
+        return 0;
+    };
+    if dims.is_empty() {
+        return 0;
+    }
+    if area.height == 0 {
+        return 0;
+    }
+    let chip_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: 1,
+    };
+    let dim = Style::default()
+        .fg(app.effective_palette().accent)
+        .add_modifier(Modifier::BOLD);
+    let val = Style::default().fg(app.effective_palette().foreground);
+    let x_style = Style::default()
+        .fg(app.effective_palette().dim)
+        .add_modifier(Modifier::UNDERLINED);
+    let mut spans: Vec<Span> = Vec::new();
+    spans.push(Span::styled(" ".to_string(), val));
+    // Walk dimensions in spec order so the chip strip
+    // matches the modal's display order.
+    let spec = crate::tui::app::filter_dimensions_for(lane);
+    let mut first = true;
+    for d in &spec {
+        if let Some(set) = dims.get(&d.name) {
+            for v in &d.values {
+                if !set.contains(v) {
+                    continue;
+                }
+                if !first {
+                    spans.push(Span::styled("  ".to_string(), val));
+                }
+                first = false;
+                spans.push(Span::styled(format!("{}:", d.label.to_ascii_lowercase()), dim));
+                spans.push(Span::styled(format!(" {v}"), val));
+                spans.push(Span::styled(" ✕".to_string(), x_style));
+            }
+        }
+    }
+    if first {
+        // No chips actually rendered (every dim is empty).
+        return 0;
+    }
+    let line = Line::from(spans);
+    frame.render_widget(Paragraph::new(line), chip_area);
+    1
 }
 
 /// M185: Milestones as a Table (REVERSED cursor) with indent + gauge.

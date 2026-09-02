@@ -92,8 +92,8 @@
       "id": "AC-05",
       "description": "Filter AND-combines: a row matches only if it satisfies every active dimension. The chip strip displays every active dimension with `✕` to remove that single chip. Removing a chip updates the visible set immediately.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/filters_and_combine|chip_strip_shows_every_active_dimension|chip_remove_updates_visible_set/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filters_and_combine|chip_strip_shows_every_active_dimension|chip_remove_updates_visible_set/) exit 0 (3/3 pass)"
     },
     {
       "id": "AC-06",
@@ -107,7 +107,7 @@
       "description": "Empty filter state hides the chip strip entirely (no row reserved). `c` clears all active filters in one action. After clearing, the visible set returns to unfiltered.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/empty_filter_hides_chip_strip|c_clears_all_active_filters/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/empty_filter_hides_chip_strip|c_clears_all_active_filters/) exit 0 (1/1 pass)"
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/empty_filter_hides_chip_strip|c_clears_all_active_filters/) exit 0 (2/2 pass)"
     },
     {
       "id": "AC-08",
@@ -342,7 +342,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filters_and_combine|chip_strip_shows_every_active_dimension|chip_remove_updates_visible_set|empty_filter_hides_chip_strip/)",
       "done_when": "All 4 named tests pass; chip strip renders; AND-combine works; chip remove updates visible set; empty hides strip",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05",
         "AC-07"
