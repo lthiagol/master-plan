@@ -1732,6 +1732,13 @@ impl App {
             .copied()
             .unwrap_or(keys[0]);
         self.lane_sort_key.insert(lane, next);
+        // M204 / AC-08: mark the new sort key as pending a
+        // `mp config set sort.<lane> <key>` write. The
+        // debounced flush in `on_idle` coalesces rapid `o`
+        // presses; the same flush that AC-02 covers for
+        // filter toggles also covers sort cycling (the
+        // writer is shared).
+        self.mark_sort_dirty(lane, next.label().to_string());
         self.selected_index = 0;
         self.touch();
     }

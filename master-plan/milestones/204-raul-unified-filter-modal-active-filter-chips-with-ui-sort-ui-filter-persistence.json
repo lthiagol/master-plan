@@ -113,8 +113,8 @@
       "id": "AC-08",
       "description": "Cycle o persists via existing sort.<lane> (M182 path) within 1s (debounce). Quitting and relaunching restores the sort. Unrecognized persisted values fall back to the per-lane default (already implemented in load_persisted_sort_keys).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|unknown_persisted_sort_falls_back_to_default/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|unknown_persisted_sort_falls_back_to_default/) exit 0 (3/3 pass)"
     },
     {
       "id": "AC-09",
@@ -468,7 +468,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|unknown_persisted_sort_falls_back_to_default/)",
       "done_when": "All 3 named tests pass; sort cycle persists; restart restores; unknown falls back silently",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],

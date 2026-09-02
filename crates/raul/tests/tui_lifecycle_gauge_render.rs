@@ -554,3 +554,136 @@ fn footer_hidden_when_default_sort_no_filters() {
         "footer must NOT show 'N filters' when no filter is active; got: {flat}"
     );
 }
+
+// ─── M204 S11: CycleSortNext persistence (M182/M205 debounce path) ─────────
+
+use raul::tui::action::{apply_action, Action};
+use raul::tui::app::{Lane, SortKey};
+
+/// AC-08 / S11: pressing `o` twice writes the new sort key
+/// to the debounced save path. The write goes through
+/// `mark_sort_dirty` → `pending_sort_writes` and the on_idle
+/// flush produces exactly one `mp config set sort.<lane> <key>`
+/// call after the debounce window elapses.
+#[test]
+fn sort_cycle_persists_to_config() {
+    use std::cell::RefCell;
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    // Press `o` twice — moves from Id to Title to Priority.
+    apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
+    apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
+    assert_eq!(
+        app.lane_sort_key(Lane::Milestones),
+        SortKey::Priority
+    );
+    // The pending sort write is recorded.
+    assert_eq!(
+        app.pending_sort_writes.get("milestones").map(|s| s.as_str()),
+        Some("priority")
+    );
+    assert!(app.last_pending_change_at.is_some());
+    // Flush the debounce — the writer is invoked with
+    // `sort.milestones = priority`.
+    let calls = RefCell::new(Vec::<(String, String)>::new());
+    let after = std::time::Instant::now()
+        .checked_add(std::time::Duration::from_secs(1))
+        .unwrap();
+    let fired = app
+        .flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            after,
+            |key, value| {
+                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                Ok::<(), ()>(())
+            },
+        )
+        .unwrap();
+    assert!(fired, "the debounce must fire after the 500ms window");
+    let calls = calls.borrow();
+    assert_eq!(calls.len(), 1, "exactly one write per flush");
+    assert_eq!(calls[0].0, "sort.milestones");
+    assert_eq!(calls[0].1, "priority");
+}
+
+/// AC-08 / S11: a TUI launch with `sort.<lane> = <key>` in
+/// `ProjectConfig.sort` restores the sort key. The loader
+/// (`load_persisted_sort_keys` → `apply_persisted_sort_value`)
+/// is the M182 path; M204 adds no new loader. The seam
+/// accepts a config value string and maps it to a
+/// `SortKey`; unknown values fall back to the per-lane
+/// default silently.
+#[test]
+fn sort_restored_on_tui_launch() {
+    use raul::tui::runner::apply_persisted_sort_value;
+    let mut app = App::new();
+    let applied = apply_persisted_sort_value(
+        &mut app,
+        Lane::Milestones,
+        "stage",
+        "milestones",
+    );
+    assert!(applied, "known value must apply a binding");
+    assert_eq!(
+        app.lane_sort_key(Lane::Milestones),
+        SortKey::Stage
+    );
+    // Re-run the loader with a different known value —
+    // overwrites the prior bind.
+    let applied = apply_persisted_sort_value(
+        &mut app,
+        Lane::Milestones,
+        "priority",
+        "milestones",
+    );
+    assert!(applied);
+    assert_eq!(
+        app.lane_sort_key(Lane::Milestones),
+        SortKey::Priority
+    );
+}
+
+/// AC-08 / S11: an unknown persisted value (e.g. a typo or a
+/// pre-M205 `lifecycle` literal) falls back to the per-lane
+/// default (Id) silently. The loader logs to stderr but
+/// does not panic or write back. The lane keeps its in-memory
+/// default so the user sees no disruption.
+#[test]
+fn unknown_persisted_sort_falls_back_to_default() {
+    use raul::tui::runner::apply_persisted_sort_value;
+    let mut app = App::new();
+    // Simulate a pre-M205 "lifecycle" literal landing in
+    // `sort.milestones`. The loader rejects it (returns
+    // `false`) and the lane keeps its in-memory default.
+    let applied = apply_persisted_sort_value(
+        &mut app,
+        Lane::Milestones,
+        "lifecycle",
+        "milestones",
+    );
+    assert!(!applied, "unknown 'lifecycle' value must NOT apply a binding");
+    assert_eq!(
+        app.lane_sort_key(Lane::Milestones),
+        SortKey::Id,
+        "lane must keep its in-memory default when the loader sees an unknown value"
+    );
+    // Garbage string also falls back.
+    let applied = apply_persisted_sort_value(
+        &mut app,
+        Lane::Backlog,
+        "garbage",
+        "backlog",
+    );
+    assert!(!applied);
+    assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Id);
+    // Empty string is the silent default path.
+    let applied = apply_persisted_sort_value(
+        &mut app,
+        Lane::Ideas,
+        "",
+        "ideas",
+    );
+    assert!(!applied);
+    assert_eq!(app.lane_sort_key(Lane::Ideas), SortKey::Id);
+}
