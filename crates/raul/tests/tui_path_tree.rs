@@ -1316,3 +1316,89 @@ fn blocked_fork_at_blocker_preserved() {
         "blocked-by M10 must appear BEFORE M20's title row"
     );
 }
+
+// =========================================================================
+// M206 S4 — tree connector preservation (AC-08)
+// =========================================================================
+
+#[test]
+fn tree_connectors_preserved() {
+    // Snapshot the rendered tree at width 120 and assert the
+    // connector characters (`├─`, `└─`, `●`, `│`) appear at the
+    // expected positions.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 120, 60);
+
+    // Dump each row as-is (skip the Path Tree widget border — the
+    // `│` at column 0 is the widget frame, not the tree spine).
+    let mut snap = String::new();
+    for y in 0..buf.area.height {
+        let mut row = String::new();
+        for x in 0..buf.area.width {
+            row.push_str(buf[(x, y)].symbol());
+        }
+        snap.push_str(&row);
+        snap.push('\n');
+    }
+
+    // ● — first execution item marker (rank 1). The marker is on
+    // the line immediately following the EXECUTION header.
+    assert!(
+        snap.contains("●  M10 — First execution item"),
+        "first execution item must use `●` marker; snapshot:\n{snap}"
+    );
+    // ├─ — trunk connector for non-first items (rank 2).
+    assert!(
+        snap.contains("├─  M11 — Second execution item"),
+        "second execution item must use `├─` connector; snapshot:\n{snap}"
+    );
+    // ├─ / └─ — branch fork for the 4 branches (Awaiting approval,
+    // Blocked, Grooming) + 3 last-item forks (M11's tail, M30's
+    // tail, M20's tail, M40's tail).
+    let fork_count = snap.matches("├─ ").count() + snap.matches("└─ ").count();
+    assert!(
+        fork_count >= 7,
+        "tree must use `├─` / `└─` connectors (>= 7 forks: 3 branches + 4 last-item forks); got {fork_count}; snapshot:\n{snap}"
+    );
+    // Spine character `│` must appear (between trunk items + branch
+    // continuation).
+    assert!(
+        snap.matches('│').count() >= 3,
+        "tree must use `│` spine character (>= 3 occurrences); snapshot:\n{snap}"
+    );
+}
+
+#[test]
+fn spines_between_trunk_items_preserved() {
+    // Between every pair of trunk items, a `│` spine row must
+    // appear. M10 is followed by spine then M11.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 120, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    let m11_y = find_row_index(&buf, "M11 — Second execution item");
+    // The spine row sits at m10_y + 1 (preview row of M10) + 1
+    // (the spine itself). Layout: M10 title, M10 preview, spine,
+    // M11 title. So spine = m10_y + 2.
+    let spine_y = m10_y + 2;
+    // The spine row begins with `  │`. Walk the row looking for the
+    // first non-space character and verify it's `│`.
+    let mut row = String::new();
+    for x in 0..buf.area.width {
+        row.push_str(buf[(x, spine_y)].symbol());
+    }
+    let trimmed = row.trim_start();
+    assert!(
+        trimmed.starts_with('│'),
+        "spine row must start (after leading whitespace) with `│`; row: {row:?}"
+    );
+    // M11's title row is one below the spine.
+    assert_eq!(
+        spine_y + 1,
+        m11_y,
+        "M11's title row must sit directly below the spine row"
+    );
+}
