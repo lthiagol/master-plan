@@ -45,7 +45,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect, data: &serde_json::Value
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let lines = build_tree_lines(app, data);
+    let lines = build_tree_lines_with_width(app, data, inner.width);
     let viewport = inner.height as usize;
     let max_scroll = lines.len().saturating_sub(viewport);
     // Clamp stored scroll if the tree shrank since last frame (e.g. refresh).
@@ -58,6 +58,19 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect, data: &serde_json::Value
 
 /// Build the full vertical tree as styled lines (shared by render + tests).
 pub fn build_tree_lines(app: &App, data: &serde_json::Value) -> Vec<Line<'static>> {
+    // Default to a comfortable preview column budget when no width
+    // is supplied (e.g. unit tests calling `build_tree_lines` directly).
+    build_tree_lines_with_width(app, data, u16::MAX)
+}
+
+/// M206 AC-11: compact mode rendering. When the path tree is asked
+/// to render at a narrow width, the preview column budget shrinks so
+/// the truncated preview kicks in earlier (less horizontal space).
+pub fn build_tree_lines_with_width(
+    app: &App,
+    data: &serde_json::Value,
+    width: u16,
+) -> Vec<Line<'static>> {
     let palette_helpers = app.effective_palette();
     let lanes_map = model::lane_map(data);
     let mut lines: Vec<Line> = Vec::new();
@@ -82,7 +95,7 @@ pub fn build_tree_lines(app: &App, data: &serde_json::Value) -> Vec<Line<'static
         for (i, item) in exec_items.iter().enumerate() {
             let is_next = i == 0;
             let marker = if is_next { "●" } else { "├─" };
-            let row = trunk_item_rows(item, marker, is_next, app);
+            let row = trunk_item_rows(item, marker, is_next, app, width);
             lines.extend(row);
             lines.push(spine_line());
         }
@@ -126,8 +139,8 @@ pub fn build_tree_lines(app: &App, data: &serde_json::Value) -> Vec<Line<'static
             ]));
             let spine = if is_last { "   " } else { "  │" };
             match *name {
-                "blocked" => blocked_lines(&mut lines, items, spine, app),
-                _ => flat_branch_lines(&mut lines, items, spine, app),
+                "blocked" => blocked_lines(&mut lines, items, spine, app, width),
+                _ => flat_branch_lines(&mut lines, items, spine, app, width),
             }
             lines.push(Line::raw(spine));
         }
@@ -181,6 +194,28 @@ fn spine_line() -> Line<'static> {
 /// preview is given a comfortable budget at a 120-wide terminal. The
 /// trunk caller MAY shrink this budget for compact mode (M206 AC-11).
 pub const PREVIEW_DEFAULT_MAX: usize = 80;
+
+/// Compact-mode preview budget. M206 AC-11: at narrow widths the
+/// preview column is shorter so truncation kicks in earlier. The
+/// compact threshold is the inner Path Tree width — anything below
+/// `COMPACT_WIDTH_THRESHOLD` (100 cols) gets the compact budget.
+pub const PREVIEW_COMPACT_MAX: usize = 40;
+pub const COMPACT_WIDTH_THRESHOLD: u16 = 100;
+
+/// Pick a preview budget based on the inner width. AC-11: compact
+/// mode (narrow widths) shrinks the preview column. Widths >= 100
+/// get the full 80-char budget; widths < 100 get the 40-char compact
+/// budget. Widths >= `u16::MAX` (sentinel from `build_tree_lines`
+/// when no width is supplied) always use the default budget.
+pub fn preview_max_for_width(width: u16) -> usize {
+    if width == u16::MAX {
+        PREVIEW_DEFAULT_MAX
+    } else if width < COMPACT_WIDTH_THRESHOLD {
+        PREVIEW_COMPACT_MAX
+    } else {
+        PREVIEW_DEFAULT_MAX
+    }
+}
 
 /// First non-empty line of `intent.outcome`, or empty string when
 /// `outcome` is missing or whitespace-only.
@@ -371,6 +406,7 @@ pub fn trunk_item_rows(
     marker: &str,
     is_next: bool,
     app: &App,
+    width: u16,
 ) -> Vec<Line<'static>> {
     let palette_helpers = app.effective_palette();
     let label = model::item_label(item);
@@ -440,7 +476,12 @@ pub fn trunk_item_rows(
     // chars. Together with the 4-space indent this keeps the preview
     // visually aligned under the title text.
     let preview_prefix = "    ↳ ".to_string();
-    let preview = preview_line(&preview_prefix, &outcome, palette_helpers, PREVIEW_DEFAULT_MAX);
+    let preview = preview_line(
+        &preview_prefix,
+        &outcome,
+        palette_helpers,
+        preview_max_for_width(width),
+    );
 
     vec![title_line, preview]
 }
@@ -450,6 +491,7 @@ fn flat_branch_lines(
     items: &[serde_json::Value],
     spine: &str,
     app: &App,
+    width: u16,
 ) {
     let palette_helpers = app.effective_palette();
     for (i, item) in items.iter().enumerate() {
@@ -501,7 +543,12 @@ fn flat_branch_lines(
         // non-last branch spine = "  │", the preview indent is
         // "{spine}      ↳ " (spine 3 + 6 spaces + ↳).
         let preview_prefix = format!("{spine}      ↳ ");
-        let preview = preview_line(&preview_prefix, &outcome, palette_helpers, PREVIEW_DEFAULT_MAX);
+        let preview = preview_line(
+            &preview_prefix,
+            &outcome,
+            palette_helpers,
+            preview_max_for_width(width),
+        );
         lines.push(preview);
     }
 }
@@ -514,6 +561,7 @@ fn blocked_lines(
     items: &[serde_json::Value],
     spine: &str,
     app: &App,
+    width: u16,
 ) {
     let palette_helpers = app.effective_palette();
     let groups = model::blocked_groups(items);
@@ -592,7 +640,7 @@ fn blocked_lines(
                 &preview_prefix,
                 &outcome,
                 palette_helpers,
-                PREVIEW_DEFAULT_MAX,
+                preview_max_for_width(width),
             );
             lines.push(preview);
         }

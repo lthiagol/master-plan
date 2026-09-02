@@ -1402,3 +1402,120 @@ fn spines_between_trunk_items_preserved() {
         "M11's title row must sit directly below the spine row"
     );
 }
+
+// =========================================================================
+// M206 S5 — compact-mode handling (AC-11)
+// =========================================================================
+
+/// A 60-char outcome that fits in the default 80-char budget but
+/// exceeds the compact 40-char budget. We use it to confirm
+/// truncation kicks in earlier at narrow widths.
+const COMPACT_OUTCOME: &str = "Implement a sixty character description that fits in eighty but exceeds forty.";
+
+fn compact_path_data() -> serde_json::Value {
+    let mut data = rich_path_data();
+    data["lanes"][0]["items"][0]["milestone"]["intent"]["outcome"] =
+        serde_json::Value::String(COMPACT_OUTCOME.to_string());
+    data
+}
+
+#[test]
+fn compact_mode_two_visual_lines() {
+    // At a narrow width (e.g. 80), the layout is still 2 lines per
+    // milestone. M10 title + preview are still adjacent.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(compact_path_data());
+    let buf = render_buffer(&app, 80, 60);
+    let title_y = find_row_index(&buf, "M10 — First execution item");
+    let preview_y = find_row_with(&buf, "Implement a sixty character")
+        .expect("compact preview row must exist");
+    assert_eq!(
+        preview_y - title_y,
+        1,
+        "M10 title + preview must be adjacent in compact mode"
+    );
+}
+
+#[test]
+fn preview_truncates_earlier_in_compact_mode() {
+    // At width 80 (compact), the 60-char outcome must be truncated
+    // (40-char budget + ellipsis). At width 140, the FULL outcome
+    // (60 chars, no ellipsis) must be present.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(compact_path_data());
+
+    // Wide render — full outcome should be present (60 chars fits in
+    // the 80-char default budget).
+    let wide_buf = render_buffer(&app, 140, 60);
+    let wide_y = find_row_with(&wide_buf, COMPACT_OUTCOME)
+        .or_else(|| {
+            // COMPACT_OUTCOME may have wrapped; locate by first 30 chars.
+            find_row_with(&wide_buf, &COMPACT_OUTCOME[..30])
+        })
+        .expect("wide render must carry the full outcome");
+    let mut wide_row = String::new();
+    for x in 0..wide_buf.area.width {
+        wide_row.push_str(wide_buf[(x, wide_y)].symbol());
+    }
+    // In the wide render, NO ellipsis should be present on this row
+    // (the outcome fits in 80 chars).
+    assert!(
+        !wide_row.contains('…'),
+        "wide render must NOT truncate the 60-char outcome (fits in 80-char budget); row: {wide_row:?}"
+    );
+
+    // Compact render — outcome must be truncated.
+    let compact_buf = render_buffer(&app, 80, 60);
+    let compact_y = find_row_with(&compact_buf, "Implement a sixty character")
+        .expect("compact render must carry the start of the outcome");
+    let mut compact_row = String::new();
+    for x in 0..compact_buf.area.width {
+        compact_row.push_str(compact_buf[(x, compact_y)].symbol());
+    }
+    // The compact budget is 40 chars — the outcome must be truncated
+    // with an ellipsis.
+    assert!(
+        compact_row.contains('…'),
+        "compact render must truncate the outcome (ellipsis present); row: {compact_row:?}"
+    );
+}
+
+#[test]
+fn compact_tree_structure_preserved() {
+    // At width 80, the tree connectors (├─, └─, │, ●) still appear
+    // and the branch sub-fork at the blocker still exists.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 80, 60);
+    let mut snap = String::new();
+    for y in 0..buf.area.height {
+        let mut row = String::new();
+        for x in 0..buf.area.width {
+            row.push_str(buf[(x, y)].symbol());
+        }
+        snap.push_str(&row);
+        snap.push('\n');
+    }
+    // ●, ├─, └─, │ all present.
+    assert!(
+        snap.contains("●  M10"),
+        "compact render must keep `●` first-item marker; snapshot:\n{snap}"
+    );
+    assert!(
+        snap.contains("├─  M11"),
+        "compact render must keep `├─` connector; snapshot:\n{snap}"
+    );
+    let fork_count = snap.matches("├─ ").count() + snap.matches("└─ ").count();
+    assert!(
+        fork_count >= 7,
+        "compact render must keep all `├─` / `└─` connectors (>= 7 forks); got {fork_count}; snapshot:\n{snap}"
+    );
+    // Sub-fork at the blocker preserved.
+    assert!(
+        snap.contains("blocked-by M10"),
+        "compact render must keep the blocked-by M10 sub-fork header; snapshot:\n{snap}"
+    );
+}
