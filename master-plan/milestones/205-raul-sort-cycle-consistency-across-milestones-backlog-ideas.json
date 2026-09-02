@@ -120,8 +120,8 @@
       "id": "AC-09",
       "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
       "verification": "make test",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo fmt --all -- --check exit 0; cargo clippy -p mp --tests --no-deps -- -D warnings exit 0; cargo clippy -p raul --tests --no-deps -- -D warnings exit 0; cargo nextest run -p mp --no-fail-fast exit 0 (2284/2284 pass); cargo nextest run -p raul --no-fail-fast exit 0 (1023/1023 pass); make test exit 0"
     }
   ],
   "design_decisions": [
@@ -378,7 +378,7 @@
       ],
       "tests": "make test",
       "done_when": "All 9 ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0; cycle_o walks all stops per lane",
-      "status": "in-progress",
+      "status": "done",
       "covers_ac": [
         "AC-06",
         "AC-09"
