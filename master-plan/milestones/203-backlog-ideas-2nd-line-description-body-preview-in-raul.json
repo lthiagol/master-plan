@@ -94,8 +94,8 @@
       "id": "AC-06",
       "description": "Sort / search / filter behavior unchanged. Sorting by Id, Title, Priority, or Status still works; search (`/`) still matches against title; the `h` hide-done filter still respects `status`. The preview field does not affect sort keys.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/sort_by_id_unchanged|sort_by_title_unchanged|sort_by_priority_unchanged|sort_by_status_unchanged|search_matches_title_not_preview|hide_done_respects_status/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/sort_by_id_unchanged|sort_by_title_unchanged|sort_by_priority_unchanged|sort_by_status_unchanged|search_matches_title_not_preview|hide_done_respects_status/)' exit 0 (6/6 pass)"
     },
     {
       "id": "AC-07",
@@ -330,7 +330,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/sort_by_id_unchanged|sort_by_title_unchanged|sort_by_priority_unchanged|sort_by_status_unchanged|search_matches_title_not_preview|hide_done_respects_status/)",
       "done_when": "All 6 named tests pass; sort and filter behavior unchanged after the 2-line refactor",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],

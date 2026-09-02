@@ -2,7 +2,7 @@
 
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
-use raul::tui::app::{App, ContentState, Lane, MilestoneSummary};
+use raul::tui::app::{App, ContentState, Lane, MilestoneSummary, SortKey};
 use raul::tui::render;
 use raul::tui::view_state;
 use serde_json::json;
@@ -1181,6 +1181,150 @@ fn preview_truncates_earlier_in_compact_mode() {
     assert!(
         narrow_chars >= 8,
         "compact preview should still hold meaningful text; got {narrow_chars}"
+    );
+}
+
+// ── M203 S7: sort / search / filter behavior unchanged after the
+// 2-line refactor. The preview field is render-only; it MUST NOT
+// influence sort keys, search needles, or hide-done filters.
+
+fn seed_backlog(app: &mut App) {
+    app.load_backlog(vec![
+        raul::tui::app::BacklogLine {
+            id: "BL-01".to_string(),
+            title: "Zeta".to_string(),
+            priority: "high".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "z-preview".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-02".to_string(),
+            title: "alpha".to_string(),
+            priority: "low".to_string(),
+            status: "resolved".to_string(),
+            resolution: "shipped".to_string(),
+            preview: "alpha-preview".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-03".to_string(),
+            title: "Mu".to_string(),
+            priority: "medium".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "mu-preview".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-04".to_string(),
+            title: "Beta".to_string(),
+            priority: "high".to_string(),
+            status: "resolved".to_string(),
+            resolution: "wont-fix".to_string(),
+            preview: "beta-preview".to_string(),
+        },
+    ]);
+}
+
+#[test]
+fn sort_by_id_unchanged() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    app.lane_sort_key.insert(Lane::Backlog, SortKey::Id);
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(ids, vec!["BL-01", "BL-02", "BL-03", "BL-04"]);
+}
+
+#[test]
+fn sort_by_title_unchanged() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    app.lane_sort_key.insert(Lane::Backlog, SortKey::Title);
+    // Title sort is case-insensitive ascending. The preview field
+    // MUST NOT participate — these titles are alphabetical with
+    // upper vs lower ordering (alpha < Beta < Mu < Zeta).
+    let titles: Vec<&str> = app.visible_backlog().iter().map(|b| b.title.as_str()).collect();
+    assert_eq!(
+        titles,
+        vec!["alpha", "Beta", "Mu", "Zeta"],
+        "title sort unchanged after preview refactor; got {titles:?}"
+    );
+}
+
+#[test]
+fn sort_by_priority_unchanged() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    app.lane_sort_key.insert(Lane::Backlog, SortKey::Priority);
+    // Priority rank: high > medium > low. Ties break on id ascending.
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec!["BL-01", "BL-04", "BL-03", "BL-02"],
+        "priority sort unchanged after preview refactor; got {ids:?}"
+    );
+}
+
+#[test]
+fn sort_by_status_unchanged() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    app.lane_sort_key.insert(Lane::Backlog, SortKey::Status);
+    // Status rank: open > resolved. Ties break on id ascending.
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec!["BL-01", "BL-03", "BL-02", "BL-04"],
+        "status sort unchanged after preview refactor; got {ids:?}"
+    );
+}
+
+#[test]
+fn search_matches_title_not_preview() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    // Search term `alpha-preview` matches ONLY the preview text,
+    // not the title. The filter must NOT pick this row up.
+    app.lane_search.insert(Lane::Backlog, "alpha-preview".to_string());
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert!(
+        ids.is_empty(),
+        "search must NOT match against preview text; got {ids:?}"
+    );
+    // Search term `alpha` matches the title of BL-02 only.
+    app.lane_search.insert(Lane::Backlog, "alpha".to_string());
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec!["BL-02"],
+        "search must match title-only; got {ids:?}"
+    );
+    // And `mu-preview` (preview-only) must not match either.
+    app.lane_search.insert(Lane::Backlog, "mu-preview".to_string());
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    assert!(
+        ids.is_empty(),
+        "search must not match preview-only terms; got {ids:?}"
+    );
+}
+
+#[test]
+fn hide_done_respects_status() {
+    let mut app = App::new();
+    seed_backlog(&mut app);
+    app.select_lane(Lane::Backlog);
+    app.hide_done = true;
+    let ids: Vec<&str> = app.visible_backlog().iter().map(|b| b.id.as_str()).collect();
+    // Resolved rows (BL-02, BL-04) must be filtered out; open rows
+    // (BL-01, BL-03) remain.
+    assert_eq!(
+        ids,
+        vec!["BL-01", "BL-03"],
+        "hide_done must filter by status, not by preview; got {ids:?}"
     );
 }
 
