@@ -306,8 +306,9 @@ fn rich_path_data() -> serde_json::Value {
                             },
                             "flow_stages": {
                                 "draft": { "status": "done" },
-                                "groom-spec": { "status": "done" },
-                                "approve-spec": { "status": "in_progress" },
+                                "groom": { "status": "done" },
+                                "specify": { "status": "done" },
+                                "approve": { "status": "in_progress" },
                                 "execute": { "status": "pending" },
                             },
                             "lifecycle_at": "2026-08-30T10:00:00Z",
@@ -793,5 +794,342 @@ fn no_placeholder_when_empty() {
     assert!(
         !full.contains("(no description)"),
         "Path tab must not render `(no description)` placeholders; got:\n{full}"
+    );
+}
+
+// =========================================================================
+// M206 S1.1 — Title-line enrichment (stage chip, priority, age, overlay)
+// =========================================================================
+
+/// Locate the row carrying `label` and return its raw text (the
+/// concatenation of every cell symbol on that row).
+fn row_text(buf: &ratatui::buffer::Buffer, y: u16) -> String {
+    let mut row = String::new();
+    for x in 0..buf.area.width {
+        row.push_str(buf[(x, y)].symbol());
+    }
+    row
+}
+
+fn row_text_contains(buf: &ratatui::buffer::Buffer, y: u16, needle: &str) -> bool {
+    row_text(buf, y).contains(needle)
+}
+
+fn find_row_index(buf: &ratatui::buffer::Buffer, label: &str) -> u16 {
+    find_row_with(buf, label)
+        .unwrap_or_else(|| panic!("row for label {label:?} not found"))
+}
+
+#[test]
+fn stage_chip_uses_flow_stages() {
+    // M10 has flow_stages populated with `approve` as in_progress →
+    // its stage chip must be `[4/12]` (approve is the 4th stage).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    assert!(
+        row_text_contains(&buf, m10_y, "[4/12]"),
+        "M10 title row must carry [4/12] stage chip (approve is the 4th stage); row: {row:?}",
+        row = row_text(&buf, m10_y)
+    );
+}
+
+#[test]
+fn stage_chip_falls_back_to_lifecycle_when_flow_stages_empty() {
+    // M11 has empty flow_stages + lifecycle = "approved". The chip
+    // must fall back to the lifecycle text (NOT [N/12]).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m11_y = find_row_index(&buf, "M11 — Second execution item");
+    let m11_row = row_text(&buf, m11_y);
+    assert!(
+        m11_row.contains("approved"),
+        "M11 title row must carry the lifecycle fallback (`approved`); row: {m11_row:?}"
+    );
+    // Specifically — NO `[N/12]` form when flow_stages is empty.
+    assert!(
+        !m11_row.contains("[1/12]") && !m11_row.contains("[2/12]") && !m11_row.contains("[12/12]"),
+        "M11 must NOT carry an [N/12] chip when flow_stages is empty; row: {m11_row:?}"
+    );
+}
+
+#[test]
+fn stage_chip_format_matches_n_over_twelve() {
+    // The chip text uses the canonical `[N/12]` format where N is
+    // `idx + 1` over `MP_FLOW_STAGE_KEYS.len() = 12`. We assert the
+    // M10 chip matches this format precisely.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    let m10_row = row_text(&buf, m10_y);
+    // Must match the regex `\[\d+/12\]`. We use a substring check
+    // for `[4/12]` (the expected chip for M10) and a negative check
+    // for malformed forms.
+    assert!(
+        m10_row.contains("[4/12]"),
+        "M10 chip must be [4/12]; row: {m10_row:?}"
+    );
+    assert!(
+        !m10_row.contains("[04/12]"),
+        "M10 chip must NOT be zero-padded; row: {m10_row:?}"
+    );
+    assert!(
+        !m10_row.contains("[4/012]"),
+        "M10 chip must NOT have a 3-digit denominator; row: {m10_row:?}"
+    );
+}
+
+#[test]
+fn blocked_overlay_renders_danger_chip() {
+    // M20 is blocked. The title row must render `[BLOCKED]` in the
+    // danger color.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m20_y = find_row_index(&buf, "M20 — Blocked on M10");
+    let m20_row = row_text(&buf, m20_y);
+    assert!(
+        m20_row.contains("[BLOCKED]"),
+        "M20 title row must carry [BLOCKED] chip; row: {m20_row:?}"
+    );
+    // Locate the `[` cell of `[BLOCKED]` and verify the color is danger.
+    let danger = app.effective_palette().danger;
+    let mut found = false;
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, m20_y)];
+        if cell.symbol() == "[" {
+            // The chip starts with `[`. The next cells must be styled danger.
+            let next = &buf[(x.saturating_add(1), m20_y)];
+            if next.symbol() == "B" {
+                assert_eq!(
+                    cell.style().fg,
+                    Some(danger),
+                    "BLOCKED chip [ cell must use danger color; got {:?}",
+                    cell.style().fg
+                );
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "could not locate [ cell of BLOCKED chip");
+}
+
+#[test]
+fn cancelled_overlay_renders_warn_chip() {
+    // M30 is cancelled (not blocked). The title row must render
+    // `[CANCELLED]` in the WARN color (NOT danger).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m30_y = find_row_index(&buf, "M30 — Awaiting approval milestone");
+    let m30_row = row_text(&buf, m30_y);
+    assert!(
+        m30_row.contains("[CANCELLED]"),
+        "M30 title row must carry [CANCELLED] chip; row: {m30_row:?}"
+    );
+    // Confirm the color is warn (yellow), NOT danger.
+    let warn = app.effective_palette().warn;
+    let danger = app.effective_palette().danger;
+    let mut found = false;
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, m30_y)];
+        if cell.symbol() == "[" {
+            let next = &buf[(x.saturating_add(1), m30_y)];
+            if next.symbol() == "C" {
+                assert_eq!(
+                    cell.style().fg,
+                    Some(warn),
+                    "CANCELLED chip [ cell must use WARN color (not danger); got {:?}",
+                    cell.style().fg
+                );
+                assert_ne!(
+                    cell.style().fg,
+                    Some(danger),
+                    "CANCELLED chip must NOT use danger color (reserved for BLOCKED)"
+                );
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "could not locate [ cell of CANCELLED chip");
+}
+
+#[test]
+fn deferred_overlay_renders_dim_chip() {
+    // M40 is deferred (not blocked/cancelled). The chip must use the
+    // DIM color (per AC-03).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m40_y = find_row_index(&buf, "M40 — Grooming milestone");
+    let m40_row = row_text(&buf, m40_y);
+    assert!(
+        m40_row.contains("[DEFERRED]"),
+        "M40 title row must carry [DEFERRED] chip; row: {m40_row:?}"
+    );
+    let dim = app.effective_palette().dim;
+    let mut found = false;
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, m40_y)];
+        if cell.symbol() == "[" {
+            let next = &buf[(x.saturating_add(1), m40_y)];
+            if next.symbol() == "D" {
+                assert_eq!(
+                    cell.style().fg,
+                    Some(dim),
+                    "DEFERRED chip [ cell must use DIM color; got {:?}",
+                    cell.style().fg
+                );
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "could not locate [ cell of DEFERRED chip");
+}
+
+#[test]
+fn multiple_overlays_blocked_wins() {
+    // A milestone with all three overlays (blocked + cancelled +
+    // deferred) must render ONLY the BLOCKED chip — blocked wins
+    // per AC-03 precedence.
+    let mut data = rich_path_data();
+    data["lanes"][1]["items"][0]["milestone"]["cancelled"] = serde_json::Value::Bool(true);
+    data["lanes"][1]["items"][0]["milestone"]["deferred"] = serde_json::Value::Bool(true);
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(data);
+    let buf = render_buffer(&app, 140, 60);
+    let m20_y = find_row_index(&buf, "M20 — Blocked on M10");
+    let m20_row = row_text(&buf, m20_y);
+    assert!(
+        m20_row.contains("[BLOCKED]"),
+        "M20 title row must carry [BLOCKED] chip when all overlays set; row: {m20_row:?}"
+    );
+    assert!(
+        !m20_row.contains("[CANCELLED]"),
+        "M20 must NOT render [CANCELLED] when blocked wins; row: {m20_row:?}"
+    );
+    assert!(
+        !m20_row.contains("[DEFERRED]"),
+        "M20 must NOT render [DEFERRED] when blocked wins; row: {m20_row:?}"
+    );
+}
+
+#[test]
+fn title_line_carries_id_title_stage_priority_age() {
+    // Title row must carry id (`M10`), title (`First execution item`),
+    // stage chip (`[4/12]`), priority glyph (`⚑high`), and a
+    // relative age (`<n>d ago`).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    let m10_row = row_text(&buf, m10_y);
+    assert!(m10_row.contains("M10"), "title row must carry id `M10`");
+    assert!(
+        m10_row.contains("First execution item"),
+        "title row must carry title"
+    );
+    assert!(
+        m10_row.contains("[4/12]"),
+        "title row must carry stage chip `[4/12]`"
+    );
+    assert!(
+        m10_row.contains("⚑high"),
+        "title row must carry priority glyph `⚑high`"
+    );
+    // Age is relative — the lifecycle_at is 2026-08-30T10:00:00Z,
+    // so the age is "Nd ago" or "Nw ago" depending on the test's
+    // wall clock. We assert the shape: ends with ` ago`.
+    assert!(
+        m10_row.contains("ago") || m10_row.contains("just now"),
+        "title row must carry a relative age (`<n>d ago` etc.); row: {m10_row:?}"
+    );
+}
+
+#[test]
+fn priority_glyph_matches_priority_value() {
+    // M10 priority="high" → glyph "⚑high".
+    // M11 priority="normal" → glyph "─norm".
+    // M30 priority="low" → glyph "─low".
+    // M20 priority="high" → glyph "⚑high" (we already use this).
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    let m11_y = find_row_index(&buf, "M11 — Second execution item");
+    let m30_y = find_row_index(&buf, "M30 — Awaiting approval milestone");
+    assert!(
+        row_text_contains(&buf, m10_y, "⚑high"),
+        "M10 (high) must carry ⚑high glyph"
+    );
+    assert!(
+        row_text_contains(&buf, m11_y, "─norm"),
+        "M11 (normal) must carry ─norm glyph"
+    );
+    assert!(
+        row_text_contains(&buf, m30_y, "─low"),
+        "M30 (low) must carry ─low glyph"
+    );
+}
+
+#[test]
+fn age_uses_relative_time() {
+    // Set M10's lifecycle_at to 2 days before now and confirm the
+    // age cell reads "2d ago" (the relative-time form). We hand-roll
+    // an RFC3339 timestamp from epoch seconds so we don't depend on
+    // chrono in the test target.
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let two_days_ago = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+        - 2 * 86_400;
+    // Howard Hinnant days_from_civil inverse (year/month/day from epoch).
+    let days = two_days_ago.div_euclid(86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    let secs_of_day = two_days_ago.rem_euclid(86_400);
+    let hh = secs_of_day / 3600;
+    let mm = (secs_of_day % 3600) / 60;
+    let ss = secs_of_day % 60;
+    let rfc3339 = format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y, m, d, hh, mm, ss
+    );
+    let mut data = rich_path_data();
+    data["lanes"][0]["items"][0]["milestone"]["lifecycle_at"] =
+        serde_json::Value::String(rfc3339);
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(data);
+    let buf = render_buffer(&app, 140, 60);
+    let m10_y = find_row_index(&buf, "M10 — First execution item");
+    assert!(
+        row_text_contains(&buf, m10_y, "2d ago"),
+        "M10 age must render as `2d ago`; row: {row:?}",
+        row = row_text(&buf, m10_y)
     );
 }
