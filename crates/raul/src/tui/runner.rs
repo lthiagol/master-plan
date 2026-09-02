@@ -447,11 +447,7 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
         let _ = app.flush_pending_writes_if_due(
             std::time::Duration::from_millis(500),
             now,
-            |key, value| {
-                runner
-                    .run_raw("config", &["set", key, value])
-                    .map(|_| ())
-            },
+            |key, value| runner.run_raw("config", &["set", key, value]).map(|_| ()),
         );
         Ok(())
     };
@@ -462,9 +458,7 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // elapses (a `q` pressed immediately after a key change).
     let on_quit = move |app: &mut App| {
         let _ = app.flush_pending_writes_now(|key, value| {
-            runner
-                .run_raw("config", &["set", key, value])
-                .map(|_| ())
+            runner.run_raw("config", &["set", key, value]).map(|_| ())
         });
     };
     run_loop(
@@ -504,6 +498,7 @@ pub(crate) fn fire_watch_tick(_app: &mut App, _runner: &MpRunner) -> Result<()> 
 /// drained-events check). The hook runs while `app` is still mutably
 /// borrowed, so it can perform any final flushes (e.g. M204's
 /// `App::flush_pending_writes_now`).
+#[allow(clippy::too_many_arguments)]
 pub fn run_loop<B, E, F, I, Q>(
     terminal: &mut Terminal<B>,
     app: &mut App,

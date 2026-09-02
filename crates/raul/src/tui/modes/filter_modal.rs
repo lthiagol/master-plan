@@ -1,23 +1,19 @@
 //! M204: unified per-lane filter modal.
 //!
-//! The widget is data-driven: each lane passes a
-//! `Vec<DimensionSpec>` describing the dimensions it offers
-//! (Milestones: lifecycle + priority + age; Backlog: priority +
-//! status + age + source prefix; Ideas: priority + status + age
-//! + tags). The renderer flattens the spec into a single
-//! navigable list of `(dimension, value)` rows; the dispatcher
-//! routes Up/Down/Space/Enter/Esc into the same handlers
+//! The widget is data-driven. Each lane passes a
+//! `Vec<DimensionSpec>` describing the dimensions it offers.
+//! The renderer flattens the spec into a single navigable list
+//! of dimension+value rows. The dispatcher routes
+//! Up / Down / Space / Enter / Esc into the same handlers
 //! across all three lanes, so keybindings are consistent.
 //!
 //! ## Keybindings (load-bearing — the AC tests pin these names)
 //!
-//! | Key        | Action                                  |
-//! |------------|-----------------------------------------|
-//! | Up / k     | Move cursor up                          |
-//! | Down / j   | Move cursor down                        |
-//! | Space      | Toggle the highlighted value            |
-//! | Enter      | Commit the draft filter and close       |
-//! | Esc        | Restore the prior filter and close      |
+//! - `Up` / `k` — Move cursor up
+//! - `Down` / `j` — Move cursor down
+//! - `Space` — Toggle the highlighted value
+//! - `Enter` — Commit the draft filter and close
+//! - `Esc` — Restore the prior filter and close
 //!
 //! ## Visual style
 //!
@@ -76,7 +72,10 @@ pub mod spec {
             DimensionSpec {
                 name: "lifecycle".to_string(),
                 label: "Lifecycle".to_string(),
-                values: LIFECYCLE_FILTER_OPTIONS.iter().map(|s| (*s).to_string()).collect(),
+                values: LIFECYCLE_FILTER_OPTIONS
+                    .iter()
+                    .map(|s| (*s).to_string())
+                    .collect(),
                 kind: DimensionKind::Toggle,
             },
             DimensionSpec {
@@ -140,7 +139,12 @@ pub mod spec {
                 name: "source".to_string(),
                 label: "Source".to_string(),
                 // Source-prefix filter — matches the row's id prefix.
-                values: vec!["B-".to_string(), "BL-".to_string(), "TW-".to_string(), "BF-".to_string()],
+                values: vec![
+                    "B-".to_string(),
+                    "BL-".to_string(),
+                    "TW-".to_string(),
+                    "BF-".to_string(),
+                ],
                 kind: DimensionKind::Toggle,
             },
         ]

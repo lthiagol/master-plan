@@ -407,7 +407,10 @@ pub(super) fn render_active_filter_chips(
                     spans.push(Span::styled("  ".to_string(), val));
                 }
                 first = false;
-                spans.push(Span::styled(format!("{}:", d.label.to_ascii_lowercase()), dim));
+                spans.push(Span::styled(
+                    format!("{}:", d.label.to_ascii_lowercase()),
+                    dim,
+                ));
                 spans.push(Span::styled(format!(" {v}"), val));
                 spans.push(Span::styled(" ✕".to_string(), x_style));
             }

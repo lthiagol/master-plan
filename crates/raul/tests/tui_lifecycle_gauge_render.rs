@@ -401,11 +401,11 @@ mod m205_in_gauge;
 
 // ─── M204 S9: footer indicator ───────────────────────────────────────────────
 
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
 use raul::tui::app::App;
 use raul::tui::render;
 use raul::tui::view_state;
-use ratatui::backend::TestBackend;
-use ratatui::Terminal;
 use std::collections::BTreeSet;
 
 /// AC-09: footer shows the active sort key as `sort: <key> ▼`
@@ -482,10 +482,7 @@ fn footer_shows_filter_count_when_active() {
         "lifecycle".to_string(),
         BTreeSet::from(["approved".to_string(), "in-progress".to_string()]),
     );
-    dims.insert(
-        "priority".to_string(),
-        BTreeSet::from(["high".to_string()]),
-    );
+    dims.insert("priority".to_string(), BTreeSet::from(["high".to_string()]));
     app.lane_filters.insert(Lane::Milestones, dims);
     let backend = TestBackend::new(140, 24);
     let mut terminal = Terminal::new(backend).unwrap();

@@ -1462,7 +1462,9 @@ fn debounced_save_writes_within_one_second() {
             std::time::Duration::from_millis(500),
             within,
             |key, value| {
-                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                calls
+                    .borrow_mut()
+                    .push((key.to_string(), value.to_string()));
                 Ok::<(), ()>(())
             },
         )
@@ -1479,7 +1481,9 @@ fn debounced_save_writes_within_one_second() {
             std::time::Duration::from_millis(500),
             after,
             |key, value| {
-                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                calls
+                    .borrow_mut()
+                    .push((key.to_string(), value.to_string()));
                 Ok::<(), ()>(())
             },
         )
@@ -1489,10 +1493,7 @@ fn debounced_save_writes_within_one_second() {
     assert_eq!(calls.len(), 1, "exactly one write per flush");
     assert_eq!(calls[0].0, "sort.milestones");
     assert_eq!(calls[0].1, "priority");
-    assert_eq!(
-        app.debounced_write_count, 1,
-        "write counter must increment"
-    );
+    assert_eq!(app.debounced_write_count, 1, "write counter must increment");
 }
 
 /// M204 AC-02: 100 rapid filter mutations within the debounce
@@ -1556,7 +1557,9 @@ fn rapid_filter_toggles_coalesce_to_single_write() {
             std::time::Duration::from_millis(500),
             within,
             |key, value| {
-                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                calls
+                    .borrow_mut()
+                    .push((key.to_string(), value.to_string()));
                 Ok::<(), ()>(())
             },
         )
@@ -1575,7 +1578,9 @@ fn rapid_filter_toggles_coalesce_to_single_write() {
             std::time::Duration::from_millis(500),
             after,
             |key, value| {
-                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                calls
+                    .borrow_mut()
+                    .push((key.to_string(), value.to_string()));
                 Ok::<(), ()>(())
             },
         )

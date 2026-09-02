@@ -543,7 +543,9 @@ fn config_set_preserves_sort_and_filter() {
     // Filter section round-trips through `config get` with the
     // expected {dimension: [values...]} JSON shape.
     let got = env.run_json(&["config", "get", "filter.milestones", "--format", "json"]);
-    let obj = got["value"].as_object().expect("filter value must be object");
+    let obj = got["value"]
+        .as_object()
+        .expect("filter value must be object");
     let lc = obj["lifecycle"]
         .as_array()
         .expect("lifecycle dim must be array");
@@ -658,7 +660,13 @@ fn sort_section_unchanged() {
     // when filter is in play.
     let cfg_path = env.tmp.path().join("master-plan/config.json");
     let body = fs::read_to_string(&cfg_path).unwrap();
-    for key in ["ui.color", "ui.icons", "ui.theme", "ui.hide_done", "ui.show_watch_tab"] {
+    for key in [
+        "ui.color",
+        "ui.icons",
+        "ui.theme",
+        "ui.hide_done",
+        "ui.show_watch_tab",
+    ] {
         assert!(
             !body.contains(&format!("{key} ")) && !body.contains(&format!("{key}:")),
             "ui key {key} must not leak into config.json by default; got: {body}"

@@ -148,10 +148,7 @@ pub enum Action {
     /// is `app.active_lane`. A chip's `x` click is dispatched
     /// through the mouse handler with this action; the lane
     /// is read from the live `App` state.
-    RemoveFilterChip {
-        dim: String,
-        value: String,
-    },
+    RemoveFilterChip { dim: String, value: String },
     /// Move to the next lane in `Lane::ordered()` (Right / l).
     NextLane,
     /// Jump to a specific lane by `Lane::ordered()` index (digit keys 1..=N,
@@ -357,10 +354,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // values.
             let lane = app.active_lane;
             if app.content == ContentState::List
-                && matches!(
-                    lane,
-                    Lane::Milestones | Lane::Backlog | Lane::Ideas
-                )
+                && matches!(lane, Lane::Milestones | Lane::Backlog | Lane::Ideas)
             {
                 app.open_filter_modal(lane, false);
             } else {
@@ -374,14 +368,10 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // grooming preset pre-toggled. Other lanes are
             // no-ops (the dispatcher gate matches the legacy
             // `ApplyGroomingPreset` policy).
-            if app.active_lane == Lane::Milestones
-                && app.content == ContentState::List
-            {
+            if app.active_lane == Lane::Milestones && app.content == ContentState::List {
                 app.open_filter_modal(Lane::Milestones, true);
             } else if app.active_lane != Lane::Milestones {
-                app.set_flash_message(
-                    "Grooming preset is only available on Milestones.",
-                );
+                app.set_flash_message("Grooming preset is only available on Milestones.");
             }
         }
         Action::FilterNext => app.filter_next(),

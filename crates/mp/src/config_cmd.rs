@@ -284,14 +284,11 @@ fn apply_config_set(cfg: &mut ProjectConfig, key: &str, value: &str) -> Result<(
             let arr = val.as_array().ok_or_else(|| {
                 anyhow::anyhow!("filter.{lane}.{dim} must be a JSON array of strings")
             })?;
-            let mut set: std::collections::BTreeSet<String> =
-                std::collections::BTreeSet::new();
+            let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
             for v in arr {
                 let s = v
                     .as_str()
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("filter.{lane}.{dim} entries must be strings")
-                    })?
+                    .ok_or_else(|| anyhow::anyhow!("filter.{lane}.{dim} entries must be strings"))?
                     .to_string();
                 if !s.is_empty() {
                     set.insert(s);

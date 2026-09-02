@@ -52,7 +52,10 @@ pub struct ProjectConfig {
     /// skipped on write so pre-M204 configs round-trip without an
     /// empty `filter` block.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub filter: std::collections::BTreeMap<String, std::collections::BTreeMap<String, std::collections::BTreeSet<String>>>,
+    pub filter: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    >,
 }
 
 /// M154: review-side integrations. The two knobs here gate the hunk

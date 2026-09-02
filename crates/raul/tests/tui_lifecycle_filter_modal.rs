@@ -105,16 +105,13 @@ fn esc_reverts_prior_filter() {
     assert_eq!(actions, vec![Action::LifecycleFilterCancel]);
     apply_action(&mut app, &r, Action::LifecycleFilterCancel).unwrap();
     let lf = app.lifecycle_filter_set();
-    assert_eq!(
-        lf.iter().collect::<Vec<_>>(),
-        vec![&"complete".to_string()]
-    );
+    assert_eq!(lf.iter().collect::<Vec<_>>(), vec![&"complete".to_string()]);
 }
 
 // ─── M204 S4: unified per-lane filter modal widget ──────────────────────────
 
-use raul::tui::modes::filter_modal::spec as fspec;
 use raul::tui::mode::DimensionKind;
+use raul::tui::modes::filter_modal::spec as fspec;
 
 /// S4 / AC-03: the widget accepts a `DimensionSpec` and the
 /// `total_items` helper counts the flattened `(dim, value)` rows
@@ -173,13 +170,34 @@ fn modal_visual_style_consistent_across_lanes() {
 
     // Same handler across all lanes (single handler in
     // modes/filter_modal.rs). The four canonical keybindings.
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Up)), vec![Action::FilterPrev]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Char('k'))), vec![Action::FilterPrev]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Down)), vec![Action::FilterNext]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Char('j'))), vec![Action::FilterNext]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Char(' '))), vec![Action::FilterToggle]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Enter)), vec![Action::FilterCommit]);
-    assert_eq!(filter_modal::handle_key(key(KeyCode::Esc)), vec![Action::FilterCancel]);
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Up)),
+        vec![Action::FilterPrev]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Char('k'))),
+        vec![Action::FilterPrev]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Down)),
+        vec![Action::FilterNext]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Char('j'))),
+        vec![Action::FilterNext]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Char(' '))),
+        vec![Action::FilterToggle]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Enter)),
+        vec![Action::FilterCommit]
+    );
+    assert_eq!(
+        filter_modal::handle_key(key(KeyCode::Esc)),
+        vec![Action::FilterCancel]
+    );
     // Modifier-bearing keys (Ctrl/Alt/Super) are no-ops — the
     // user can't accidentally trigger a binding via OS-level
     // chord.
@@ -193,6 +211,7 @@ fn modal_visual_style_consistent_across_lanes() {
 /// shape (Mode::Filter) is the new M204 variant; the legacy
 /// Mode::LifecycleFilter is no longer the default for capital F.
 #[test]
+#[allow(non_snake_case)] // F matches the keybind symbol per the AC test contract
 fn filter_modal_opens_on_F_from_milestones() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
@@ -213,6 +232,7 @@ fn filter_modal_opens_on_F_from_milestones() {
 }
 
 #[test]
+#[allow(non_snake_case)] // F matches the keybind symbol per the AC test contract
 fn filter_modal_opens_on_F_from_backlog() {
     let mut app = App::new();
     app.select_lane(Lane::Backlog);
@@ -230,6 +250,7 @@ fn filter_modal_opens_on_F_from_backlog() {
 }
 
 #[test]
+#[allow(non_snake_case)] // F matches the keybind symbol per the AC test contract
 fn filter_modal_opens_on_F_from_ideas() {
     let mut app = App::new();
     app.select_lane(Lane::Ideas);
@@ -261,7 +282,10 @@ fn milestones_modal_exposes_lifecycle_priority_age() {
     assert_eq!(st.dimensions[0].values[0], "draft");
     assert_eq!(st.dimensions[0].values[8], "cancelled");
     // Priority: 4 values.
-    assert_eq!(st.dimensions[1].values, vec!["urgent", "high", "normal", "low"]);
+    assert_eq!(
+        st.dimensions[1].values,
+        vec!["urgent", "high", "normal", "low"]
+    );
     // Age: 3 preset chips.
     assert_eq!(st.dimensions[2].values, vec![">7d", ">30d", ">90d"]);
 }
@@ -309,10 +333,7 @@ fn c_clears_all_active_filters() {
         "lifecycle".to_string(),
         BTreeSet::from(["approved".to_string()]),
     );
-    dims.insert(
-        "priority".to_string(),
-        BTreeSet::from(["high".to_string()]),
-    );
+    dims.insert("priority".to_string(), BTreeSet::from(["high".to_string()]));
     app.lane_filters.insert(Lane::Milestones, dims);
     assert!(!app.lifecycle_filter_set().is_empty());
 
@@ -396,10 +417,7 @@ fn filters_and_combine() {
         "lifecycle".to_string(),
         BTreeSet::from(["approved".to_string()]),
     );
-    dims.insert(
-        "priority".to_string(),
-        BTreeSet::from(["high".to_string()]),
-    );
+    dims.insert("priority".to_string(), BTreeSet::from(["high".to_string()]));
     app.lane_filters.insert(Lane::Milestones, dims);
     let ids: Vec<&str> = app
         .visible_milestones()
@@ -433,10 +451,7 @@ fn chip_strip_shows_every_active_dimension() {
         "lifecycle".to_string(),
         BTreeSet::from(["approved".to_string(), "in-progress".to_string()]),
     );
-    dims.insert(
-        "priority".to_string(),
-        BTreeSet::from(["high".to_string()]),
-    );
+    dims.insert("priority".to_string(), BTreeSet::from(["high".to_string()]));
     app.lane_filters.insert(Lane::Milestones, dims);
     // Add at least one milestone so the lane renders (the
     // empty-state path bypasses the chip strip).
@@ -578,7 +593,7 @@ fn empty_filter_hides_chip_strip() {
     }]);
     app.select_lane(Lane::Milestones);
     // Lane has no filter; the chip strip must NOT reserve a row.
-    assert!(filter_dimensions_for(Lane::Milestones).len() > 0);
+    assert!(!filter_dimensions_for(Lane::Milestones).is_empty());
     // Render and verify no chip glyph appears in the buffer.
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
@@ -728,7 +743,10 @@ fn g_opens_modal_with_grooming_preset() {
     match &app.active_mode {
         Mode::Filter(st) => {
             assert_eq!(st.lane, Lane::Milestones);
-            assert!(st.grooming_preset, "modal must be opened with the grooming preset flag set");
+            assert!(
+                st.grooming_preset,
+                "modal must be opened with the grooming preset flag set"
+            );
             // The lifecycle dim is pre-toggled to the preset.
             let lc = st.draft.get("lifecycle");
             assert!(lc.is_some(), "lifecycle dim must be present in the draft");

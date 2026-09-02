@@ -704,8 +704,10 @@ pub struct App {
     /// `ProjectConfig.filter` — `lane → dimension → set of
     /// values` — so the flush produces the exact same on-disk
     /// shape that the explicit set path would.
-    pub pending_filter_writes:
-        std::collections::BTreeMap<String, std::collections::BTreeMap<String, std::collections::BTreeSet<String>>>,
+    pub pending_filter_writes: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    >,
     /// M204: timestamp of the most recent mark-dirty call. The
     /// flush window is `now - last_pending_change_at >= 500ms`;
     /// within that window new mutations keep coalescing into the
@@ -1493,11 +1495,10 @@ impl App {
     /// M204: writes through the new `lane_filters` model
     /// (lifecycle dimension for Milestones).
     pub fn apply_grooming_preset(&mut self) {
-        let preset: std::collections::BTreeSet<String> =
-            crate::tui::progress::GROOMING_PRESET
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect();
+        let preset: std::collections::BTreeSet<String> = crate::tui::progress::GROOMING_PRESET
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
         self.set_lifecycle_filter(preset);
     }
 
@@ -1512,11 +1513,8 @@ impl App {
         use crate::tui::mode::{FilterModalState, Mode};
         let dimensions = filter_dimensions_for(lane);
         // Snapshot the lane's current filter as the prior.
-        let prior: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> = self
-            .lane_filters
-            .get(&lane)
-            .cloned()
-            .unwrap_or_default();
+        let prior: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+            self.lane_filters.get(&lane).cloned().unwrap_or_default();
         let mut draft = prior.clone();
         if grooming_preset {
             use std::collections::BTreeSet;
@@ -1650,7 +1648,6 @@ impl App {
             self.touch();
         }
     }
-
 
     /// M186: the active lane's committed search term (empty = no filter).
     pub fn lane_search_term(&self) -> &str {
@@ -1943,11 +1940,7 @@ impl App {
             // of its tags matches an active tag-prefix).
             if let Some(tags) = dims.get("tags") {
                 if !tags.is_empty() {
-                    filtered.retain(|b| {
-                        b.tags
-                            .iter()
-                            .any(|t| tags.iter().any(|p| t == p))
-                    });
+                    filtered.retain(|b| b.tags.iter().any(|t| tags.iter().any(|p| t == p)));
                 }
             }
         }
@@ -2310,11 +2303,7 @@ impl App {
     /// the last write carries the user's final selection).
     pub fn mark_filter_dirty(&mut self, lane: Lane) {
         let label = crate::tui::runner_helpers::match_lane_label(&lane);
-        let dims = self
-            .lane_filters
-            .get(&lane)
-            .cloned()
-            .unwrap_or_default();
+        let dims = self.lane_filters.get(&lane).cloned().unwrap_or_default();
         if dims.is_empty() {
             self.pending_filter_writes.remove(&label);
         } else {
@@ -2428,9 +2417,7 @@ pub fn is_actionable_backlog_id(id: &str) -> bool {
 /// [`crate::tui::modes::filter_modal::spec`] for convenience so
 /// callers (e.g. `App::open_filter_modal`) don't have to know
 /// the modes:: path.
-pub fn filter_dimensions_for(
-    lane: Lane,
-) -> Vec<crate::tui::mode::DimensionSpec> {
+pub fn filter_dimensions_for(lane: Lane) -> Vec<crate::tui::mode::DimensionSpec> {
     use crate::tui::modes::filter_modal::spec as fspec;
     match lane {
         Lane::Milestones => fspec::milestones(),
