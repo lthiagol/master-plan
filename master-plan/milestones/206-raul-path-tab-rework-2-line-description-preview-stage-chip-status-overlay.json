@@ -3,9 +3,9 @@
     "id": "206",
     "title": "raul Path tab rework — 2-line description preview + stage chip + status overlay",
     "slug": "raul-path-tab-rework-2-line-description-preview-stage-chip-status-overlay",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -19,13 +19,23 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-29",
-    "updated": "2026-08-30",
+    "updated": "2026-09-02",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-30T21:57:48.016352+00:00"
+    "lifecycle_at": "2026-09-02T02:27:53.859278+00:00",
+    "flow_stages": {
+      "execute": {
+        "status": "done",
+        "at": "2026-09-02T02:27:53.859283+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-02T02:27:53.859283+00:00"
+      }
+    }
   },
   "intent": {
     "outcome": "Every milestone in the raul Path tab renders as 2 visual lines: a title line carrying the id, title, current mp-flow stage chip (`[N/12]` from M202's flow_stages), priority glyph, age, and (when set) a status overlay chip for blocked / cancelled / deferred; plus a preview line carrying the first line of `intent.outcome` truncated to ~80 chars with a `↳` prefix. The tree structure (trunk + branches + blocked fork) is preserved. Operators scanning the Path tree see what each milestone is about without opening detail."
@@ -61,85 +71,85 @@
       "id": "AC-01",
       "description": "Every milestone in the Path tree renders as 2 visual lines: title line + preview line. Preview is the first line of intent.outcome, truncated to ~80 chars, dim, with ↳ prefix.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/path_milestone_renders_two_visual_lines|preview_uses_first_line_of_intent_outcome|preview_truncates_at_eighty_chars/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-02",
       "description": "Stage chip text derives from `flow_stages` (current mp-flow stage) using the same logic as M202's Stage column. Format: `[N/12]` where N is the position in MP_FLOW_STAGE_KEYS canonical order. Falls back to the milestone's `lifecycle` text when `flow_stages` is empty.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/stage_chip_uses_flow_stages|stage_chip_falls_back_to_lifecycle_when_flow_stages_empty|stage_chip_format_matches_n_over_twelve/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-03",
       "description": "Status overlay chip renders on the title line when the milestone has blocked / cancelled / deferred set. Precedence when multiple overlays: blocked > cancelled > deferred (blocked wins). Color: blocked uses danger; cancelled uses warn; deferred uses dim.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_overlay_renders_danger_chip|cancelled_overlay_renders_warn_chip|deferred_overlay_renders_dim_chip|multiple_overlays_blocked_wins/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-04",
       "description": "Title line shows id, title, stage chip, priority glyph, age (relative time). Priority glyph: `⚑high` / `⚑urgent` for high+urgent, `─norm` for normal, `─low` for low. Age: relative time via humanize (e.g. `2d`, `5h`). Missing fields render as `—` (em-dash).",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/title_line_carries_id_title_stage_priority_age|priority_glyph_matches_priority_value|age_uses_relative_time/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-05",
       "description": "Preview line uses `↳` prefix in dim color. Truncated text is plain (no extra formatting). When `intent.outcome` is empty or whitespace-only, the preview line renders only the `↳` prefix.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_line_uses_arrow_prefix|preview_line_dim_color|preview_line_empty_when_intent_outcome_empty/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-06",
       "description": "Blocked items still show `blocker: M<n>` on the title line (existing behavior preserved). The annotation appears alongside the status overlay chip.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-07",
       "description": "The `◀ next` indicator stays on the first execution item only (existing behavior preserved). Style: warn color + bold.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/next_indicator_on_first_execution_item_only|next_indicator_warn_color_bold/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-08",
       "description": "Tree structure is preserved. The `├─` / `└─` / `│` / `●` connector logic stays. Spines between trunk items stay. Blocked fork at the blocker (grouped by `depends_on`) stays.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved|blocked_fork_at_blocker_preserved/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-09",
       "description": "Branch headers (BLOCKED / AWAITING-APPROVAL / GROOMING / REVIEW) keep their bold color and item-count suffix. Color uses the existing `lane_color_for_tui` mapping.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-10",
       "description": "Whitespace-only intent.outcome is treated as empty: the preview line renders only the ↳ prefix (same as a missing outcome). No (no description) placeholder.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/preview_empty_intent_outcome_renders_only_prefix|no_placeholder_when_empty/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-11",
       "description": "Compact-mode handling: same 2-line layout at narrower terminal widths. Preview truncation kicks in earlier due to less horizontal space. Tree structure (spines, connectors) stays.",
       "verification": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     },
     {
       "id": "AC-12",
       "description": "`cargo fmt --all -- --check` exits 0; `cargo clippy -p mp --tests --no-deps -- -D warnings` exits 0; `cargo clippy -p raul --tests --no-deps -- -D warnings` exits 0; `cargo nextest run -p mp --no-fail-fast` exits 0; `cargo nextest run -p raul --no-fail-fast` exits 0; `mp validate` exits 0.",
       "verification": "make test",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "milestone complete"
     }
   ],
   "design_decisions": [
@@ -260,7 +270,7 @@
       "files": [
         "crates/raul/src/tui/path_view.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/tree_connectors_preserved|spines_between_trunk_items_preserved/)",
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/tree_connectors_preserved|spines_between_trunk_items_preserved/)'",
       "done_when": "Both named tests pass; tree structure intact",
       "status": "pending",
       "covers_ac": [
@@ -280,7 +290,7 @@
       "files": [
         "crates/raul/src/tui/path_view.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip|blocked_lines_emits_two_visual_lines|blocked_fork_at_blocker_preserved/)",
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/blocked_items_show_blocker_annotation|blocker_annotation_appears_with_overlay_chip|blocked_lines_emits_two_visual_lines|blocked_fork_at_blocker_preserved/)'",
       "done_when": "All 4 named tests pass; blocked items use the 2-line format with blocker annotation + overlay chip + preview line",
       "status": "pending",
       "covers_ac": [
@@ -301,7 +311,7 @@
       "files": [
         "crates/raul/src/tui/path_view.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix|flat_branch_emits_two_visual_lines/)",
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/branch_headers_bold_color_preserved|branch_headers_show_item_count_suffix|flat_branch_emits_two_visual_lines/)'",
       "done_when": "All 3 named tests pass; flat branches use the 2-line format with enriched title + preview; branch headers preserve existing style",
       "status": "pending",
       "covers_ac": [
@@ -321,7 +331,7 @@
       "files": [
         "crates/raul/src/tui/path_view.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)",
+      "tests": "cargo nextest run -p raul --test tui_path_tree --no-fail-fast -E 'test(/compact_mode_two_visual_lines|preview_truncates_earlier_in_compact_mode|compact_tree_structure_preserved/)'",
       "done_when": "All 3 named tests pass; compact mode renders 2 lines with narrower columns and earlier truncation",
       "status": "pending",
       "covers_ac": [
@@ -380,7 +390,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-02",
     "branch": "",
     "evidence": ""
   }
