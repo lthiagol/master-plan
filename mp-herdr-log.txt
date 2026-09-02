@@ -1326,3 +1326,69 @@ the runner will complete it — by any means available, including
 violating role boundaries. The fix isn't to ask the runner more nicely;
 the fix is to make the boundary mechanically enforced.
 
+
+---
+
+## 2026-09-02 ~09:45 — M200 recovery + lesson for the future
+
+M200 was at lifecycle=executed, spec_status=implemented in the raul UI
+despite all 13 findings fixed and the cycle-4 reviewer reporting Pass=yes.
+Root cause: the activity.json event from the reviewer's `mp reviews pass
+200 --verdict ok --reviewer reviewer` was lost during one of the
+activity.json truncation events that hit during the overnight run.
+The milestone JSON and reviews.json records survived, but the activity
+stream was wiped.
+
+### What we recovered
+
+User noticed M200 was "not completed" in raul UI even though all tests
+passed and all findings were fixed. Orchestrator ran:
+
+    mp reviews pass 200 --verdict ok --reviewer reviewer-200
+
+This re-recorded the verdict, transitioned M200 to lifecycle=complete and
+spec_status=verified, and added the review record to reviews.json. The
+activity.json event was NOT added (quirk: `mp reviews pass` writes to
+the milestone JSON and reviews.json but does not add an activity.json
+event by default).
+
+### Lesson for the future Drive milestone
+
+The orchestrator's R5 verification protocol (currently: lifecycle in
+{executed, complete}, exec=done, len(activity entries) > 0) is INSUFFICIENT
+to catch this class of bug. Three concrete improvements:
+
+1. **Multi-source verification.** Don't trust activity.json alone. When
+   verifying a milestone, check BOTH:
+     - `mp show milestone <id> --fields lifecycle,execution_status,spec_status`
+     - `cat master-plan/reviews.json | jq '... | select(.verdict == "ok")'`
+   The milestone JSON + reviews.json are the source of truth; activity.json
+   is just an event stream.
+
+2. **Cross-check lifecycle=complete with reviews.json.** If the lifecycle
+   is `complete` but reviews.json has no review record with verdict=ok,
+   that's a flag. Conversely, if reviews.json has verdict=ok but the
+   lifecycle is NOT `complete`, that's the M200 case — the review was
+   recorded but the state didn't transition.
+
+3. **Document `mp reviews pass`'s writing pattern.** The command writes
+   to milestone JSON (lifecycle, spec_status) and reviews.json
+   (review record). It does NOT add an activity.json event by default.
+   Future agents should not look for a `review-pass` event in activity.json
+   as proof of completion — they should look at reviews.json.
+
+### Reproducibility for future Drive milestone
+
+A test of the recovery flow: start with a milestone at lifecycle=executed
+(spec=implemented). The orchestrator's R5 verifier should:
+- Read milestone state.
+- Read reviews.json.
+- If reviews.json has verdict=ok but state is NOT complete, raise a flag
+  ("review-pass lost to truncation"). Either re-run mp reviews pass or
+  surface the discrepancy.
+
+This is the kind of state-recovery scenario the future Drive milestone
+should explicitly handle. Right now, recovery was manual — the user
+noticed the gap and asked "what's the state for M200?" which prompted
+the diagnosis. A future Drive milestone would catch it automatically.
+
