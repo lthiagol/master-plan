@@ -12,6 +12,13 @@
 //! [`crate::path_tree_model`]. M164 removed the CLI counterpart, but
 //! the shape still lives in the shared model so future emitters (e.g.
 //! a markdown or dot exporter) reuse it without copying the helpers.
+//!
+//! M206: every milestone row renders as 2 visual lines — a title line
+//! (id, title, stage chip, priority glyph, age, detail, optional
+//! overlay chip, optional "next" indicator) and a preview line
+//! (`↳` + first line of `intent.outcome`, truncated). The branch
+//! headers (BLOCKED / AWAITING-APPROVAL / …) keep their bold color and
+//! item-count suffix; tree connectors (├─/└─/│/●) and spines stay.
 
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -21,7 +28,9 @@ use ratatui::Frame;
 
 use super::app::App;
 use super::palette;
+use super::progress::{self, MP_FLOW_STAGE_KEYS};
 use crate::path_tree_model as model;
+use crate::theme;
 
 pub fn render(frame: &mut Frame, app: &App, area: Rect, data: &serde_json::Value) {
     let palette_helpers = app.effective_palette();
@@ -73,7 +82,8 @@ pub fn build_tree_lines(app: &App, data: &serde_json::Value) -> Vec<Line<'static
         for (i, item) in exec_items.iter().enumerate() {
             let is_next = i == 0;
             let marker = if is_next { "●" } else { "├─" };
-            lines.push(trunk_item_line(item, marker, is_next, app));
+            let row = trunk_item_rows(item, marker, is_next, app);
+            lines.extend(row);
             lines.push(spine_line());
         }
     }
@@ -162,26 +172,250 @@ fn spine_line() -> Line<'static> {
     Line::from(vec![Span::raw("  │")])
 }
 
-fn trunk_item_line(
+// =========================================================================
+// M206: helpers — outcome preview, enrichment chips, overlay chip.
+// =========================================================================
+
+/// Default preview column width. The Path title line already uses
+/// ~10 columns of chrome (marker + spine + id + chip + priority) so the
+/// preview is given a comfortable budget at a 120-wide terminal. The
+/// trunk caller MAY shrink this budget for compact mode (M206 AC-11).
+pub const PREVIEW_DEFAULT_MAX: usize = 80;
+
+/// First non-empty line of `intent.outcome`, or empty string when
+/// `outcome` is missing or whitespace-only.
+///
+/// AC-05 / AC-10: whitespace-only outcomes render ONLY the `↳` prefix
+/// (no `(no description)` placeholder). Splitting on `\n` keeps the
+/// first visual line for multi-line outcomes; the rest is truncated.
+pub fn outcome_first_line(item: &serde_json::Value) -> String {
+    let raw = item["milestone"]["intent"]["outcome"]
+        .as_str()
+        .unwrap_or("");
+    raw.lines().map(str::trim).find(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_default()
+}
+
+/// Render the preview line `↳ …` (dim color) for an outcome string.
+/// Empty / whitespace-only outcomes emit JUST the `↳` prefix in dim
+/// color (no content span) — AC-05 / AC-10.
+///
+/// `prefix` is the leading whitespace + spine chars (e.g. `"    ↳ "`),
+/// `outcome` is the first-line text, `max_chars` is the content budget
+/// (not counting the prefix). Truncation uses char boundaries (NOT
+/// byte boundaries) so multi-byte UTF-8 doesn't panic.
+pub fn preview_line(prefix: &str, outcome: &str, palette_helpers: &theme::Palette, max_chars: usize) -> Line<'static> {
+    let dim = Style::default().fg(palette_helpers.dim);
+    if outcome.is_empty() {
+        // AC-05 / AC-10: only the prefix, dim color, no content.
+        return Line::from(vec![Span::styled(prefix.to_string(), dim)]);
+    }
+    let truncated: String = if outcome.chars().count() > max_chars {
+        let mut s: String = outcome.chars().take(max_chars).collect();
+        s.push('…');
+        s
+    } else {
+        outcome.to_string()
+    };
+    Line::from(vec![
+        Span::styled(prefix.to_string(), dim),
+        Span::styled(truncated, dim),
+    ])
+}
+
+/// Plain text for assertions that bypass styling (`preview_line` keeps
+/// style; this strips it for snapshotting).
+pub fn preview_line_plain(prefix: &str, outcome: &str, max_chars: usize) -> String {
+    if outcome.is_empty() {
+        return prefix.to_string();
+    }
+    if outcome.chars().count() > max_chars {
+        let mut s: String = outcome.chars().take(max_chars).collect();
+        s.push('…');
+        format!("{prefix}{s}")
+    } else {
+        format!("{prefix}{outcome}")
+    }
+}
+
+/// Map priority string to the M206 title-line glyph. The "flag" prefix
+/// (`⚑`) flags high/urgent; the dash (`─`) marks normal/low. Missing
+/// or unknown priorities render `—` (em-dash) — AC-04.
+pub fn priority_glyph(priority: &str) -> &'static str {
+    match priority {
+        "high" => "⚑high",
+        "urgent" => "⚑urgent",
+        "normal" => "─norm",
+        "low" => "─low",
+        _ => "—",
+    }
+}
+
+/// Plain helper around `humanize_relative` with a `—` fallback so the
+/// title line never has a bare `unknown` token.
+pub fn age_text(lifecycle_at: &str) -> String {
+    use super::humanize::humanize_relative;
+    if lifecycle_at.is_empty() {
+        "—".to_string()
+    } else {
+        humanize_relative(lifecycle_at)
+    }
+}
+
+/// Status overlay chip text — `BLOCKED` / `CANCELLED` / `DEFERRED`.
+/// Precedence (AC-03): `blocked` wins over `cancelled` wins over
+/// `deferred`. Returns `None` when none of the three are set.
+pub fn overlay_chip(item: &serde_json::Value) -> Option<(&'static str, Color)> {
+    let blocked = item["milestone"]["blocked"].as_bool().unwrap_or(false);
+    let cancelled = item["milestone"]["cancelled"].as_bool().unwrap_or(false);
+    let deferred = item["milestone"]["deferred"].as_bool().unwrap_or(false);
+    let m = item["milestone"].clone();
+    let _ = m;
+    if blocked {
+        Some(("BLOCKED", super::app::App::default().effective_palette().danger))
+    } else if cancelled {
+        Some(("CANCELLED", super::app::App::default().effective_palette().danger))
+    } else if deferred {
+        Some(("DEFERRED", super::app::App::default().effective_palette().warn))
+    } else {
+        None
+    }
+}
+
+/// Color for a status overlay chip given the palette. Extracted so
+/// tests can verify the color without instantiating an `App`.
+pub fn overlay_chip_color(kind: &str, palette_helpers: &theme::Palette) -> Color {
+    match kind {
+        "BLOCKED" => palette_helpers.danger,
+        "CANCELLED" => palette_helpers.danger,
+        "DEFERRED" => palette_helpers.warn,
+        // AC-03: deferred uses dim per spec, even though the badge
+        // text uses warn. We carry two channels — text (warn so it
+        // stands out) and color (dim so it visually downgrades). The
+        // title-line color here is dim per AC-03.
+        _ => palette_helpers.dim,
+    }
+}
+
+/// AC-03: the spec calls for `danger/warn/dim` for blocked/cancelled/
+/// deferred respectively. Return that pair explicitly. Cancelled gets
+/// warn (not danger) — danger is reserved for blocked.
+pub fn overlay_chip_pair(
+    item: &serde_json::Value,
+    palette_helpers: &theme::Palette,
+) -> Option<(&'static str, Color)> {
+    let blocked = item["milestone"]["blocked"].as_bool().unwrap_or(false);
+    let cancelled = item["milestone"]["cancelled"].as_bool().unwrap_or(false);
+    let deferred = item["milestone"]["deferred"].as_bool().unwrap_or(false);
+    if blocked {
+        Some(("BLOCKED", palette_helpers.danger))
+    } else if cancelled {
+        Some(("CANCELLED", palette_helpers.warn))
+    } else if deferred {
+        Some(("DEFERRED", palette_helpers.dim))
+    } else {
+        None
+    }
+}
+
+/// Stage chip text `[N/12]` from `flow_stages`. The current stage is
+/// the first non-done, non-skipped stage in canonical order (absent
+/// entries read as pending). When `flow_stages` is empty the chip
+/// falls back to the milestone's `lifecycle` text — AC-02.
+pub fn stage_chip_text(item: &serde_json::Value) -> String {
+    let m = &item["milestone"];
+    let flow_map: std::collections::BTreeMap<String, String> = m["flow_stages"]
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(slug, stage)| {
+                    stage
+                        .get("status")
+                        .and_then(|s| s.as_str())
+                        .map(|s| (slug.clone(), s.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if flow_map.is_empty() {
+        // AC-02: lifecycle fallback when flow_stages is empty.
+        return m["lifecycle"].as_str().unwrap_or("").to_string();
+    }
+    let (slug, _label) = progress::current_mp_flow_stage(&flow_map);
+    let idx = progress::mp_flow_stage_index(slug).unwrap_or(MP_FLOW_STAGE_KEYS.len() - 1);
+    format!("[{}/{}]", idx + 1, MP_FLOW_STAGE_KEYS.len())
+}
+
+/// Blocker annotation `blocker: M<n>` for blocked milestones. Mirrors
+/// `model::first_dep` — returns `None` when there is no depends_on.
+/// The label appears on the title line alongside the overlay chip
+/// (M206 AC-06).
+pub fn blocker_annotation(item: &serde_json::Value) -> Option<String> {
+    let dep = model::first_dep(item)?;
+    Some(format!("blocker: M{dep}"))
+}
+
+// =========================================================================
+// M206: row emitters — title line + preview line.
+// =========================================================================
+
+/// Build the 2 visual lines for one execution trunk item: title +
+/// preview. Returned as a `Vec<Line>` so the caller can extend the
+/// shared line buffer in one pass. Title line carries the marker,
+/// label, stage chip, priority glyph, age, detail, optional overlay
+/// chip, and the optional `◀ next` indicator. Preview line carries
+/// `↳` + the first line of `intent.outcome`.
+pub fn trunk_item_rows(
     item: &serde_json::Value,
     marker: &str,
     is_next: bool,
     app: &App,
-) -> Line<'static> {
+) -> Vec<Line<'static>> {
     let palette_helpers = app.effective_palette();
     let label = model::item_label(item);
     let detail = model::trunk_detail(item);
-    let mut spans = vec![
+
+    // ── Title line ──
+    let mut title_spans = vec![
         Span::raw(format!("  {marker}  ")),
         Span::styled(
             label,
             Style::default().fg(palette::header_color(palette_helpers)),
         ),
     ];
+    // M206 S1.1: stage chip (S1.1 adds it; placeholder until S1.1 lands
+    // so this step's tests can pin the title-line shape without
+    // asserting against the chip yet). M206 S1 emits the marker/label/
+    // detail/next set WITHOUT the chip; S1.1 adds the chip + priority
+    // + age + overlay.
+    let stage = stage_chip_text(item);
+    if !stage.is_empty() {
+        title_spans.push(Span::styled(
+            format!("  {stage}"),
+            Style::default().fg(palette_helpers.dim),
+        ));
+    }
+    let prio = priority_glyph(item["milestone"]["priority"].as_str().unwrap_or(""));
+    title_spans.push(Span::styled(
+        format!("  {prio}"),
+        Style::default().fg(palette_helpers.dim),
+    ));
+    let age = age_text(item["milestone"]["lifecycle_at"].as_str().unwrap_or(""));
+    title_spans.push(Span::styled(
+        format!("  {age}"),
+        Style::default().fg(palette_helpers.dim),
+    ));
     if !detail.is_empty() {
-        spans.push(Span::styled(
+        title_spans.push(Span::styled(
             format!("  · {detail}"),
             Style::default().fg(palette::dim_color(palette_helpers)),
+        ));
+    }
+    if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
+        title_spans.push(Span::styled(
+            format!("  [{label}]"),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
         ));
     }
     if is_next {
@@ -189,14 +423,26 @@ fn trunk_item_line(
         // in mocha) so the highlighted milestone stands out from
         // the other trunk entries without colliding with the
         // blocked-row red.
-        spans.push(Span::styled(
+        title_spans.push(Span::styled(
             "  ◀ next".to_string(),
             Style::default()
                 .fg(palette::warn_color(palette_helpers))
                 .add_modifier(Modifier::BOLD),
         ));
     }
-    Line::from(spans)
+    let title_line = Line::from(title_spans);
+
+    // ── Preview line ──
+    let outcome = outcome_first_line(item);
+    // The preview indent matches the title-line content indent: two
+    // spaces (trunk indent) + two spaces (post-marker gap) = 4 spaces
+    // before the ↳ glyph. The `↳` itself is one char; `↳ ` is two
+    // chars. Together with the 4-space indent this keeps the preview
+    // visually aligned under the title text.
+    let preview_prefix = "    ↳ ".to_string();
+    let preview = preview_line(&preview_prefix, &outcome, palette_helpers, PREVIEW_DEFAULT_MAX);
+
+    vec![title_line, preview]
 }
 
 fn flat_branch_lines(
@@ -205,35 +451,71 @@ fn flat_branch_lines(
     spine: &str,
     app: &App,
 ) {
+    let palette_helpers = app.effective_palette();
     for (i, item) in items.iter().enumerate() {
         let last = i + 1 == items.len();
         let connector = if last { "└─" } else { "├─" };
         let label = model::item_label(item);
         let detail = model::branch_detail(item);
-        let mut spans = vec![
+
+        // ── Title line ──
+        let mut title_spans = vec![
             Span::raw(format!("{spine}  {connector}  ")),
-            Span::styled(
-                label,
-                Style::default().fg(app.effective_palette().foreground),
-            ),
+            Span::styled(label, Style::default().fg(palette_helpers.foreground)),
         ];
-        if !detail.is_empty() {
-            spans.push(Span::styled(
-                format!("  · {detail}"),
-                Style::default().fg(app.effective_palette().dim),
+        let stage = stage_chip_text(item);
+        if !stage.is_empty() {
+            title_spans.push(Span::styled(
+                format!("  {stage}"),
+                Style::default().fg(palette_helpers.dim),
             ));
         }
-        lines.push(Line::from(spans));
+        let prio = priority_glyph(item["milestone"]["priority"].as_str().unwrap_or(""));
+        title_spans.push(Span::styled(
+            format!("  {prio}"),
+            Style::default().fg(palette_helpers.dim),
+        ));
+        let age = age_text(item["milestone"]["lifecycle_at"].as_str().unwrap_or(""));
+        title_spans.push(Span::styled(
+            format!("  {age}"),
+            Style::default().fg(palette_helpers.dim),
+        ));
+        if !detail.is_empty() {
+            title_spans.push(Span::styled(
+                format!("  · {detail}"),
+                Style::default().fg(palette_helpers.dim),
+            ));
+        }
+        if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
+            title_spans.push(Span::styled(
+                format!("  [{label}]"),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ));
+        }
+        lines.push(Line::from(title_spans));
+
+        // ── Preview line ──
+        let outcome = outcome_first_line(item);
+        // Indent mirrors the title-line post-spine gap: "{spine}  {connector}  "
+        // becomes a 2-space preview indent under the label. For a
+        // non-last branch spine = "  │", the preview indent is
+        // "{spine}      ↳ " (spine 3 + 6 spaces + ↳).
+        let preview_prefix = format!("{spine}      ↳ ");
+        let preview = preview_line(&preview_prefix, &outcome, palette_helpers, PREVIEW_DEFAULT_MAX);
+        lines.push(preview);
     }
 }
 
 /// Blocked branch: fork items by their blocker (shared model grouping).
+/// Each blocked item emits 2 visual lines: title (with blocker
+/// annotation + overlay chip) + preview.
 fn blocked_lines(
     lines: &mut Vec<Line<'static>>,
     items: &[serde_json::Value],
     spine: &str,
     app: &App,
 ) {
+    let palette_helpers = app.effective_palette();
     let groups = model::blocked_groups(items);
     let total = groups.len();
     for (gi, (blocker, group_items)) in groups.iter().enumerate() {
@@ -245,7 +527,7 @@ fn blocked_lines(
             Span::styled(
                 header_label,
                 Style::default()
-                    .fg(palette::status_color("blocked", app.effective_palette()))
+                    .fg(palette::status_color("blocked", palette_helpers))
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
@@ -256,20 +538,63 @@ fn blocked_lines(
             let connector = if last { "└─" } else { "├─" };
             let label = model::item_label(item);
             let detail = model::branch_detail(item);
-            let mut spans = vec![
+
+            // ── Title line ──
+            let mut title_spans = vec![
                 Span::raw(format!("{prefix}  {connector}  ")),
-                Span::styled(
-                    label,
-                    Style::default().fg(app.effective_palette().foreground),
-                ),
+                Span::styled(label, Style::default().fg(palette_helpers.foreground)),
             ];
-            if !detail.is_empty() {
-                spans.push(Span::styled(
-                    format!("  · {detail}"),
-                    Style::default().fg(app.effective_palette().dim),
+            let stage = stage_chip_text(item);
+            if !stage.is_empty() {
+                title_spans.push(Span::styled(
+                    format!("  {stage}"),
+                    Style::default().fg(palette_helpers.dim),
                 ));
             }
-            lines.push(Line::from(spans));
+            let prio = priority_glyph(item["milestone"]["priority"].as_str().unwrap_or(""));
+            title_spans.push(Span::styled(
+                format!("  {prio}"),
+                Style::default().fg(palette_helpers.dim),
+            ));
+            let age = age_text(item["milestone"]["lifecycle_at"].as_str().unwrap_or(""));
+            title_spans.push(Span::styled(
+                format!("  {age}"),
+                Style::default().fg(palette_helpers.dim),
+            ));
+            if !detail.is_empty() {
+                title_spans.push(Span::styled(
+                    format!("  · {detail}"),
+                    Style::default().fg(palette_helpers.dim),
+                ));
+            }
+            // M206 AC-06: blocker annotation appears on the title line
+            // alongside the overlay chip. Use a muted dim style for
+            // the annotation so it doesn't compete with the danger
+            // overlay chip.
+            if let Some(ann) = blocker_annotation(item) {
+                title_spans.push(Span::styled(
+                    format!("  {ann}"),
+                    Style::default().fg(palette_helpers.dim),
+                ));
+            }
+            if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
+                title_spans.push(Span::styled(
+                    format!("  [{label}]"),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ));
+            }
+            lines.push(Line::from(title_spans));
+
+            // ── Preview line ──
+            let outcome = outcome_first_line(item);
+            let preview_prefix = format!("{prefix}      ↳ ");
+            let preview = preview_line(
+                &preview_prefix,
+                &outcome,
+                palette_helpers,
+                PREVIEW_DEFAULT_MAX,
+            );
+            lines.push(preview);
         }
     }
 }
