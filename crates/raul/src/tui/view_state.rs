@@ -813,6 +813,11 @@ fn compute_milestone_list_rects(view: &mut ViewState, app: &App, area: Rect) {
 }
 /// M135 + M137: hit areas + scrollbar for the Backlog lane (Table).
 /// Same header-aware geometry as milestones so clicks land on data rows.
+///
+/// M203: each logical backlog row now spans 2 visual lines (title on
+/// line 1, preview on line 2). Hit areas are 2 cells tall; the
+/// scroll offset is computed in *logical* rows so the table-selected
+/// index in the renderer stays aligned.
 fn compute_backlog_list_rects(view: &mut ViewState, app: &App, area: Rect) {
     let track = scrollbar_rect(area, SCROLLBAR_GUTTER);
 
@@ -832,8 +837,8 @@ fn compute_backlog_list_rects(view: &mut ViewState, app: &App, area: Rect) {
     }
 
     let inner_height = area.height.saturating_sub(2);
-    let data_height = inner_height.saturating_sub(1); // table header row
-    if data_height == 0 {
+    let data_height_visual = inner_height.saturating_sub(1); // table header row
+    if data_height_visual == 0 {
         if track.width > 0 {
             view.scrollbar_rects.push(ScrollbarHitArea {
                 id: ScrollableId::BacklogList,
@@ -846,7 +851,12 @@ fn compute_backlog_list_rects(view: &mut ViewState, app: &App, area: Rect) {
         return;
     }
 
-    let offset = compute_list_scroll(app.selected_index, data_height as usize, visible.len());
+    // Logical rows that fit in the data window (each row is 2 visual lines).
+    const BACKLOG_ROW_VISUAL_HEIGHT: u16 = 2;
+    let data_rows = (data_height_visual / BACKLOG_ROW_VISUAL_HEIGHT) as usize;
+    let data_height_rows = data_rows.max(1);
+
+    let offset = compute_list_scroll(app.selected_index, data_height_rows, visible.len());
     let data_y_start = area.y.saturating_add(2); // border + header
     let inner_x = area.x.saturating_add(1);
     let inner_width = area
@@ -859,16 +869,17 @@ fn compute_backlog_list_rects(view: &mut ViewState, app: &App, area: Rect) {
             continue;
         }
         let visible_idx = i - offset;
-        if visible_idx >= data_height as usize {
+        if visible_idx >= data_rows {
             break;
         }
         view.list_item_rects.push(ListItemHitArea {
             id: b.id.clone(),
             rect: Rect {
                 x: inner_x,
-                y: data_y_start.saturating_add(visible_idx as u16),
+                y: data_y_start
+                    .saturating_add((visible_idx as u16).saturating_mul(BACKLOG_ROW_VISUAL_HEIGHT)),
                 width: inner_width,
-                height: 1,
+                height: BACKLOG_ROW_VISUAL_HEIGHT,
             },
         });
     }
@@ -879,7 +890,7 @@ fn compute_backlog_list_rects(view: &mut ViewState, app: &App, area: Rect) {
             rect: track,
             scroll: offset,
             total: visible.len(),
-            visible: data_height as usize,
+            visible: data_rows,
         });
     }
 }

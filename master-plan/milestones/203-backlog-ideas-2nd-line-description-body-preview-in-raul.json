@@ -80,8 +80,8 @@
       "id": "AC-04",
       "description": "render_backlog_list (shared by Backlog and Ideas) renders 2-line rows. Each logical row produces 2 visual rows: title (bold) + preview (dim, ↳ prefix, ~80-char truncation). Selected-row highlight spans both visual rows. Selected-index addresses logical rows. Ideas use the same layout via the shared renderer.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_row_renders_two_visual_lines|preview_line_is_dim_with_arrow_prefix|selected_row_highlight_spans_both_lines|selected_index_addresses_logical_rows/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_row_renders_two_visual_lines|preview_line_is_dim_with_arrow_prefix|selected_row_highlight_spans_both_lines|selected_index_addresses_logical_rows/)' exit 0 (4/4 pass)"
     },
     {
       "id": "AC-05",
@@ -288,7 +288,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/backlog_row_renders_two_visual_lines|preview_line_is_dim_with_arrow_prefix|selected_row_highlight_spans_both_lines|selected_index_addresses_logical_rows/)",
       "done_when": "All 4 named tests pass; Backlog list renders 2-line rows with dim preview and arrow prefix; selected-row highlight spans both rows",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],

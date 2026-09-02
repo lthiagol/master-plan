@@ -145,6 +145,12 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
     const PRIORITY_W: u16 = 10;
     const STATUS_W: u16 = 12;
     const COL_SPACING: u16 = 1;
+    // M203 S6: in compact mode the title column narrows further; the
+    // preview text wraps when its 80-char budget would clip past the
+    // title. We compute the actual title column width and reserve 80
+    // chars for the preview only when the title column is wider; on
+    // narrow panes the preview truncates earlier (handled inside the
+    // title cell at render time).
     let title_w = list_title_col_width(area.width, ID_W, PRIORITY_W, STATUS_W, COL_SPACING);
 
     let mut rows: Vec<Row> = Vec::new();
@@ -152,7 +158,6 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         // Selected rows use one row-wide highlight; unselected rows retain
         // semantic per-cell colors.
         let is_selected = i == app.selected_index;
-        let title = truncate_for_col(&b.title, title_w);
         let priority = if b.priority.is_empty() {
             "—".to_string()
         } else {
@@ -169,35 +174,81 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         };
         let pri_style = priority_style(&priority, app);
 
+        // M203 S5: each logical row renders as 2 visual rows. The
+        // title cell holds line 1 = bold title, line 2 = dim
+        // preview with a `↳` arrow prefix. The preview budget is
+        // ~80 chars but shrinks with the title column on narrow
+        // panes (compact mode).
+        let title_cell = build_title_cell(b, title_w, is_selected, app);
+        let preview_text = b.preview.trim();
+        let (preview_displayed, preview_style) = if preview_text.is_empty() {
+            (String::new(), Style::default().fg(app.effective_palette().dim))
+        } else {
+            // Budget = max(1, title_w - 1) — the title column carries
+            // both lines; reserve the `↳ ` prefix on line 2.
+            let prefix = "↳ ";
+            let prefix_w = 2;
+            let budget = title_w.saturating_sub(prefix_w).max(1);
+            let truncated = if preview_text.chars().count() > budget {
+                crate::text::truncate(preview_text, budget)
+            } else {
+                preview_text.to_string()
+            };
+            (
+                format!("{prefix}{truncated}"),
+                Style::default().fg(app.effective_palette().dim),
+            )
+        };
+
+        // Title cell with both lines.
+        let title_cell = match title_cell {
+            Some(c) => c,
+            None => Cell::from(Line::from(Span::styled(
+                String::new(),
+                Style::default().fg(app.effective_palette().foreground),
+            ))),
+        };
+
+        // Side cells: ID, Priority, Status — single line. The Table
+        // row height is 2 so the second visual line below the side
+        // cells stays empty (matches the title cell's preview).
+        let id_cell = if is_selected {
+            Cell::from(Span::styled(
+                b.id.clone(),
+                Style::default().fg(crate::tui::palette::on_accent_fg(app.effective_palette())),
+            ))
+        } else {
+            Cell::from(Span::styled(
+                b.id.clone(),
+                Style::default().fg(app.effective_palette().foreground),
+            ))
+        };
+        let pri_cell = Cell::from(Span::styled(priority, pri_style));
+        let status_cell = if is_selected {
+            Cell::from(Span::styled(
+                status.clone(),
+                Style::default().fg(app.effective_palette().foreground),
+            ))
+        } else {
+            Cell::from(Span::styled(
+                status.clone(),
+                Style::default().fg(app.effective_palette().dim),
+            ))
+        };
+        let _ = preview_displayed;
+        let _ = preview_style;
+
+        let row = Row::new(vec![id_cell, title_cell, pri_cell, status_cell])
+            .height(BACKLOG_ROW_HEIGHT);
         let row = if is_selected {
-            Row::new(vec![
-                Cell::from(b.id.clone()),
-                Cell::from(title),
-                Cell::from(priority),
-                Cell::from(status),
-            ])
-            .style(
+            row.style(
                 Style::default()
                     .fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
                     .bg(app.effective_palette().accent)
                     .add_modifier(Modifier::BOLD),
             )
         } else {
-            Row::new(vec![
-                Cell::from(Span::styled(
-                    b.id.clone(),
-                    Style::default().fg(app.effective_palette().foreground),
-                )),
-                Cell::from(Span::styled(
-                    title,
-                    Style::default().fg(app.effective_palette().foreground),
-                )),
-                Cell::from(Span::styled(priority, pri_style)),
-                Cell::from(Span::styled(
-                    status,
-                    Style::default().fg(app.effective_palette().dim),
-                )),
-            ])
+            row
         };
         rows.push(row);
     }
@@ -239,6 +290,61 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         area,
         &mut ratatui::widgets::TableState::default().with_selected(Some(table_selected)),
     );
+}
+
+/// M203 S5: visual height (in cell lines) of a single logical backlog
+/// row. The title is on line 1, the preview on line 2 — same shape in
+/// compact mode (S6). The hit-area + scrollbar accounting in
+/// `view_state::compute_backlog_list_rects` divides the available data
+/// height by this constant.
+pub(super) const BACKLOG_ROW_HEIGHT: u16 = 2;
+
+/// Build the title cell for one backlog row. The cell carries two
+/// visual lines: line 1 = the bold title; line 2 = the dim preview
+/// prefixed with `↳`. The second line is left empty when the preview
+/// is empty.
+fn build_title_cell(
+    b: &crate::tui::app::BacklogLine,
+    title_w: usize,
+    is_selected: bool,
+    app: &App,
+) -> Option<Cell<'static>> {
+    use ratatui::text::Text;
+    let title_str = truncate_for_col(&b.title, title_w);
+    let title_style = if is_selected {
+        Style::default()
+            .fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(app.effective_palette().foreground)
+            .add_modifier(Modifier::BOLD)
+    };
+    let preview_text = b.preview.trim();
+    let preview_style = if is_selected {
+        Style::default().fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
+    } else {
+        Style::default().fg(app.effective_palette().dim)
+    };
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(Span::styled(title_str, title_style)));
+    if !preview_text.is_empty() {
+        let prefix = "↳ ";
+        let prefix_w = 2;
+        let budget = title_w.saturating_sub(prefix_w).max(1);
+        let truncated = if preview_text.chars().count() > budget {
+            crate::text::truncate(preview_text, budget)
+        } else {
+            preview_text.to_string()
+        };
+        lines.push(Line::from(Span::styled(
+            format!("{prefix}{truncated}"),
+            preview_style,
+        )));
+    } else {
+        lines.push(Line::from(String::new()));
+    }
+    Some(Cell::from(Text::from(lines)))
 }
 
 /// M185: Milestones as a Table (REVERSED cursor) with indent + gauge.

@@ -775,3 +775,322 @@ fn detail_header_shows_stage_cell_not_lifecycle_badge() {
         "header must show Stage cell 12/12 · Hand-off; got: {flat}"
     );
 }
+
+// ── M203 S5: 2-line backlog rows with preview ─────────────────────────────
+//
+// AC-04 contracts:
+//   * Each logical Backlog row renders as 2 visual lines.
+//   * Title bold on line 1, preview dim with `↳` prefix on line 2.
+//   * Selected-row highlight spans both visual lines.
+//   * Selected-index addresses logical rows (not visual rows).
+
+fn render_backlog(app: &App, w: u16, h: u16) -> String {
+    let backend = TestBackend::new(w, h);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(app, frame.area());
+            render::render(frame, app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    flat
+}
+
+#[test]
+fn backlog_row_renders_two_visual_lines() {
+    let mut app = App::new();
+    app.load_backlog(vec![
+        raul::tui::app::BacklogLine {
+            id: "BL-01".to_string(),
+            title: "Refactor parser".to_string(),
+            priority: "high".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "Continuation detail here".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-02".to_string(),
+            title: "Single line row".to_string(),
+            priority: "medium".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "".to_string(),
+        },
+    ]);
+    app.select_lane(Lane::Backlog);
+    let flat = render_backlog(&app, 140, 20);
+
+    // Title appears on a visual row (line N) immediately above a
+    // visual row that starts with the `↳` arrow prefix. Title row
+    // N+1 should contain `Continuation detail here` (after the prefix).
+    let lines: Vec<&str> = flat.lines().collect();
+    let title_row = lines
+        .iter()
+        .position(|l| l.contains("Refactor parser"))
+        .expect("title row must appear");
+    // Within the next 2 visual rows below the title, the preview
+    // must appear. The 2-line layout means the preview row is
+    // immediately under the title row.
+    assert!(
+        lines
+            .iter()
+            .skip(title_row + 1)
+            .take(2)
+            .any(|l| l.contains("Continuation detail here")),
+        "preview row must appear within 2 visual lines of the title; got flat:\n{flat}"
+    );
+    // The preview row must carry the `↳` arrow prefix (M203 AC-04).
+    assert!(
+        lines
+            .iter()
+            .skip(title_row + 1)
+            .take(2)
+            .any(|l| l.contains('↳')),
+        "preview row must carry the `↳` arrow prefix; got flat:\n{flat}"
+    );
+}
+
+#[test]
+fn preview_line_is_dim_with_arrow_prefix() {
+    // The preview line is dim (lower-priority style) AND prefixed
+    // with `↳ `. Empty previews render as an empty visual line.
+    let mut app = App::new();
+    app.load_backlog(vec![raul::tui::app::BacklogLine {
+        id: "BL-01".to_string(),
+        title: "Refactor parser".to_string(),
+        priority: "high".to_string(),
+        status: "open".to_string(),
+        resolution: "".to_string(),
+        preview: "some continuation text".to_string(),
+    }]);
+    app.select_lane(Lane::Backlog);
+
+    let backend = TestBackend::new(140, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    // Find the title row, then read the next row's prefix cell.
+    let mut title_y: Option<u16> = None;
+    for y in 0..buf.area().height {
+        let row: String = (0..buf.area().width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if row.contains("Refactor parser") {
+            title_y = Some(y);
+            break;
+        }
+    }
+    let title_y = title_y.expect("title row must exist");
+    let preview_y = title_y + 1;
+
+    // The `↳` glyph must land on the preview row.
+    let preview_row: String = (0..buf.area().width)
+        .map(|x| buf[(x, preview_y)].symbol().to_string())
+        .collect();
+    assert!(
+        preview_row.contains('↳'),
+        "preview row must contain `↳` glyph at row {preview_y}; got: {preview_row:?}"
+    );
+    // The preview text follows the prefix.
+    assert!(
+        preview_row.contains("some continuation text"),
+        "preview row must contain the continuation text; got: {preview_row:?}"
+    );
+}
+
+#[test]
+fn selected_row_highlight_spans_both_lines() {
+    // When a row is selected, BOTH visual rows (title + preview)
+    // share the same background highlight.
+    let mut app = App::new();
+    app.load_backlog(vec![
+        raul::tui::app::BacklogLine {
+            id: "BL-01".to_string(),
+            title: "Refactor parser".to_string(),
+            priority: "high".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "Continuation detail".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-02".to_string(),
+            title: "Other row".to_string(),
+            priority: "low".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "Other continuation".to_string(),
+        },
+    ]);
+    app.select_lane(Lane::Backlog);
+    app.selected_index = 0;
+
+    let backend = TestBackend::new(140, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+
+    // Find the title and preview rows for the SELECTED row (BL-01).
+    let mut sel_title_y: Option<u16> = None;
+    for y in 0..buf.area().height {
+        let row: String = (0..buf.area().width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if row.contains("Refactor parser") {
+            sel_title_y = Some(y);
+            break;
+        }
+    }
+    let sel_title_y = sel_title_y.expect("selected title row present");
+    let sel_preview_y = sel_title_y + 1;
+
+    // Sample the bg style of a cell on the title row + preview row
+    // for the SELECTED item, AND for the UNSELECTED item (BL-02).
+    let sample_bg = |y: u16, contains: &str| -> Option<ratatui::style::Color> {
+        let needle = contains.chars().next().unwrap_or(' ');
+        for x in 0..buf.area().width {
+            let cell = &buf[(x, y)];
+            if cell.symbol().chars().next().unwrap_or(' ') == needle {
+                return Some(cell.style().bg.unwrap_or(ratatui::style::Color::Reset));
+            }
+        }
+        None
+    };
+
+    // Title row bg vs preview row bg for the SELECTED row: both must
+    // be the accent background (not the default panel bg).
+    let sel_title_bg = sample_bg(sel_title_y, "R")
+        .or_else(|| sample_bg(sel_title_y, "C"))
+        .expect("selected title cell");
+    let sel_preview_bg = sample_bg(sel_preview_y, "↳")
+        .expect("selected preview cell");
+    assert_eq!(
+        sel_title_bg, sel_preview_bg,
+        "selected row highlight must span both visual rows; got title_bg={sel_title_bg:?} preview_bg={sel_preview_bg:?}"
+    );
+
+    // The preview row must NOT carry the unselected-row dim fg.
+    let preview_cell = (0..buf.area().width)
+        .map(|x| buf[(x, sel_preview_y)].clone())
+        .find(|c| c.symbol() == "↳")
+        .expect("preview arrow cell");
+    let preview_fg = preview_cell.style().fg.unwrap_or(ratatui::style::Color::Reset);
+    // Selected preview fg must differ from the unselected dim color
+    // (we don't pin the exact RGB; just assert it's NOT the dim
+    // color used for unselected previews).
+    assert_ne!(
+        preview_fg,
+        app.effective_palette().dim,
+        "selected preview cell must not render with the unselected dim color"
+    );
+}
+
+#[test]
+fn selected_index_addresses_logical_rows() {
+    // The selected_index points at logical rows (not visual lines).
+    // With 2 visible rows, indices 0 and 1 must address distinct
+    // logical rows. Selecting index 1 must NOT scroll the cursor
+    // into the preview sub-line of row 0.
+    let mut app = App::new();
+    app.load_backlog(vec![
+        raul::tui::app::BacklogLine {
+            id: "BL-01".to_string(),
+            title: "First row".to_string(),
+            priority: "high".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "first preview".to_string(),
+        },
+        raul::tui::app::BacklogLine {
+            id: "BL-02".to_string(),
+            title: "Second row".to_string(),
+            priority: "low".to_string(),
+            status: "open".to_string(),
+            resolution: "".to_string(),
+            preview: "second preview".to_string(),
+        },
+    ]);
+    app.select_lane(Lane::Backlog);
+    app.selected_index = 1;
+
+    let backend = TestBackend::new(140, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+
+    // Locate row 0 title + preview and row 1 title + preview.
+    let mut r0_title_y: Option<u16> = None;
+    let mut r1_title_y: Option<u16> = None;
+    for y in 0..buf.area().height {
+        let row: String = (0..buf.area().width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if row.contains("First row") {
+            r0_title_y = Some(y);
+        }
+        if row.contains("Second row") {
+            r1_title_y = Some(y);
+        }
+    }
+    let r0_title_y = r0_title_y.expect("first title row present");
+    let r1_title_y = r1_title_y.expect("second title row present");
+    // Logical rows must NOT share a visual row (they are stacked).
+    assert!(
+        r1_title_y > r0_title_y,
+        "logical rows must occupy distinct visual rows; got r0={r0_title_y} r1={r1_title_y}"
+    );
+    // And they must be 2 visual rows apart (one logical row = 2
+    // visual lines).
+    assert_eq!(
+        r1_title_y - r0_title_y,
+        2,
+        "logical rows must be 2 visual lines apart; got delta={}",
+        r1_title_y - r0_title_y
+    );
+
+    // The selected row (index 1) must carry the highlight. The
+    // `First row` (index 0) must NOT carry the highlight.
+    let r0_cell = (0..buf.area().width)
+        .map(|x| buf[(x, r0_title_y)].clone())
+        .find(|c| c.symbol() == "F")
+        .expect("first-row F cell");
+    let r1_cell = (0..buf.area().width)
+        .map(|x| buf[(x, r1_title_y)].clone())
+        .find(|c| c.symbol() == "S")
+        .expect("second-row S cell");
+    let r0_bg = r0_cell.style().bg.unwrap_or(ratatui::style::Color::Reset);
+    let r1_bg = r1_cell.style().bg.unwrap_or(ratatui::style::Color::Reset);
+    // The selected row's bg must equal the accent; the unselected
+    // row's bg must be the default panel bg (Reset).
+    assert_eq!(
+        r1_bg,
+        app.effective_palette().accent,
+        "row at selected_index=1 must be highlighted"
+    );
+    assert_ne!(
+        r0_bg, r1_bg,
+        "row at selected_index=0 must NOT be highlighted; got bg={r0_bg:?}"
+    );
+}
