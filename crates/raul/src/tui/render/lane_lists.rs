@@ -180,25 +180,6 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         // ~80 chars but shrinks with the title column on narrow
         // panes (compact mode).
         let title_cell = build_title_cell(b, title_w, is_selected, app);
-        let preview_text = b.preview.trim();
-        let (preview_displayed, preview_style) = if preview_text.is_empty() {
-            (String::new(), Style::default().fg(app.effective_palette().dim))
-        } else {
-            // Budget = max(1, title_w - 1) — the title column carries
-            // both lines; reserve the `↳ ` prefix on line 2.
-            let prefix = "↳ ";
-            let prefix_w = 2;
-            let budget = title_w.saturating_sub(prefix_w).max(1);
-            let truncated = if preview_text.chars().count() > budget {
-                crate::text::truncate(preview_text, budget)
-            } else {
-                preview_text.to_string()
-            };
-            (
-                format!("{prefix}{truncated}"),
-                Style::default().fg(app.effective_palette().dim),
-            )
-        };
 
         // Title cell with both lines.
         let title_cell = match title_cell {
@@ -235,8 +216,6 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
                 Style::default().fg(app.effective_palette().dim),
             ))
         };
-        let _ = preview_displayed;
-        let _ = preview_style;
 
         let row = Row::new(vec![id_cell, title_cell, pri_cell, status_cell])
             .height(BACKLOG_ROW_HEIGHT);
@@ -303,6 +282,15 @@ pub(super) const BACKLOG_ROW_HEIGHT: u16 = 2;
 /// visual lines: line 1 = the bold title; line 2 = the dim preview
 /// prefixed with `↳`. The second line is left empty when the preview
 /// is empty.
+///
+/// **Why we truncate tightly:** the title column width is computed
+/// from the pane width (compact mode shrinks it). The preview budget
+/// must be small enough that the truncated preview PLUS the `...`
+/// ellipsis and the `↳ ` prefix fits within the column — otherwise
+/// ratatui wraps the preview to a second visual line, blowing the
+/// row's 2-line height contract. `text::truncate(s, max)` returns
+/// `max + 3` chars (head + "..."), so we pass `budget - 3` to keep
+/// the total at `budget` chars.
 fn build_title_cell(
     b: &crate::tui::app::BacklogLine,
     title_w: usize,
@@ -330,17 +318,22 @@ fn build_title_cell(
     lines.push(Line::from(Span::styled(title_str, title_style)));
     if !preview_text.is_empty() {
         let prefix = "↳ ";
-        let prefix_w = 2;
-        let budget = title_w.saturating_sub(prefix_w).max(1);
-        let truncated = if preview_text.chars().count() > budget {
-            crate::text::truncate(preview_text, budget)
+        let prefix_w = prefix.chars().count();
+        // Reserve prefix + ellipsis room so the truncated preview
+        // fits within the title column on a single line.
+        let total_budget = title_w.saturating_sub(prefix_w).max(1);
+        let truncate_budget = total_budget.saturating_sub(3).max(1);
+        let truncated = if preview_text.chars().count() > total_budget {
+            crate::text::truncate(preview_text, truncate_budget)
         } else {
             preview_text.to_string()
         };
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}{truncated}"),
-            preview_style,
-        )));
+        let composed = format!("{prefix}{truncated}");
+        // Last-resort guard: hard-clip the composed string so even
+        // a pathological input (multi-byte chars, sanitizer
+        // expansion) can't overflow the column.
+        let clipped: String = composed.chars().take(total_budget).collect();
+        lines.push(Line::from(Span::styled(clipped, preview_style)));
     } else {
         lines.push(Line::from(String::new()));
     }

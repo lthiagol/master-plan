@@ -87,8 +87,8 @@
       "id": "AC-05",
       "description": "Compact-mode (narrow terminal) renders the same 2-line layout with reduced column widths. Preview content unchanged; truncation may kick in earlier due to narrower title column.",
       "verification": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_compact_row_renders_two_visual_lines|preview_truncates_earlier_in_compact_mode/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E 'test(/backlog_compact_row_renders_two_visual_lines|preview_truncates_earlier_in_compact_mode/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-06",
@@ -309,7 +309,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/backlog_compact_row_renders_two_visual_lines|preview_truncates_earlier_in_compact_mode/)",
       "done_when": "Both named tests pass; compact mode renders 2-line rows with narrower columns",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],

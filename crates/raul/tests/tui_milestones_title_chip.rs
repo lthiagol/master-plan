@@ -1094,3 +1094,137 @@ fn selected_index_addresses_logical_rows() {
         "row at selected_index=0 must NOT be highlighted; got bg={r0_bg:?}"
     );
 }
+
+// ── M203 S6: compact-mode (narrow terminal) 2-line rows ───────────────────
+//
+// AC-05 contracts:
+//   * Compact-mode (narrow terminal) renders the same 2-line layout
+//     with reduced column widths.
+//   * Preview content unchanged; truncation may kick in earlier due
+//     to narrower title column.
+
+#[test]
+fn backlog_compact_row_renders_two_visual_lines() {
+    // Compact: pane width small enough that the side columns
+    // dominate. Title column shrinks but the row layout must still
+    // be 2 visual lines per logical row, and the `↳` arrow must
+    // still appear under the title.
+    let mut app = App::new();
+    app.load_backlog(vec![raul::tui::app::BacklogLine {
+        id: "BL-01".to_string(),
+        title: "Refactor parser".to_string(),
+        priority: "high".to_string(),
+        status: "open".to_string(),
+        resolution: "".to_string(),
+        preview: "A continuation text".to_string(),
+    }]);
+    app.select_lane(Lane::Backlog);
+
+    // Narrow pane — typical compact-mode width.
+    let backend = TestBackend::new(60, 12);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut title_y: Option<u16> = None;
+    for y in 0..buf.area().height {
+        let row: String = (0..buf.area().width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if row.contains("Refactor parser") {
+            title_y = Some(y);
+            break;
+        }
+    }
+    let title_y = title_y.expect("title row must exist even in compact mode");
+    let preview_row: String = (0..buf.area().width)
+        .map(|x| buf[(x, title_y + 1)].symbol().to_string())
+        .collect();
+    assert!(
+        preview_row.contains('↳'),
+        "compact mode must still render 2-line rows with the ↳ arrow on line 2; got row: {preview_row:?}"
+    );
+    assert!(
+        preview_row.contains("continuation"),
+        "compact preview must contain the continuation text; got: {preview_row:?}"
+    );
+}
+
+#[test]
+fn preview_truncates_earlier_in_compact_mode() {
+    // The preview truncates to its title-column budget. On a wide
+    // pane the budget is ~80 chars; on a narrow pane the title
+    // column shrinks and the preview gets clipped earlier. The same
+    // payload preview should render fewer characters when the pane
+    // is narrower.
+    let long_preview: String = "a".repeat(120);
+    let wide = render_preview_visible_chars(&long_preview, 140, 24);
+    let narrow = render_preview_visible_chars(&long_preview, 60, 12);
+    let wide_chars = wide.chars().filter(|c| *c == 'a').count();
+    let narrow_chars = narrow.chars().filter(|c| *c == 'a').count();
+    assert!(
+        wide_chars > narrow_chars,
+        "compact mode must truncate the preview earlier than wide mode; wide={wide_chars} narrow={narrow_chars}"
+    );
+    // Compact mode budget: title_w = inner - (id_w + pri_w + status_w
+    // + 3 spacing) = (60-2) - (10+10+12+3) = 23. Preview budget =
+    // 23 - 2 (prefix) = 21 chars. So we expect ~21 chars of preview
+    // text in narrow mode (the ellipsis adds 3 more chars).
+    assert!(
+        narrow_chars <= 23,
+        "compact preview should fit within ~21-23 a-chars; got {narrow_chars}"
+    );
+    assert!(
+        narrow_chars >= 8,
+        "compact preview should still hold meaningful text; got {narrow_chars}"
+    );
+}
+
+/// Helper: render the backlog list at the given pane size and return
+/// just the preview substring (everything after `↳ ` on the preview
+/// row of the first backlog item).
+fn render_preview_visible_chars(preview: &str, w: u16, h: u16) -> String {
+    let mut app = App::new();
+    app.load_backlog(vec![raul::tui::app::BacklogLine {
+        id: "BL-01".to_string(),
+        title: "Title".to_string(),
+        priority: "high".to_string(),
+        status: "open".to_string(),
+        resolution: "".to_string(),
+        preview: preview.to_string(),
+    }]);
+    app.select_lane(Lane::Backlog);
+    let backend = TestBackend::new(w, h);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    // Find the row that contains BOTH "BL-01" and "Title" (the data
+    // row, not the column header which has "Title" alone). That row
+    // is the logical row's title line; the preview is on the next
+    // row.
+    let mut title_y: Option<u16> = None;
+    for y in 0..buf.area().height {
+        let row: String = (0..buf.area().width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if row.contains("BL-01") && row.contains("Title") {
+            title_y = Some(y);
+            break;
+        }
+    }
+    let title_y = title_y.unwrap_or_else(|| panic!("BL-01 data row not found for w={w} h={h}"));
+    // Preview is on the row immediately below the title row.
+    let preview_row: String = (0..buf.area().width)
+        .map(|x| buf[(x, title_y + 1)].symbol().to_string())
+        .collect();
+    preview_row
+}
