@@ -372,9 +372,11 @@ pub fn blocker_annotation(item: &serde_json::Value) -> Option<String> {
 /// Build the 2 visual lines for one execution trunk item: title +
 /// preview. Returned as a `Vec<Line>` so the caller can extend the
 /// shared line buffer in one pass. Title line carries the marker,
-/// label, stage chip, priority glyph, age, detail, optional overlay
-/// chip, and the optional `◀ next` indicator. Preview line carries
-/// `↳` + the first line of `intent.outcome`.
+/// label, stage chip, priority glyph, age, status overlay chip
+/// (when set), detail, and the optional `◀ next` indicator. Preview
+/// line carries `↳` + the first line of `intent.outcome`. Spec
+/// (S1.1): detail field stays on the title line AFTER the overlay
+/// chip — the operator sees the chip first when scanning.
 pub fn trunk_item_rows(
     item: &serde_json::Value,
     marker: &str,
@@ -416,16 +418,19 @@ pub fn trunk_item_rows(
         format!("  {age}"),
         Style::default().fg(palette_helpers.dim),
     ));
-    if !detail.is_empty() {
-        title_spans.push(Span::styled(
-            format!("  · {detail}"),
-            Style::default().fg(palette::dim_color(palette_helpers)),
-        ));
-    }
+    // AC-03 + spec: status overlay chip renders BEFORE the detail
+    // field so the operator sees the chip first when scanning the
+    // title line.
     if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
         title_spans.push(Span::styled(
             format!("  [{label}]"),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ));
+    }
+    if !detail.is_empty() {
+        title_spans.push(Span::styled(
+            format!("  · {detail}"),
+            Style::default().fg(palette::dim_color(palette_helpers)),
         ));
     }
     if is_next {
@@ -496,16 +501,17 @@ fn flat_branch_lines(
             format!("  {age}"),
             Style::default().fg(palette_helpers.dim),
         ));
-        if !detail.is_empty() {
-            title_spans.push(Span::styled(
-                format!("  · {detail}"),
-                Style::default().fg(palette_helpers.dim),
-            ));
-        }
+        // Spec: status overlay chip renders BEFORE the detail field.
         if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
             title_spans.push(Span::styled(
                 format!("  [{label}]"),
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ));
+        }
+        if !detail.is_empty() {
+            title_spans.push(Span::styled(
+                format!("  · {detail}"),
+                Style::default().fg(palette_helpers.dim),
             ));
         }
         lines.push(Line::from(title_spans));
@@ -583,26 +589,27 @@ fn blocked_lines(
                 format!("  {age}"),
                 Style::default().fg(palette_helpers.dim),
             ));
-            if !detail.is_empty() {
-                title_spans.push(Span::styled(
-                    format!("  · {detail}"),
-                    Style::default().fg(palette_helpers.dim),
-                ));
-            }
+            // Spec: status overlay chip renders BEFORE the detail field.
             // M206 AC-06: blocker annotation appears on the title line
             // alongside the overlay chip. Use a muted dim style for
             // the annotation so it doesn't compete with the danger
             // overlay chip.
+            if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
+                title_spans.push(Span::styled(
+                    format!("  [{label}]"),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ));
+            }
             if let Some(ann) = blocker_annotation(item) {
                 title_spans.push(Span::styled(
                     format!("  {ann}"),
                     Style::default().fg(palette_helpers.dim),
                 ));
             }
-            if let Some((label, color)) = overlay_chip_pair(item, palette_helpers) {
+            if !detail.is_empty() {
                 title_spans.push(Span::styled(
-                    format!("  [{label}]"),
-                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                    format!("  · {detail}"),
+                    Style::default().fg(palette_helpers.dim),
                 ));
             }
             lines.push(Line::from(title_spans));
