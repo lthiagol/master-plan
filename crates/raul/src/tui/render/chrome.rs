@@ -89,6 +89,13 @@ pub(super) fn footer_for(app: &App) -> String {
     // key. The arrow matches the column-header arrow glyph used
     // in `header_cell`, so the operator sees the same visual
     // affordance on the column header and the footer.
+    //
+    // M204 / AC-09: the footer also surfaces the active
+    // filter count as `<N> filters` when at least one filter
+    // chip is active. Both indicators sit on the per-tab line
+    // (right of the lane-key affordances) so the operator
+    // sees sort + filter state in one glance. Hidden when
+    // no filters and the default sort.
     if matches!(
         app.active_lane,
         Lane::Milestones | Lane::Backlog | Lane::Ideas
@@ -102,6 +109,23 @@ pub(super) fn footer_for(app: &App) -> String {
             // Append after the existing per-tab text — separator
             // matches the existing `·` between affordances.
             text.push_str(&format!("  ·  {indicator}"));
+        }
+        // M204 / AC-09: filter count indicator. The count is
+        // the total number of (dim, value) chips across the
+        // active lane (not the number of dimensions — a
+        // multi-select dim with two values counts as 2).
+        let filter_count = app
+            .lane_filters
+            .get(&app.active_lane)
+            .map(|d| d.values().map(|s| s.len()).sum::<usize>())
+            .unwrap_or(0);
+        if filter_count > 0 {
+            let f = format!("{filter_count} filters");
+            if text.is_empty() {
+                text = format!(" {f} ");
+            } else {
+                text.push_str(&format!("  ·  {f}"));
+            }
         }
     }
     text

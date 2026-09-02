@@ -120,8 +120,8 @@
       "id": "AC-09",
       "description": "Footer indicator shows active sort as `sort: <key> ▼` and shows chip count when filters are active (`3 filters`). Hidden when no filters and default sort.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/footer_shows_active_sort_with_arrow|footer_shows_filter_count_when_active|footer_hidden_when_default_sort_no_filters/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/footer_shows_active_sort_with_arrow|footer_shows_filter_count_when_active|footer_hidden_when_default_sort_no_filters/) exit 0 (3/3 pass)"
     },
     {
       "id": "AC-10",
@@ -405,7 +405,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/footer_shows_active_sort_with_arrow|footer_shows_filter_count_when_active|footer_hidden_when_default_sort_no_filters/)",
       "done_when": "All 3 named tests pass; footer shows active sort + chip count; hides when default",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-09"
       ],

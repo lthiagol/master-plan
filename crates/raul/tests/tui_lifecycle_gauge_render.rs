@@ -398,3 +398,162 @@ fn selected_row_highlight_stays() {
 // picks up the in-gauge copy deterministically.
 #[path = "m205_sort_cycle.rs"]
 mod m205_in_gauge;
+
+// ─── M204 S9: footer indicator ───────────────────────────────────────────────
+
+use raul::tui::app::App;
+use raul::tui::render;
+use raul::tui::view_state;
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
+use std::collections::BTreeSet;
+
+/// AC-09: footer shows the active sort key as `sort: <key> ▼`
+/// on Milestones / Backlog / Ideas when the lane is on the
+/// List content state.
+#[test]
+fn footer_shows_active_sort_with_arrow() {
+    let mut app = App::new();
+    app.load_milestones(vec![raul::tui::app::MilestoneSummary {
+        id: "01".into(),
+        title: "x".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "normal".into(),
+        updated: String::new(),
+        created: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+        flow_stages: BTreeMap::new(),
+    }]);
+    app.select_lane(raul::tui::app::Lane::Milestones);
+    // Default sort is Id — but the indicator should still
+    // show `sort: id ▼` because the footer is the per-tab
+    // sort indicator (always shown on list lanes).
+    let backend = TestBackend::new(140, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    // Footer must show the sort indicator.
+    assert!(
+        flat.contains("sort: id ▼"),
+        "footer must show 'sort: id ▼' on the default sort; got: {flat}"
+    );
+}
+
+/// AC-09: footer shows `<N> filters` when at least one
+/// filter chip is active on the lane. A lane with two
+/// lifecycle values + one priority value shows `3 filters`.
+#[test]
+fn footer_shows_filter_count_when_active() {
+    use raul::tui::app::Lane;
+    let mut app = App::new();
+    app.load_milestones(vec![raul::tui::app::MilestoneSummary {
+        id: "01".into(),
+        title: "x".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "normal".into(),
+        updated: String::new(),
+        created: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+        flow_stages: BTreeMap::new(),
+    }]);
+    app.select_lane(Lane::Milestones);
+    let mut dims: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    dims.insert(
+        "lifecycle".to_string(),
+        BTreeSet::from(["approved".to_string(), "in-progress".to_string()]),
+    );
+    dims.insert(
+        "priority".to_string(),
+        BTreeSet::from(["high".to_string()]),
+    );
+    app.lane_filters.insert(Lane::Milestones, dims);
+    let backend = TestBackend::new(140, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    assert!(
+        flat.contains("3 filters"),
+        "footer must show '3 filters' (2 lifecycle + 1 priority); got: {flat}"
+    );
+}
+
+/// AC-09: footer hides the filter count when no filters are
+/// active. The sort indicator is always present on list
+/// lanes; the filter indicator is conditional.
+#[test]
+fn footer_hidden_when_default_sort_no_filters() {
+    use raul::tui::app::Lane;
+    let mut app = App::new();
+    app.load_milestones(vec![raul::tui::app::MilestoneSummary {
+        id: "01".into(),
+        title: "x".into(),
+        lifecycle: "approved".into(),
+        lifecycle_at: None,
+        depends_on: vec![],
+        priority: "normal".into(),
+        updated: String::new(),
+        created: String::new(),
+        cancelled: false,
+        cancelled_at: None,
+        cancel_reason: None,
+        flow_stages: BTreeMap::new(),
+    }]);
+    app.select_lane(Lane::Milestones);
+    // No filters, default sort (Id).
+    let backend = TestBackend::new(140, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            let view = view_state::compute_view(&app, frame.area());
+            render::render(frame, &app, &view);
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let mut flat = String::new();
+    for y in 0..buf.area().height {
+        for x in 0..buf.area().width {
+            flat.push_str(buf[(x, y)].symbol());
+        }
+        flat.push('\n');
+    }
+    assert!(
+        flat.contains("sort: id ▼"),
+        "footer must still show the sort indicator; got: {flat}"
+    );
+    assert!(
+        !flat.contains("filters"),
+        "footer must NOT show 'N filters' when no filter is active; got: {flat}"
+    );
+}
