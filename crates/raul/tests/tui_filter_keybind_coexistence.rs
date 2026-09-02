@@ -5,7 +5,6 @@
 /// reachable via `Action::OpenLifecycleFilter` programmatically) but
 /// no default keybinding resolves to it. This test pins the new
 /// M204 contract: capital F → `Action::OpenFilter`.
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use raul::tui::action::{apply_action, Action};
 use raul::tui::app::{App, ContentState, Lane};

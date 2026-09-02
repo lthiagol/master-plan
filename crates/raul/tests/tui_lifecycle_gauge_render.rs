@@ -574,13 +574,12 @@ fn sort_cycle_persists_to_config() {
     // Press `o` twice — moves from Id to Title to Priority.
     apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
     apply_action(&mut app, &r, Action::CycleSortNext).unwrap();
-    assert_eq!(
-        app.lane_sort_key(Lane::Milestones),
-        SortKey::Priority
-    );
+    assert_eq!(app.lane_sort_key(Lane::Milestones), SortKey::Priority);
     // The pending sort write is recorded.
     assert_eq!(
-        app.pending_sort_writes.get("milestones").map(|s| s.as_str()),
+        app.pending_sort_writes
+            .get("milestones")
+            .map(|s| s.as_str()),
         Some("priority")
     );
     assert!(app.last_pending_change_at.is_some());
@@ -595,7 +594,9 @@ fn sort_cycle_persists_to_config() {
             std::time::Duration::from_millis(500),
             after,
             |key, value| {
-                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                calls
+                    .borrow_mut()
+                    .push((key.to_string(), value.to_string()));
                 Ok::<(), ()>(())
             },
         )
@@ -618,30 +619,14 @@ fn sort_cycle_persists_to_config() {
 fn sort_restored_on_tui_launch() {
     use raul::tui::runner::apply_persisted_sort_value;
     let mut app = App::new();
-    let applied = apply_persisted_sort_value(
-        &mut app,
-        Lane::Milestones,
-        "stage",
-        "milestones",
-    );
+    let applied = apply_persisted_sort_value(&mut app, Lane::Milestones, "stage", "milestones");
     assert!(applied, "known value must apply a binding");
-    assert_eq!(
-        app.lane_sort_key(Lane::Milestones),
-        SortKey::Stage
-    );
+    assert_eq!(app.lane_sort_key(Lane::Milestones), SortKey::Stage);
     // Re-run the loader with a different known value —
     // overwrites the prior bind.
-    let applied = apply_persisted_sort_value(
-        &mut app,
-        Lane::Milestones,
-        "priority",
-        "milestones",
-    );
+    let applied = apply_persisted_sort_value(&mut app, Lane::Milestones, "priority", "milestones");
     assert!(applied);
-    assert_eq!(
-        app.lane_sort_key(Lane::Milestones),
-        SortKey::Priority
-    );
+    assert_eq!(app.lane_sort_key(Lane::Milestones), SortKey::Priority);
 }
 
 /// AC-08 / S11: an unknown persisted value (e.g. a typo or a
@@ -656,34 +641,22 @@ fn unknown_persisted_sort_falls_back_to_default() {
     // Simulate a pre-M205 "lifecycle" literal landing in
     // `sort.milestones`. The loader rejects it (returns
     // `false`) and the lane keeps its in-memory default.
-    let applied = apply_persisted_sort_value(
-        &mut app,
-        Lane::Milestones,
-        "lifecycle",
-        "milestones",
+    let applied = apply_persisted_sort_value(&mut app, Lane::Milestones, "lifecycle", "milestones");
+    assert!(
+        !applied,
+        "unknown 'lifecycle' value must NOT apply a binding"
     );
-    assert!(!applied, "unknown 'lifecycle' value must NOT apply a binding");
     assert_eq!(
         app.lane_sort_key(Lane::Milestones),
         SortKey::Id,
         "lane must keep its in-memory default when the loader sees an unknown value"
     );
     // Garbage string also falls back.
-    let applied = apply_persisted_sort_value(
-        &mut app,
-        Lane::Backlog,
-        "garbage",
-        "backlog",
-    );
+    let applied = apply_persisted_sort_value(&mut app, Lane::Backlog, "garbage", "backlog");
     assert!(!applied);
     assert_eq!(app.lane_sort_key(Lane::Backlog), SortKey::Id);
     // Empty string is the silent default path.
-    let applied = apply_persisted_sort_value(
-        &mut app,
-        Lane::Ideas,
-        "",
-        "ideas",
-    );
+    let applied = apply_persisted_sort_value(&mut app, Lane::Ideas, "", "ideas");
     assert!(!applied);
     assert_eq!(app.lane_sort_key(Lane::Ideas), SortKey::Id);
 }

@@ -810,7 +810,10 @@ fn filter_keybind_help() {
         crossterm::event::KeyCode::Char('f'),
         crossterm::event::KeyModifiers::empty(),
     );
-    assert_eq!(kb.resolve(&f), Some(raul::tui::action::Action::ToggleFilter));
+    assert_eq!(
+        kb.resolve(&f),
+        Some(raul::tui::action::Action::ToggleFilter)
+    );
 }
 
 /// AC-11: the `keybinds.grooming_preset` keybind (default `g`)
