@@ -66,8 +66,8 @@
       "id": "AC-02",
       "description": "`mp list backlog` JSON includes a `preview` field per item. For active items with multi-line description, preview is the continuation (everything after the first line), truncated to ~80 chars with `...`. For resolved items, preview is `resolved · <resolution>`. For items with no description continuation, preview is empty string.",
       "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/list_backlog_projects_preview_field|preview_for_active_item_uses_description_continuation|preview_for_resolved_item_collapses_to_resolution/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/list_backlog_projects_preview_field|preview_for_active_item_uses_description_continuation|preview_for_resolved_item_collapses_to_resolution/)' exit 0 (10/10 pass)"
     },
     {
       "id": "AC-03",
@@ -101,15 +101,15 @@
       "id": "AC-07",
       "description": "Resolved backlog items render with `resolved · <resolution>` as the preview (NOT the full description continuation). Empty resolution renders as just `resolved`.",
       "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/preview_for_resolved_collapses|preview_for_resolved_with_empty_resolution/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/preview_for_resolved_collapses|preview_for_resolved_with_empty_resolution/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-08",
       "description": "BF/TW items (mixed into the Backlog lane via the legacy backlog.json payload) render with the legacy `description` continuation as the preview, same as BL/B-* items. No special-casing for BF/TW prefixes in this slice.",
       "verification": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/bf_item_preview_uses_legacy_description|tw_item_preview_uses_legacy_description/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E 'test(/bf_item_preview_uses_legacy_description|tw_item_preview_uses_legacy_description/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-09",
@@ -223,7 +223,7 @@
       ],
       "tests": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E test(/list_backlog_projects_preview_field|preview_for_active_item_uses_description_continuation|preview_for_resolved_item_collapses_to_resolution|bf_item_preview_uses_legacy_description|tw_item_preview_uses_legacy_description|preview_for_resolved_collapses|preview_for_resolved_with_empty_resolution/)",
       "done_when": "All named tests pass; mp list backlog --fields preview returns the projected preview per row",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-07",
@@ -246,7 +246,7 @@
       ],
       "tests": "cargo nextest run -p mp --test backlog_list --no-fail-fast -E test(/list_ideas_projects_preview_field|preview_uses_first_line_of_body|preview_truncates_at_eighty_chars/)",
       "done_when": "All named tests pass; mp list ideas --fields preview returns the projected preview per row",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],

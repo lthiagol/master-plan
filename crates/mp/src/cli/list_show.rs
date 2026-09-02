@@ -65,6 +65,10 @@ pub enum ListTarget {
         #[arg(long)]
         status: Option<String>,
     },
+    Ideas {
+        #[arg(long)]
+        status: Option<String>,
+    },
     Decisions,
 }
 

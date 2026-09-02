@@ -8,9 +8,12 @@ use crate::commands::common::emit_value;
 use crate::commands::track as cmd_track_mod;
 use crate::decisions;
 use crate::groom;
+use crate::idea;
 use crate::path_engine;
 use crate::paths::{self, PlanContext};
 use crate::store;
+
+const PREVIEW_MAX: usize = 80;
 
 pub(crate) fn cmd_list(
     ctx: &PlanContext,
@@ -142,7 +145,16 @@ pub(crate) fn cmd_list(
         }
         ListTarget::Backlog { status } => {
             let items = backlog::backlog_list(ctx, status.as_deref())?;
-            let value = json!({ "backlog": items });
+            let projected: Vec<serde_json::Value> =
+                items.iter().map(backlog_item_with_preview).collect();
+            let value = json!({ "backlog": projected });
+            emit_value(format, &value, fields)
+        }
+        ListTarget::Ideas { status } => {
+            let items = idea::idea_list(ctx, status.as_deref())?;
+            let projected: Vec<serde_json::Value> =
+                items.iter().map(idea_entry_with_preview).collect();
+            let value = json!({ "ideas": projected });
             emit_value(format, &value, fields)
         }
         ListTarget::Decisions => {
@@ -618,4 +630,79 @@ fn field_value_as_str(value: &serde_json::Value, field: &str) -> Option<String> 
         serde_json::Value::Null => Some(String::new()),
         _ => None,
     }
+}
+
+// ── M203: Backlog/Ideas preview projection ─────────────────────────────────
+//
+// Each list row gains a `preview` field that the raul TUI renders as a dim
+// second visual row under the bold title. The projection lives here, not in
+// the model, so the on-disk shape stays minimal (only an empty default is
+// permitted in BacklogItem.created).
+
+/// Project a BacklogItem into a JSON object that includes a `preview` field.
+///
+/// Preview rules:
+///   * `status == "resolved"`: `"resolved · <resolution>"`. If `resolution`
+///     is empty, the preview collapses to just `"resolved"`.
+///   * Otherwise (active): description continuation = everything after the
+///     first line, trimmed. Truncated to ~80 chars with `...`.
+///   * No continuation → empty string.
+fn backlog_item_with_preview(item: &crate::model::BacklogItem) -> serde_json::Value {
+    let preview = preview_for_backlog(item);
+    let mut value = serde_json::to_value(item).unwrap_or_else(|_| json!({}));
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.insert("preview".to_string(), serde_json::Value::String(preview));
+    }
+    value
+}
+
+fn preview_for_backlog(item: &crate::model::BacklogItem) -> String {
+    if item.status == "resolved" {
+        if item.resolution.is_empty() {
+            "resolved".to_string()
+        } else {
+            format!("resolved · {}", item.resolution)
+        }
+    } else {
+        let continuation = description_continuation(&item.description);
+        truncate_chars(&continuation, PREVIEW_MAX)
+    }
+}
+
+fn description_continuation(description: &str) -> String {
+    let mut lines = description.lines();
+    let _first = lines.next();
+    lines.collect::<Vec<_>>().join(" ").trim().to_string()
+}
+
+/// Char-safe truncation: keeps the first `max` chars, appends `...` when the
+/// input is longer. Mirrors `raul::text::truncate` semantics but lives in
+/// `mp` so `mp list backlog` can use it without taking a TUI dependency.
+fn truncate_chars(s: &str, max: usize) -> String {
+    let mut chars = s.chars();
+    let head: String = chars.by_ref().take(max).collect();
+    let had_more = chars.next().is_some();
+    if had_more {
+        format!("{}...", head)
+    } else {
+        head
+    }
+}
+
+/// Project an IdeaEntry into a JSON object that includes a `preview` field.
+///
+/// Preview rule: first line of `body`, truncated to ~80 chars with `...`.
+/// Empty string for ideas with no body. Empty body → empty preview.
+fn idea_entry_with_preview(idea: &crate::model::IdeaEntry) -> serde_json::Value {
+    let preview = preview_for_idea(idea);
+    let mut value = serde_json::to_value(idea).unwrap_or_else(|_| json!({}));
+    if let serde_json::Value::Object(ref mut map) = value {
+        map.insert("preview".to_string(), serde_json::Value::String(preview));
+    }
+    value
+}
+
+fn preview_for_idea(idea: &crate::model::IdeaEntry) -> String {
+    let first_line = idea.body.lines().next().unwrap_or("").trim();
+    truncate_chars(first_line, PREVIEW_MAX)
 }
