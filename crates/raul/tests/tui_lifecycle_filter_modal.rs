@@ -713,3 +713,64 @@ fn age_preset_intersection_uses_strictest() {
     set.insert("garbage".to_string());
     assert_eq!(age_strictest_threshold(&set), 90);
 }
+
+// ─── M204 S8: g key on Milestones opens modal with grooming preset ──────────
+
+/// AC-03 / S8: pressing `g` on Milestones opens the unified
+/// filter modal with the lifecycle dimension pre-toggled to
+/// the Grooming preset (approved + in-progress + groomed).
+#[test]
+fn g_opens_modal_with_grooming_preset() {
+    let mut app = App::new();
+    app.select_lane(Lane::Milestones);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilterWithGroomingPreset).unwrap();
+    match &app.active_mode {
+        Mode::Filter(st) => {
+            assert_eq!(st.lane, Lane::Milestones);
+            assert!(st.grooming_preset, "modal must be opened with the grooming preset flag set");
+            // The lifecycle dim is pre-toggled to the preset.
+            let lc = st.draft.get("lifecycle");
+            assert!(lc.is_some(), "lifecycle dim must be present in the draft");
+            let lc = lc.unwrap();
+            assert!(lc.contains("approved"));
+            assert!(lc.contains("in-progress"));
+            assert!(lc.contains("groomed"));
+        }
+        other => panic!("expected Mode::Filter, got {other:?}"),
+    }
+}
+
+/// AC-03 / S8: pressing `g` on Backlog is a no-op. The
+/// dispatcher gate (apply_action) only opens the modal on
+/// Milestones; on Backlog the action sets a flash message
+/// and leaves the active mode untouched.
+#[test]
+fn g_noop_on_backlog() {
+    let mut app = App::new();
+    app.select_lane(Lane::Backlog);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilterWithGroomingPreset).unwrap();
+    // Mode is unchanged (still Normal).
+    assert!(matches!(app.active_mode, Mode::Normal));
+    // A flash message surfaces the constraint (per
+    // AC-03's "the per-tab footer documents the constraint"
+    // — the flash_message is the in-band equivalent).
+    let flash = app.flash_message.as_deref().unwrap_or("");
+    assert!(
+        flash.to_ascii_lowercase().contains("milestones")
+            || flash.to_ascii_lowercase().contains("grooming"),
+        "expected the no-op flash to mention the Milestones-only constraint; got {flash:?}"
+    );
+}
+
+/// AC-03 / S8: pressing `g` on Ideas is a no-op (mirrors the
+/// Backlog case — the preset is Milestones-only).
+#[test]
+fn g_noop_on_ideas() {
+    let mut app = App::new();
+    app.select_lane(Lane::Ideas);
+    let r = raul::mp_runner::MpRunner::new().expect("mp");
+    apply_action(&mut app, &r, Action::OpenFilterWithGroomingPreset).unwrap();
+    assert!(matches!(app.active_mode, Mode::Normal));
+}

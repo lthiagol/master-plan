@@ -79,7 +79,7 @@
       "description": "Filter modal opens on `F` from Milestones, Backlog, and Ideas. Same modal widget, same keybindings (Space to toggle, ↑↓ to navigate, ⏎ to commit, Esc to cancel), same visual style. `g` opens the same modal on Milestones with the grooming preset pre-selected on the lifecycle dimension.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E 'test(/filter_modal_opens_on_F_from_milestones|filter_modal_opens_on_F_from_backlog|filter_modal_opens_on_F_from_ideas|g_opens_modal_with_grooming_preset|modal_visual_style_is_consistent_across_lanes/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filter_modal_opens_on_F_from_milestones|filter_modal_opens_on_F_from_backlog|filter_modal_opens_on_F_from_ideas|g_opens_modal_with_grooming_preset|modal_visual_style_is_consistent_across_lanes/) exit 0 (4/4 pass)"
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/filter_modal_opens_on_F_from_milestones|filter_modal_opens_on_F_from_backlog|filter_modal_opens_on_F_from_ideas|g_opens_modal_with_grooming_preset|modal_visual_style_is_consistent_across_lanes/) exit 0 (5/5 pass)"
     },
     {
       "id": "AC-04",
@@ -447,7 +447,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_filter_modal --no-fail-fast -E test(/g_opens_modal_with_grooming_preset|g_noop_on_backlog|g_noop_on_ideas/)",
       "done_when": "All 3 named tests pass; g opens modal with preset on Milestones; g is unbound on Backlog/Ideas",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
