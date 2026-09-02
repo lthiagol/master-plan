@@ -71,50 +71,50 @@
       "id": "AC-02",
       "description": "Stage sort on Milestones uses `flow_stages` (current mp-flow stage, computed as the first non-done, non-skipped stage in MP_FLOW_STAGE_KEYS canonical order — same logic as the Stage column cell). Tiebreak on Id.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_stage_uses_flow_stages|sort_by_stage_tiebreak_is_id/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_stage_uses_flow_stages|sort_by_stage_tiebreak_is_id/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-03",
       "description": "Created sort uses the created field on all three lanes (MilestoneMeta.created, BacklogItem.created, IdeaEntry.created). Updated on Milestones continues to use lifecycle_at (last transition). Created and Updated are different keys. Tiebreak on Id.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_created_milestones_uses_created|sort_by_created_backlog_uses_created|sort_by_created_ideas_uses_created|sort_by_updated_milestones_uses_lifecycle_at/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_created_milestones_uses_created|sort_by_created_backlog_uses_created|sort_by_created_ideas_uses_created|sort_by_updated_milestones_uses_lifecycle_at/)' exit 0 (4/4 pass)"
     },
     {
       "id": "AC-04",
       "description": "ResolvedAt sort on Backlog uses `resolved_at` (RFC3339 date string). Unresolved items sort to the bottom under ascending order (or to the top under descending — implementation choice pinned in test). Tiebreak on Id.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_resolved_at_uses_resolved_at_field|sort_by_resolved_at_unresolved_items_go_to_bottom|sort_by_resolved_at_tiebreak_is_id/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_resolved_at_uses_resolved_at_field|sort_by_resolved_at_unresolved_items_go_to_bottom|sort_by_resolved_at_tiebreak_is_id/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-05",
       "description": "Tags sort on Ideas uses the first tag alphabetically as the primary key, subsequent tags as stable tiebreak. Ideas with no tags sort to the bottom under ascending order. Tiebreak on Id.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_tags_uses_first_tag_alphabetically|sort_by_tags_uses_subsequent_tags_as_tiebreak|sort_by_tags_no_tag_items_go_to_bottom|sort_by_tags_tiebreak_is_id/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_tags_uses_first_tag_alphabetically|sort_by_tags_uses_subsequent_tags_as_tiebreak|sort_by_tags_no_tag_items_go_to_bottom|sort_by_tags_tiebreak_is_id/)' exit 0 (4/4 pass)"
     },
     {
       "id": "AC-06",
       "description": "Cycle `o` walks all six stops on each lane in the documented order. From any starting position, one `o` press advances to the next stop; wrap-around from the last stop to the first. The footer indicator shows the active sort key as `sort: <key> ▼`.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/cycle_o_walks_all_six_stops_milestones|cycle_o_walks_all_six_stops_backlog|cycle_o_walks_all_six_stops_ideas|cycle_o_wraps_from_last_to_first|footer_shows_active_sort_key/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/cycle_o_walks_all_six_stops_milestones|cycle_o_walks_all_six_stops_backlog|cycle_o_walks_all_six_stops_ideas|cycle_o_wraps_from_last_to_first|footer_shows_active_sort_key/)' exit 0 (5/5 pass)"
     },
     {
       "id": "AC-07",
       "description": "Column-header sort behavior is consistent across lanes. Clicking a column header sorts by that key (toggle ascending/descending); active key shows `▼`. Header cells for keys not in the lane's cycle render as plain labels (no `▼`).",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/column_header_click_sorts_by_key|active_key_shows_arrow|non_lane_keys_render_plain_label/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/column_header_click_sorts_by_key|active_key_shows_arrow|non_lane_keys_render_plain_label/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-08",
       "description": "Sort persistence via existing sort.<lane> still works. Changing the cycle writes sort.<lane> within 1s via the M204 debounce. Restarting restores. Pre-M205 value lifecycle falls back to the per-lane default.",
       "verification": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|legacy_lifecycle_sort_falls_back_to_default/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_cycle_persists_to_config|sort_restored_on_tui_launch|legacy_lifecycle_sort_falls_back_to_default/)' exit 0 (3/3 pass)"
     },
     {
       "id": "AC-09",
@@ -217,7 +217,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_stage_uses_flow_stages|sort_by_stage_tiebreak_is_id/)",
       "done_when": "Both named tests pass; Stage sort orders milestones by current mp-flow stage",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -237,7 +237,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/no_lifecycle_variant_in_sort_key_enum/)",
       "done_when": "No references to SortKey::Lifecycle remain; named test passes",
-      "status": "in-progress",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -257,7 +257,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_created_milestones_uses_created|sort_by_created_backlog_uses_created|sort_by_created_ideas_uses_created|sort_by_updated_milestones_uses_lifecycle_at/)'",
       "done_when": "All 3 named tests pass; Created sort orders correctly per lane",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -297,7 +297,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_resolved_at_uses_resolved_at_field|sort_by_resolved_at_unresolved_items_go_to_bottom|sort_by_resolved_at_tiebreak_is_id/)",
       "done_when": "All 3 named tests pass; ResolvedAt sort works correctly with unresolved-to-bottom under both directions",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -317,7 +317,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/legacy_lifecycle_sort_falls_back_to_default/)",
       "done_when": "Named test passes; unknown persisted values fall back to default silently",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -337,7 +337,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/column_header_click_sorts_by_key|active_key_shows_arrow|non_lane_keys_render_plain_label/)",
       "done_when": "All 3 named tests pass; column headers sort + show v correctly",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -357,7 +357,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_tags_uses_first_tag_alphabetically|sort_by_tags_uses_subsequent_tags_as_tiebreak|sort_by_tags_no_tag_items_go_to_bottom|sort_by_tags_tiebreak_is_id/)",
       "done_when": "All 4 named tests pass; Tags sort works correctly with no-tag items to bottom",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -378,7 +378,7 @@
       ],
       "tests": "make test",
       "done_when": "All 9 ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0; cycle_o walks all stops per lane",
-      "status": "pending",
+      "status": "in-progress",
       "covers_ac": [
         "AC-06",
         "AC-09"
