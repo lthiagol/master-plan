@@ -534,7 +534,10 @@ fn preview_uses_first_line_of_intent_outcome() {
     // must show only the FIRST line. The second line must NOT leak
     // into the rendered tree.
     assert!(
-        buf_search(&buf, "Implement the first execution item with intent preview visible in the Path tree."),
+        buf_search(
+            &buf,
+            "Implement the first execution item with intent preview visible in the Path tree."
+        ),
         "first line of outcome must render in the preview"
     );
     assert!(
@@ -557,13 +560,14 @@ fn preview_truncates_at_eighty_chars() {
     //   3. The preview row length is bounded (80 chars + `…`).
     let mut data = rich_path_data();
     let long = "a".repeat(200);
-    data["lanes"][0]["items"][0]["milestone"]["intent"]["outcome"] = serde_json::Value::String(long.clone());
+    data["lanes"][0]["items"][0]["milestone"]["intent"]["outcome"] =
+        serde_json::Value::String(long.clone());
     let mut app = App::new();
     app.select_lane(Lane::Path);
     app.load_path_data(data);
     let buf = render_buffer(&app, 200, 60);
-    let title_y = find_row_with(&buf, "M10 — First execution item")
-        .expect("M10 title row must exist");
+    let title_y =
+        find_row_with(&buf, "M10 — First execution item").expect("M10 title row must exist");
     let preview_y = title_y + 1;
     let mut row = String::new();
     for x in 0..buf.area.width {
@@ -599,8 +603,8 @@ fn preview_line_uses_arrow_prefix() {
     let buf = render_buffer(&app, 140, 60);
     // The preview row carrying "Implement the first execution item…"
     // must ALSO carry the `↳` glyph on the same row.
-    let preview_y = find_row_with(&buf, "Implement the first execution item")
-        .expect("preview row must exist");
+    let preview_y =
+        find_row_with(&buf, "Implement the first execution item").expect("preview row must exist");
     let mut row = String::new();
     for x in 0..buf.area.width {
         row.push_str(buf[(x, preview_y)].symbol());
@@ -618,8 +622,8 @@ fn preview_line_dim_color() {
     app.select_lane(Lane::Path);
     app.load_path_data(rich_path_data());
     let buf = render_buffer(&app, 140, 60);
-    let preview_y = find_row_with(&buf, "Implement the first execution item")
-        .expect("preview row must exist");
+    let preview_y =
+        find_row_with(&buf, "Implement the first execution item").expect("preview row must exist");
     // Locate the first non-whitespace cell on the preview row, then
     // walk until we hit the first letter of the outcome text. Those
     // cells should be styled with the dim color.
@@ -641,7 +645,10 @@ fn preview_line_dim_color() {
             break;
         }
     }
-    assert!(found_dim, "could not locate preview content cell to test color");
+    assert!(
+        found_dim,
+        "could not locate preview content cell to test color"
+    );
 }
 
 #[test]
@@ -659,8 +666,8 @@ fn preview_line_empty_when_intent_outcome_empty() {
     let buf = render_buffer(&app, 140, 60);
     // M11 has empty outcome — preview row must still exist and carry
     // the ↳ glyph but no content text.
-    let m11_title_y = find_row_with(&buf, "M11 — Second execution item")
-        .expect("M11 title row must exist");
+    let m11_title_y =
+        find_row_with(&buf, "M11 — Second execution item").expect("M11 title row must exist");
     let preview_y = m11_title_y + 1;
     let mut row = String::new();
     for x in 0..buf.area.width {
@@ -685,10 +692,8 @@ fn next_indicator_on_first_execution_item_only() {
     // M10 is rank 1 → carries `◀ next`. M11 is rank 2 → does NOT.
     // M10 occupies 2 visual lines (title + preview) + a spine line
     // separator → 3 rows between M10's title and M11's title.
-    let m10_y = find_row_with(&buf, "M10 — First execution item")
-        .expect("M10 row must exist");
-    let m11_y = find_row_with(&buf, "M11 — Second execution item")
-        .expect("M11 row must exist");
+    let m10_y = find_row_with(&buf, "M10 — First execution item").expect("M10 row must exist");
+    let m11_y = find_row_with(&buf, "M11 — Second execution item").expect("M11 row must exist");
     assert_eq!(
         m11_y - m10_y,
         3,
@@ -719,8 +724,7 @@ fn next_indicator_warn_color_bold() {
     app.select_lane(Lane::Path);
     app.load_path_data(rich_path_data());
     let buf = render_buffer(&app, 140, 60);
-    let m10_y = find_row_with(&buf, "M10 — First execution item")
-        .expect("M10 row must exist");
+    let m10_y = find_row_with(&buf, "M10 — First execution item").expect("M10 row must exist");
     let mut found = false;
     for x in 0..buf.area.width {
         let cell = &buf[(x, m10_y)];
@@ -732,7 +736,9 @@ fn next_indicator_warn_color_bold() {
                 cell.style().fg
             );
             assert!(
-                cell.style().add_modifier.contains(ratatui::style::Modifier::BOLD),
+                cell.style()
+                    .add_modifier
+                    .contains(ratatui::style::Modifier::BOLD),
                 "◀ cell must use BOLD modifier"
             );
             found = true;
@@ -754,8 +760,8 @@ fn preview_empty_intent_outcome_renders_only_prefix() {
     // M40 lives on the grooming branch. Find its title row, then
     // check the row immediately below for `↳` (and the absence of
     // any content).
-    let m40_title_y = find_row_with(&buf, "M40 — Grooming milestone")
-        .expect("M40 title row must exist");
+    let m40_title_y =
+        find_row_with(&buf, "M40 — Grooming milestone").expect("M40 title row must exist");
     let preview_y = m40_title_y + 1;
     let mut row = String::new();
     for x in 0..buf.area.width {
@@ -816,8 +822,7 @@ fn row_text_contains(buf: &ratatui::buffer::Buffer, y: u16, needle: &str) -> boo
 }
 
 fn find_row_index(buf: &ratatui::buffer::Buffer, label: &str) -> u16 {
-    find_row_with(buf, label)
-        .unwrap_or_else(|| panic!("row for label {label:?} not found"))
+    find_row_with(buf, label).unwrap_or_else(|| panic!("row for label {label:?} not found"))
 }
 
 #[test]
@@ -1115,13 +1120,9 @@ fn age_uses_relative_time() {
     let hh = secs_of_day / 3600;
     let mm = (secs_of_day % 3600) / 60;
     let ss = secs_of_day % 60;
-    let rfc3339 = format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, hh, mm, ss
-    );
+    let rfc3339 = format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hh, mm, ss);
     let mut data = rich_path_data();
-    data["lanes"][0]["items"][0]["milestone"]["lifecycle_at"] =
-        serde_json::Value::String(rfc3339);
+    data["lanes"][0]["items"][0]["milestone"]["lifecycle_at"] = serde_json::Value::String(rfc3339);
     let mut app = App::new();
     app.select_lane(Lane::Path);
     app.load_path_data(data);
@@ -1185,7 +1186,9 @@ fn branch_headers_bold_color_preserved() {
         let cell = &buf[(x, blocked_header_y)];
         if cell.symbol() == "B" {
             assert!(
-                cell.style().add_modifier.contains(ratatui::style::Modifier::BOLD),
+                cell.style()
+                    .add_modifier
+                    .contains(ratatui::style::Modifier::BOLD),
                 "Blocked header label `B` must carry BOLD modifier; row: {row:?}"
             );
             found = true;
@@ -1201,14 +1204,19 @@ fn branch_headers_bold_color_preserved() {
         let cell = &buf[(x, awaiting_header_y)];
         if cell.symbol() == "A" {
             assert!(
-                cell.style().add_modifier.contains(ratatui::style::Modifier::BOLD),
+                cell.style()
+                    .add_modifier
+                    .contains(ratatui::style::Modifier::BOLD),
                 "Awaiting approval header label `A` must carry BOLD modifier"
             );
             found = true;
             break;
         }
     }
-    assert!(found, "could not locate A cell on Awaiting approval header row");
+    assert!(
+        found,
+        "could not locate A cell on Awaiting approval header row"
+    );
 }
 
 #[test]
@@ -1410,7 +1418,8 @@ fn spines_between_trunk_items_preserved() {
 /// A 60-char outcome that fits in the default 80-char budget but
 /// exceeds the compact 40-char budget. We use it to confirm
 /// truncation kicks in earlier at narrow widths.
-const COMPACT_OUTCOME: &str = "Implement a sixty character description that fits in eighty but exceeds forty.";
+const COMPACT_OUTCOME: &str =
+    "Implement a sixty character description that fits in eighty but exceeds forty.";
 
 fn compact_path_data() -> serde_json::Value {
     let mut data = rich_path_data();
@@ -1428,8 +1437,8 @@ fn compact_mode_two_visual_lines() {
     app.load_path_data(compact_path_data());
     let buf = render_buffer(&app, 80, 60);
     let title_y = find_row_index(&buf, "M10 — First execution item");
-    let preview_y = find_row_with(&buf, "Implement a sixty character")
-        .expect("compact preview row must exist");
+    let preview_y =
+        find_row_with(&buf, "Implement a sixty character").expect("compact preview row must exist");
     assert_eq!(
         preview_y - title_y,
         1,

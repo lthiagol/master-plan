@@ -227,7 +227,9 @@ pub fn outcome_first_line(item: &serde_json::Value) -> String {
     let raw = item["milestone"]["intent"]["outcome"]
         .as_str()
         .unwrap_or("");
-    raw.lines().map(str::trim).find(|s| !s.is_empty())
+    raw.lines()
+        .map(str::trim)
+        .find(|s| !s.is_empty())
         .map(str::to_string)
         .unwrap_or_default()
 }
@@ -240,7 +242,12 @@ pub fn outcome_first_line(item: &serde_json::Value) -> String {
 /// `outcome` is the first-line text, `max_chars` is the content budget
 /// (not counting the prefix). Truncation uses char boundaries (NOT
 /// byte boundaries) so multi-byte UTF-8 doesn't panic.
-pub fn preview_line(prefix: &str, outcome: &str, palette_helpers: &theme::Palette, max_chars: usize) -> Line<'static> {
+pub fn preview_line(
+    prefix: &str,
+    outcome: &str,
+    palette_helpers: &theme::Palette,
+    max_chars: usize,
+) -> Line<'static> {
     let dim = Style::default().fg(palette_helpers.dim);
     if outcome.is_empty() {
         // AC-05 / AC-10: only the prefix, dim color, no content.
@@ -308,11 +315,20 @@ pub fn overlay_chip(item: &serde_json::Value) -> Option<(&'static str, Color)> {
     let m = item["milestone"].clone();
     let _ = m;
     if blocked {
-        Some(("BLOCKED", super::app::App::default().effective_palette().danger))
+        Some((
+            "BLOCKED",
+            super::app::App::default().effective_palette().danger,
+        ))
     } else if cancelled {
-        Some(("CANCELLED", super::app::App::default().effective_palette().danger))
+        Some((
+            "CANCELLED",
+            super::app::App::default().effective_palette().danger,
+        ))
     } else if deferred {
-        Some(("DEFERRED", super::app::App::default().effective_palette().warn))
+        Some((
+            "DEFERRED",
+            super::app::App::default().effective_palette().warn,
+        ))
     } else {
         None
     }
