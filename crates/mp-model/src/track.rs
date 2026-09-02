@@ -59,4 +59,6 @@ pub struct BacklogItem {
     pub resolution: String,
     #[serde(default)]
     pub resolved_at: String,
+    #[serde(default)]
+    pub created: String,
 }

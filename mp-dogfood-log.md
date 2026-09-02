@@ -1206,3 +1206,49 @@ Closure path: M176 — re-spec AC-04 to measure
   repairs for the AC-17 gate; recorded here per the workaround queue.
 - One-line: M202 S21 commit bundled tab-bar + settings-schema repairs
   required to unblock `make test`; declared as drift in F-09 resolution.
+
+## Entry — 2026-09-01 — Flaky test in mp watch::bridge under parallel load  <!-- points-at: M149 -->
+
+- Date / when: 2026-09-01, M202 external review (cycle 3) noted.
+- Command attempted: cargo nextest run -p mp --no-fail-fast -E
+  test(/run_herdr_with_timeout_kills_entire_process_group/)
+- Observed: test failed once under parallel cargo nextest load (reported
+  as 1/2272 fail). Passes in isolation. Passes on full re-run.
+  M202 diff did not touch crates/mp/src/watch/bridge.rs or the test.
+- Suspected cause: signal/process-group handling race in the test fixture
+  (likely the heredoc-based mp binary launch conflicting with the parent
+  test process's process group when cargo nextest runs tests in parallel).
+  Pre-existing flakiness, surfaced by M202's expanded AC-17 matrix running
+  more parallel cases.
+- Verdict: **backlog** — not blocking M202 (test passes in isolation and
+  on re-run). File as BF-NN in backlog.json. Triage: investigate the
+  fixture under `cargo nextest run --test-threads=1` and `cargo nextest
+  archive`; consider adding `#[ignore]` or a retry-on-failure wrapper.
+- One-line: pre-existing flaky test in mp watch::bridge, exposed by M202's
+  expanded parallel test matrix; passes in isolation and on re-run.
+
+## Entry — 2026-09-01 — Pre-M202 installed mp binary wipes flow_stages via serde  <!-- points-at: M202 -->
+
+- Date / when: 2026-09-01, M202 cycle 2 review noted.
+- Command attempted: any mp write command using `/opt/homebrew/bin/mp`
+  (the pre-M202 installed binary) against an M202-era milestone file
+  that has a `flow_stages` field.
+- Observed: the flow_stages field is silently dropped from the milestone
+  JSON. Reading via the new binary shows empty flow_stages even though
+  the git history has the field populated. Not an M202 code bug (the
+  new binary preserves it; S2 round-trip test in crates/mp-model pins
+  it); the issue is the OLD binary's serde config which silently
+  drops unknown fields.
+- Suspected cause: installed mp binary is from 2026-08-25 (pre-M202).
+  Pre-M202 serde config used `#[serde(default)]` with deny-unknown-fields
+  off, so unknown fields (flow_stages) are dropped on write. M202-era
+  binaries preserve them. The dogfood plan zone should only be written
+  with the M202-era binary.
+- Verdict: **backlog** — file as BF-NN. Operational fix: when hacking on
+  mp, the agent should `make build` (or `eval "$(make dev-env)"`) and use
+  target/debug/mp for plan-zone writes, not the installed /opt/homebrew/bin/mp.
+  Per AGENTS.md "Hacking on the mp binary? Run `eval "$(make dev-env)"`",
+  but it's not enforced for the dogfood plan zone.
+- One-line: pre-M202 installed mp binary silently drops the M202
+  flow_stages field on write (serde unknown-fields policy). Use
+  target/debug/mp for plan-zone writes during M202+ work.

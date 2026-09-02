@@ -381,3 +381,588 @@ For NOW (until the future milestone lands):
 - Closed w12:t6 (orchestration-test, M200 panes) — M200 complete
 - Closed w12:t7 (orchestration-test-201, M201 panes) — M201 complete
 - w12:t9 (orchestration-test-202) stays alive — M202 in flight
+
+---
+
+## 2026-09-01 ~23:30 — test session CLOSED. M200, M201, M202 all shipped.
+
+### Final milestone state
+
+| Milestone | lifecycle | execution_status | spec_status | Notes |
+|---|---|---|---|---|
+| M200 (Keybind deconflict) | executed | done | implemented | Full review pass happened at end of cycle 4, but the activity.json entry was lost during the M201-cycle-1 state-regression event. Review-pass event is gone from the audit trail; not re-doing it. |
+| M201 (raul Settings 2.0) | complete | done | verified | Full lifecycle. 3 review cycles. All 8 ACs passed. 13 findings fixed. |
+| M202 (mp milestone per-stage tracker + raul Stage column) | complete | done | verified | Full lifecycle. 3 review cycles. All 19 ACs passed. 13 findings fixed (11 cycle 1 + 2 cycle 2). |
+
+### Test session summary
+
+3 milestones driven through the same semi-automatic orchestration pattern
+(orchestrator pane + lane panes spawned via herdr, push-based notifications
+via `herdr agent prompt <orchestrator_pane_id>`, lifecycle polling for
+verification, `make clean` before each reviewer cycle).
+
+Cycle-count outcomes matched the matrix:
+- M200: 4 cycles (default 2 → soft cap 3 → hard limit 4 hit on F-13)
+- M201: 3 cycles (default 2 → soft cap 3 hit on F-01/F-02 double-quote regression)
+- M202: 3 cycles (default 2 → soft cap 3 hit on F-12 + F-13)
+
+Time budget (rough):
+- M200: ~80 min for 8 steps / 6 ACs
+- M201: ~65 min for 16 steps / 8 ACs (faster per cycle because pattern known)
+- M202: ~3.5 hours for 22 steps / 19 ACs (more cycles due to spec complexity)
+
+### Two new mp-dogfood-log entries
+
+Filed at ~/Github/master-plan/mp-dogfood-log.md:
+1. **Flaky test in mp watch::bridge** under parallel load — backlog.
+   Test passes in isolation. Pre-existing flakiness surfaced by M202's
+   expanded parallel test matrix.
+2. **Pre-M202 installed mp binary wipes flow_stages via serde** —
+   backlog. Operational fix: use target/debug/mp for plan-zone writes
+   during M202+ work.
+
+### Cleanup status
+
+- w12:t6 (orchestration-test, M200) — CLOSED earlier in session
+- w12:t7 (orchestration-test-201, M201) — CLOSED earlier in session
+- w12:t9 (orchestration-test-202, M202) — STILL ALIVE, lanes idle
+
+If you want to close the M202 tab: `herdr tab close w12:t9`.
+
+### Total test artifact
+
+- mp-herdr-log.txt: ~430 lines (multiple truncations during the session,
+  see R15 in the design-input section; substance preserved in git +
+  plan.json + activity.json + mp-dogfood-log.md)
+- mp-dogfood-log.md: +2 new entries (4 total in this run)
+- Git: 42 commits ahead of origin/wip on branch wip
+- Activity.json: ~840 lines with full audit trail
+
+### Final state for future-milestone planning
+
+The future "Drive milestone" milestone that replaces this manual
+orchestration has all the design input it needs:
+
+1. **R1–R15** hard requirements (topology, cycle governance, decision
+   matrix, lane notification, orchestrator verification, per-step
+   discipline, AC verification semantics, mp verify constraints,
+   build cleanliness, per-AC evidence, reviewer contract, TUI caveats,
+   lifecycle state model, herdr quirks, log fragility)
+2. **Migration plan** for the log file (move into master-plan/ as a
+   structured record queryable via `mp`)
+3. **Three-plane architecture** (raul/herdr/mp) — fully documented with
+   the meta-prompt template for the orchestrator pane
+4. **Decision matrix** as Python pseudocode ready to drop into mp watch
+5. **Three real test runs** showing the pattern works end-to-end
+6. **Two backlog entries** for adjacent issues (flaky test, installed
+   binary serde)
+
+
+---
+
+## 2026-09-01 ~23:35 — consolidated lessons (the hard ones)
+
+### Three lessons that recurred across all three milestones
+
+#### Lesson 1: Lane notifications must be SHELL COMMANDS, not printed text
+- M200 cycle 1: runner printed notification in TUI instead of running `herdr agent prompt`.
+- M201 cycle 1: runner fabricated the lifecycle claim entirely.
+- M202 cycle 1: 11 findings but with placeholders / generic strings.
+- **Fix:** every lane prompt must show the exact shell command for the notification. The word "notify" is interpreted as "print" by opencode agents by default.
+
+#### Lesson 2: Per-AC evidence discipline (THIRD REPEAT — load-bearing)
+- M200 F-12 (cycle 2): "milestone completion" step overwrote evidence with generic string.
+- M201 F-05 (cycle 1): evidence counts disagreed with actual test counts in 3 ACs.
+- M202 F-13 (cycle 3): cycle-2 completion commit 10a5586 replaced all 19 AC evidence with placeholder "M202 cycle 2 retry".
+- **Pattern:** any "summary" or "completion" step that touches milestone JSON tends to overwrite per-AC evidence. Three milestones, three occurrences.
+- **Fix:** evidence restoration MUST happen AFTER any completion ceremony. Restoring evidence via `mp milestone criterion pass <AC> --evidence "..."` is the only safe path. NEVER have a completion-summary commit touch evidence fields. The future Drive milestone should codify this as a hard rule for the runner contract.
+
+#### Lesson 3: Orchestrator must verify state independently
+- M200: state was at `executed` but review-pass event was lost to a regression.
+- M201 cycle 1: runner claimed "lifecycle=executed" but state was at approved/planned.
+- **Fix:** before accepting any lane's "done" notification, the orchestrator MUST independently verify:
+  ```
+  state = mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status
+  acts  = grep '"subject": "<id>"' master-plan/activity.json | tail -3
+  assert state.lifecycle in {executed, complete}
+  assert state.execution_status == "done"
+  assert len(acts) > 0
+  if any check fails: REJECT and send back
+  ```
+
+### One lesson that did NOT occur but is worth noting
+
+#### "Ship with backlog" path — algorithm defined, never exercised
+The decision matrix defines `ship_with_backlog` for low-severity drift findings. Across M200 (13 findings, 1 high), M201 (13 findings, 2 high), and M202 (13 findings, 1 high), every cycle produced real findings worth fixing. The ship-with-backlog path was never used. This means:
+- The algorithm is correct in theory but unvalidated in practice.
+- For future milestones with mostly drift findings, the ship-with-backlog command sequence is documented in the decision-matrix section but not battle-tested.
+
+### One pattern that was untested
+
+#### Cycle 4 escalation (cycle 4 fails)
+- M200 hit cycle 4 (hard limit) but the cycle-4 reviewer PASSED. We never tested what happens when cycle 4 review fails.
+- The matrix says: cycle 4 fail → escalate to user. We never exercised that path.
+- For the future Drive milestone: when implementing the cycle-4-escalation behavior, this path needs explicit testing (a milestone with cycle-4 unfixable HIGH blocker).
+
+### Audit-trail gap observed
+
+#### M200 review-pass event lost
+- The M200 cycle-4 reviewer called `mp reviews pass 200 --verdict ok --reviewer reviewer` (verified in their report). The milestone should have transitioned to `lifecycle=complete`.
+- Today, M200 is at `lifecycle=executed, spec_status=implemented`. The activity.json has 8 lifecycle entries for milestone 200, but the final `executed → complete` transition is missing.
+- Cause: likely the same state-regression event that hit M201 cycle 1 (the M200/M201 milestone files were both touched during that event).
+- Not recovering it: M200's body of work is done and reviewed. The state-tracking artifact is acknowledged in this log. The future Drive milestone would handle this correctly via R5 (orchestrator verification protocol).
+
+### Summary statistics across all three milestones
+
+| Metric | M200 | M201 | M202 |
+|---|---|---|---|
+| Steps | 8 | 16 | 22 (+S4.1) |
+| ACs | 6 | 8 | 19 |
+| Cycles | 4 | 3 | 3 |
+| Findings filed | 13 | 13 | 13 |
+| Findings fixed | 13/13 | 13/13 | 13/13 |
+| Final lifecycle | executed | complete | complete |
+| Final spec_status | implemented | verified | verified |
+| `make clean` runs | 1 (before cycle 3 review) | 0 (build artifacts from cycle 2 still good) | 2 (before each reviewer cycle) |
+| Time (rough) | ~80 min | ~65 min | ~210 min |
+| Reviewer pass on final cycle | yes | yes | yes |
+
+Total findings filed across all milestones: 39.
+Total findings fixed: 39/39.
+Total cycles: 10.
+Total `make clean` runs: 3.
+Total reviewer passes: 3.
+
+
+---
+
+## 2026-09-01 ~23:40 — OPEN DECISION: git commit strategy
+
+The future "Drive milestone" / new mp watch needs an explicit git commit
+strategy. The current test ran with whatever the runner chose per-cycle,
+and that produced inconsistencies.
+
+### What we observed
+
+| Milestone | Steps | Findings | Commit pattern | Audit-trail consequence |
+|---|---|---|---|---|
+| M200 | 8 | 13 (over 4 cycles) | 1 commit per step group + 1 per cycle resolution + 1 lifecycle evidence commit | clean step history, but `fixed_in` got cross-stamped in cycle 1 (F-11 lesson) |
+| M201 | 16 | 13 (over 3 cycles) | 1 commit per step group (5 commits for 16 steps) + 1 per finding (3 cycle-2 commits) + 1 lifecycle evidence | grouped-step commits made per-AC evidence restamping necessary in cycle 3 |
+| M202 | 22 | 13 (over 3 cycles) | 1 commit per step group (9 commits for 22 steps) + 1 per finding (cycle 2: 4 commits for 11 findings, several grouped) + 1 lifecycle evidence | cycle 3 F-13: a "completion summary" commit overwrote all per-AC evidence with a placeholder string |
+
+### Cross-cycle patterns
+
+1. **Per-step commits** — the runner's natural unit. Some steps are
+   trivial enough that they were bundled (S1-S3 in M201), others were
+   kept as one commit per step (S4 in M201).
+2. **Per-finding commits** — the reviewer expects `mp reviews finding
+   resolve --commit <sha>` to point to the actual fixing commit.
+   Grouped finding commits (M202 cycle 2: F-01..F-05 + F-08 + F-11 in one
+   commit `eb3b66d`) made `fixed_in` resolve ambiguous — every finding
+   got the same SHA.
+3. **Lifecycle evidence commits** — at the end of each cycle, a commit
+   that records the milestone's final state for that cycle.
+4. **Resolve findings commits** — separate from the fix commits; just
+   the `mp reviews finding resolve --commit <sha>` calls. Often grouped
+   into one commit (M202 cycle 2: `cb2e0d9 resolve F-01..F-11`).
+
+### What's broken about the current ad-hoc strategy
+
+- **`fixed_in` metadata drift.** When findings are grouped into one
+  commit, every finding gets that single SHA as `fixed_in`. The audit
+  trail loses which finding was fixed in which commit. M200 F-11
+  caught this: 5 findings all stamped `0f246fa`, but F-01 was actually
+  fixed in `63266db`, F-02 in `98dd281`, etc.
+- **Evidence overwrite by "completion" commits.** M200 F-12, M201 F-05,
+  M202 F-13 all had a "milestone complete" or "cycle evidence" commit
+  that overwrote per-AC evidence with a generic string. Any
+  cycle-bounded summary commit touches evidence fields by accident.
+- **Step granularity varies.** S1 alone in one commit, but S1-S3 in
+  another commit. Inconsistent makes bisect harder.
+
+### Open decision for the new mp watch / Drive milestone
+
+The Drive milestone MUST pick a strategy. Options:
+
+**A. One commit per step (strict)**
+- Pros: clean audit trail, easy step-level revert, predictable.
+- Cons: lots of commits (22 for M202). `fixed_in` is unambiguous when
+  finding fixes coincide with step work. Tedious for trivial steps.
+
+**B. One commit per finding (strict)**
+- Pros: `fixed_in` is unambiguous. Easy to track what fix landed where.
+- Cons: doesn't capture step-level progress. Implementation commits
+  don't fit this model.
+
+**C. One commit per AC pass (strict)**
+- Pros: ties commits to acceptance criteria. Ties to the AC verification.
+- Cons: steps cover multiple ACs; one AC may pass without a clean commit
+  boundary. Awkward granularity.
+
+**D. One commit per cycle (end-of-cycle)**
+- Pros: cycle-bounded rollback. Single commit shows the cycle's net
+  change.
+- Cons: loses step-level and finding-level granularity. Hard to
+  bisect within a cycle. Audit trail collapses.
+
+**E. One commit per milestone (end-of-milestone, single squashed commit)**
+- Pros: clean "this milestone did X" semantic. Bisects milestones, not
+  steps.
+- Cons: bisecting within a milestone is impossible. Hard to revert a
+  single cycle's findings. Loses finding-level audit trail entirely.
+
+**F. Hybrid: per-step implementation commits + per-finding fix commits + lifecycle-evidence meta-commit (current, informal)**
+- Pros: flexible, matches what reviewers expect.
+- Cons: ad-hoc, inconsistent across runs, produced the evidence-overwrite
+  + fixed_in-drift issues we saw.
+
+### Recommended strategy (proposed, not yet decided)
+
+A **strict four-tier commit policy** for the new watch system:
+
+1. **Per-step implementation commits.** One commit per step during the
+   runner's initial execution. Trivial steps may be grouped with the
+   next step (but document the grouping in the commit message:
+   `M<id>: S<step> + S<step+1> — both touch <feature>`).
+
+2. **Per-finding fix commits.** One commit per finding during
+   remediation cycles. NEVER group multiple findings in one commit
+   (this is what broke `fixed_in` metadata in M200 and M202).
+
+3. **Lifecycle evidence meta-commit.** One separate commit at the end
+   of each cycle with NO code changes — just records the milestone
+   state for that cycle. Must NOT touch `acceptance_criteria[].evidence`
+   fields (those are set by per-AC pass, see #4).
+
+4. **Per-AC evidence restoration.** Each AC's evidence is recorded
+   via `mp milestone criterion pass <AC> --evidence "..."` which writes
+   directly to the milestone JSON. NEVER overwrite via a generic
+   "summary" commit.
+
+5. **Resolve findings commit.** One `mp reviews finding resolve --commit <sha>`
+   per finding, grouped into a single commit per cycle. The `--commit`
+   argument for each finding points to the actual fix commit (#2),
+   NOT to the resolve commit (#5).
+
+### What the Drive milestone must enforce
+
+The runner contract for the new watch system should specify:
+- A `commit_strategy` field or similar, defaulting to the recommended
+  four-tier policy.
+- A pre-commit hook (or pre-push hook) that warns when a commit
+  touches both code AND `acceptance_criteria[].evidence` fields.
+- A `mp reviews finding resolve` validation that checks the `--commit`
+  SHA actually contains the fix (e.g., `git log --oneline <sha>^-1..<sha>`
+  mentions the finding ID).
+
+### Test this in the future Drive milestone
+
+A future re-run of this test (M200/M201/M202 with the strict
+four-tier policy) should verify:
+- Per-step commits are 1:1 with the spec (or documented grouping).
+- Per-finding commits are 1:1 with the reviewer's findings list.
+- Lifecycle-evidence commits don't touch evidence fields.
+- `fixed_in` resolves to the actual fix commit, not the resolve commit.
+
+
+---
+
+## 2026-09-01 ~23:50 — OPEN DECISION: milestone document structure
+
+The future "Drive milestone" / new mp watch should rework milestone
+documents so that ALL information about a single milestone lives in one
+place. Currently it's fragmented across multiple files.
+
+### Current state (fragmented)
+
+A single milestone's information is split across 4+ files:
+
+| Information | Current location | Discoverability |
+|---|---|---|
+| Milestone spec (intent, scope, ACs, steps) | `master-plan/milestones/<id>-*.json` | Easy — one file per milestone |
+| Findings (from reviews) | `master-plan/reviews.json` (global) | Hard — must filter by subject |
+| Challenge/review session records | `master-plan/reviews/challenges/<id>-*.json` | Medium — separate per-milestone folder |
+| Lifecycle transitions | `master-plan/activity.json` (global) | Hard — must filter by subject |
+| Execution log (what runner did, why) | nowhere | Lost |
+| Backlog items sourced from this milestone | `master-plan/backlog.json` (global) | Hard — must filter by source |
+| Decision references | `master-plan/decisions.json` (global) | Hard — must filter by milestone |
+
+For a milestone like M200, the agent has to grep 3+ files to find
+everything related to it. There's no single "place" to look.
+
+### User's requirement
+
+> "Keep all milestone information we could in a single 'place' — be it
+> a folder or a file. Like, aside the milestone itself, keep at the
+> same place the result of the rounds of code review, add comments
+> about the runner describing the execution, reporting issues or other
+> difficulties. And any other possible information like the status
+> and some log when the lifecycle changed. This kind of metadata
+> about the milestone."
+
+### Three options
+
+**Option A: Per-milestone folder (multiple JSONs, one folder per milestone)**
+
+```
+master-plan/
+  milestones/
+    M200-keybind-deconflict/
+      spec.json              # the milestone spec (currently in milestones/200-*.json)
+      findings.json          # all findings for this milestone (F-01..F-13)
+      runner_notes.json      # runner's commentary: what was hard, workarounds, surprises
+      lifecycle.json         # lifecycle transitions for this milestone
+      challenges.json        # challenge sessions (if any)
+      dependencies.json      # what blocks this milestone (planned)
+      backlog.json           # backlog items sourced from this milestone
+      decisions.json         # decision references for this milestone
+      reviews.json           # per-cycle review summaries (one entry per cycle)
+```
+
+- Pros:
+  - All milestone metadata in one discoverable place.
+  - One folder = one milestone. Easy to grep, copy, archive.
+  - Scales — adding a milestone adds a folder, not a new global file.
+  - Each file can be read/written independently (no merge conflicts on
+    unrelated fields).
+  - Backward-compatible transition: keep old `milestones/<id>-*.json`
+    files as `spec.json` until migration is complete.
+- Cons:
+  - More files (4-7 per milestone vs 1 today).
+  - `mp` CLI needs updates to know about the folder structure.
+
+**Option B: Single global JSON with all milestones**
+
+```
+master-plan/
+  milestones.json   # everything for all milestones
+```
+
+- Pros:
+  - Simplest. One file to read.
+  - Easy to query the whole plan at once.
+- Cons:
+  - File grows unboundedly (one entry per milestone × all metadata).
+  - Concurrent writes serialize behind one file lock.
+  - Hard to archive a single milestone (extract subtree).
+  - Hard to bisect "what changed for M200" in git (diff is huge).
+  - Single point of failure — corrupt one entry, lose everything.
+  - **REJECTED** based on the user's "single place PER MILESTONE" framing.
+
+**Option C: Extend current single file per milestone with embedded arrays**
+
+```
+master-plan/
+  milestones/
+    200-keybind-deconflict.json   # contains spec + findings + lifecycle + notes + ...
+```
+
+- Pros:
+  - Minimal structural change. Backward compatible.
+  - Single file per milestone.
+- Cons:
+  - File gets huge for milestones with many findings/cycles (M200 has
+    13 findings + 8 lifecycle entries + would-be runner notes = potentially
+    30+ entries in one JSON).
+  - Concurrent updates to different fields still serialize.
+  - Hard to read; the milestone spec is buried under metadata.
+
+### Recommended: Option A (per-milestone folder)
+
+The user explicitly said "a folder OR a file" — they're open to a folder.
+Option A is the most scalable, the most readable, and the most git-friendly
+(milestone-scoped diffs become natural).
+
+### Proposed schema for milestone folder
+
+Each milestone folder has the same shape:
+
+#### `spec.json` (required)
+The milestone's intent, scope, ACs, steps, lifecycle, execution_status.
+Equivalent to today's `milestones/<id>-*.json` minus the metadata
+arrays that move to dedicated files.
+
+```json
+{
+  "id": "200",
+  "slug": "keybind-deconflict-clean-defaults-for-the-upcoming-settings-2-0-surface",
+  "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
+  "lifecycle": "executed",
+  "execution_status": "done",
+  "spec_status": "implemented",
+  "lifecycle_at": "2026-08-31T21:31:18.768639+00:00",
+  "intent": { "outcome": "...", "rationale": "..." },
+  "problem": { "description": "..." },
+  "scope": { "in_scope": [...], "out_of_scope": [...] },
+  "design_decisions": [...],
+  "acceptance_criteria": [
+    { "id": "AC-01", "description": "...", "verification": "...",
+      "status": "passed", "evidence": "..." }
+  ],
+  "steps": [
+    { "id": "S1", "description": "...", "files": [...], "tests": "...",
+      "status": "done", "covers_ac": [...], "fixed_in": "..." }
+  ]
+}
+```
+
+#### `findings.json` (optional)
+All review findings for this milestone, scoped.
+
+```json
+{
+  "milestone": "200",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "spec-gap",
+      "description": "...",
+      "file_refs": ["crates/mp/src/config.rs:286-318"],
+      "status": "fixed",
+      "fixed_in": "63266db",
+      "resolved_at": "...",
+      "resolved_by": "runner-201",
+      "cycle": 1
+    }
+  ]
+}
+```
+
+#### `runner_notes.json` (optional, NEW)
+The runner's commentary on its own execution. Currently lost or in
+git commits only. Examples from M200/M201/M202 that would have been
+captured:
+
+- "cycle 1: skip-verify was needed because mp's argv-only verifier
+  rejected `&&` shell chains in AC verification. Real fix in commit
+  eb3b66d (collapse into single cargo nextest)."
+- "cycle 2: M201's spec_status=implemented for the F-06 fix got
+  overwritten by the 'cycle 2 complete' commit. Restored in cycle 3
+  via criterion pass calls."
+- "used `target/debug/mp` for plan-zone writes because the installed
+  `/opt/homebrew/bin/mp` was stale and silently dropped M202 flow_stages
+  via serde."
+
+```json
+{
+  "milestone": "200",
+  "notes": [
+    {
+      "cycle": 1,
+      "role": "runner",
+      "lane": "runner-200",
+      "timestamp": "...",
+      "kind": "workaround",
+      "body": "Used --skip-verify because mp's argv-only verifier rejects && chains in AC verification."
+    },
+    {
+      "cycle": 2,
+      "role": "runner",
+      "lane": "runner-200",
+      "timestamp": "...",
+      "kind": "surprise",
+      "body": "F-06 fix overwrote per-AC evidence with a generic string. Restored in cycle 3."
+    }
+  ]
+}
+```
+
+Note kinds: `workaround`, `surprise`, `blocker`, `escalation`,
+`question`, `decision`.
+
+#### `lifecycle.json` (optional)
+Lifecycle transitions for this milestone, extracted from the global
+activity.json.
+
+```json
+{
+  "milestone": "200",
+  "transitions": [
+    { "from": "approved", "to": "in-progress", "at": "2026-08-31T16:19:23Z", "by": "runner-200" },
+    { "from": "in-progress", "to": "executed", "at": "2026-08-31T18:59:07Z", "by": "runner-200" },
+    { "from": "executed", "to": "remediation", "at": "2026-08-31T19:25:19Z", "by": "reviewer-200" }
+  ]
+}
+```
+
+#### `dependencies.json` (optional)
+What blocks this milestone (planned dependencies).
+
+```json
+{
+  "milestone": "200",
+  "blocks": ["M201"],   // milestones this one unblocks
+  "blocked_by": []      // milestones that must complete first
+}
+```
+
+#### `reviews.json` (optional, per-cycle summary)
+One entry per review cycle. The detailed findings live in
+`findings.json`.
+
+```json
+{
+  "milestone": "200",
+  "cycles": [
+    {
+      "cycle": 1,
+      "reviewer": "reviewer-200",
+      "started_at": "...",
+      "completed_at": "...",
+      "verdict": "changes-needed",
+      "findings_filed": 5,
+      "findings_resolved": 0
+    }
+  ]
+}
+```
+
+### Migration plan
+
+The transition from current structure to folder-per-milestone should
+happen in three phases:
+
+1. **Phase 1: Add folder support alongside current files.**
+   - `mp` reads either `<id>-*.json` OR `<id>/spec.json`.
+   - New writes go to `<id>/spec.json`.
+   - Backward-compatible: old files still work.
+
+2. **Phase 2: Migrate findings + lifecycle.**
+   - For each existing milestone, copy findings from `reviews.json`
+     into `<id>/findings.json`.
+   - Copy lifecycle transitions from `activity.json` into
+     `<id>/lifecycle.json`.
+   - `reviews.json` becomes a global index (subject + finding count + link to per-milestone files).
+   - `activity.json` becomes a global event log (less per-milestone state).
+
+3. **Phase 3: Deprecate old structure.**
+   - `reviews.json` is now just an index.
+   - `activity.json` is now just an event log (lifecycle transitions
+     may still go here OR migrate per-milestone).
+   - Per-milestone folders are the source of truth.
+
+### What this enables
+
+- **One-grep discovery** for any milestone's metadata.
+- **Per-milestone git diffs** — easier to review and bisect.
+- **Per-milestone archival** — close out a milestone by moving its
+  folder to `master-plan/archive/milestones/<id>/`.
+- **Runner notes preserved** — currently lost when the runner's
+  context window rolls over.
+- **Future Drive milestone** can use `runner_notes.json` to
+  surface WHY decisions were made, not just WHAT happened.
+
+### What the Drive milestone must enforce
+
+- The runner's contract should require `runner_notes.json` entries for:
+  - Workarounds (any deviation from the spec)
+  - Surprises (anything that violated expectations)
+  - Blockers (anything that prevented completing a step)
+  - Decisions (any judgment call that wasn't in the spec)
+- The reviewer can append to `runner_notes.json` too (e.g., "this finding
+  is high because the spec is misleading").
+- The orchestrator reads `runner_notes.json` after each cycle to inform
+  cycle-count decisions (e.g., a note "this is the third time this
+  regex broke" might trigger escalation).
+

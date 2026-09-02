@@ -659,6 +659,7 @@ pub fn migrate_kinds(plan_dir: &Path, dry_run: bool) -> Result<KindsMigrationRep
                 status: item.status.clone(),
                 resolution: String::new(),
                 resolved_at: String::new(),
+                created: item.created.clone(),
             });
             report.from_bugfix += 1;
         }
@@ -689,6 +690,7 @@ pub fn migrate_kinds(plan_dir: &Path, dry_run: bool) -> Result<KindsMigrationRep
                 status: item.status.clone(),
                 resolution: String::new(),
                 resolved_at: String::new(),
+                created: item.created.clone(),
             });
             report.from_tweak += 1;
         }
@@ -720,6 +722,7 @@ pub fn migrate_kinds(plan_dir: &Path, dry_run: bool) -> Result<KindsMigrationRep
                 status: entry.status.clone(),
                 resolution: String::new(),
                 resolved_at: String::new(),
+                created: entry.created.clone(),
             });
             report.from_ideas += 1;
         }

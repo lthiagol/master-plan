@@ -3,8 +3,8 @@
     "id": "202",
     "title": "mp milestone per-stage mp-flow tracker + raul Stage column",
     "slug": "mp-milestone-per-stage-mp-flow-tracker-raul-stage-column",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -23,7 +23,25 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "runner-202",
-    "lifecycle_at": "2026-09-01T23:26:23.893472+00:00"
+    "lifecycle_at": "2026-09-01T23:26:23.893472+00:00",
+    "flow_stages": {
+      "complete": {
+        "status": "done",
+        "at": "2026-09-01T23:59:42.004337+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-01T23:59:42.004337+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-01T23:59:42.045350+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-01T23:59:42.004337+00:00"
+      }
+    }
   },
   "intent": {
     "outcome": "Every milestone carries a per-stage map of the 12 mp-flow stages. The raul Milestones list replaces the 8-cell lifecycle gauge with a single Stage column (`5/12 · Claim & execute`); the MilestoneDetail view gains a Stages checklist. Lifecycle writers auto-derive the canonical stage transitions; agents can override via `mp milestone stage set`. After this lands, a handoff agent can read `mp show milestone <id>` and know exactly which mp-flow stage the milestone is in."

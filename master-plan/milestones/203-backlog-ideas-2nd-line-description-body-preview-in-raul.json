@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-08-29",
-    "updated": "2026-08-30",
+    "updated": "2026-09-02",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -59,8 +59,8 @@
       "id": "AC-01",
       "description": "BacklogItem gains `created: String` field with `#[serde(default)]`. Legacy backlog.json items without the field load fine; round-trip serde preserves an empty string.",
       "verification": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/backlog_item_serde_round_trip_with_created_field|legacy_backlog_item_loads_without_created/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E 'test(/backlog_item_serde_round_trip_with_created_field|legacy_backlog_item_loads_without_created/)' exit 0 (2/2 pass)"
     },
     {
       "id": "AC-02",
@@ -202,7 +202,7 @@
       ],
       "tests": "cargo nextest run -p mp --test lifecycle_setter_overlay --no-fail-fast -E test(/backlog_item_serde_round_trip_with_created_field|legacy_backlog_item_loads_without_created/)",
       "done_when": "BacklogItem has created String field with serde default; both named tests pass; cargo nextest exits 0",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],

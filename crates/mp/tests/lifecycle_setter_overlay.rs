@@ -1346,3 +1346,76 @@ fn explicit_stage_set_survives_subsequent_lifecycle_transition() {
         flow_after["external-review"]["status"]
     );
 }
+
+// ── M203 AC-01: BacklogItem.created field with serde default ──────────────
+//
+// Legacy backlog.json files have no `created` field. With `#[serde(default)]`
+// on the new field, deserialization must succeed (loading empty string) and
+// round-trip must preserve the empty string for legacy items. New items
+// round-trip with the explicit value.
+
+#[test]
+fn legacy_backlog_item_loads_without_created() {
+    // Pre-M203 on-disk shape: a BacklogItem JSON object with NO `created`
+    // field. serde_json::from_str must load it without error and the
+    // `created` field defaults to "".
+    let legacy_json = r#"{
+        "id": "B-99",
+        "description": "Legacy backlog item",
+        "source": "",
+        "suggested_when": "",
+        "priority": "",
+        "status": "",
+        "resolution": "",
+        "resolved_at": ""
+    }"#;
+    let item: mp_model::BacklogItem =
+        serde_json::from_str(legacy_json).expect("legacy backlog item must load without `created`");
+    assert_eq!(
+        item.created, "",
+        "legacy item must default `created` to empty string; got: {:?}",
+        item.created
+    );
+    assert_eq!(item.id, "B-99");
+}
+
+#[test]
+fn backlog_item_serde_round_trip_with_created_field() {
+    // Post-M203 on-disk shape: explicit `created` value. Round-trip must
+    // preserve the value (non-empty).
+    let item = mp_model::BacklogItem {
+        id: "B-100".to_string(),
+        description: "Newly added".to_string(),
+        source: String::new(),
+        suggested_when: String::new(),
+        priority: String::new(),
+        status: String::new(),
+        resolution: String::new(),
+        resolved_at: String::new(),
+        created: "2026-09-02".to_string(),
+    };
+    let serialized = serde_json::to_value(&item).expect("serialize");
+    assert_eq!(
+        serialized["created"], "2026-09-02",
+        "serialize must preserve `created`; got: {serialized}"
+    );
+    let round: mp_model::BacklogItem =
+        serde_json::from_value(serialized).expect("deserialize");
+    assert_eq!(round.created, "2026-09-02");
+    assert_eq!(round.id, "B-100");
+
+    // Legacy → round-trip → empty string preserved.
+    let legacy_json = r#"{
+        "id": "B-101",
+        "description": "legacy",
+        "status": ""
+    }"#;
+    let legacy: mp_model::BacklogItem = serde_json::from_str(legacy_json).unwrap();
+    let reserialized = serde_json::to_string(&legacy).unwrap();
+    let reloaded: mp_model::BacklogItem = serde_json::from_str(&reserialized).unwrap();
+    assert_eq!(
+        reloaded.created, "",
+        "round-trip must preserve empty `created` for legacy items; got: {:?}",
+        reloaded.created
+    );
+}

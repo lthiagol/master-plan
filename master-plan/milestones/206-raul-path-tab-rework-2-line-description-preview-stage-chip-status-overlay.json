@@ -3,8 +3,8 @@
     "id": "206",
     "title": "raul Path tab rework — 2-line description preview + stage chip + status overlay",
     "slug": "raul-path-tab-rework-2-line-description-preview-stage-chip-status-overlay",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -25,25 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T03:02:06.421312+00:00",
-    "flow_stages": {
-      "execute": {
-        "status": "done",
-        "at": "2026-09-02T03:06:31.255573+00:00"
-      },
-      "re-review": {
-        "status": "done",
-        "at": "2026-09-02T03:02:06.421314+00:00"
-      },
-      "remediate": {
-        "status": "done",
-        "at": "2026-09-02T03:02:06.421314+00:00"
-      },
-      "self-review": {
-        "status": "done",
-        "at": "2026-09-02T03:06:31.255573+00:00"
-      }
-    }
+    "lifecycle_at": "2026-09-02T03:02:06.421312+00:00"
   },
   "intent": {
     "outcome": "Every milestone in the raul Path tab renders as 2 visual lines: a title line carrying the id, title, current mp-flow stage chip (`[N/12]` from M202's flow_stages), priority glyph, age, and (when set) a status overlay chip for blocked / cancelled / deferred; plus a preview line carrying the first line of `intent.outcome` truncated to ~80 chars with a `↳` prefix. The tree structure (trunk + branches + blocked fork) is preserved. Operators scanning the Path tree see what each milestone is about without opening detail."

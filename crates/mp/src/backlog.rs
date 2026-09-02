@@ -26,6 +26,7 @@ pub fn backlog_add(
         status: "active".to_string(),
         resolution: String::new(),
         resolved_at: String::new(),
+        created: store::today(),
     };
     backlog.items.push(item.clone());
     store::write_backlog(ctx, &backlog)?;
