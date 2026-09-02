@@ -575,6 +575,18 @@ pub struct App {
     /// M186: per-lane substring search against id+title (empty = all).
     /// Survives lane switches; cleared on raul restart.
     pub lane_search: std::collections::HashMap<Lane, String>,
+    /// M204: per-lane filter state loaded from
+    /// `ProjectConfig.filter` at TUI launch. The structure is
+    /// `lane → dimension → set of values`, mirroring the on-disk
+    /// shape. Survives lane switches; mutations mark the lane
+    /// dirty (see [`App::mark_filter_dirty`]) so the debounced
+    /// flush writes them back. Empty lane entries are equivalent
+    /// to "no filter" — `visible_milestones` / `visible_backlog`
+    /// skip the per-dimension `retain` when the lane is empty.
+    pub lane_filters: std::collections::HashMap<
+        Lane,
+        std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    >,
     /// M154: `[review].hunk` flag read from mp config at startup.
     /// When true, the milestone detail view shows the "hunk export:
     /// on (N anchored)" indicator. Loaded once via `UiConfig::load`;
@@ -685,6 +697,28 @@ pub struct App {
     /// Plan directory used by the Watch poller to refresh its bounded log cache.
     /// Defaults to `.` for tests and callers that do not override it.
     pub plan_dir: std::path::PathBuf,
+    /// M204: pending `mp config set sort.<lane> <key>` writes that
+    /// haven't been flushed to disk yet. Keyed by the canonical
+    /// lane label (`milestones` / `backlog` / `ideas`). Sorted
+    /// so iteration is deterministic for tests.
+    pub pending_sort_writes: std::collections::BTreeMap<String, String>,
+    /// M204: pending `mp config set filter.<lane> <json>` writes
+    /// that haven't been flushed. The structure mirrors
+    /// `ProjectConfig.filter` — `lane → dimension → set of
+    /// values` — so the flush produces the exact same on-disk
+    /// shape that the explicit set path would.
+    pub pending_filter_writes:
+        std::collections::BTreeMap<String, std::collections::BTreeMap<String, std::collections::BTreeSet<String>>>,
+    /// M204: timestamp of the most recent mark-dirty call. The
+    /// flush window is `now - last_pending_change_at >= 500ms`;
+    /// within that window new mutations keep coalescing into the
+    /// same write. `None` when no writes are pending.
+    pub last_pending_change_at: Option<std::time::Instant>,
+    /// M204: total number of disk writes performed by the
+    /// debounced flush path. Test-only observation — production
+    /// code never reads this; tests use it to assert coalescing
+    /// (e.g. 100 rapid toggles → 1 disk write).
+    pub debounced_write_count: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -734,6 +768,7 @@ impl App {
             hide_done: false,
             milestone_filter: std::collections::BTreeSet::new(),
             lane_search: std::collections::HashMap::new(),
+            lane_filters: std::collections::HashMap::new(),
             review_hunk_enabled: false,
             show_watch_tab: false,
             quitting: false,
@@ -774,6 +809,10 @@ impl App {
             watch: crate::tui::watch::Watch::empty(),
             watch_poller: crate::tui::watch::Poller::new(),
             plan_dir: std::path::PathBuf::from("."),
+            pending_sort_writes: std::collections::BTreeMap::new(),
+            pending_filter_writes: std::collections::BTreeMap::new(),
+            last_pending_change_at: None,
+            debounced_write_count: 0,
         }
     }
 
@@ -1988,6 +2027,123 @@ impl App {
         if !Lane::ordered_visible(self.show_watch_tab).contains(&self.active_lane) {
             self.active_lane = Lane::Overview;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // M204: debounced config writes
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// M204: mark the active lane's sort key as pending a
+    /// `mp config set sort.<lane> <key>` write. Repeated calls
+    /// within the debounce window coalesce into a single write
+    /// (the most recent key wins, since the user is *changing* the
+    /// sort and the last value is the one that should land on
+    /// disk).
+    pub fn mark_sort_dirty(&mut self, lane: Lane, key: String) {
+        let label = crate::tui::runner_helpers::match_lane_label(&lane);
+        self.pending_sort_writes.insert(label, key);
+        self.last_pending_change_at = Some(std::time::Instant::now());
+        self.touch();
+    }
+
+    /// M204: mark the active lane's filter state as pending a
+    /// `mp config set filter.<lane> <json>` write. The current
+    /// `lane_filters` snapshot is what gets persisted — calling
+    /// this twice in a row writes the *most recent* filter set,
+    /// not the union (filter toggles flip individual values, so
+    /// the last write carries the user's final selection).
+    pub fn mark_filter_dirty(&mut self, lane: Lane) {
+        let label = crate::tui::runner_helpers::match_lane_label(&lane);
+        let dims = self
+            .lane_filters
+            .get(&lane)
+            .cloned()
+            .unwrap_or_default();
+        if dims.is_empty() {
+            self.pending_filter_writes.remove(&label);
+        } else {
+            self.pending_filter_writes.insert(label, dims);
+        }
+        self.last_pending_change_at = Some(std::time::Instant::now());
+        self.touch();
+    }
+
+    /// M204: flush pending config writes if the debounce window
+    /// has elapsed. Returns `true` when at least one disk write
+    /// fired (so the on_idle hook can avoid the next render until
+    /// the flush settles). The `now` argument is injected so
+    /// tests can drive the clock deterministically; production
+    /// callers pass `std::time::Instant::now()`.
+    ///
+    /// `writer` is the side-effect seam — production wires it to
+    /// `MpRunner::run_raw`; tests pass a counting closure to
+    /// pin the coalescing behavior. The closure receives the
+    /// config key (e.g. `sort.milestones`) and value (the sort
+    /// key label or the JSON-encoded filter dimensions).
+    pub fn flush_pending_writes_if_due<W, E>(
+        &mut self,
+        debounce: std::time::Duration,
+        now: std::time::Instant,
+        mut writer: W,
+    ) -> std::result::Result<bool, E>
+    where
+        W: FnMut(&str, &str) -> std::result::Result<(), E>,
+    {
+        let Some(last) = self.last_pending_change_at else {
+            return Ok(false);
+        };
+        if now.saturating_duration_since(last) < debounce {
+            return Ok(false);
+        }
+        // Snapshot and clear so re-entrancy / new mutations during
+        // the writer call start a fresh debounce window.
+        let sort_writes = std::mem::take(&mut self.pending_sort_writes);
+        let filter_writes = std::mem::take(&mut self.pending_filter_writes);
+        self.last_pending_change_at = None;
+        let mut fired = false;
+        for (lane, key) in &sort_writes {
+            let config_key = format!("sort.{lane}");
+            writer(&config_key, key)?;
+            fired = true;
+        }
+        for (lane, dims) in &filter_writes {
+            let config_key = format!("filter.{lane}");
+            let json = serde_json::to_string(dims)
+                .map_err(|e| -> E { panic!("filter serialize: {e}") })?;
+            writer(&config_key, &json)?;
+            fired = true;
+        }
+        if fired {
+            self.debounced_write_count = self.debounced_write_count.saturating_add(1);
+        }
+        Ok(fired)
+    }
+
+    /// M204: force-flush all pending writes regardless of the
+    /// debounce window. Called on quit so a final keypress still
+    /// lands on disk. Same `writer` seam as
+    /// [`flush_pending_writes_if_due`].
+    pub fn flush_pending_writes_now<W, E>(&mut self, mut writer: W) -> std::result::Result<(), E>
+    where
+        W: FnMut(&str, &str) -> std::result::Result<(), E>,
+    {
+        let sort_writes = std::mem::take(&mut self.pending_sort_writes);
+        let filter_writes = std::mem::take(&mut self.pending_filter_writes);
+        self.last_pending_change_at = None;
+        for (lane, key) in &sort_writes {
+            let config_key = format!("sort.{lane}");
+            writer(&config_key, key)?;
+        }
+        for (lane, dims) in &filter_writes {
+            let config_key = format!("filter.{lane}");
+            let json = serde_json::to_string(dims)
+                .map_err(|e| -> E { panic!("filter serialize: {e}") })?;
+            writer(&config_key, &json)?;
+        }
+        if !sort_writes.is_empty() || !filter_writes.is_empty() {
+            self.debounced_write_count = self.debounced_write_count.saturating_add(1);
+        }
+        Ok(())
     }
 }
 

@@ -1,4 +1,6 @@
 //! M185 AC-05: title bar chip for Milestones filter.
+//! M204 AC-02: debounced sort/filter writes (test names pinned
+//! here per the S2 step's `tests` field).
 
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
@@ -1432,4 +1434,164 @@ fn render_preview_visible_chars(preview: &str, w: u16, h: u16) -> String {
         .map(|x| buf[(x, title_y + 1)].symbol().to_string())
         .collect();
     preview_row
+}
+
+// ─── M204 AC-02: debounced sort/filter writes ────────────────────────────────
+
+/// M204 AC-02: a single sort/filter mutation reaches disk within 1s
+/// of the mutation, not on the next on_idle tick alone. The
+/// debounce window is 500ms; the test pins the seam
+/// `flush_pending_writes_if_due` with an injected clock.
+#[test]
+fn debounced_save_writes_within_one_second() {
+    let mut app = App::new();
+    let baseline = std::time::Instant::now();
+    app.mark_sort_dirty(Lane::Milestones, "priority".to_string());
+    assert!(
+        app.last_pending_change_at.is_some(),
+        "mark_sort_dirty must stamp last_pending_change_at"
+    );
+
+    // Within the debounce window — must NOT fire.
+    let within = baseline
+        .checked_add(std::time::Duration::from_millis(100))
+        .unwrap();
+    let calls = std::cell::RefCell::new(Vec::<(String, String)>::new());
+    let fired = app
+        .flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            within,
+            |key, value| {
+                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                Ok::<(), ()>(())
+            },
+        )
+        .unwrap();
+    assert!(!fired, "writes must not fire before debounce elapses");
+    assert!(calls.borrow().is_empty(), "no writes yet");
+
+    // After the debounce elapses — must fire exactly once.
+    let after = baseline
+        .checked_add(std::time::Duration::from_millis(600))
+        .unwrap();
+    let fired = app
+        .flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            after,
+            |key, value| {
+                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                Ok::<(), ()>(())
+            },
+        )
+        .unwrap();
+    assert!(fired, "writes must fire after debounce elapses");
+    let calls = calls.borrow();
+    assert_eq!(calls.len(), 1, "exactly one write per flush");
+    assert_eq!(calls[0].0, "sort.milestones");
+    assert_eq!(calls[0].1, "priority");
+    assert_eq!(
+        app.debounced_write_count, 1,
+        "write counter must increment"
+    );
+}
+
+/// M204 AC-02: 100 rapid filter mutations within the debounce
+/// window coalesce into a single disk write. Per the spec:
+/// "100 rapid filter toggles → 1 disk write". The
+/// `mark_filter_dirty` call snapshots the current `lane_filters`
+/// into `pending_filter_writes`; repeated calls within the window
+/// overwrite, not accumulate, so the on-disk JSON reflects the
+/// most recent user selection.
+#[test]
+fn rapid_filter_toggles_coalesce_to_single_write() {
+    let mut app = App::new();
+    // Seed a small lane_filter so the mark-dirty call has something
+    // to persist.
+    let mut dims: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        std::collections::BTreeMap::new();
+    dims.insert(
+        "lifecycle".to_string(),
+        std::collections::BTreeSet::from(["approved".to_string()]),
+    );
+    app.lane_filters.insert(Lane::Milestones, dims);
+
+    // 100 rapid filter mutations, all within the debounce window.
+    let t0 = std::time::Instant::now();
+    for i in 0..100 {
+        // Mutate the in-memory filter (toggling a value), then mark
+        // dirty. The last mark wins; the debounce coalesces all 100
+        // into one write.
+        if i % 2 == 0 {
+            let entry = app
+                .lane_filters
+                .entry(Lane::Milestones)
+                .or_default()
+                .entry("lifecycle".to_string())
+                .or_default();
+            entry.insert("in-progress".to_string());
+        } else {
+            let entry = app
+                .lane_filters
+                .entry(Lane::Milestones)
+                .or_default()
+                .entry("lifecycle".to_string())
+                .or_default();
+            entry.remove("in-progress");
+        }
+        app.mark_filter_dirty(Lane::Milestones);
+    }
+    // Sanity: the pending write state has a single Milestones entry
+    // (the 100 marks coalesce in-memory too — `mark_filter_dirty`
+    // overwrites per-lane with the most recent snapshot).
+    assert_eq!(app.pending_filter_writes.len(), 1);
+    assert!(app.pending_filter_writes.contains_key("milestones"));
+
+    // Try to flush before the window — must not fire.
+    let within = t0
+        .checked_add(std::time::Duration::from_millis(50))
+        .unwrap();
+    let calls = std::cell::RefCell::new(Vec::<(String, String)>::new());
+    let _ = app
+        .flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            within,
+            |key, value| {
+                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                Ok::<(), ()>(())
+            },
+        )
+        .unwrap();
+    assert!(
+        calls.borrow().is_empty(),
+        "100 mutations must not fire before debounce"
+    );
+
+    // After the window — exactly one disk write.
+    let after = t0
+        .checked_add(std::time::Duration::from_millis(700))
+        .unwrap();
+    let fired = app
+        .flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            after,
+            |key, value| {
+                calls.borrow_mut().push((key.to_string(), value.to_string()));
+                Ok::<(), ()>(())
+            },
+        )
+        .unwrap();
+    assert!(fired);
+    let calls = calls.borrow();
+    assert_eq!(
+        calls.len(),
+        1,
+        "100 rapid filter mutations must coalesce into 1 disk write; got {:?}",
+        calls.clone()
+    );
+    assert_eq!(calls[0].0, "filter.milestones");
+    let parsed: serde_json::Value = serde_json::from_str(&calls[0].1).unwrap();
+    let lc = parsed["lifecycle"]
+        .as_array()
+        .expect("lifecycle must be a JSON array");
+    assert!(lc.iter().any(|v| v.as_str() == Some("approved")));
 }

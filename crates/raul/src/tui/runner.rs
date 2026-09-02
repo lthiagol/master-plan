@@ -435,7 +435,37 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
             app.watch_poller = poller;
             result?;
         }
+        // M204: debounced flush — write pending sort/filter changes
+        // through `mp config set` once the 500ms window has elapsed.
+        // The `on_idle` hook fires on every loop iteration, so the
+        // worst-case latency from last mutation to disk is one
+        // iteration (~16ms in the smooth frame path, longer when the
+        // TUI is idle). A real TUI call never blocks the event loop —
+        // the debounce coalesces 100 rapid filter toggles into a
+        // single `mp config set filter.<lane>` round-trip.
+        let now = std::time::Instant::now();
+        let _ = app.flush_pending_writes_if_due(
+            std::time::Duration::from_millis(500),
+            now,
+            |key, value| {
+                runner
+                    .run_raw("config", &["set", key, value])
+                    .map(|_| ())
+            },
+        );
         Ok(())
+    };
+    // M204: quit-flush — force any pending sort/filter writes
+    // through `mp config set` so a quit right after a mutation
+    // still lands the value on disk. The on_idle path runs the
+    // debounced flush, but the loop may exit before the window
+    // elapses (a `q` pressed immediately after a key change).
+    let on_quit = move |app: &mut App| {
+        let _ = app.flush_pending_writes_now(|key, value| {
+            runner
+                .run_raw("config", &["set", key, value])
+                .map(|_| ())
+        });
     };
     run_loop(
         &mut terminal,
@@ -445,6 +475,7 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
         &mut source,
         |app, event, term_size| dispatch_event(app, runner, event, term_size),
         on_idle,
+        on_quit,
     )
 }
 
@@ -468,7 +499,12 @@ pub(crate) fn fire_watch_tick(_app: &mut App, _runner: &MpRunner) -> Result<()> 
 ///
 /// The closure form keeps the loop independent of `MpRunner`; the idle hook
 /// polls Watch state when its deadline expires.
-pub fn run_loop<B, E, F, I>(
+///
+/// `on_quit` is invoked on every quit path (top-of-loop check and the
+/// drained-events check). The hook runs while `app` is still mutably
+/// borrowed, so it can perform any final flushes (e.g. M204's
+/// `App::flush_pending_writes_now`).
+pub fn run_loop<B, E, F, I, Q>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     frame_clock: &mut FrameClock,
@@ -476,12 +512,14 @@ pub fn run_loop<B, E, F, I>(
     source: &mut E,
     mut dispatch: F,
     on_idle: I,
+    mut on_quit: Q,
 ) -> Result<()>
 where
     B: Backend,
     E: EventSource,
     F: FnMut(&mut App, CrosstermEvent, (u16, u16)) -> Result<()>,
     I: FnMut(&mut App) -> Result<()>,
+    Q: FnMut(&mut App),
 {
     let mut needs_render = true;
     let mut on_idle = on_idle;
@@ -500,6 +538,7 @@ where
         }
 
         if app.quitting {
+            on_quit(app);
             break;
         }
 
@@ -558,6 +597,7 @@ where
             // out now instead of sleeping out the interval and rendering one
             // extra frame before the next iteration's quit check fires.
             if app.quitting {
+                on_quit(app);
                 break;
             }
             let remaining = frame_clock.time_until_ready();

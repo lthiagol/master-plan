@@ -71,8 +71,8 @@
       "id": "AC-02",
       "description": "Debounced save writes `sort.<lane>` (on cycle o) and `filter.<lane>` within 1 second of the last change. Rapid filter toggles coalesce into a single disk write. Sort-rebind confirm keeps its existing immediate write.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/debounced_save_writes_within_one_second|rapid_filter_toggles_coalesce_to_single_write/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/debounced_save_writes_within_one_second|rapid_filter_toggles_coalesce_to_single_write/) exit 0 (2/2 pass)"
     },
     {
       "id": "AC-03",
@@ -278,7 +278,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_milestones_title_chip --no-fail-fast -E test(/debounced_save_writes_within_one_second|rapid_filter_toggles_coalesce_to_single_write/)",
       "done_when": "debounced_save_writes_within_one_second and rapid_filter_toggles_coalesce_to_single_write tests pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
