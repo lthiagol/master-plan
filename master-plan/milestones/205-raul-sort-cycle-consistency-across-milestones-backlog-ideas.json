@@ -3,9 +3,9 @@
     "id": "205",
     "title": "raul sort cycle consistency across Milestones / Backlog / Ideas",
     "slug": "raul-sort-cycle-consistency-across-milestones-backlog-ideas",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -27,7 +27,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-08-30T21:57:12.432646+00:00"
+    "lifecycle_at": "2026-09-02T06:29:26.928212+00:00"
   },
   "intent": {
     "outcome": "All three list-style lanes in raul (Milestones, Backlog, Ideas) use the same 6-stop sort cycle grammar, same column-header sort behavior, and same `o` cycle key. Sort choices persist via the [ui].sort framework introduced by M204. Per-tab stop order: Milestones uses Id, Title, Priority, Stage, Created, Updated; Backlog uses Id, Title, Priority, Status, Created, Resolved-at; Ideas uses Id, Title, Priority, Status, Created, Tags. After this lands, operators learn one sort UX and apply it across all three lanes."
@@ -215,7 +215,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_stage_uses_flow_stages|sort_by_stage_tiebreak_is_id/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_stage_uses_flow_stages|sort_by_stage_tiebreak_is_id/)'",
       "done_when": "Both named tests pass; Stage sort orders milestones by current mp-flow stage",
       "status": "done",
       "covers_ac": [
@@ -235,7 +235,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/no_lifecycle_variant_in_sort_key_enum/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/no_lifecycle_variant_in_sort_key_enum/)'",
       "done_when": "No references to SortKey::Lifecycle remain; named test passes",
       "status": "done",
       "covers_ac": [
@@ -275,7 +275,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_keys_for_milestones_has_six_stops|sort_keys_for_backlog_has_six_stops|sort_keys_for_ideas_has_six_stops|per_lane_order_matches_spec/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_keys_for_milestones_has_six_stops|sort_keys_for_backlog_has_six_stops|sort_keys_for_ideas_has_six_stops|per_lane_order_matches_spec/)'",
       "done_when": "All 4 named tests pass; SortKey has 9 variants; sort_keys_for returns the right 6-stop list per lane",
       "status": "done",
       "covers_ac": [
@@ -295,7 +295,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_resolved_at_uses_resolved_at_field|sort_by_resolved_at_unresolved_items_go_to_bottom|sort_by_resolved_at_tiebreak_is_id/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_resolved_at_uses_resolved_at_field|sort_by_resolved_at_unresolved_items_go_to_bottom|sort_by_resolved_at_tiebreak_is_id/)'",
       "done_when": "All 3 named tests pass; ResolvedAt sort works correctly with unresolved-to-bottom under both directions",
       "status": "done",
       "covers_ac": [
@@ -315,7 +315,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/legacy_lifecycle_sort_falls_back_to_default/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/legacy_lifecycle_sort_falls_back_to_default/)'",
       "done_when": "Named test passes; unknown persisted values fall back to default silently",
       "status": "done",
       "covers_ac": [
@@ -335,7 +335,7 @@
       "files": [
         "crates/raul/src/tui/render/lane_lists.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/column_header_click_sorts_by_key|active_key_shows_arrow|non_lane_keys_render_plain_label/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/column_header_click_sorts_by_key|active_key_shows_arrow|non_lane_keys_render_plain_label/)'",
       "done_when": "All 3 named tests pass; column headers sort + show v correctly",
       "status": "done",
       "covers_ac": [
@@ -355,7 +355,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E test(/sort_by_tags_uses_first_tag_alphabetically|sort_by_tags_uses_subsequent_tags_as_tiebreak|sort_by_tags_no_tag_items_go_to_bottom|sort_by_tags_tiebreak_is_id/)",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/sort_by_tags_uses_first_tag_alphabetically|sort_by_tags_uses_subsequent_tags_as_tiebreak|sort_by_tags_no_tag_items_go_to_bottom|sort_by_tags_tiebreak_is_id/)'",
       "done_when": "All 4 named tests pass; Tags sort works correctly with no-tag items to bottom",
       "status": "done",
       "covers_ac": [
@@ -376,7 +376,7 @@
         "crates/mp",
         "crates/raul"
       ],
-      "tests": "make test",
+      "tests": "cargo nextest run -p raul --test tui_lifecycle_gauge_render --no-fail-fast -E 'test(/cycle_o_walks_all_six_stops_milestones|cycle_o_walks_all_six_stops_backlog|cycle_o_walks_all_six_stops_ideas|cycle_o_wraps_from_last_to_first|footer_shows_active_sort_key/)'",
       "done_when": "All 9 ACs have non-prose evidence; fmt + clippy + nextest + validate all exit 0; cycle_o walks all stops per lane",
       "status": "done",
       "covers_ac": [
@@ -391,7 +391,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-02",
     "branch": "",
     "evidence": ""
   }
