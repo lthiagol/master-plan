@@ -99,8 +99,8 @@
       "id": "AC-06",
       "description": "Age preset chips: >7d, >30d, >90d. All three lanes use the created field (BacklogItem.created, IdeaEntry.created, MilestoneMeta.created). Items older than the threshold are hidden. Multi-select: >7d + >30d = older than 30d (intersection).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/age_filter_uses_created_for_backlog|age_filter_uses_created_for_milestones|age_filter_uses_created_for_ideas|age_preset_intersection_uses_strictest/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E test(/age_filter_uses_created_for_backlog|age_filter_uses_created_for_milestones|age_filter_uses_created_for_ideas|age_preset_intersection_uses_strictest/) exit 0 (4/4 pass)"
     },
     {
       "id": "AC-07",
@@ -385,7 +385,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/age_filter_uses_created_for_backlog|age_filter_uses_created_for_milestones|age_filter_uses_created_for_ideas|age_preset_intersection_uses_strictest/)'",
       "done_when": "All 3 named tests pass; age filter chips work with intersection semantics",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],

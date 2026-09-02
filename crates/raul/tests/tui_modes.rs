@@ -108,6 +108,9 @@ fn mode_enum_has_seven_variants() {
             }) => "ReviewMenu",
             Mode::LifecycleFilter(_) => "LifecycleFilter",
             Mode::SearchInput(_) => "SearchInput",
+            // M204: unified per-lane filter modal — bucketed
+            // with the legacy lifecycle filter for tests.
+            Mode::Filter(_) => "Filter",
         }
     }
     assert_eq!(exhaustive(Mode::Normal), "Normal");
@@ -231,6 +234,16 @@ fn actions_have_required_variants() {
             | Action::SearchInputCommit
             | Action::SearchInputCancel
             | Action::CycleSortNext => "M186",
+            // M204: unified filter modal + chip management.
+            Action::OpenFilter
+            | Action::OpenFilterWithGroomingPreset
+            | Action::FilterPrev
+            | Action::FilterNext
+            | Action::FilterToggle
+            | Action::FilterCommit
+            | Action::FilterCancel
+            | Action::ClearFilters
+            | Action::RemoveFilterChip { .. } => "M204Filter",
             // Force exhaustiveness — must compile, must use every variant.
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",

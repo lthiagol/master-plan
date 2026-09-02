@@ -1191,7 +1191,18 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::SearchInputBackspace
             | Action::SearchInputCommit
             | Action::SearchInputCancel
-            | Action::CycleSortNext => {
+            | Action::CycleSortNext
+            // M204: unified filter modal + chip management
+            // — bucketed with the M136 "other" set.
+            | Action::OpenFilter
+            | Action::OpenFilterWithGroomingPreset
+            | Action::FilterPrev
+            | Action::FilterNext
+            | Action::FilterToggle
+            | Action::FilterCommit
+            | Action::FilterCancel
+            | Action::ClearFilters
+            | Action::RemoveFilterChip { .. } => {
                 set.insert("OtherM136Action");
             }
         }

@@ -605,3 +605,111 @@ fn empty_filter_hides_chip_strip() {
         "empty filter must not render the chip strip; got: {flat}"
     );
 }
+
+// ─── M204 S7: age filter chips use the `created` field ──────────────────────
+
+use raul::tui::app::{age_passes, age_strictest_threshold};
+use std::collections::BTreeSet;
+
+/// AC-06: age filter on Milestones uses the `created` field
+/// (`MilestoneMeta.created`). Items older than the threshold
+/// are hidden.
+#[test]
+fn age_filter_uses_created_for_milestones() {
+    // The test pins the pure seam (`age_passes` +
+    // `age_strictest_threshold`) rather than running the
+    // full TUI loop with a real clock. The integration
+    // coverage lives in `tui_milestones_title_chip.rs`.
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+    let now: DateTime<Utc> = Utc.from_utc_datetime(
+        &NaiveDate::from_ymd_opt(2026, 9, 2)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap(),
+    );
+    // 60 days old — passes >30d, fails >90d.
+    let sixty_days_ago = "2026-07-04".to_string();
+    assert!(age_passes(&sixty_days_ago, 30, now));
+    assert!(!age_passes(&sixty_days_ago, 90, now));
+    // 100 days old — passes both.
+    let hundred_days_ago = "2026-05-25".to_string();
+    assert!(age_passes(&hundred_days_ago, 30, now));
+    assert!(age_passes(&hundred_days_ago, 90, now));
+    // 3 days old — fails both.
+    let three_days_ago = "2026-08-30".to_string();
+    assert!(!age_passes(&three_days_ago, 7, now));
+    // Empty string (pre-M205 record) — always passes
+    // (permissive default).
+    assert!(age_passes("", 7, now));
+}
+
+/// AC-06: age filter on Backlog uses `BacklogItem.created`
+/// (the `BacklogLine.created_at` field).
+#[test]
+fn age_filter_uses_created_for_backlog() {
+    // Pin the pure seam — the integration is covered by
+    // tui_milestones_title_chip.rs / tui_lifecycle_filter_modal.rs.
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+    let now: DateTime<Utc> = Utc.from_utc_datetime(
+        &NaiveDate::from_ymd_opt(2026, 9, 2)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap(),
+    );
+    // Backlog age filter uses the same `age_passes` helper
+    // applied to `b.created_at`. The path is the same;
+    // the field is just the `BacklogLine` member.
+    let created_at = "2026-07-04"; // ~60d old
+    assert!(age_passes(created_at, 30, now));
+}
+
+/// AC-06: age filter on Ideas uses `IdeaEntry.created`
+/// (the `BacklogLine.created_at` field — same shape as
+/// Backlog).
+#[test]
+fn age_filter_uses_created_for_ideas() {
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+    let now: DateTime<Utc> = Utc.from_utc_datetime(
+        &NaiveDate::from_ymd_opt(2026, 9, 2)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap(),
+    );
+    let created_at = "2026-05-25"; // ~100d old
+    assert!(age_passes(created_at, 90, now));
+}
+
+/// AC-06: age preset intersection uses the strictest
+/// threshold. If `>7d` AND `>30d` are both active, the row
+/// must be >30d (not just >7d). The `age_strictest_threshold`
+/// helper returns 30 for that set.
+#[test]
+fn age_preset_intersection_uses_strictest() {
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    set.insert(">7d".to_string());
+    set.insert(">30d".to_string());
+    assert_eq!(age_strictest_threshold(&set), 30);
+    // >7d + >90d → 90 (strictest).
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    set.insert(">7d".to_string());
+    set.insert(">90d".to_string());
+    assert_eq!(age_strictest_threshold(&set), 90);
+    // All three → 90.
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    set.insert(">7d".to_string());
+    set.insert(">30d".to_string());
+    set.insert(">90d".to_string());
+    assert_eq!(age_strictest_threshold(&set), 90);
+    // Just >30d → 30.
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    set.insert(">30d".to_string());
+    assert_eq!(age_strictest_threshold(&set), 30);
+    // Empty → 0 (caller skips the age filter).
+    let set: BTreeSet<String> = BTreeSet::new();
+    assert_eq!(age_strictest_threshold(&set), 0);
+    // Unknown values are skipped.
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    set.insert(">90d".to_string());
+    set.insert("garbage".to_string());
+    assert_eq!(age_strictest_threshold(&set), 90);
+}

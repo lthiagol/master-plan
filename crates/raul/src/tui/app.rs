@@ -1756,8 +1756,8 @@ impl App {
         // the Milestones lane. The legacy lifecycle-only
         // helper covers the historical case; the new
         // `lane_filters` map is consulted for every dimension
-        // so a (priority=high) filter narrows to milestones
-        // satisfying that dimension. Age is handled in S7.
+        // so a (priority=high, age=>30d) filter narrows to
+        // milestones satisfying BOTH dimensions.
         if let Some(dims) = self.lane_filters.get(&Lane::Milestones) {
             // lifecycle (back-compat surface).
             if let Some(lc) = dims.get("lifecycle") {
@@ -1769,6 +1769,18 @@ impl App {
             if let Some(pri) = dims.get("priority") {
                 if !pri.is_empty() {
                     filtered.retain(|m| pri.contains(&m.priority));
+                }
+            }
+            // age preset chips (AC-06). Multi-select with
+            // intersection semantics: the row must be older
+            // than the strictest active threshold. The
+            // threshold is computed from the active set;
+            // empty / unknown values are skipped.
+            if let Some(age) = dims.get("age") {
+                let threshold = age_strictest_threshold(age);
+                if threshold > 0 {
+                    let now = chrono::Utc::now();
+                    filtered.retain(|m| age_passes(&m.created, threshold, now));
                 }
             }
         }
@@ -1910,6 +1922,15 @@ impl App {
             if let Some(st) = dims.get("status") {
                 if !st.is_empty() {
                     filtered.retain(|b| st.contains(&b.status));
+                }
+            }
+            // age (Backlog + Ideas) — uses the row's
+            // `created_at` (RFC3339 or YYYY-MM-DD).
+            if let Some(age) = dims.get("age") {
+                let threshold = age_strictest_threshold(age);
+                if threshold > 0 {
+                    let now = chrono::Utc::now();
+                    filtered.retain(|b| age_passes(&b.created_at, threshold, now));
                 }
             }
             // source (Backlog only — match the row's id prefix).
@@ -2436,6 +2457,67 @@ pub fn filter_modal_selected(
         idx -= dim.values.len();
     }
     None
+}
+
+/// M204 / AC-06: parse a date string (YYYY-MM-DD or RFC3339)
+/// and return days-since-reference. The reference is
+/// `now()`; the helper is split from `age_passes` so the
+/// tests can pin a stable `now` via the pure seam. Returns
+/// `None` on parse failure — `age_passes` treats that as
+/// "unknown" and keeps the row (the filter is a hide
+/// operation, not a show operation; unknown created is the
+/// common pre-M205 case).
+pub fn age_days_since(created: &str, now: chrono::DateTime<chrono::Utc>) -> Option<i64> {
+    use chrono::DateTime;
+    if created.is_empty() {
+        return None;
+    }
+    // RFC3339 (full timestamp) — preferred.
+    if let Ok(dt) = DateTime::parse_from_rfc3339(created) {
+        let now_d = now.date_naive();
+        let dt_d = dt.with_timezone(&chrono::Utc).date_naive();
+        return Some((now_d - dt_d).num_days());
+    }
+    // YYYY-MM-DD.
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(created, "%Y-%m-%d") {
+        let now_d = now.date_naive();
+        return Some((now_d - d).num_days());
+    }
+    None
+}
+
+/// M204 / AC-06: does a row's `created` field pass an age
+/// threshold? `threshold_days` is the strictest active
+/// threshold (computed by the caller as `max(>7d, >30d, >90d)`).
+/// `now` is the reference (production uses `Utc::now()`;
+/// tests pin a fixed timestamp). A row passes when:
+///   - its created date is older than the threshold, OR
+///   - its created date can't be parsed (unknown — the
+///     filter is permissive by default, so an item with no
+///     known created date is never hidden by age).
+pub fn age_passes(created: &str, threshold_days: u32, now: chrono::DateTime<chrono::Utc>) -> bool {
+    let Some(days) = age_days_since(created, now) else {
+        return true;
+    };
+    days >= threshold_days as i64
+}
+
+/// M204 / AC-06: convert a set of active age-preset values
+/// (`>7d`, `>30d`, `>90d`) into the strictest threshold in
+/// days. Returns `0` when the set is empty (caller skips
+/// the age filter).
+pub fn age_strictest_threshold(values: &std::collections::BTreeSet<String>) -> u32 {
+    let mut days: u32 = 0;
+    for v in values {
+        let d = match v.as_str() {
+            ">7d" => 7,
+            ">30d" => 30,
+            ">90d" => 90,
+            _ => continue,
+        };
+        days = days.max(d);
+    }
+    days
 }
 
 /// M181 S2: build the legacy `DashboardSnapshot` from the typed
