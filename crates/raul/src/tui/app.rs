@@ -358,6 +358,12 @@ pub struct BacklogLine {
     pub priority: String,
     pub status: String,
     pub resolution: String,
+    /// M203: second-line preview text projected from `mp list backlog` /
+    /// `mp list ideas`. Active items: description continuation (lines after
+    /// the first), truncated. Resolved items: `resolved · <resolution>` or
+    /// just `resolved` for empty resolutions. Ideas: first line of `body`.
+    /// Empty string when no preview is available.
+    pub preview: String,
 }
 
 #[derive(Debug, Clone, Default)]

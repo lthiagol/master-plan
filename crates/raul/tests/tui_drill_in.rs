@@ -92,6 +92,7 @@ fn drill_into_backlog_detail() {
         priority: "high".into(),
         status: "open".into(),
         resolution: String::new(),
+        preview: String::new(),
     }]);
     if let Some(b) = app.backlog.first() {
         app.selected_backlog_id = Some(b.id.clone());

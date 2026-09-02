@@ -548,6 +548,7 @@ mod drill_in_tests {
             priority: "high".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         }]
     }
 

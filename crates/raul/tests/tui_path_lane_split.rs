@@ -45,6 +45,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "high".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "TW-01".into(),
@@ -52,6 +53,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "high".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "BF-01".into(),
@@ -59,6 +61,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "regular".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "BL-01".into(),
@@ -66,6 +69,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "low".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "ID-01".into(),
@@ -73,6 +77,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "normal".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "XX-01".into(),
@@ -80,6 +85,7 @@ fn tui_side_lanes_visible_backlog_filters_by_prefix() {
             priority: "low".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
     ];
     app.load_backlog(sample);

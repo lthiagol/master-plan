@@ -726,6 +726,7 @@ fn s8_backlog_list_drill_opens_backlog_detail() {
         priority: "med".into(),
         status: "open".into(),
         resolution: "".into(),
+        preview: "".into(),
     }]);
     app.selected_backlog_id = Some("BL-01".into());
     app.detail_scroll = 0;

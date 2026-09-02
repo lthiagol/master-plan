@@ -88,6 +88,11 @@ fn parse_backlog_lines(data: &serde_json::Value) -> Vec<BacklogLine> {
                     priority: item["priority"].as_str().unwrap_or("?").to_string(),
                     status: item["status"].as_str().unwrap_or("?").to_string(),
                     resolution: item["resolution"].as_str().unwrap_or("").to_string(),
+                    // M203 S4: project the second-line preview from the
+                    // payload. `mp list backlog` always emits the key
+                    // post-M203; the parser tolerates older payloads
+                    // (no `preview`) by defaulting to "".
+                    preview: item["preview"].as_str().unwrap_or("").to_string(),
                 })
                 .collect()
         })
@@ -1000,11 +1005,84 @@ mod tests {
     //! parsing pin lives here so a regression in the helper is
     //! caught by the model-side test instead of by the lane
     //! renderer's surface.
-    use super::parse_milestone_summaries;
+    use super::{parse_backlog_lines, parse_milestone_summaries};
     use std::collections::BTreeMap;
 
     fn payload_with(milestone: serde_json::Value) -> serde_json::Value {
         serde_json::json!({ "milestones": [milestone] })
+    }
+
+    // ── M203 S4: parse_backlog_lines populates the preview field ──
+
+    #[test]
+    fn parse_backlog_lines_populates_preview() {
+        let payload = serde_json::json!({
+            "backlog": [
+                {
+                    "id": "BL-01",
+                    "description": "Title\nContinuation detail",
+                    "priority": "high",
+                    "status": "active",
+                    "resolution": "",
+                    "preview": "Continuation detail"
+                },
+                {
+                    "id": "BL-02",
+                    "description": "Resolved row",
+                    "priority": "medium",
+                    "status": "resolved",
+                    "resolution": "shipped",
+                    "preview": "resolved · shipped"
+                },
+                {
+                    "id": "BL-03",
+                    "description": "Empty resolution resolved row",
+                    "priority": "low",
+                    "status": "resolved",
+                    "resolution": "",
+                    "preview": "resolved"
+                },
+                {
+                    "id": "BL-04",
+                    "description": "Single line, no continuation",
+                    "priority": "low",
+                    "status": "active",
+                    "resolution": "",
+                    "preview": ""
+                },
+                {
+                    // Legacy payload (no `preview` key) — parser must
+                    // default to empty string.
+                    "id": "BL-05",
+                    "description": "Legacy row",
+                    "priority": "low",
+                    "status": "active",
+                    "resolution": ""
+                }
+            ]
+        });
+        let lines = parse_backlog_lines(&payload);
+        assert_eq!(lines.len(), 5);
+
+        // Active continuation lands in `preview` verbatim (the parser
+        // does not re-derive it from `description` — that's the mp
+        // projection's job).
+        assert_eq!(lines[0].preview, "Continuation detail");
+
+        // Resolved with a resolution projects the resolution chip.
+        assert_eq!(lines[1].preview, "resolved · shipped");
+
+        // Empty resolution collapses to "resolved".
+        assert_eq!(lines[2].preview, "resolved");
+
+        // Active item with no continuation projects "".
+        assert_eq!(lines[3].preview, "");
+
+        // Legacy payload (no `preview` key) defaults to "".
+        assert_eq!(lines[4].preview, "");
+        // And all other fields still parse.
+        assert_eq!(lines[4].id, "BL-05");
+        assert_eq!(lines[4].resolution, "");
     }
 
     #[test]

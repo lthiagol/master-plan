@@ -1169,6 +1169,7 @@ mod tests {
                 priority: "high".to_string(),
                 status: "open".to_string(),
                 resolution: "".to_string(),
+                preview: "".to_string(),
             },
             BacklogLine {
                 id: "BL-02".to_string(),
@@ -1176,6 +1177,7 @@ mod tests {
                 priority: "medium".to_string(),
                 status: "open".to_string(),
                 resolution: "".to_string(),
+                preview: "".to_string(),
             },
             BacklogLine {
                 id: "BL-03".to_string(),
@@ -1183,6 +1185,7 @@ mod tests {
                 priority: "low".to_string(),
                 status: "resolved".to_string(),
                 resolution: "shipped".to_string(),
+                preview: "resolved · shipped".to_string(),
             },
         ];
         app

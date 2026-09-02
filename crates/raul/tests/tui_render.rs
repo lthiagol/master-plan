@@ -109,6 +109,7 @@ fn backlog_list_renders_table_columns() {
         priority: "high".into(),
         status: "open".into(),
         resolution: String::new(),
+        preview: String::new(),
     }]);
     let output = render_to_string(&app);
     assert!(output.contains("Backlog"), "should contain backlog header");

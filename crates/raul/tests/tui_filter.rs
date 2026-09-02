@@ -110,6 +110,7 @@ fn hide_done_filters_resolved_backlog() {
             priority: "high".into(),
             status: "open".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "BL-02".into(),
@@ -117,6 +118,7 @@ fn hide_done_filters_resolved_backlog() {
             priority: "low".into(),
             status: "resolved".into(),
             resolution: "shipped".into(),
+            preview: "resolved · shipped".into(),
         },
         BacklogLine {
             id: "BL-03".into(),
@@ -124,6 +126,7 @@ fn hide_done_filters_resolved_backlog() {
             priority: "regular".into(),
             status: "pending".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
         BacklogLine {
             id: "BL-04".into(),
@@ -131,6 +134,7 @@ fn hide_done_filters_resolved_backlog() {
             priority: "low".into(),
             status: "archived".into(),
             resolution: String::new(),
+            preview: String::new(),
         },
     ]);
     assert_eq!(app.visible_backlog().len(), 4);

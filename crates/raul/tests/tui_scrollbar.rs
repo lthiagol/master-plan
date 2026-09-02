@@ -151,6 +151,7 @@ fn ac01_view_state_reserves_gutter_on_backlog_list() {
         priority: "high".to_string(),
         status: "open".to_string(),
         resolution: "".to_string(),
+        preview: "".to_string(),
     }];
     app.load_backlog(bl);
 
@@ -244,6 +245,7 @@ fn ac01_view_state_reserves_gutter_on_backlog_detail() {
         priority: "high".to_string(),
         status: "open".to_string(),
         resolution: "".to_string(),
+        preview: "".to_string(),
     }];
     // Drive compute_view directly into the detail content state. The
     // production entry is `Action::OpenBacklogDetail` which requires

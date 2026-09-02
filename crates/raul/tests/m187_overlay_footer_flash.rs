@@ -33,6 +33,7 @@ fn bl(id: &str) -> BacklogLine {
         priority: "normal".into(),
         status: "open".into(),
         resolution: String::new(),
+        preview: String::new(),
     }
 }
 

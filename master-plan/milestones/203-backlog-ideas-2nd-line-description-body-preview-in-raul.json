@@ -267,7 +267,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/parse_backlog_lines_populates_preview/)",
       "done_when": "BacklogLine carries preview; parse_backlog_lines populates it from payload; named test passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],

@@ -99,6 +99,7 @@ fn backlog_app() -> App {
             priority: "high".to_string(),
             status: "open".to_string(),
             resolution: "".to_string(),
+            preview: "".to_string(),
         },
         raul::tui::app::BacklogLine {
             id: "BL-02".to_string(),
@@ -106,6 +107,7 @@ fn backlog_app() -> App {
             priority: "medium".to_string(),
             status: "open".to_string(),
             resolution: "".to_string(),
+            preview: "".to_string(),
         },
         raul::tui::app::BacklogLine {
             id: "BL-03".to_string(),
@@ -113,6 +115,7 @@ fn backlog_app() -> App {
             priority: "low".to_string(),
             status: "resolved".to_string(),
             resolution: "shipped in 1.4".to_string(),
+            preview: "resolved · shipped in 1.4".to_string(),
         },
     ];
     app
