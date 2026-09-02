@@ -1232,3 +1232,87 @@ fn branch_headers_show_item_count_suffix() {
         "Awaiting approval header must show item count `· 1`; row: {awaiting_row:?}"
     );
 }
+
+// =========================================================================
+// M206 S3 — blocked_lines 2-line + blocker annotation + sub-fork
+// =========================================================================
+
+#[test]
+fn blocked_items_show_blocker_annotation() {
+    // M20 has depends_on = ["10"] → must show `blocker: M10` on the
+    // title line.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m20_y = find_row_index(&buf, "M20 — Blocked on M10");
+    let m20_row = row_text(&buf, m20_y);
+    assert!(
+        m20_row.contains("blocker: M10"),
+        "M20 title row must carry `blocker: M10` annotation; row: {m20_row:?}"
+    );
+}
+
+#[test]
+fn blocker_annotation_appears_with_overlay_chip() {
+    // The blocker annotation AND the overlay chip must coexist on the
+    // same title row.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let m20_y = find_row_index(&buf, "M20 — Blocked on M10");
+    let m20_row = row_text(&buf, m20_y);
+    assert!(
+        m20_row.contains("blocker: M10") && m20_row.contains("[BLOCKED]"),
+        "M20 title row must carry both `blocker: M10` annotation AND `[BLOCKED]` chip; row: {m20_row:?}"
+    );
+}
+
+#[test]
+fn blocked_lines_emits_two_visual_lines() {
+    // M20 (blocked branch item) must occupy 2 visual lines: title +
+    // preview.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    let title_y = find_row_index(&buf, "M20 — Blocked on M10");
+    let mut preview_y = None;
+    for y in title_y + 1..buf.area.height {
+        if row_text_contains(&buf, y, "Ship the second milestone once M10 lands.") {
+            preview_y = Some(y);
+            break;
+        }
+    }
+    let preview_y = preview_y.expect("M20 preview row must exist");
+    assert_eq!(
+        preview_y - title_y,
+        1,
+        "M20 title + preview must be adjacent (title -> preview)"
+    );
+}
+
+#[test]
+fn blocked_fork_at_blocker_preserved() {
+    // The blocked branch forks at the blocker (`blocked-by M10`).
+    // This header MUST appear in the rendered tree even with the new
+    // 2-line item layout.
+    let mut app = App::new();
+    app.select_lane(Lane::Path);
+    app.load_path_data(rich_path_data());
+    let buf = render_buffer(&app, 140, 60);
+    // The fork header `blocked-by M10` lives between the Blocked
+    // branch header and M20's title row.
+    let blocked_y = find_row_index(&buf, "Blocked");
+    let blocked_by_y = find_row_index(&buf, "blocked-by M10");
+    let m20_y = find_row_index(&buf, "M20 — Blocked on M10");
+    assert!(
+        blocked_y < blocked_by_y,
+        "blocked-by M10 must appear AFTER the Blocked header"
+    );
+    assert!(
+        blocked_by_y < m20_y,
+        "blocked-by M10 must appear BEFORE M20's title row"
+    );
+}
