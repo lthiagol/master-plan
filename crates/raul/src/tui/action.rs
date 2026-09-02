@@ -123,6 +123,19 @@ pub enum Action {
     // ---- M186: cycle sort ----------------------------------------------------
     /// Cycle to the next sort key for the active lane (default `o`).
     CycleSortNext,
+    // ---- M204: unified filter modal -----------------------------------------
+    /// Open the unified filter modal (default capital `F`).
+    OpenFilter,
+    /// Move the filter modal cursor up (Up / k).
+    FilterPrev,
+    /// Move the filter modal cursor down (Down / j).
+    FilterNext,
+    /// Toggle the highlighted value in the filter modal (Space).
+    FilterToggle,
+    /// Commit the filter modal draft and close the modal (Enter).
+    FilterCommit,
+    /// Restore the prior filter state and close the modal (Esc).
+    FilterCancel,
     /// Move to the next lane in `Lane::ordered()` (Right / l).
     NextLane,
     /// Jump to a specific lane by `Lane::ordered()` index (digit keys 1..=N,
@@ -295,6 +308,11 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
 
         // M185: lifecycle filter modal + grooming preset.
         Action::OpenLifecycleFilter => {
+            // M204: legacy M185 entry point — opens the same
+            // single-dim modal on Milestones. S5 retires it in
+            // favor of `Action::OpenFilter` (the unified modal);
+            // the legacy dispatch remains in this commit so the
+            // M185-era tests keep passing.
             if app.active_lane == Lane::Milestones && app.content == ContentState::List {
                 app.open_lifecycle_filter();
             } else {
@@ -314,6 +332,32 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
                 app.set_flash_message("Grooming preset is only available on Milestones.");
             }
         }
+        // M204: unified per-lane filter modal.
+        Action::OpenFilter => {
+            // Open the modal on the active lane if it's a list
+            // lane with a filter spec. The grooming_preset flag
+            // is reserved for the `g` binding on Milestones —
+            // the `OpenFilter` key (F) does not pre-toggle any
+            // values.
+            let lane = app.active_lane;
+            if app.content == ContentState::List
+                && matches!(
+                    lane,
+                    Lane::Milestones | Lane::Backlog | Lane::Ideas
+                )
+            {
+                app.open_filter_modal(lane, false);
+            } else {
+                app.set_flash_message(
+                    "Filter modal is only available on Milestones / Backlog / Ideas.",
+                );
+            }
+        }
+        Action::FilterNext => app.filter_next(),
+        Action::FilterPrev => app.filter_prev(),
+        Action::FilterToggle => app.filter_toggle(),
+        Action::FilterCommit => app.filter_commit(),
+        Action::FilterCancel => app.filter_cancel(),
 
         // M186: search input + cycle sort.
         Action::OpenSearch => {
@@ -1314,6 +1358,11 @@ pub fn apply_esc(app: &mut App, _runner: &MpRunner) -> Result<()> {
         // M186: Esc cancels the search input and restores prior term.
         Mode::SearchInput(_) => {
             app.search_cancel();
+        }
+        // M204: Esc cancels the unified filter modal and restores
+        // the prior filter snapshot.
+        Mode::Filter(_) => {
+            app.filter_cancel();
         }
     }
     Ok(())

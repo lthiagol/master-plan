@@ -1501,6 +1501,118 @@ impl App {
         self.set_lifecycle_filter(preset);
     }
 
+    // ─── M204: unified per-lane filter modal ────────────────────────────
+
+    /// M204: open the unified filter modal for the given lane.
+    /// `grooming_preset=true` (set by `g` on Milestones — S8)
+    /// pre-toggles the lifecycle dimension to the Grooming
+    /// preset (approved + in-progress + groomed). The user
+    /// sees the preset already applied when the modal opens.
+    pub fn open_filter_modal(&mut self, lane: Lane, grooming_preset: bool) {
+        use crate::tui::mode::{FilterModalState, Mode};
+        let dimensions = filter_dimensions_for(lane);
+        // Snapshot the lane's current filter as the prior.
+        let prior: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> = self
+            .lane_filters
+            .get(&lane)
+            .cloned()
+            .unwrap_or_default();
+        let mut draft = prior.clone();
+        if grooming_preset {
+            use std::collections::BTreeSet;
+            let preset: BTreeSet<String> = crate::tui::progress::GROOMING_PRESET
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect();
+            draft.insert("lifecycle".to_string(), preset);
+        }
+        self.active_mode = Mode::Filter(FilterModalState {
+            lane,
+            selected: 0,
+            draft,
+            prior,
+            dimensions,
+            grooming_preset,
+        });
+        self.touch();
+    }
+
+    /// M204: Move the filter-modal cursor down by one row.
+    pub fn filter_next(&mut self) {
+        use crate::tui::mode::Mode as M;
+        if let M::Filter(ref mut st) = self.active_mode {
+            let n = crate::tui::modes::filter_modal::spec::total_items(&st.dimensions);
+            if n > 0 {
+                st.selected = (st.selected + 1) % n;
+                self.touch();
+            }
+        }
+    }
+
+    /// M204: Move the filter-modal cursor up by one row.
+    pub fn filter_prev(&mut self) {
+        use crate::tui::mode::Mode as M;
+        if let M::Filter(ref mut st) = self.active_mode {
+            let n = crate::tui::modes::filter_modal::spec::total_items(&st.dimensions);
+            if n > 0 {
+                st.selected = (st.selected + n - 1) % n;
+                self.touch();
+            }
+        }
+    }
+
+    /// M204: Toggle the highlighted value. For Toggle dimensions,
+    /// add/remove from the set. For Preset dimensions (age),
+    /// clear the dimension then set the new value.
+    pub fn filter_toggle(&mut self) {
+        use crate::tui::mode::Mode as M;
+        if let M::Filter(ref mut st) = self.active_mode {
+            if let Some((dim_name, value, kind)) = filter_modal_selected(st) {
+                let entry = st.draft.entry(dim_name.clone()).or_default();
+                match kind {
+                    crate::tui::mode::DimensionKind::Toggle => {
+                        if !entry.remove(&value) {
+                            entry.insert(value);
+                        }
+                    }
+                    crate::tui::mode::DimensionKind::Preset => {
+                        // Single-select: clear all then insert the new value.
+                        entry.clear();
+                        entry.insert(value);
+                    }
+                }
+                self.touch();
+            }
+        }
+    }
+
+    /// M204: commit the draft and close the modal. The lane's
+    /// `lane_filters` map is updated atomically; an empty draft
+    /// removes the lane entry entirely.
+    pub fn filter_commit(&mut self) {
+        use crate::tui::mode::Mode as M;
+        if let M::Filter(st) = std::mem::replace(&mut self.active_mode, M::Normal) {
+            if st.draft.is_empty() {
+                self.lane_filters.remove(&st.lane);
+            } else {
+                self.lane_filters.insert(st.lane, st.draft.clone());
+            }
+            self.mark_filter_dirty(st.lane);
+            self.selected_index = 0;
+            self.touch();
+        }
+    }
+
+    /// M204: restore the prior filter state and close the modal.
+    pub fn filter_cancel(&mut self) {
+        use crate::tui::mode::Mode as M;
+        if let M::Filter(_) = &self.active_mode {
+            self.active_mode = M::Normal;
+            self.touch();
+        }
+    }
+
+
     /// M186: the active lane's committed search term (empty = no filter).
     pub fn lane_search_term(&self) -> &str {
         self.lane_search
@@ -2202,6 +2314,41 @@ pub fn backlog_is_terminal(b: &BacklogLine) -> bool {
 /// a full `"X-"` prefix so they are mutually exclusive.
 pub fn is_actionable_backlog_id(id: &str) -> bool {
     id.starts_with("B-") || id.starts_with("BL-") || id.starts_with("TW-") || id.starts_with("BF-")
+}
+
+/// M204: per-lane filter dimension specs. Re-exports
+/// [`crate::tui::modes::filter_modal::spec`] for convenience so
+/// callers (e.g. `App::open_filter_modal`) don't have to know
+/// the modes:: path.
+pub fn filter_dimensions_for(
+    lane: Lane,
+) -> Vec<crate::tui::mode::DimensionSpec> {
+    use crate::tui::modes::filter_modal::spec as fspec;
+    match lane {
+        Lane::Milestones => fspec::milestones(),
+        Lane::Backlog => fspec::backlog(),
+        Lane::Ideas => fspec::ideas(),
+        // Path / Overview / Watch / Settings have no list to
+        // filter — the modal never opens on these lanes.
+        _ => Vec::new(),
+    }
+}
+
+/// M204: resolve the highlighted `(dim, value, kind)` row in
+/// the filter modal. Returns `None` if the cursor is past the
+/// last item (defensive; the `filter_next/prev` arms clamp the
+/// cursor modulo `total_items`).
+pub fn filter_modal_selected(
+    st: &crate::tui::mode::FilterModalState,
+) -> Option<(String, String, crate::tui::mode::DimensionKind)> {
+    let mut idx = st.selected;
+    for dim in &st.dimensions {
+        if idx < dim.values.len() {
+            return Some((dim.name.clone(), dim.values[idx].clone(), dim.kind));
+        }
+        idx -= dim.values.len();
+    }
+    None
 }
 
 /// M181 S2: build the legacy `DashboardSnapshot` from the typed

@@ -110,3 +110,79 @@ fn esc_reverts_prior_filter() {
         vec![&"complete".to_string()]
     );
 }
+
+// ─── M204 S4: unified per-lane filter modal widget ──────────────────────────
+
+use raul::tui::modes::filter_modal::spec as fspec;
+use raul::tui::mode::DimensionKind;
+
+/// S4 / AC-03: the widget accepts a `DimensionSpec` and the
+/// `total_items` helper counts the flattened `(dim, value)` rows
+/// for navigation. The pinned shape (3 dims on Milestones, 4
+/// dims on Backlog, 4 dims on Ideas) is the load-bearing
+/// contract — reordering dimensions in `spec::milestones()` is
+/// a breaking change for chip rendering (S6).
+#[test]
+fn filter_modal_widget_handles_dimension_spec() {
+    let ms_dims = fspec::milestones();
+    assert_eq!(ms_dims.len(), 3, "Milestones must expose 3 dimensions");
+    // Names match the on-disk ProjectConfig.filter keys.
+    assert_eq!(ms_dims[0].name, "lifecycle");
+    assert_eq!(ms_dims[1].name, "priority");
+    assert_eq!(ms_dims[2].name, "age");
+    // Age is a Preset (single-select) per AC-06.
+    assert_eq!(ms_dims[2].kind, DimensionKind::Preset);
+    // Priority is a Toggle (multi-select).
+    assert_eq!(ms_dims[1].kind, DimensionKind::Toggle);
+    // Total items = 10 lifecycle + 4 priority + 3 age = 17.
+    assert_eq!(fspec::total_items(&ms_dims), 17);
+
+    let bl_dims = fspec::backlog();
+    assert_eq!(bl_dims.len(), 4, "Backlog must expose 4 dimensions");
+    let bl_names: Vec<&str> = bl_dims.iter().map(|d| d.name.as_str()).collect();
+    assert_eq!(
+        bl_names,
+        vec!["priority", "status", "age", "source"],
+        "Backlog dim order; got {bl_names:?}"
+    );
+
+    let id_dims = fspec::ideas();
+    assert_eq!(id_dims.len(), 4, "Ideas must expose 4 dimensions");
+    let id_names: Vec<&str> = id_dims.iter().map(|d| d.name.as_str()).collect();
+    assert_eq!(
+        id_names,
+        vec!["priority", "status", "age", "tags"],
+        "Ideas dim order; got {id_names:?}"
+    );
+}
+
+/// S4 / AC-03: the modal keybindings are identical across
+/// lanes — Up/k move up, Down/j move down, Space toggles, Enter
+/// commits, Esc cancels. The pin lives in the handler
+/// signature; the test exercises the same handler with the
+/// three key shapes.
+#[test]
+fn modal_visual_style_consistent_across_lanes() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use raul::tui::action::Action;
+    use raul::tui::modes::filter_modal;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::empty())
+    }
+
+    // Same handler across all lanes (single handler in
+    // modes/filter_modal.rs). The four canonical keybindings.
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Up)), vec![Action::FilterPrev]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Char('k'))), vec![Action::FilterPrev]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Down)), vec![Action::FilterNext]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Char('j'))), vec![Action::FilterNext]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Char(' '))), vec![Action::FilterToggle]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Enter)), vec![Action::FilterCommit]);
+    assert_eq!(filter_modal::handle_key(key(KeyCode::Esc)), vec![Action::FilterCancel]);
+    // Modifier-bearing keys (Ctrl/Alt/Super) are no-ops — the
+    // user can't accidentally trigger a binding via OS-level
+    // chord.
+    let ctrl_a = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert!(filter_modal::handle_key(ctrl_a).is_empty());
+}

@@ -218,6 +218,10 @@ pub enum Mode {
     LifecycleFilter(LifecycleFilterState),
     /// M186: live substring search input (Milestones/Backlog/Ideas).
     SearchInput(SearchInputState),
+    /// M204: unified per-lane filter modal. The widget is reused
+    /// across all three list lanes; per-lane dimensions live in
+    /// [`FilterModalState::dimensions`].
+    Filter(FilterModalState),
 }
 
 /// M185: state for the lifecycle filter modal.
@@ -241,4 +245,61 @@ pub struct LifecycleFilterState {
 pub struct SearchInputState {
     pub buffer: String,
     pub prior: String,
+}
+
+/// M204: per-lane filter modal state. The widget is reused across
+/// all three lanes (Milestones / Backlog / Ideas) and the per-lane
+/// dimension set is data, not UI — see
+/// [`crate::tui::modes::filter_modal`]. The draft is a
+/// `dimension → set-of-values` map; the prior snapshot is the
+/// pre-open state so Esc can revert.
+///
+/// `grooming_preset` is a per-open optional — when `Some`, the
+/// modal pre-toggles the lifecycle dimension's values to the
+/// grooming preset (approved + in-progress + groomed). The flag
+/// is consumed by the commit arm and dropped on close.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterModalState {
+    pub lane: crate::tui::app::Lane,
+    /// Cursor over the flattened `(dim, value)` item list.
+    pub selected: usize,
+    /// Working set; mutated by Space (toggle).
+    pub draft: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    /// Snapshot at open time (Esc restores).
+    pub prior: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    /// Dimensions offered by this lane.
+    pub dimensions: Vec<DimensionSpec>,
+    /// When `Some`, the modal opens with the grooming preset
+    /// already toggled in the lifecycle dimension. Set by `g` on
+    /// Milestones (S8); cleared on commit/cancel.
+    pub grooming_preset: bool,
+}
+
+/// M204: one filter dimension. The widget is data-driven — per-lane
+/// dimensions live in a `Vec<DimensionSpec>`. `kind` controls whether
+/// the dimension accepts multiple selections (Toggle — lifecycle,
+/// priority, status, source prefix, tags) or a single preset
+/// (Preset — age: at most one of `>7d` / `>30d` / `>90d`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DimensionSpec {
+    /// Canonical name used in `ProjectConfig.filter` JSON
+    /// (e.g. `lifecycle`, `priority`, `age`).
+    pub name: String,
+    /// Display label (e.g. "Lifecycle", "Age").
+    pub label: String,
+    /// Possible values for this dimension, in display order.
+    pub values: Vec<String>,
+    /// Toggle (multi-select) or Preset (single-select).
+    pub kind: DimensionKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DimensionKind {
+    /// Multi-select: Space toggles individual values in/out of
+    /// the dimension's set. Used for lifecycle, priority, status,
+    /// source, tags.
+    Toggle,
+    /// Single-select: Space selects one value (and clears the
+    /// others). Used for age — only one threshold at a time.
+    Preset,
 }

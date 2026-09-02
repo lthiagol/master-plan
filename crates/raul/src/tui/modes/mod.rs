@@ -17,6 +17,7 @@
 //!   * `settings.rs`           — Settings lane key handler (M169).
 
 pub mod annotation_thread;
+pub mod filter_modal;
 pub mod help;
 pub mod input;
 pub mod lifecycle_filter;

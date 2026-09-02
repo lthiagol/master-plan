@@ -734,6 +734,8 @@ fn dispatch_key(app: &App, key: crossterm::event::KeyEvent) -> Vec<Action> {
         M::ReviewMenu(_) => modes::review_menu::handle_key(key),
         M::LifecycleFilter(_) => modes::lifecycle_filter::handle_key(key),
         M::SearchInput(_) => modes::search_input::handle_key(key),
+        // M204: unified per-lane filter modal.
+        M::Filter(_) => modes::filter_modal::handle_key(key),
     }
 }
 
