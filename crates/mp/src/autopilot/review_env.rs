@@ -165,6 +165,7 @@ impl ReviewerProvenance {
 /// target_dir, pid }`. The builder lives at module scope rather than on
 /// the struct so the struct stays `serde`–friendly (a `Default` impl
 /// on `PathBuf`-bearing fields would be misleading).
+#[allow(clippy::too_many_arguments)]
 pub fn build_provenance(
     session_id: impl Into<String>,
     actor_token: impl Into<String>,
@@ -313,7 +314,7 @@ impl CleanRoomTrigger {
 /// Per-session knobs that govern [`select_mode`]. Defaults are
 /// conservative: clean-room is opt-in (never unconditional), and the
 /// gate refuses an unsafe environment.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ReviewEnvConfig {
     /// When `true`, every review runs in clean-room mode. Off by
@@ -322,15 +323,6 @@ pub struct ReviewEnvConfig {
     /// When `true`, the gate accepts a dirty worktree. Off by
     /// default — the gate would normally refuse.
     pub allow_dirty_worktree: bool,
-}
-
-impl Default for ReviewEnvConfig {
-    fn default() -> Self {
-        Self {
-            clean_room: false,
-            allow_dirty_worktree: false,
-        }
-    }
 }
 
 // ─── Mode selection (S2 / AC-02) ───────────────────────────────────────
@@ -398,10 +390,7 @@ pub fn clean_room_commands(
 ) -> Vec<String> {
     match trigger {
         None => Vec::new(),
-        Some(_) => vec![format!(
-            "cargo clean --target-dir {}",
-            target_dir.display()
-        )],
+        Some(_) => vec![format!("cargo clean --target-dir {}", target_dir.display())],
     }
 }
 
@@ -430,7 +419,10 @@ mod s2_tests {
         };
         let sel = select_mode(&cfg, &[]);
         assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
-        assert!(matches!(sel.trigger, Some(CleanRoomTrigger::ExplicitConfig)));
+        assert!(matches!(
+            sel.trigger,
+            Some(CleanRoomTrigger::ExplicitConfig)
+        ));
     }
 
     #[test]
