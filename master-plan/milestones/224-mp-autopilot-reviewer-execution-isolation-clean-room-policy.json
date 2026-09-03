@@ -3,9 +3,9 @@
     "id": "224",
     "title": "mp autopilot reviewer execution isolation + clean-room policy",
     "slug": "mp-autopilot-reviewer-execution-isolation-clean-room-policy",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -27,7 +27,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T21:33:17.247580+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-03T21:38:20.482893+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -41,9 +42,17 @@
         "status": "done",
         "at": "2026-09-03T21:33:17.247584+00:00"
       },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T21:38:20.482894+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:13:30.830541+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-03T21:38:20.482894+00:00"
       },
       "self-review": {
         "status": "done",
@@ -183,5 +192,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "spec-gap",
+      "description": "Gate does not compare env.worktree_path against the runner's worktree. ReviewerProvenance carries worktree_path and exposes worktree_matches() but GateInputs has no runner_worktree_path field and the gate never invokes the accessor. If a reviewer is spawned on a different worktree (stale checkout, secondary clone), it would silently review different code while binary_sha / target_dir / pid / actor all check out. Contradicts the spec's 'runner/reviewer independence checks' phrasing and is a structural isolation gap.",
+      "status": "open",
+      "author": "reviewer-224",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": ""
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "test-gap",
+      "description": "The gate's PassWithCleanRoom escalation on shared pid (review_env.rs:645-658) is untested. Unit tests in s3_tests cover shared-target-dir escalation but not shared-pid; integration tests in m224_ac03 also lack this case. AC-03 advertises 10/10 gate coverage but this critical safety path (reviewer process is the runner process) has no test asserting the typed decision / reason / commands. The implementation may be silently wrong on this path.",
+      "status": "open",
+      "author": "reviewer-224",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": ""
+    }
+  ]
 }

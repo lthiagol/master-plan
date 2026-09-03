@@ -2153,6 +2153,29 @@
       "body": "Cycle 1 verdict: changes-needed (deferred). F-01 (HIGH, spec-gap) is a real AC-04 contract violation: rendered_for in crates/mp/src/autopilot/spawn.rs:1008-1018 maps a SpawnPromptInputs to its Role by skill name with a fallback that catches the Reviewer's 'mp-runner' built-in, persisting the Runner prompt under roles.reviewer.spawn_prompt_rendered. F-02 (LOW, doc-drift) is a stale doc comment for render_topology_prompts at crates/mp/src/autopilot/prompts/spawn.rs:16. AC verification on cold build (make clean + cargo nextest --no-fail-fast): 56/56 pass (AC-01 9/9, AC-02 9/9, AC-03 8/8, AC-04 5/5, AC-05 8/8, AC-06 9/9, AC-07 8/8). mp reviews pass --verdict changes-needed was blocked by the execution_status=in-progress gate (the milestone auto-transitioned to remediation on filing F-01). Verdict call will land on cycle 2 after the runner fixes F-01 and re-executes.",
       "finding_id": "F-01",
       "created_at": "2026-09-03T19:41:59.105038+00:00"
+    },
+    {
+      "id": "C-23",
+      "milestone_id": "224",
+      "author": "reviewer-224",
+      "body": "F-01 (medium, spec-gap): the gate must compare env.worktree_path against the runner's worktree before allowing Pass. Currently GateInputs lacks a runner_worktree_path field and the worktree_matches() accessor is unused — a reviewer spawned on a stale or secondary clone would silently review different code while binary_sha / target_dir / pid / actor all check out. Suggested fix: add runner_worktree_path to GateInputs and a WorktreeMismatch ReviewEnvError variant (typed + actionable hint), then add an s3 gate test asserting the rejection.",
+      "finding_id": "F-01",
+      "created_at": "2026-09-03T21:39:06.470187+00:00"
+    },
+    {
+      "id": "C-24",
+      "milestone_id": "224",
+      "author": "reviewer-224",
+      "body": "F-02 (medium, test-gap): the gate's PassWithCleanRoom escalation on shared pid (review_env.rs:645-658) is untested in both the unit suite (s3_tests) and the integration suite (m224_ac03). AC-03 advertises 10/10 gate coverage but this critical safety path (reviewer process is the runner process) has no test asserting the typed decision / reason / commands. Suggested fix: add s3_gate_escalates_to_clean_room_on_shared_pid in s3_tests mirroring the existing shared-target-dir test, plus an m224_ac03 test asserting PassWithCleanRoom with 'shared-pid' reason.",
+      "finding_id": "F-02",
+      "created_at": "2026-09-03T21:39:09.528653+00:00"
+    },
+    {
+      "id": "C-25",
+      "milestone_id": "224",
+      "author": "reviewer-224",
+      "body": "Cycle 1 verdict: changes-needed (DEFERRED — cannot land on cycle 1). Cold build: make clean + per-AC verification all PASS (AC-01 4/4, AC-02 5/5, AC-03 10/10). cargo fmt --all --check exit 0. cargo clippy -p mp --tests --no-deps -- -D warnings clean. consumer-surface-lint clean. Filed 2 medium findings (F-01 spec-gap, F-02 test-gap). Per M210 precedent (commit 7f4f770): filing a medium/high finding auto-transitions the milestone to lifecycle=remediation + execution_status=in-progress, which gates mp reviews pass with 'milestone is not done'. Verdict call will land on cycle 2 once the runner fixes F-01/F-02 and re-marks execution_status=done. Until then the milestone carries two open medium findings that block automatic review pass.",
+      "created_at": "2026-09-03T21:39:13.164901+00:00"
     }
   ],
   "handoffs": [
