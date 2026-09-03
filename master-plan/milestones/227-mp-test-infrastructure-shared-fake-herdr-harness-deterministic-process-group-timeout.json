@@ -3,9 +3,9 @@
     "id": "227",
     "title": "mp test infrastructure — shared fake-herdr harness + deterministic process-group timeout",
     "slug": "mp-test-infrastructure-shared-fake-herdr-harness-deterministic-process-group-timeout",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,7 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T14:15:01.388291+00:00",
+    "lifecycle_at": "2026-09-03T20:53:16.432284+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -33,9 +33,17 @@
         "status": "done",
         "at": "2026-09-03T14:15:02.062094+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T20:53:16.432287+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:15:02.156182+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T20:53:16.432287+00:00"
       },
       "specify": {
         "status": "done",
@@ -65,22 +73,22 @@
       "id": "AC-01",
       "description": "Spawn, prompt, list, version, delayed response, nonzero exit, and signal-ignore behaviors are configured through one shared fake-herdr helper used by representative watch tests.",
       "verification": "cargo nextest run -p mp --test watch_herdr_wait --test watch_herdr_start --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M227 cycle 1: shared fake-herdr harness (crates/mp/tests/common/fake_herdr.rs) with version/pane/agent/prompt/list/delay/failure/signal modes; watch_herdr_wait + watch_herdr_start + watch_bridge_report migrated; deterministic process-group timeout test added (no fixed sleeps, readiness sync via pid file); cargo fmt --check + clippy --no-deps -D warnings pass; AC-01 51/51 + AC-02 20/20 + AC-03 43/43 all pass."
     },
     {
       "id": "AC-02",
       "description": "The process-group timeout test passes repeatedly under parallel nextest without fixed sleeps and proves descendant processes are terminated.",
       "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M227 cycle 1: shared fake-herdr harness (crates/mp/tests/common/fake_herdr.rs) with version/pane/agent/prompt/list/delay/failure/signal modes; watch_herdr_wait + watch_herdr_start + watch_bridge_report migrated; deterministic process-group timeout test added (no fixed sleeps, readiness sync via pid file); cargo fmt --check + clippy --no-deps -D warnings pass; AC-01 51/51 + AC-02 20/20 + AC-03 43/43 all pass."
     },
     {
       "id": "AC-03",
       "description": "Migrated watch tests preserve their prior assertions and no additional ad-hoc fake-herdr script builder is introduced by M210-M226 steps.",
       "verification": "cargo nextest run -p mp --test watch_herdr_start --test watch_bridge_report --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M227 cycle 1: shared fake-herdr harness (crates/mp/tests/common/fake_herdr.rs) with version/pane/agent/prompt/list/delay/failure/signal modes; watch_herdr_wait + watch_herdr_start + watch_bridge_report migrated; deterministic process-group timeout test added (no fixed sleeps, readiness sync via pid file); cargo fmt --check + clippy --no-deps -D warnings pass; AC-01 51/51 + AC-02 20/20 + AC-03 43/43 all pass."
     }
   ],
   "design_decisions": [
@@ -117,7 +125,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_herdr_wait --test watch_herdr_start --no-fail-fast",
       "done_when": "AC-01 uses one helper across both test targets.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -138,7 +146,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "done_when": "AC-02 passes repeated parallel runs without retry dependence.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -160,7 +168,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_herdr_start --test watch_bridge_report --no-fail-fast",
       "done_when": "AC-03 preserves assertions and removes local duplicate builders.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -175,8 +183,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
-    "evidence": ""
+    "evidence": "M227 cycle 1: shared fake-herdr harness (crates/mp/tests/common/fake_herdr.rs) with version/pane/agent/prompt/list/delay/failure/signal modes; watch_herdr_wait + watch_herdr_start + watch_bridge_report migrated; deterministic process-group timeout test added (no fixed sleeps, readiness sync via pid file); cargo fmt --check + clippy --no-deps -D warnings pass; AC-01 51/51 + AC-02 20/20 + AC-03 43/43 all pass."
   }
 }
