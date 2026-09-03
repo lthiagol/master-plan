@@ -125,7 +125,10 @@ pub use role::{
 };
 #[allow(unused_imports)]
 use schema::validate_value as _;
-pub use review_env::{build_provenance, ActorIdentity, ReviewerProvenance};
+pub use review_env::{
+    build_provenance, clean_room_commands, select_mode, ActorIdentity, CleanRoomTrigger,
+    ModeSelection, ReviewEnvConfig, ReviewEnvMode, ReviewerProvenance,
+};
 pub use schema::{validate_session_value, SESSION_MAX_BYTES};
 pub use session::{
     append_event, autopilot_dir, load_session, load_session_from, sample_session_for_tests,

@@ -1023,3 +1023,76 @@ mod m224_ac01 {
         );
     }
 }
+
+mod m224_ac02 {
+    //! AC-02 — mode selection (Normal default, CleanRoom only when
+    //! explicitly configured or provenance checks fail) and no
+    //! unconditional cargo clean.
+    use super::m224_fixtures::*;
+    use mp::autopilot::review_env::{
+        clean_room_commands, select_mode, CleanRoomTrigger, ModeSelection, ReviewEnvConfig,
+        ReviewEnvMode,
+    };
+
+    #[test]
+    fn defaults_to_normal_with_empty_issue_list() {
+        let cfg = ReviewEnvConfig::default();
+        let sel: ModeSelection = select_mode(&cfg, &[]);
+        assert_eq!(sel.mode, ReviewEnvMode::Normal);
+        assert!(sel.trigger.is_none());
+        assert!(
+            sel.pre_launch_commands.is_empty(),
+            "Normal mode must not emit commands — unconditional cargo clean is forbidden"
+        );
+    }
+
+    #[test]
+    fn explicit_clean_room_opt_in_escalates_with_config_trigger() {
+        let cfg = ReviewEnvConfig {
+            clean_room: true,
+            allow_dirty_worktree: false,
+        };
+        let sel = select_mode(&cfg, &[]);
+        assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
+        assert!(matches!(sel.trigger, Some(CleanRoomTrigger::ExplicitConfig)));
+    }
+
+    #[test]
+    fn provenance_failure_escalates_with_reason_and_commands() {
+        let cfg = ReviewEnvConfig::default();
+        let issues = vec!["shared-target-dir".to_string(), "shared-pid".to_string()];
+        let sel = select_mode(&cfg, &issues);
+        assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
+        match sel.trigger {
+            Some(CleanRoomTrigger::ProvenanceFailure { ref reasons }) => {
+                assert_eq!(reasons.len(), 2);
+                assert!(reasons.contains(&"shared-target-dir".to_string()));
+                assert!(reasons.contains(&"shared-pid".to_string()));
+            }
+            other => panic!("expected ProvenanceFailure, got {other:?}"),
+        }
+        let cmds = clean_room_commands(sel.trigger.as_ref(), &review_target());
+        assert_eq!(cmds.len(), 1);
+        assert!(cmds[0].starts_with("cargo clean"));
+        assert!(cmds[0].contains("reviewer-target"));
+    }
+
+    #[test]
+    fn clean_room_commands_are_empty_when_no_trigger() {
+        let cmds = clean_room_commands(None, &review_target());
+        assert!(
+            cmds.is_empty(),
+            "absence of trigger must not manufacture commands (no unconditional cargo clean)"
+        );
+    }
+
+    #[test]
+    fn explicit_config_trigger_records_commands() {
+        let cmds = clean_room_commands(
+            Some(&CleanRoomTrigger::ExplicitConfig),
+            &review_target(),
+        );
+        assert_eq!(cmds.len(), 1);
+        assert!(cmds[0].contains("cargo clean"));
+    }
+}

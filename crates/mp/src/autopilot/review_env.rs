@@ -251,3 +251,221 @@ mod tests {
         assert!(!env.pid_is_fresh(env.pid));
     }
 }
+
+// ─── Lane mode (S2 / AC-02) ────────────────────────────────────────────
+
+/// Selected mode for the next reviewer environment.
+///
+/// The default is [`ReviewEnvMode::Normal`] — a fresh reviewer process
+/// in an isolated target directory with no `cargo clean`. Clean-room
+/// escalation is opt-in (config flag) or forced (provenance checks
+/// failed); see [`select_mode`] for the decision table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReviewEnvMode {
+    /// Default. Fresh reviewer process + isolated target directory.
+    /// No `cargo clean` of the runner's build cache.
+    Normal,
+    /// Clean-room escalation: remove the reviewer's build artifacts
+    /// before launching the reviewer. Only chosen by [`select_mode`]
+    /// when the policy explicitly forces it.
+    CleanRoom,
+}
+
+impl ReviewEnvMode {
+    /// Stable kebab-case label (matches the serde representation).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ReviewEnvMode::Normal => "normal",
+            ReviewEnvMode::CleanRoom => "clean-room",
+        }
+    }
+}
+
+// ─── Clean-room trigger (S2 / AC-02) ───────────────────────────────────
+
+/// Why the policy escalated to [`ReviewEnvMode::CleanRoom`]. Recorded
+/// for the audit trail — the reason + the commands run are visible to
+/// the reviewer and the next cycle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "trigger", rename_all = "kebab-case")]
+pub enum CleanRoomTrigger {
+    /// `config.clean_room = true` for this session. Explicit opt-in.
+    ExplicitConfig,
+    /// Provenance checks failed; clean-room is forced rather than
+    /// blocking the review entirely. The reasons are the verifier's
+    /// [`provenance_issues`] output.
+    ProvenanceFailure { reasons: Vec<String> },
+}
+
+impl CleanRoomTrigger {
+    /// Short label, suitable for log lines and lifecycle evidence.
+    pub fn label(&self) -> &'static str {
+        match self {
+            CleanRoomTrigger::ExplicitConfig => "explicit-config",
+            CleanRoomTrigger::ProvenanceFailure { .. } => "provenance-failure",
+        }
+    }
+}
+
+// ─── Configuration (S2 / AC-02) ───────────────────────────────────────
+
+/// Per-session knobs that govern [`select_mode`]. Defaults are
+/// conservative: clean-room is opt-in (never unconditional), and the
+/// gate refuses an unsafe environment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ReviewEnvConfig {
+    /// When `true`, every review runs in clean-room mode. Off by
+    /// default — the user has to opt in for the slow path.
+    pub clean_room: bool,
+    /// When `true`, the gate accepts a dirty worktree. Off by
+    /// default — the gate would normally refuse.
+    pub allow_dirty_worktree: bool,
+}
+
+impl Default for ReviewEnvConfig {
+    fn default() -> Self {
+        Self {
+            clean_room: false,
+            allow_dirty_worktree: false,
+        }
+    }
+}
+
+// ─── Mode selection (S2 / AC-02) ───────────────────────────────────────
+
+/// Outcome of [`select_mode`]. Carries the chosen mode and — when the
+/// choice was clean-room — the trigger reason + the commands the
+/// policy instructs the cycle to run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ModeSelection {
+    pub mode: ReviewEnvMode,
+    pub trigger: Option<CleanRoomTrigger>,
+    /// Commands the cycle should run before launching the reviewer.
+    /// Empty for [`ReviewEnvMode::Normal`] — the whole point of the
+    /// policy is *no* unconditional `cargo clean`.
+    pub pre_launch_commands: Vec<String>,
+}
+
+/// Decide which [`ReviewEnvMode`] to use. Decision table (matches the
+/// design rationale and AC-02 verbatim):
+///
+/// | `config.clean_room` | `provenance_issues`              | Mode           |
+/// |---------------------|----------------------------------|----------------|
+/// | `false`             | empty                            | `Normal`       |
+/// | `false`             | non-empty                        | `CleanRoom`    |
+/// | `true`              | any                              | `CleanRoom`    |
+///
+/// `Normal` mode never emits `pre_launch_commands`: the policy does
+/// not make `cargo clean` the default. `CleanRoom` always emits
+/// `cargo clean --target-dir <reviewer_target>` (scoped to the
+/// reviewer's target directory so we do not disturb the runner's
+/// build artifacts).
+pub fn select_mode(config: &ReviewEnvConfig, provenance_issues: &[String]) -> ModeSelection {
+    if config.clean_room {
+        return ModeSelection {
+            mode: ReviewEnvMode::CleanRoom,
+            trigger: Some(CleanRoomTrigger::ExplicitConfig),
+            pre_launch_commands: Vec::new(),
+        };
+    }
+    if !provenance_issues.is_empty() {
+        return ModeSelection {
+            mode: ReviewEnvMode::CleanRoom,
+            trigger: Some(CleanRoomTrigger::ProvenanceFailure {
+                reasons: provenance_issues.to_vec(),
+            }),
+            pre_launch_commands: Vec::new(),
+        };
+    }
+    ModeSelection {
+        mode: ReviewEnvMode::Normal,
+        trigger: None,
+        pre_launch_commands: Vec::new(),
+    }
+}
+
+/// Render the commands a clean-room cycle must run before launching
+/// the reviewer. Centralised so the audit trail and the test suite
+/// agree on the exact invocation shape. Passing `None` (no trigger)
+/// returns an empty vec — the policy refuses to manufacture
+/// commands out of thin air.
+pub fn clean_room_commands(
+    trigger: Option<&CleanRoomTrigger>,
+    target_dir: &std::path::Path,
+) -> Vec<String> {
+    match trigger {
+        None => Vec::new(),
+        Some(_) => vec![format!(
+            "cargo clean --target-dir {}",
+            target_dir.display()
+        )],
+    }
+}
+
+#[cfg(test)]
+mod s2_tests {
+    use super::*;
+
+    #[test]
+    fn s2_select_mode_defaults_to_normal() {
+        let cfg = ReviewEnvConfig::default();
+        let issues: Vec<String> = Vec::new();
+        let sel = select_mode(&cfg, &issues);
+        assert_eq!(sel.mode, ReviewEnvMode::Normal);
+        assert!(sel.trigger.is_none());
+        assert!(
+            sel.pre_launch_commands.is_empty(),
+            "Normal mode must never emit pre-launch commands (no unconditional cargo clean)"
+        );
+    }
+
+    #[test]
+    fn s2_select_mode_escalates_when_config_sets_clean_room() {
+        let cfg = ReviewEnvConfig {
+            clean_room: true,
+            allow_dirty_worktree: false,
+        };
+        let sel = select_mode(&cfg, &[]);
+        assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
+        assert!(matches!(sel.trigger, Some(CleanRoomTrigger::ExplicitConfig)));
+    }
+
+    #[test]
+    fn s2_select_mode_escalates_on_provenance_failure() {
+        let cfg = ReviewEnvConfig::default();
+        let issues = vec!["shared-target-dir".to_string()];
+        let sel = select_mode(&cfg, &issues);
+        assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
+        match sel.trigger {
+            Some(CleanRoomTrigger::ProvenanceFailure { reasons }) => {
+                assert_eq!(reasons, vec!["shared-target-dir".to_string()]);
+            }
+            other => panic!("expected ProvenanceFailure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn s2_clean_room_commands_are_scoped_to_reviewer_target() {
+        let cmds = clean_room_commands(
+            Some(&CleanRoomTrigger::ProvenanceFailure {
+                reasons: vec!["shared-target-dir".to_string()],
+            }),
+            std::path::Path::new("/tmp/reviewer-target"),
+        );
+        assert_eq!(cmds.len(), 1);
+        assert!(cmds[0].contains("/tmp/reviewer-target"));
+        assert!(cmds[0].starts_with("cargo clean"));
+    }
+
+    #[test]
+    fn s2_clean_room_commands_with_no_trigger_is_empty() {
+        let cmds = clean_room_commands(None, std::path::Path::new("/tmp/reviewer-target"));
+        assert!(
+            cmds.is_empty(),
+            "absence of trigger must not manufacture commands"
+        );
+    }
+}
