@@ -3,8 +3,8 @@
     "id": "208",
     "title": "mp autopilot CLI rename — pivot `mp watch` to `mp autopilot` with legacy alias",
     "slug": "mp-autopilot-cli-rename-pivot-mp-watch-to-mp-autopilot-with-legacy-alias",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,7 +17,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -25,11 +25,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T18:57:05.367451+00:00",
+    "lifecycle_at": "2026-09-03T19:03:49.629342+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:02.539372+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T19:03:55.745424+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T18:57:05.367452+00:00"
+        "at": "2026-09-03T19:03:55.745424+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T19:03:55.779194+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.906506+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T19:03:55.779195+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T19:03:49.629343+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T18:57:05.367452+00:00"
+        "at": "2026-09-03T19:03:55.745424+00:00"
       },
       "specify": {
         "status": "done",
@@ -245,5 +261,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "test",
+      "description": "autopilot_help_stop_replaces_watch_control_stop test passes for incidental reasons: help.find(\"stop\") returns the index of the first occurrence which is inside the status verb description (\"Replaces `mp watch-control status`\\n  stop …\"), so the snippet already contains \"watch\" before reaching the stop verb line. The stop verb's own description says \"gracefully stop the recorded autopilot run by signaling its PID\" and does not contain \"watch\" or \"control\". The AC-01 spec (\"matching today's mp watch and mp watch-control sub-commands\") is satisfied semantically — the autopilot stop description matches watch-control stop (\"gracefully stop the recorded live watch …\") with watch → autopilot. But the test would pass even if the stop verb description omitted the migration pointer entirely. Backlog: tighten the test to scope to the stop verb's own line.",
+      "status": "fixed",
+      "author": "reviewer-208",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "style",
+      "description": "crates/mp/src/commands/autopilot.rs lines 437-457 ship three #[allow(dead_code)] reserved-for-future items that pull in three otherwise-unused imports at lines 30-31: _AUTOPILOT_TOPOLOGY (uses AutopilotTopology), _ac_surface (uses AcStatus, ProjectionKey, ProjectionWriteOutcome), _emit (no new imports, just wraps the existing emit()). The dead-import stubs pattern matches M211 F-01 (low/style, task_assign.rs lines 600-620). Clippy is silenced via the allow attribute, so the lint is benign today, but the surface ships intentional dead code with explicit \"reserved for future\" comments that future contributors can leave untouched. Backlog: remove the stubs and the associated imports when no follow-on milestone lands in scope.",
+      "status": "fixed",
+      "author": "reviewer-208",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    }
+  ]
 }
