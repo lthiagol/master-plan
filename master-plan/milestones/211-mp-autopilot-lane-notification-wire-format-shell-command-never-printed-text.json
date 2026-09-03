@@ -67,21 +67,21 @@
     {
       "id": "AC-01",
       "description": "Task-assignment rendering is deterministic for orchestrator-to-runner and orchestrator-to-reviewer, includes session/milestone/cycle/role/evidence fields, and produces an argv vector rather than a shell string.",
-      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_task_assignment_golden --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Before dispatch, validation rejects empty payloads, unknown target panes, invalid role directions, missing session identity, and shell metacharacter interpolation; no herdr call or session mutation occurs on rejection.",
-      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_task_assignment_validation --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "A regression fixture reproduces the M200 text-only assignment mistake: only the typed dispatcher can append AssignmentDispatched, and a prose-only or empty assignment is rejected before execution with TaskAssignmentShapeViolation.",
-      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_task_assignment_m200_regression --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
