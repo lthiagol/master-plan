@@ -68,28 +68,28 @@
     {
       "id": "AC-01",
       "description": "`mp autopilot start` with herdr absent exits 78 before creating a session directory, writing plan state, or invoking any spawn operation; the diagnostic contains an install hint.",
-      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_herdr_gate_missing --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Semantic-version checking accepts every compatible herdr version >=0.7.0 whose required command shape is present, rejects lower versions or incompatible shapes with exit 78, and reports detected version plus upgrade hint.",
-      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_herdr_gate_versions --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "The precondition function is called by both `mp autopilot start` and `mp watch` (legacy alias) — no divergence in gate behavior between the two.",
-      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_gate_shared_with_watch --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "`mp doctor` reports autopilot herdr availability, detected version/shape, compatibility result, and install/upgrade guidance without making the overall doctor command mutating.",
-      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test doctor_autopilot_herdr --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
