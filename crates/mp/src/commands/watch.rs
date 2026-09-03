@@ -92,6 +92,71 @@ pub(crate) fn cmd_watch(
         .clone()
         .unwrap_or_else(|| default_log_path(&ctx.plan_dir));
 
+    // ─── M226 F-03 wiring (topology preflight at plan-mutation gate) ──
+    // The M209 topology policy (1-pane / 2-pane / 3-pane) was
+    // declared but never consulted on the production path —
+    // `cmd_watch_drive` previously drove milestones without
+    // checking whether the configured topology allows a full
+    // milestone. M226 AC-03 certifies "rejects one-pane full
+    // milestones before plan mutation"; this guard enforces the
+    // typed [`TopologyPreflightError`] before any herdr spawn, run-
+    // state write, sequencer dispatch, or even precondition
+    // check. The gate is intentionally cheap (in-memory only —
+    // no subprocess, no disk write beyond reading the milestone's
+    // change_kind), so it short-circuits fast on a 1-pane + Full
+    // combination. A recorded review-bypass policy (future on-
+    // disk surface) is not yet plumbed through `cmd_watch_drive`;
+    // the gate reads `None` and surfaces the typed refusal, which
+    // is the M226 F-03 fix.
+    if !dry_run {
+        use crate::autopilot::role::{
+            topology_preflight, MilestoneKind, ReviewBypassPolicy, Topology, TopologyPreflightError,
+        };
+        let topology_str = cfg.autopilot.topology.as_deref().unwrap_or("three-agent");
+        let topology: Topology = topology_str.parse().unwrap_or(Topology::ThreeAgent);
+        for id in &ids {
+            let kind = match load_milestone_by_id(ctx, id) {
+                Ok(m) if m.milestone.change_kind == "track" => MilestoneKind::Track,
+                Ok(_) => MilestoneKind::Full,
+                Err(_) => continue, // surface load error via sequencer
+            };
+            if let Err(err) = topology_preflight(topology, kind, ReviewBypassPolicy::None) {
+                let policy = match &err {
+                    TopologyPreflightError::FullMilestoneRequiresReviewer { policy } => *policy,
+                    TopologyPreflightError::ShipWithBacklogDisabled { policy } => *policy,
+                };
+                let detail = match &err {
+                    TopologyPreflightError::FullMilestoneRequiresReviewer { .. } => {
+                        "full_milestone_requires_reviewer"
+                    }
+                    TopologyPreflightError::ShipWithBacklogDisabled { .. } => {
+                        "ship_with_backlog_disabled"
+                    }
+                };
+                let report = serde_json::json!({
+                    "dry_run": false,
+                    "log_file": log_path.to_string_lossy(),
+                    "sequencer": serde_json::Value::Null,
+                    "topology_preflight": {
+                        "ok": false,
+                        "reason": detail,
+                        "policy_mode": policy.mode.as_str(),
+                        "cycle_budget": policy.cycle_budget,
+                        "topology": topology_str,
+                        "milestone_id": id,
+                        "milestone_kind": match kind {
+                            MilestoneKind::Full => "full",
+                            MilestoneKind::Track => "track",
+                        },
+                        "message": format!("{err}"),
+                    },
+                });
+                emit(format, &report)?;
+                anyhow::bail!("{err}");
+            }
+        }
+    }
+
     // M197 WP1 / AC-01: lazy auto-set fallback. When the user runs
     // `mp watch` against a project that never went through
     // `mp init` (or whose harness skill was installed after init),
