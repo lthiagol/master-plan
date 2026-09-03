@@ -57,7 +57,7 @@ fn per_tab_line_matches_footer_per_tab_on_all_lanes() {
         Lane::Path,
         Lane::Backlog,
         Lane::Ideas,
-        Lane::Watch,
+        Lane::Autopilot,
         Lane::Settings,
     ];
 
@@ -140,7 +140,7 @@ fn footer_per_tab_returns_expected_strings_for_every_pair() {
         Lane::Path,
         Lane::Backlog,
         Lane::Ideas,
-        Lane::Watch,
+        Lane::Autopilot,
         Lane::Settings,
     ] {
         for content in [
@@ -153,7 +153,7 @@ fn footer_per_tab_returns_expected_strings_for_every_pair() {
             let s = app.keybinds.footer_per_tab(lane, content, false, false);
             match (lane, content) {
                 (Lane::Path, _)
-                | (Lane::Watch, _)
+                | (Lane::Autopilot, _)
                 | (Lane::Ideas, ContentState::MilestoneDetail)
                 | (Lane::Ideas, ContentState::BacklogDetail)
                 | (Lane::Ideas, ContentState::AnnotationThread)

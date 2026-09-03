@@ -55,10 +55,10 @@ fn select_settings_lane_loads_settings_state() {
     let mut app = App::new();
     app.select_lane(Lane::Settings);
     // M198: JumpLane indices are resolved against the VISIBLE lane
-    // list (Watch omitted when `ui.show_watch_tab` is off, which is
+    // list (Watch omitted when `ui.show_autopilot_tab` is off, which is
     // the App::new() default). With Watch hidden, Settings is the
     // last of 6 visible lanes → index 5.
-    let idx = Lane::ordered_visible(app.show_watch_tab)
+    let idx = Lane::ordered_visible(app.show_autopilot_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();
@@ -72,7 +72,7 @@ fn select_settings_lane_loads_settings_state() {
 fn esc_on_settings_lane_is_noop_without_active_edit() {
     let (_tmp, runner) = fixture_runner();
     let mut app = App::new();
-    let idx = Lane::ordered_visible(app.show_watch_tab)
+    let idx = Lane::ordered_visible(app.show_autopilot_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();

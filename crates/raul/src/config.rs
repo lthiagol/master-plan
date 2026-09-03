@@ -36,15 +36,15 @@ pub struct UiConfig {
     /// is read-only on mp config — the flag is loaded once at startup
     /// via `UiConfig::load` and never written back.
     pub review_hunk_enabled: bool,
-    /// M198: the `ui.show_watch_tab` flag read from mp's project
-    /// config. When true, raul's tab bar includes the Watch lane;
-    /// when false (the default), the Watch lane is filtered out of
-    /// the tab bar, the hit-test areas, and the prev/next
-    /// navigation. Loaded once at startup; restart raul to pick
-    /// up mid-session changes. Independent of `mp watch` — the
-    /// `mp` binary's `mp watch` command always works regardless
-    /// of this flag.
-    pub show_watch_tab: bool,
+    /// M198 / M214: the `ui.show_autopilot_tab` flag read from mp's
+    /// project config (renamed from `ui.show_watch_tab` in M214). When
+    /// true, raul's tab bar includes the Autopilot lane; when false
+    /// (the default), the Autopilot lane is filtered out of the tab
+    /// bar, the hit-test areas, and the prev/next navigation. Loaded
+    /// once at startup; restart raul to pick up mid-session changes.
+    /// Independent of `mp autopilot` — the `mp` binary's `mp autopilot`
+    /// command always works regardless of this flag.
+    pub show_autopilot_tab: bool,
 }
 
 impl Default for UiConfig {
@@ -55,7 +55,7 @@ impl Default for UiConfig {
             theme: Palette::DEFAULT_NAME.to_string(),
             hide_done: false,
             review_hunk_enabled: false,
-            show_watch_tab: false,
+            show_autopilot_tab: false,
         }
     }
 }
@@ -93,14 +93,19 @@ impl UiConfig {
         if let Some(h) = data["config"]["review"]["hunk"].as_bool() {
             cfg.review_hunk_enabled = h;
         }
-        // M198: read `ui.show_watch_tab`. The default is `false`
-        // (the Watch lane is hidden); the operator opts in by
-        // `mp config set ui.show_watch_tab true` (either from the
-        // raul Settings lane or the CLI). An absent value keeps
-        // the default so a stale config never accidentally
-        // re-enables the tab.
-        if let Some(s) = ui["show_watch_tab"].as_bool() {
-            cfg.show_watch_tab = s;
+        // M198 / M214: read `ui.show_autopilot_tab` (renamed from
+        // `ui.show_watch_tab`). Single-read back-compat shim: when
+        // the new key is unset but the legacy `ui.show_watch_tab`
+        // is present, the read honors the legacy value without
+        // rewriting it (the next explicit Settings save writes the
+        // new key). When both are set, the new key wins so a
+        // user-driven save overrides any stale legacy value. An
+        // absent value keeps the default so a missing config
+        // never accidentally re-enables the tab.
+        if let Some(s) = ui["show_autopilot_tab"].as_bool() {
+            cfg.show_autopilot_tab = s;
+        } else if let Some(s) = ui["show_watch_tab"].as_bool() {
+            cfg.show_autopilot_tab = s;
         }
         cfg
     }
@@ -184,7 +189,7 @@ pub fn lane_icon(lane: &str) -> &'static str {
             crate::lanes::LANE_BUGFIXES => "[B]",
             crate::lanes::LANE_BACKLOG => "[L]",
             crate::lanes::LANE_IDEAS => "[I]",
-            crate::lanes::LANE_WATCH => "[W]",
+            crate::lanes::LANE_AUTOPILOT => "[W]",
             crate::lanes::LANE_SETTINGS => "[S]",
             _ => "[ ]",
         },
@@ -195,7 +200,7 @@ pub fn lane_icon(lane: &str) -> &'static str {
             crate::lanes::LANE_BUGFIXES => "🐛",
             crate::lanes::LANE_BACKLOG => "📋",
             crate::lanes::LANE_IDEAS => "💡",
-            crate::lanes::LANE_WATCH => "👁",
+            crate::lanes::LANE_AUTOPILOT => "▶",
             crate::lanes::LANE_SETTINGS => "⚙",
             _ => "·",
         },

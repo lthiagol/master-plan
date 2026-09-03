@@ -154,7 +154,7 @@ fn new_terminal() -> Terminal<TestBackend> {
 fn watch_idle_deadline_ticks_without_input_or_end_of_stream() {
     let mut terminal = new_terminal();
     let mut app = App::new();
-    app.select_lane(Lane::Watch);
+    app.select_lane(Lane::Autopilot);
     app.watch_poller.last_poll = Some(Instant::now());
     let mut clock = FrameClock::with_interval(Duration::ZERO);
     let mut sync = Vec::new();

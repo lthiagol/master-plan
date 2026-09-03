@@ -137,9 +137,9 @@ pub(super) fn compute_tab_bar_layout(
     active: &Lane,
     lanes: &[Lane],
 ) -> TabBarLayout {
-    // M198 WP2 / AC-04: the caller passes the filtered lane list
-    // (`Lane::ordered_visible(app.show_watch_tab)`) so the layout
-    // and the hit-test areas see the same set. The function
+    // M198 WP2 / AC-04 / M214: the caller passes the filtered lane
+    // list (`Lane::ordered_visible(app.show_autopilot_tab)`) so the
+    // layout and the hit-test areas see the same set. The function
     // itself is pure; tests pass `&Lane::ordered()` for the
     // full-list case.
     let total = lanes.len();
@@ -601,12 +601,13 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
     // hit areas agree with the renderer's `render_tab_bar` by
     // construction (M105 S1 / B-39 / M124 follow-up).
     let compact = tab_bar_area.width < 60;
-    // M198 WP2 / AC-04: pass the filtered lane list (Watch
-    // omitted when `ui.show_watch_tab` is `false`) to both
-    // `compute_tab_bar_layout` and `visible_tab_x_ranges` so
-    // the layout, the hit-test areas, and the prev/next
-    // navigation all see the same set. Single filter point.
-    let lanes = Lane::ordered_visible(app.show_watch_tab);
+    // M198 WP2 / AC-04 / M214: pass the filtered lane list
+    // (Autopilot omitted when `ui.show_autopilot_tab` is
+    // `false`) to both `compute_tab_bar_layout` and
+    // `visible_tab_x_ranges` so the layout, the hit-test areas,
+    // and the prev/next navigation all see the same set. Single
+    // filter point.
+    let lanes = Lane::ordered_visible(app.show_autopilot_tab);
     let tab_layout = compute_tab_bar_layout(tab_bar_area.width, compact, &app.active_lane, &lanes);
     for (lane_idx, start_x, end_x) in visible_tab_x_ranges(&tab_layout, &lanes) {
         if let Some(lane) = lanes.get(lane_idx).cloned() {
@@ -644,10 +645,10 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
             Lane::Settings => {
                 // Settings content is the modal overlay; no list rects.
             }
-            Lane::Watch => {
-                // M179: the Watch lane's selection model is
-                // multi-select with a stable ordered queue — the
-                // hit-test surface is computed by the Watch
+            Lane::Autopilot => {
+                // M179 / M214: the Autopilot lane's selection model
+                // is multi-select with a stable ordered queue — the
+                // hit-test surface is computed by the Autopilot
                 // module's renderer (S3/S6) and is independent of
                 // the legacy `selected_index` + scrollbar path.
                 // No list-rect computation here until S6 ships the

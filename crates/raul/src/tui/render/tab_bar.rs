@@ -26,13 +26,14 @@ use crate::tui::app::{App, Lane};
 use crate::tui::view_state::TabBarLayout;
 
 pub(super) fn render_tab_bar(frame: &mut Frame, app: &App, area: Rect, layout: &TabBarLayout) {
-    // M198 follow-up: the layout indices are computed against the
-    // FILTERED lane list (`ordered_visible(app.show_watch_tab)` —
-    // see `view_state::compute_view`). The renderer must use the
-    // same list, otherwise the visible indices walk the wrong list
-    // and the bar shows the lane one slot over (e.g. Watch where
-    // Settings should be when `show_watch_tab=false`).
-    let lanes = Lane::ordered_visible(app.show_watch_tab);
+    // M198 / M214 follow-up: the layout indices are computed
+    // against the FILTERED lane list
+    // (`ordered_visible(app.show_autopilot_tab)` — see
+    // `view_state::compute_view`). The renderer must use the same
+    // list, otherwise the visible indices walk the wrong list and
+    // the bar shows the lane one slot over (e.g. Autopilot where
+    // Settings should be when `show_autopilot_tab=false`).
+    let lanes = Lane::ordered_visible(app.show_autopilot_tab);
     let active_idx = lanes
         .iter()
         .position(|l| l == &app.active_lane)

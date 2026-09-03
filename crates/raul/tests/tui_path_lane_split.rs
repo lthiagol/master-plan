@@ -19,7 +19,7 @@ fn tui_path_lane_split_lane_ordered_is_seven() {
             Lane::Path,
             Lane::Backlog,
             Lane::Ideas,
-            Lane::Watch,
+            Lane::Autopilot,
             Lane::Settings,
         ]
     );
@@ -121,29 +121,30 @@ fn tui_side_lanes_view_state_computes_scrollbar_rects() {
     }
 }
 
-/// M179 S2: the Watch lane is pinned immediately before Settings.
+/// M179 / M214: the Autopilot lane is pinned immediately before
+/// Settings.
 #[test]
-fn m179_watch_lane_is_immediately_before_settings() {
+fn m179_autopilot_lane_is_immediately_before_settings() {
     let lanes = Lane::ordered();
-    let watch_idx = lanes
+    let autopilot_idx = lanes
         .iter()
-        .position(|l| matches!(l, Lane::Watch))
-        .expect("Watch lane must be in Lane::ordered()");
+        .position(|l| matches!(l, Lane::Autopilot))
+        .expect("Autopilot lane must be in Lane::ordered()");
     let settings_idx = lanes
         .iter()
         .position(|l| matches!(l, Lane::Settings))
         .expect("Settings lane must remain in Lane::ordered()");
     assert_eq!(
-        watch_idx + 1,
+        autopilot_idx + 1,
         settings_idx,
-        "Watch must be immediately before Settings (M179 tab placement DD); \
-         got Watch at {watch_idx} and Settings at {settings_idx}"
+        "Autopilot must be immediately before Settings (M179 tab placement DD); \
+         got Autopilot at {autopilot_idx} and Settings at {settings_idx}"
     );
-    assert_eq!(Lane::Watch.label(), "Watch");
-    assert_eq!(Lane::Watch.compact_label(), "Wt");
+    assert_eq!(Lane::Autopilot.label(), "Autopilot");
+    assert_eq!(Lane::Autopilot.compact_label(), "Ap");
     assert_eq!(
-        Lane::Watch.label(),
-        raul::lanes::LANE_WATCH,
-        "Watch label must be the LANE_WATCH constant from lanes.rs"
+        Lane::Autopilot.label(),
+        raul::lanes::LANE_AUTOPILOT,
+        "Autopilot label must be the LANE_AUTOPILOT constant from lanes.rs"
     );
 }

@@ -327,7 +327,7 @@ fn watch_lane_log_pane_uses_cached_entries_without_render_io() {
     .expect("write watch.log");
 
     let mut app = App::new();
-    app.active_lane = Lane::Watch;
+    app.active_lane = Lane::Autopilot;
     app.plan_dir = dir.path().to_path_buf();
     app.watch.log_tail = raul::tui::watch::tail_watch_log(&app.plan_dir, 8);
     std::fs::remove_dir_all(&log_dir).expect("poison render-time log path");
@@ -355,7 +355,7 @@ fn watch_lane_log_pane_placeholder_when_log_absent() {
     let dir = tempfile::tempdir().expect("tempdir");
 
     let mut app = App::new();
-    app.active_lane = Lane::Watch;
+    app.active_lane = Lane::Autopilot;
     app.plan_dir = dir.path().to_path_buf();
 
     let output = render_to_string(&app);

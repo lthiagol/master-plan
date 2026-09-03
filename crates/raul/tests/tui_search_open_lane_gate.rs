@@ -18,7 +18,7 @@ fn slash_opens_search_on_milestones() {
 fn slash_is_noop_on_path_overview_watch_settings() {
     let mut app = App::new();
     let r = MpRunner::new().expect("mp");
-    for lane in [Lane::Path, Lane::Overview, Lane::Watch, Lane::Settings] {
+    for lane in [Lane::Path, Lane::Overview, Lane::Autopilot, Lane::Settings] {
         app.select_lane(lane);
         app.active_mode = Mode::Normal;
         apply_action(&mut app, &r, Action::OpenSearch).unwrap();

@@ -228,7 +228,7 @@ fn help_reflects_overridden_binding() {
 #[test]
 fn footers_are_generated_and_nonempty() {
     let kb = Keybinds::default();
-    // M198: `footer_tab_bar` takes the show_watch_tab flag so
+    // M198: `footer_tab_bar` takes the show_autopilot_tab flag so
     // the "1-N:jump" range matches the visible lane list. With
     // Watch visible the legend is "1-7"; with Watch hidden it
     // drops to "1-6". Both variants must end in ":quit".

@@ -64,7 +64,7 @@ fn build_test_schema() -> SettingsSchema {
         ),
         (
             "ui",
-            "ui.show_watch_tab",
+            "ui.show_autopilot_tab",
             "bool",
             "false",
             None,
@@ -423,7 +423,7 @@ fn build_test_schema() -> SettingsSchema {
 
 fn settings_app_with_schema() -> App {
     let mut app = App::new();
-    app.show_watch_tab = true; // include Watch lane to land on Settings via JumpLane
+    app.show_autopilot_tab = true; // include Watch lane to land on Settings via JumpLane
     let idx = Lane::ordered_visible(true)
         .iter()
         .position(|l| *l == Lane::Settings)
@@ -432,7 +432,7 @@ fn settings_app_with_schema() -> App {
     // Use JumpLane to drive load_settings_lane path (which sets the schema).
     let _ = idx;
     let config = serde_json::json!({
-        "ui": { "color": true, "icons": "unicode", "theme": "mocha", "hide_done": false, "show_watch_tab": false },
+        "ui": { "color": true, "icons": "unicode", "theme": "mocha", "hide_done": false, "show_autopilot_tab": false },
         "workflow": { "profile": "full", "plan": { "in_repo": true, "location": "master-plan" },
                       "gates": { "strictness": "relaxed" }, "steps": { "code_review": true } },
         "git": { "auto_commit": false, "commit_on_milestone_complete": false, "auto_push": false },

@@ -33,12 +33,14 @@ pub enum Lane {
     /// Actionable backlog (`TW-*` / `BF-*` / `BL-*`) lives on
     /// [`Lane::Backlog`]; the former Tweaks lane was folded in.
     Ideas,
-    /// M179: dedicated `mp watch` workflow — milestone picker,
+    /// M214: the `mp autopilot` workflow — milestone picker,
     /// preflight, start, lifecycle graph, queue, log + agent
-    /// output, attach/stop/detach. Pinned immediately before
-    /// `Settings` so it stays adjacent to the most workflow-y
-    /// control surface.
-    Watch,
+    /// output, attach/stop/detach. Renamed from `Watch` to
+    /// `Autopilot` to align with the new CLI surface and the
+    /// role-name family (orchestrator / runner / reviewer).
+    /// Pinned immediately before `Settings` so it stays
+    /// adjacent to the most workflow-y control surface.
+    Autopilot,
     /// M164: Settings lane (M169 real lane, not modal).
     Settings,
 }
@@ -117,8 +119,8 @@ impl SortKey {
 ///   (6 stops; ResolvedAt on the resolved end of the cycle).
 /// - `Ideas` — `Id → Title → Priority → Status → Created → Tags`
 ///   (6 stops; Tags on the exploratory end of the cycle).
-/// - `Path` / `Overview` / `Settings` / `Watch` — no sort menu (no
-///   list to sort, or the sort surface is custom — Watch has its own
+/// - `Path` / `Overview` / `Settings` / `Autopilot` — no sort menu (no
+///   list to sort, or the sort surface is custom — Autopilot has its own
 ///   selection ordering by milestone id).
 pub fn sort_keys_for(lane: Lane) -> Vec<SortKey> {
     match lane {
@@ -146,8 +148,8 @@ pub fn sort_keys_for(lane: Lane) -> Vec<SortKey> {
             SortKey::Created,
             SortKey::Tags,
         ],
-        // Path / Overview / Settings / Watch: no sort menu.
-        Lane::Path | Lane::Overview | Lane::Settings | Lane::Watch => Vec::new(),
+        // Path / Overview / Settings / Autopilot: no sort menu.
+        Lane::Path | Lane::Overview | Lane::Settings | Lane::Autopilot => Vec::new(),
     }
 }
 
@@ -263,13 +265,13 @@ impl Lane {
             Lane::Path,
             Lane::Backlog,
             Lane::Ideas,
-            Lane::Watch,
+            Lane::Autopilot,
             Lane::Settings,
         ]
     }
 
-    /// M198 WP2 / AC-04: single filter point for the Watch lane.
-    /// When `show_watch_tab` is `false` (the default), the Watch
+    /// M198 WP2 / AC-04: single filter point for the Autopilot lane.
+    /// When `show_autopilot_tab` is `false` (the default), the Autopilot
     /// lane is omitted from the returned list. Every consumer
     /// that drives the tab bar, hit-test areas, or prev/next
     /// navigation should use this — *not* [`Lane::ordered`] —
@@ -278,13 +280,13 @@ impl Lane {
     /// [`Lane::ordered`] list is still used by tests that
     /// exercise the wiring without caring about the operator's
     /// preference.
-    pub fn ordered_visible(show_watch_tab: bool) -> Vec<Lane> {
-        if show_watch_tab {
+    pub fn ordered_visible(show_autopilot_tab: bool) -> Vec<Lane> {
+        if show_autopilot_tab {
             Self::ordered()
         } else {
             Self::ordered()
                 .into_iter()
-                .filter(|l| !matches!(l, Lane::Watch))
+                .filter(|l| !matches!(l, Lane::Autopilot))
                 .collect()
         }
     }
@@ -300,7 +302,7 @@ impl Lane {
             Lane::Path => "Ph",
             Lane::Backlog => "Bl",
             Lane::Ideas => "Id",
-            Lane::Watch => "Wt",
+            Lane::Autopilot => "Ap",
             Lane::Settings => "Set",
         }
     }
@@ -589,14 +591,16 @@ pub struct App {
     /// on (N anchored)" indicator. Loaded once via `UiConfig::load`;
     /// restart raul to pick up mid-session flag changes.
     pub review_hunk_enabled: bool,
-    /// M198: the `ui.show_watch_tab` flag read from mp's project
-    /// config. When `false` (the default), the Watch lane is
+    /// M198: the `ui.show_autopilot_tab` flag read from mp's project
+    /// config (M214: renamed from `ui.show_watch_tab`; the legacy key
+    /// is honored as a single-read shim — see [`crate::config::UiConfig::load`]).
+    /// When `false` (the default), the Autopilot lane is
     /// filtered out of the tab bar, the hit-test areas, and the
     /// prev/next navigation. Loaded once via `UiConfig::load`;
     /// restart raul to pick up mid-session flag changes.
-    /// Independent of `mp watch` — the `mp` binary's `mp watch`
+    /// Independent of `mp autopilot` — the `mp` binary's `mp autopilot`
     /// command always works regardless of this flag.
-    pub show_watch_tab: bool,
+    pub show_autopilot_tab: bool,
     pub quitting: bool,
     /// M172 S5: sort rebind inline menu. `None` = menu closed;
     /// `Some(keys)` = menu open with the listed available keys.
@@ -681,17 +685,21 @@ pub struct App {
     pub keybinds: Keybinds,
     /// M169: populated while `active_lane == Lane::Settings`; cleared on leave.
     pub settings: Option<SettingsState>,
-    /// M179: Watch client model — picker + selection + preflight +
+    /// M179: Autopilot client model — picker + selection + preflight +
     /// M178 status/output snapshots. Single source of truth for
-    /// the Watch lane; other modules read but do not write.
+    /// the Autopilot lane; other modules read but do not write.
+    /// M214: field name kept as `watch` (internal identifier, per
+    /// scope "internal Watch-prefixed identifiers that are not
+    /// user-visible stay as-is"); the user-facing lane label is
+    /// `Autopilot`.
     pub watch: crate::tui::watch::Watch,
-    /// M179 S7: 2-5s poller state for the Watch lane. The
+    /// M179 S7: 2-5s poller state for the Autopilot lane. The
     /// `run_loop`'s `on_idle` closure calls `poll_watch_state`
-    /// whenever the Watch lane is active; the Poller rate-limits
+    /// whenever the Autopilot lane is active; the Poller rate-limits
     /// the underlying `mp watch-control status` / `output`
     /// shell-outs.
     pub watch_poller: crate::tui::watch::Poller,
-    /// Plan directory used by the Watch poller to refresh its bounded log cache.
+    /// Plan directory used by the Autopilot poller to refresh its bounded log cache.
     /// Defaults to `.` for tests and callers that do not override it.
     pub plan_dir: std::path::PathBuf,
     /// M204: pending `mp config set sort.<lane> <key>` writes that
@@ -768,7 +776,7 @@ impl App {
             lane_search: std::collections::HashMap::new(),
             lane_filters: std::collections::HashMap::new(),
             review_hunk_enabled: false,
-            show_watch_tab: false,
+            show_autopilot_tab: false,
             quitting: false,
             active_mode: Mode::Normal,
             approval_blocked: false,
@@ -1183,8 +1191,8 @@ impl App {
             // Path uses `path_scroll` / `path_max_scroll`, not selected_index.
             Lane::Path => 0,
             Lane::Overview => self.visible_inbox().len(),
-            // Watch and Settings own independent selection models.
-            Lane::Watch => 0,
+            // Autopilot and Settings own independent selection models.
+            Lane::Autopilot => 0,
             Lane::Settings => 0,
         }
     }
@@ -2227,12 +2235,12 @@ impl App {
     /// and the AC text was aspirational until now.
     pub fn tab_move_up(&mut self) {
         // M198 WP2 / AC-04: prev/next navigation walks the
-        // *visible* lane set (Watch omitted when the config
+        // *visible* lane set (Autopilot omitted when the config
         // says so), so the operator's keys never land on a
         // hidden tab. When the active lane is not in the
-        // visible set (a stale config flipped Watch off
+        // visible set (a stale config flipped Autopilot off
         // mid-session), fall back to the last visible lane.
-        let lanes = Lane::ordered_visible(self.show_watch_tab);
+        let lanes = Lane::ordered_visible(self.show_autopilot_tab);
         if lanes.is_empty() {
             return;
         }
@@ -2249,7 +2257,7 @@ impl App {
     }
 
     /// Tab / Shift+Tab next lane — wraps from the last visible
-    /// lane (Settings when Watch is shown, Ideas when Watch is
+    /// lane (Settings when Autopilot is shown, Ideas when Autopilot is
     /// hidden) to the first (Overview).
     pub fn tab_move_down(&mut self) {
         // Same filtering rationale as `tab_move_up`. The
@@ -2258,7 +2266,7 @@ impl App {
         // handling (the runner's config reload falls back to
         // Overview on toggle-off; this function is the manual
         // key path).
-        let lanes = Lane::ordered_visible(self.show_watch_tab);
+        let lanes = Lane::ordered_visible(self.show_autopilot_tab);
         if lanes.is_empty() {
             return;
         }
@@ -2272,15 +2280,15 @@ impl App {
 
     /// M198 S4 / AC-04 + F-05: if the active lane is not in the
     /// *visible* lane set (e.g. an old `state.json` named
-    /// `Lane::Watch` as active but the operator's config now
-    /// has `ui.show_watch_tab = false`), reset to `Overview`.
+    /// `Lane::Autopilot` as active but the operator's config now
+    /// has `ui.show_autopilot_tab = false`), reset to `Overview`.
     /// Overview is the default landing lane and is always
     /// visible, so it preserves a sane state regardless of
     /// which other lanes are also hidden. Called once at
-    /// startup by the runner after `show_watch_tab` is loaded
+    /// startup by the runner after `show_autopilot_tab` is loaded
     /// from `UiConfig`.
     pub fn reconcile_active_lane_with_visible(&mut self) {
-        if !Lane::ordered_visible(self.show_watch_tab).contains(&self.active_lane) {
+        if !Lane::ordered_visible(self.show_autopilot_tab).contains(&self.active_lane) {
             self.active_lane = Lane::Overview;
         }
     }
@@ -2430,7 +2438,7 @@ pub fn filter_dimensions_for(lane: Lane) -> Vec<crate::tui::mode::DimensionSpec>
         Lane::Milestones => fspec::milestones(),
         Lane::Backlog => fspec::backlog(),
         Lane::Ideas => fspec::ideas(),
-        // Path / Overview / Watch / Settings have no list to
+        // Path / Overview / Autopilot / Settings have no list to
         // filter — the modal never opens on these lanes.
         _ => Vec::new(),
     }
@@ -2833,137 +2841,137 @@ mod tests {
         assert!(app.open_only); // other fields preserved
     }
 
-    // ---- M198: ui.show_watch_tab filter -------------------------------
+    // ---- M198 / M214: ui.show_autopilot_tab filter -----------------------
 
-    /// M198: when `show_watch_tab` is `true`, `ordered_visible`
+    /// M198: when `show_autopilot_tab` is `true`, `ordered_visible`
     /// returns the full lane set — same as `ordered()`.
     #[test]
     fn ordered_visible_returns_full_list_when_flag_is_true() {
         assert_eq!(Lane::ordered_visible(true), Lane::ordered());
-        assert!(Lane::ordered_visible(true).contains(&Lane::Watch));
+        assert!(Lane::ordered_visible(true).contains(&Lane::Autopilot));
     }
 
-    /// M198: when `show_watch_tab` is `false` (the default),
-    /// `ordered_visible` filters the Watch lane out. This is the
+    /// M198: when `show_autopilot_tab` is `false` (the default),
+    /// `ordered_visible` filters the Autopilot lane out. This is the
     /// single filter point the spec calls for; every consumer
     /// (tab bar, hit-test, prev/next, digit-jump) reads from
     /// this list so the rendered tab number and the keystroke
     /// can never disagree.
     #[test]
-    fn ordered_visible_filters_watch_when_flag_is_false() {
+    fn ordered_visible_filters_autopilot_when_flag_is_false() {
         let visible = Lane::ordered_visible(false);
         assert_eq!(visible.len(), Lane::ordered().len() - 1);
-        assert!(!visible.contains(&Lane::Watch));
+        assert!(!visible.contains(&Lane::Autopilot));
         // The relative order of the remaining lanes is preserved.
-        let full_without_watch: Vec<Lane> = Lane::ordered()
+        let full_without_autopilot: Vec<Lane> = Lane::ordered()
             .into_iter()
-            .filter(|l| !matches!(l, Lane::Watch))
+            .filter(|l| !matches!(l, Lane::Autopilot))
             .collect();
-        assert_eq!(visible, full_without_watch);
+        assert_eq!(visible, full_without_autopilot);
     }
 
-    /// M198: when Watch is hidden and Watch is the active lane,
+    /// M198: when Autopilot is hidden and Autopilot is the active lane,
     /// `tab_move_up` falls back to the last visible lane so the
     /// next keystroke has a sensible starting point. Pairs with
     /// the S4 startup-time fallback in the runner.
     #[test]
     fn tab_move_up_falls_back_when_active_lane_was_filtered() {
         let mut app = App::new();
-        app.show_watch_tab = false;
-        app.active_lane = Lane::Watch; // stale state
+        app.show_autopilot_tab = false;
+        app.active_lane = Lane::Autopilot; // stale state
         app.tab_move_up();
-        // Fallback: last visible lane (Settings, since Watch is
+        // Fallback: last visible lane (Settings, since Autopilot is
         // the only filter).
         assert_eq!(app.active_lane, Lane::Settings);
     }
 
     /// M198: same scenario as above, for `tab_move_down` — falls
-    /// back to the first visible lane (Overview) when Watch is
-    /// hidden and Watch was the active lane.
+    /// back to the first visible lane (Overview) when Autopilot is
+    /// hidden and Autopilot was the active lane.
     #[test]
     fn tab_move_down_falls_back_when_active_lane_was_filtered() {
         let mut app = App::new();
-        app.show_watch_tab = false;
-        app.active_lane = Lane::Watch;
+        app.show_autopilot_tab = false;
+        app.active_lane = Lane::Autopilot;
         app.tab_move_down();
         assert_eq!(app.active_lane, Lane::Overview);
     }
 
-    /// M198: when Watch is visible, `tab_move_up` from Watch
+    /// M198: when Autopilot is visible, `tab_move_up` from Autopilot
     /// moves to Ideas (the previous lane in the full ordered
     /// list) — same as the pre-M198 contract. The filter is a
     /// no-op when the flag is true.
     #[test]
-    fn tab_move_up_wraps_within_visible_list_when_watch_is_shown() {
+    fn tab_move_up_wraps_within_visible_list_when_autopilot_is_shown() {
         let mut app = App::new();
-        app.show_watch_tab = true;
-        app.active_lane = Lane::Watch;
+        app.show_autopilot_tab = true;
+        app.active_lane = Lane::Autopilot;
         app.tab_move_up();
         assert_eq!(app.active_lane, Lane::Ideas);
     }
 
-    /// M198: when Watch is hidden, `tab_move_down` from Ideas
-    /// (the lane just before where Watch would be) lands on
-    /// Settings, not Watch. The operator's `Tab` key never
+    /// M198: when Autopilot is hidden, `tab_move_down` from Ideas
+    /// (the lane just before where Autopilot would be) lands on
+    /// Settings, not Autopilot. The operator's `Tab` key never
     /// lands on a hidden tab.
     #[test]
-    fn tab_move_down_skips_hidden_watch_lane() {
+    fn tab_move_down_skips_hidden_autopilot_lane() {
         let mut app = App::new();
-        app.show_watch_tab = false;
+        app.show_autopilot_tab = false;
         app.active_lane = Lane::Ideas;
         app.tab_move_down();
-        // Without the filter this would land on Watch; with
+        // Without the filter this would land on Autopilot; with
         // the filter it lands on Settings.
         assert_eq!(app.active_lane, Lane::Settings);
     }
 
-    /// M198: with Watch visible, `tab_move_down` from Ideas
-    /// does land on Watch (pre-M198 behavior).
+    /// M198: with Autopilot visible, `tab_move_down` from Ideas
+    /// does land on Autopilot (pre-M198 behavior).
     #[test]
-    fn tab_move_down_lands_on_watch_when_visible() {
+    fn tab_move_down_lands_on_autopilot_when_visible() {
         let mut app = App::new();
-        app.show_watch_tab = true;
+        app.show_autopilot_tab = true;
         app.active_lane = Lane::Ideas;
         app.tab_move_down();
-        assert_eq!(app.active_lane, Lane::Watch);
+        assert_eq!(app.active_lane, Lane::Autopilot);
     }
 
     /// M198 S4 / AC-04 + F-05: when the active lane is not in
-    /// the visible set (Watch hidden, active lane was Watch),
+    /// the visible set (Autopilot hidden, active lane was Autopilot),
     /// `reconcile_active_lane_with_visible` falls back to
     /// Overview. This is the startup-time guard the runner
     /// calls after loading `UiConfig`; the unit test pins the
     /// same code path that the integration TUI test would.
     #[test]
-    fn reconcile_active_lane_falls_back_when_watch_is_hidden() {
+    fn reconcile_active_lane_falls_back_when_autopilot_is_hidden() {
         let mut app = App::new();
-        app.show_watch_tab = false;
-        app.active_lane = Lane::Watch; // stale state
+        app.show_autopilot_tab = false;
+        app.active_lane = Lane::Autopilot; // stale state
         app.reconcile_active_lane_with_visible();
         assert_eq!(app.active_lane, Lane::Overview);
     }
 
     /// M198 S4 / AC-04 + F-05: when the active lane IS in
-    /// the visible set, the guard is a no-op. The Watch lane
-    /// stays active when `ui.show_watch_tab = true`.
+    /// the visible set, the guard is a no-op. The Autopilot lane
+    /// stays active when `ui.show_autopilot_tab = true`.
     #[test]
-    fn reconcile_active_lane_preserves_when_watch_is_visible() {
+    fn reconcile_active_lane_preserves_when_autopilot_is_visible() {
         let mut app = App::new();
-        app.show_watch_tab = true;
-        app.active_lane = Lane::Watch;
+        app.show_autopilot_tab = true;
+        app.active_lane = Lane::Autopilot;
         app.reconcile_active_lane_with_visible();
-        assert_eq!(app.active_lane, Lane::Watch);
+        assert_eq!(app.active_lane, Lane::Autopilot);
     }
 
     /// M198 S4 / AC-04 + F-05: a lane that is always visible
     /// (e.g. Milestones) is preserved regardless of the
-    /// Watch flag. This pins the "Overview is the fallback,
+    /// Autopilot flag. This pins the "Overview is the fallback,
     /// not the only valid result" semantics — the guard only
     /// fires when the active lane is genuinely hidden.
     #[test]
-    fn reconcile_active_lane_preserves_visible_lane_regardless_of_watch() {
+    fn reconcile_active_lane_preserves_visible_lane_regardless_of_autopilot() {
         let mut app = App::new();
-        app.show_watch_tab = false;
+        app.show_autopilot_tab = false;
         app.active_lane = Lane::Milestones;
         app.reconcile_active_lane_with_visible();
         assert_eq!(app.active_lane, Lane::Milestones);

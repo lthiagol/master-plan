@@ -436,23 +436,22 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             load_data_for_lane(runner, app)?;
         }
         Action::JumpLane(idx) => {
-            // M198: digit keys 1..=N follow the *visible* lane
-            // list (Watch omitted when `ui.show_watch_tab` is
-            // `false`) so the on-screen tab number matches the
-            // key. F-03: the `lanes.get(idx)` is a defensive
-            // bounds check — `Action::JumpLane` is a public
-            // enum variant that any caller (the digit dispatch
-            // in `modes/normal.rs`, future programmatic
-            // dispatchers, tests) can construct. The digit
-            // dispatch itself always computes the index from
-            // the same `Lane::ordered_visible(app.show_watch_tab)`
-            // at the same call site, so a stale index from the
-            // digit path is impossible; this guard is for other
-            // callers. The S4 startup-time fallback
-            // (`runner.rs`) handles the case where Watch *was*
-            // the active lane and the operator toggled the
-            // flag off in config.
-            let lanes = Lane::ordered_visible(app.show_watch_tab);
+            // M198 / M214: digit keys 1..=N follow the *visible* lane
+            // list (Autopilot omitted when `ui.show_autopilot_tab`
+            // is `false`) so the on-screen tab number matches the
+            // key. F-03: the `lanes.get(idx)` is a defensive bounds
+            // check — `Action::JumpLane` is a public enum variant
+            // that any caller (the digit dispatch in
+            // `modes/normal.rs`, future programmatic dispatchers,
+            // tests) can construct. The digit dispatch itself
+            // always computes the index from the same
+            // `Lane::ordered_visible(app.show_autopilot_tab)` at
+            // the same call site, so a stale index from the digit
+            // path is impossible; this guard is for other callers.
+            // The S4 startup-time fallback (`runner.rs`) handles
+            // the case where Autopilot *was* the active lane and
+            // the operator toggled the flag off in config.
+            let lanes = Lane::ordered_visible(app.show_autopilot_tab);
             if let Some(lane) = lanes.get(idx) {
                 app.select_lane(*lane);
                 load_data_for_lane(runner, app)?;
@@ -1475,12 +1474,13 @@ fn apply_enter(app: &mut App, runner: &MpRunner) -> Result<()> {
                     super::runner_helpers::navigate_from_inbox_item(app, runner, &item)?;
                 }
             }
-            Lane::Watch => {
-                // M179: the Watch lane's Enter semantics are
-                // selector-driven (toggle a milestone's selection
-                // in the picker) — see `tui::watch` (S3). The
-                // dispatch here is a no-op fallback; S3 will
-                // re-route via a dedicated `Action::WatchToggleSelect`.
+            Lane::Autopilot => {
+                // M179 / M214: the Autopilot lane's Enter semantics
+                // are selector-driven (toggle a milestone's
+                // selection in the picker) — see `tui::watch`
+                // (S3). The dispatch here is a no-op fallback;
+                // S3 re-routes via a dedicated
+                // `Action::WatchToggleSelect`.
             }
             Lane::Settings => {}
         },

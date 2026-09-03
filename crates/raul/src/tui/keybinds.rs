@@ -738,17 +738,18 @@ impl Keybinds {
 
     /// The tab-bar-focused footer, generated from the navigation bindings.
     /// The "1-N:jump" range follows the *visible* lane list
-    /// (`Lane::ordered_visible(show_watch_tab).len()`) so the
+    /// (`Lane::ordered_visible(show_autopilot_tab).len()`) so the
     /// on-screen tab number matches the keystroke when the
-    /// operator has hidden the Watch tab. M198 WP2: the helper
-    /// is purely text generation; it does not mutate any state
-    /// and is safe to call from the render path on every frame.
-    pub fn footer_tab_bar(&self, show_watch_tab: bool) -> String {
+    /// operator has hidden the Autopilot tab. M198 WP2 / M214: the
+    /// helper is purely text generation; it does not mutate any
+    /// state and is safe to call from the render path on every
+    /// frame.
+    pub fn footer_tab_bar(&self, show_autopilot_tab: bool) -> String {
         format!(
             " {}/{}:lanes  1-{}:jump  {}:focus  {}:quit ",
             Self::primary(&self.previous_lane),
             Self::primary(&self.next_lane),
-            super::app::Lane::ordered_visible(show_watch_tab).len(),
+            super::app::Lane::ordered_visible(show_autopilot_tab).len(),
             Self::primary(&self.focus_content),
             Self::primary(&self.quit),
         )
@@ -1009,11 +1010,12 @@ impl Keybinds {
                 // globals baseline.
                 return String::new();
             }
-            (Lane::Watch, _) => {
-                // Watch has no in-band bindings beyond what the
+            (Lane::Autopilot, _) => {
+                // Autopilot has no in-band bindings beyond what the
                 // globals line offers in v1. Per design decision D-07
-                // this is a deliberate 1-row footer (the Watch lane's
-                // per-row actions render in the row, not the footer).
+                // this is a deliberate 1-row footer (the Autopilot
+                // lane's per-row actions render in the row, not the
+                // footer).
                 return String::new();
             }
             (Lane::Settings, _) => {
@@ -1672,10 +1674,10 @@ mod footer_per_tab_tests {
     }
 
     #[test]
-    fn watch_lane_returns_empty_string_for_every_content_state() {
-        // D-07: Watch is the second v1 lane with an empty
-        // per-tab string (its per-row actions render in the
-        // row, not the footer).
+    fn autopilot_lane_returns_empty_string_for_every_content_state() {
+        // D-07 / M214: Autopilot is the second v1 lane with an
+        // empty per-tab footer (Path is the first). The action
+        // bar lives inside the row, not the footer.
         for content in [
             ContentState::List,
             ContentState::MilestoneDetail,
@@ -1683,10 +1685,10 @@ mod footer_per_tab_tests {
             ContentState::AnnotationThread,
             ContentState::CoApproval,
         ] {
-            let s = per_tab(Lane::Watch, content);
+            let s = per_tab(Lane::Autopilot, content);
             assert!(
                 s.is_empty(),
-                "footer_per_tab(Watch, {content:?}) must be empty; got={s:?}"
+                "footer_per_tab(Autopilot, {content:?}) must be empty; got={s:?}"
             );
         }
     }

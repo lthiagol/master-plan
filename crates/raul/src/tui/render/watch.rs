@@ -1,4 +1,4 @@
-//! Render the Watch lane as three regions:
+//! Render the Autopilot lane as three regions:
 //!
 //! 1. **Picker** (left) — the drivable candidate list with the
 //!    current selection highlighted. `>` marks the active
@@ -16,7 +16,7 @@
 //! The renderer is intentionally text-based — no tui
 //! widgets beyond `Paragraph` + `Block`. The TUI main loop
 //! calls `render_watch_lane` whenever the active lane is
-//! `Lane::Watch`.
+//! `Lane::Autopilot`.
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};

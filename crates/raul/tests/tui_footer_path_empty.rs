@@ -67,7 +67,7 @@ fn non_path_lane_footer_is_two_rows_tall() {
         Lane::Milestones,
         Lane::Backlog,
         Lane::Ideas,
-        Lane::Watch,
+        Lane::Autopilot,
         Lane::Settings,
     ] {
         let mut app = App::new();
@@ -80,7 +80,7 @@ fn non_path_lane_footer_is_two_rows_tall() {
         // Watch is a 1-row footer in v1 because it has no
         // per-tab keys (per D-07 / `footer_per_tab` returns
         // empty for Watch). The other non-Path lanes are 2-row.
-        if lane == Lane::Watch {
+        if lane == Lane::Autopilot {
             assert_eq!(
                 view.footer_area.height, 1,
                 "{lane:?} (Watch) must reserve a 1-row footer_area"

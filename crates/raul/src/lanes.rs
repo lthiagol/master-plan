@@ -15,10 +15,13 @@ use crate::tui::app::Lane;
 
 /// Sidebar / list-row header for the high-level Overview lane.
 pub const LANE_OVERVIEW: &str = "Overview";
-/// M179: Watch lane — the dedicated `mp watch` workflow surface
+/// M214: Autopilot lane — the dedicated `mp autopilot` workflow surface
 /// (milestone picker, preflight, start, lifecycle graph, queue,
-/// log + agent output, attach/stop/detach controls).
-pub const LANE_WATCH: &str = "Watch";
+/// log + agent output, attach/stop/detach controls). Renamed from
+/// `LANE_WATCH = "Watch"` (M179) to align with the new CLI surface
+/// (`mp autopilot`) and the role-name family (orchestrator / runner /
+/// reviewer).
+pub const LANE_AUTOPILOT: &str = "Autopilot";
 /// Sidebar / list-row header for the milestone-tree lane.
 pub const LANE_MILESTONES: &str = "Milestones";
 /// Sidebar / list-row header for the Plan / Path lane.
@@ -51,7 +54,7 @@ pub fn lane_label(lane: &Lane) -> &'static str {
         Lane::Path => LANE_PATH,
         Lane::Backlog => LANE_BACKLOG,
         Lane::Ideas => LANE_IDEAS,
-        Lane::Watch => LANE_WATCH,
+        Lane::Autopilot => LANE_AUTOPILOT,
         Lane::Settings => LANE_SETTINGS,
     }
 }
@@ -84,7 +87,7 @@ mod lane_name_constants_are_the_only_source_of_truth {
         assert_eq!(LANE_MILESTONES, "Milestones");
         assert_eq!(LANE_PATH, "Path");
         assert_eq!(LANE_BACKLOG, "Backlog");
-        assert_eq!(LANE_WATCH, "Watch");
+        assert_eq!(LANE_AUTOPILOT, "Autopilot");
         assert_eq!(LANE_SETTINGS, "Settings");
         assert_eq!(LANE_BUGFIXES, "Bugfixes");
         assert_eq!(LANE_TWEAKS, "Tweaks");
@@ -102,7 +105,7 @@ mod lane_name_constants_are_the_only_source_of_truth {
         assert_eq!(lane_label(&Lane::Path), LANE_PATH);
         assert_eq!(lane_label(&Lane::Backlog), LANE_BACKLOG);
         assert_eq!(lane_label(&Lane::Ideas), LANE_IDEAS);
-        assert_eq!(lane_label(&Lane::Watch), LANE_WATCH);
+        assert_eq!(lane_label(&Lane::Autopilot), LANE_AUTOPILOT);
         assert_eq!(lane_label(&Lane::Settings), LANE_SETTINGS);
     }
 
@@ -120,6 +123,7 @@ mod lane_name_constants_are_the_only_source_of_truth {
             LANE_PATH,
             LANE_MILESTONES,
             LANE_BACKLOG,
+            LANE_AUTOPILOT,
             LANE_SETTINGS,
         ];
         // Sources we audit. Any new render site added under

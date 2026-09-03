@@ -12,7 +12,7 @@ fn ordered_is_seven_without_grooming() {
             Lane::Path,
             Lane::Backlog,
             Lane::Ideas,
-            Lane::Watch,
+            Lane::Autopilot,
             Lane::Settings,
         ]
     );

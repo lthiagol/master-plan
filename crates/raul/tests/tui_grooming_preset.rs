@@ -29,7 +29,7 @@ fn grooming_preset_noop_on_other_lanes() {
         Lane::Path,
         Lane::Backlog,
         Lane::Ideas,
-        Lane::Watch,
+        Lane::Autopilot,
         Lane::Settings,
     ] {
         app.select_lane(lane);

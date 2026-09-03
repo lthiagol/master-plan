@@ -19,12 +19,16 @@ pub const SETTINGS_KEYS: &[(&str, &str)] = &[
     ("ui", "ui.icons"),
     ("ui", "ui.theme"),
     ("ui", "ui.hide_done"),
-    // M198 WP1: when `false` (the default), raul's tab bar
-    // filters the Watch lane out (see S3 / `compute_tab_bar_layout`).
-    // The `mp` binary's `mp watch` command is independent of this
-    // flag — only the human-facing TUI surface reacts. Operators
-    // opt in via this row.
-    ("ui", "ui.show_watch_tab"),
+    // M198 WP1 / M214: when `false` (the default), raul's tab bar
+    // filters the Autopilot lane out (see S3 /
+    // `compute_tab_bar_layout`). The `mp` binary's `mp autopilot`
+    // command is independent of this flag — only the human-facing
+    // TUI surface reacts. Operators opt in via this row. The
+    // legacy `ui.show_watch_tab` key is honored as a single-read
+    // shim — see `crate::config::UiConfig::load` — and is
+    // rewritten to this new key on the operator's next explicit
+    // Settings save.
+    ("ui", "ui.show_autopilot_tab"),
     // workflow
     ("workflow", "workflow.profile"),
     ("workflow", "workflow.plan.location"),

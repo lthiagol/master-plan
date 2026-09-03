@@ -70,8 +70,8 @@
       "id": "AC-01",
       "description": "`Lane::Autopilot` exists; `Lane::Watch` is gone. The lane list under both visible (toggle on) and hidden (toggle off) states matches the documented behavior, including the `JumpLane` digit dispatch and the footer hint.",
       "verification": "cargo nextest run -p raul --test lane_autopilot_rename --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test lane_autopilot_rename --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-02",
@@ -130,7 +130,7 @@
       ],
       "tests": "cargo nextest run -p raul --test lane_autopilot_rename --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 214 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],

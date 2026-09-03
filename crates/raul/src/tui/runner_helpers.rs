@@ -159,19 +159,22 @@ pub fn load_milestones(runner: &MpRunner, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-/// M179 S3 / AC-02: load the Watch picker. Sources `mp list
+/// M179 S3 / AC-02: load the Autopilot picker. Sources `mp list
 /// milestones` (the same shell-out the Milestones lane uses, but
-/// unfiltered by `hide_done` — the Watch picker must surface
+/// unfiltered by `hide_done` — the Autopilot picker must surface
 /// every drivable milestone regardless of the user's Overview
 /// hide-done preference) and replaces the picker's candidate
 /// list. The picker's selection is preserved where it still
 /// resolves in the new candidate set; ids that no longer
-/// exist are dropped.
+/// exist are dropped. M214: function name kept as `load_watch_picker`
+/// (internal helper, per scope "internal Watch-prefixed identifiers
+/// that are not user-visible stay as-is"); the user-facing lane label
+/// is `Autopilot`.
 pub fn load_watch_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
     // M143: cache hit short-circuits the mp call. Cache key is
-    // `Lane::Watch`; the picker source is `mp list milestones`
+    // `Lane::Autopilot`; the picker source is `mp list milestones`
     // (no sort — the picker renders in canonical M122 order).
-    if let Some(cached) = app.lane_cache.get(&Lane::Watch) {
+    if let Some(cached) = app.lane_cache.get(&Lane::Autopilot) {
         let data = &cached["data"];
         if data.is_object() {
             app.watch.refresh_candidates(data);
@@ -181,7 +184,7 @@ pub fn load_watch_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
     }
     let data = reads::list_milestones(runner, None)?;
     let cache_value = serde_json::json!({ "data": data });
-    app.lane_cache.put(Lane::Watch, cache_value);
+    app.lane_cache.put(Lane::Autopilot, cache_value);
     app.watch.refresh_candidates(&data);
     let _ = crate::tui::watch::restore_latest_status(runner, app)?;
     Ok(())
@@ -693,6 +696,8 @@ fn parse_config_get_value(raw: &[u8]) -> Option<String> {
 /// opens on lanes that expose it, so the sentinel is unreachable in
 /// practice — but the function is `pub` for completeness (a future
 /// milestone might surface sort on Overview via a custom toggle).
+/// M214: `Lane::Autopilot` maps to `"autopilot"` (the config key
+/// segment matches the new lane label).
 pub fn match_lane_label(lane: &Lane) -> String {
     match lane {
         Lane::Overview => "overview".to_string(),
@@ -700,7 +705,7 @@ pub fn match_lane_label(lane: &Lane) -> String {
         Lane::Path => "path".to_string(),
         Lane::Backlog => "backlog".to_string(),
         Lane::Ideas => "ideas".to_string(),
-        Lane::Watch => "watch".to_string(),
+        Lane::Autopilot => "autopilot".to_string(),
         Lane::Settings => "settings".to_string(),
     }
 }
@@ -918,11 +923,12 @@ pub fn load_data_for_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         Lane::Path => load_path_data(runner, app),
         // M169: Settings lane loads config from `mp config show`.
         Lane::Settings => load_settings_lane(runner, app),
-        // M179: Watch lane data is owned by the Watch module
-        // (S3). The data model is selection-driven, not list-
-        // driven, so refresh uses `mp list milestones` (the
-        // picker source). S7 adds the periodic poller.
-        Lane::Watch => load_watch_picker(runner, app),
+        // M179 / M214: Autopilot lane data is owned by the
+        // Autopilot module (S3). The data model is
+        // selection-driven, not list-driven, so refresh uses
+        // `mp list milestones` (the picker source). S7 adds
+        // the periodic poller.
+        Lane::Autopilot => load_watch_picker(runner, app),
     }
 }
 

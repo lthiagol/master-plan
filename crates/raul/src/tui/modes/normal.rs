@@ -81,11 +81,12 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
         if app.active_lane == Lane::Settings {
             return Vec::new();
         }
-        // M198: the Settings lane is always visible (it's a
-        // control surface, not a domain lane) so its position in
-        // the visible list is deterministic. Use the visible
-        // list so the digit-jump dispatch below agrees.
-        let idx = Lane::ordered_visible(app.show_watch_tab)
+        // M198 / M214: the Settings lane is always visible
+        // (it's a control surface, not a domain lane) so its
+        // position in the visible list is deterministic. Use
+        // the visible list so the digit-jump dispatch below
+        // agrees.
+        let idx = Lane::ordered_visible(app.show_autopilot_tab)
             .iter()
             .position(|l| *l == Lane::Settings)
             .expect("Settings lane must exist");
@@ -112,12 +113,11 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
     // Digit lane-jumps are positional, not per-action bindings (indexed
     // bindings are out of scope for the v1/v2 keybind rework).
     if matches!(key.code, KeyCode::Char(c) if c.is_ascii_digit()) {
-        // M198: digits index into the *visible* lane list so
+        // M198 / M214: digits index into the *visible* lane list so
         // the on-screen tab number matches the key. When the
-        // Watch tab is hidden, the operator sees 6 tabs and
-        // digits 1..=6 are valid; the seventh digit is a
-        // no-op.
-        let max_idx = Lane::ordered_visible(app.show_watch_tab).len();
+        // Autopilot tab is hidden, the operator sees 6 tabs and
+        // digits 1..=6 are valid; the seventh digit is a no-op.
+        let max_idx = Lane::ordered_visible(app.show_autopilot_tab).len();
         if max_idx <= 9 {
             if let KeyCode::Char(c) = key.code {
                 if let Some(d) = c.to_digit(10) {

@@ -35,12 +35,12 @@ pub(super) fn render_lane_list(frame: &mut Frame, app: &App, area: Rect, view: &
     match app.active_lane {
         Lane::Milestones => render_milestones_table(frame, app, inner, view),
         Lane::Backlog | Lane::Ideas => render_backlog_list(frame, app, inner, view),
-        // M179 S3-S6: the Watch lane has its own renderer
-        // (picker + lifecycle graph + compact queue + log +
-        // active-pane output). The renderer does not use the
-        // legacy `selected_index` + scrollbar path; the
+        // M179 / M214 S3-S6: the Autopilot lane has its own
+        // renderer (picker + lifecycle graph + compact queue +
+        // log + active-pane output). The renderer does not use
+        // the legacy `selected_index` + scrollbar path; the
         // picker / queue cursors live on `app.watch`.
-        Lane::Watch => super::watch::render_watch_lane(frame, app, area),
+        Lane::Autopilot => super::watch::render_watch_lane(frame, app, area),
         _ => {
             let msg = Paragraph::new("")
                 .block(Block::default().borders(Borders::ALL).title(""))

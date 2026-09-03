@@ -195,9 +195,9 @@ fn view_state_lists_tabs() {
         "expected at least one tab hit area, got none"
     );
     // M198: the tab bar renders the FILTERED lane list
-    // (`ordered_visible(app.show_watch_tab)` — Watch omitted when
+    // (`ordered_visible(app.show_autopilot_tab)` — Watch omitted when
     // the flag is off). The hit areas must match the visible set.
-    let lanes = Lane::ordered_visible(app.show_watch_tab);
+    let lanes = Lane::ordered_visible(app.show_autopilot_tab);
     assert_eq!(
         view.tab_hit_areas.len(),
         lanes.len(),
@@ -318,8 +318,8 @@ fn tab_click_hits_rendered_tab() {
     let (buf, view) = render_to_buffer(&app, 100, 30);
 
     // M198: hit areas use the FILTERED lane list (Watch omitted
-    // when `ui.show_watch_tab` is off).
-    let lanes = Lane::ordered_visible(app.show_watch_tab);
+    // when `ui.show_autopilot_tab` is off).
+    let lanes = Lane::ordered_visible(app.show_autopilot_tab);
     for (i, hit) in view.tab_hit_areas.iter().enumerate() {
         assert_eq!(hit.id, lanes[i], "tab hit area {i} id mismatch");
 

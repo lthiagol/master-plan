@@ -13,7 +13,7 @@ fn ordered_is_seven_without_tweaks() {
             Lane::Path,
             Lane::Backlog,
             Lane::Ideas,
-            Lane::Watch,
+            Lane::Autopilot,
             Lane::Settings,
         ]
     );

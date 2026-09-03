@@ -388,22 +388,22 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // that toggle the flag mid-session need a restart for the
     // indicator to flip (acceptable for the human surface).
     app.review_hunk_enabled = ui_config.review_hunk_enabled;
-    // M198: same pattern as `review_hunk_enabled` — read
-    // `ui.show_watch_tab` once at startup and pin it on App.
-    // When `false` (the default), the Watch lane is filtered
-    // out of the tab bar, the hit-test areas, and the
-    // prev/next navigation. Mid-session flips need a restart,
-    // which the spec accepts: the toggle is a setup-time
-    // decision, not a hot key.
-    app.show_watch_tab = ui_config.show_watch_tab;
-    // M198 S4 / AC-04: if the operator toggled Watch off while
-    // the active lane was Watch (stale state, e.g. an old
-    // `state.json` or a mid-session reload), fall back to
-    // Overview. The check uses the *visible* list so it is
-    // the same set the tab bar / hit-test / prev-next
-    // navigation all see — single filter point. F-05: this
-    // is now a method on `App` so the same code path is
-    // unit-testable from `app.rs::tests`.
+    // M198 / M214: same pattern as `review_hunk_enabled` — read
+    // `ui.show_autopilot_tab` (renamed from `ui.show_watch_tab`)
+    // once at startup and pin it on App. When `false` (the
+    // default), the Autopilot lane is filtered out of the tab
+    // bar, the hit-test areas, and the prev/next navigation.
+    // Mid-session flips need a restart, which the spec accepts:
+    // the toggle is a setup-time decision, not a hot key.
+    app.show_autopilot_tab = ui_config.show_autopilot_tab;
+    // M198 S4 / AC-04 / M214: if the operator toggled Autopilot
+    // off while the active lane was Autopilot (stale state, e.g.
+    // an old `state.json` or a mid-session reload), fall back to
+    // Overview. The check uses the *visible* list so it is the
+    // same set the tab bar / hit-test / prev-next navigation
+    // all see — single filter point. F-05: this is now a method
+    // on `App` so the same code path is unit-testable from
+    // `app.rs::tests`.
     app.reconcile_active_lane_with_visible();
     app.keybinds = crate::tui::keybinds::Keybinds::load(runner);
 
@@ -426,10 +426,10 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     let mut source = CrosstermSource;
     let mut sync_out = stdout();
 
-    // The idle hook drives the rate-limited Watch poller.
+    // The idle hook drives the rate-limited Autopilot poller.
     let on_idle = move |app: &mut App| -> Result<()> {
-        let watch_lane_active = app.active_lane == crate::tui::app::Lane::Watch;
-        if watch_lane_active {
+        let autopilot_lane_active = app.active_lane == crate::tui::app::Lane::Autopilot;
+        if autopilot_lane_active {
             let mut poller = std::mem::take(&mut app.watch_poller);
             let result = crate::tui::watch::poll_watch_state(runner, app, &mut poller);
             app.watch_poller = poller;
@@ -603,9 +603,9 @@ where
         }
 
         // ---- Wait for the next event -------------------------------------
-        // Watch uses its polling deadline; other lanes wait effectively
+        // Autopilot uses its polling deadline; other lanes wait effectively
         // indefinitely for input.
-        let timeout = if app.active_lane == Lane::Watch {
+        let timeout = if app.active_lane == Lane::Autopilot {
             app.watch_poller.time_until_due()
         } else {
             Duration::from_secs(24 * 60 * 60)

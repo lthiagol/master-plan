@@ -618,9 +618,9 @@ fn apply_action_settings_lane_quit_still_works() {
 fn normal_handler_tab_lane_jump_emits_jump_action() {
     let app = App::new();
     // M198: digits index into the VISIBLE lane list (Watch omitted
-    // when `ui.show_watch_tab` is off — the App::new() default), so
-    // the upper bound follows `ordered_visible(app.show_watch_tab)`.
-    let n = Lane::ordered_visible(app.show_watch_tab).len();
+    // when `ui.show_autopilot_tab` is off — the App::new() default), so
+    // the upper bound follows `ordered_visible(app.show_autopilot_tab)`.
+    let n = Lane::ordered_visible(app.show_autopilot_tab).len();
     assert_eq!(
         modes::normal::handle_key(key(KeyCode::Char('1')), &app),
         vec![Action::JumpLane(0)]

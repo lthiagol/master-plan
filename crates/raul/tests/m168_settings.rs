@@ -117,7 +117,7 @@ fn fixture_env() -> (TempDir, MpRunner) {
 }
 
 fn open_settings_lane(app: &mut App, runner: &MpRunner) {
-    let idx = Lane::ordered_visible(app.show_watch_tab)
+    let idx = Lane::ordered_visible(app.show_autopilot_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .expect("Settings lane");
@@ -189,7 +189,7 @@ fn s_opens_settings_lane_once() {
     assert_ne!(app.active_lane, Lane::Settings);
 
     let actions = raul::tui::modes::normal::handle_key(ctrl_o(), &app);
-    let idx = Lane::ordered_visible(app.show_watch_tab)
+    let idx = Lane::ordered_visible(app.show_autopilot_tab)
         .iter()
         .position(|l| *l == Lane::Settings)
         .unwrap();
