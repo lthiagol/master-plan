@@ -600,3 +600,55 @@ M211 is the next dependency in the sequence: mp autopilot typed task assignment 
 ### Going idle
 
 Closing the M209 tab, building a fresh one for M211.
+
+---
+
+## 2026-09-03 ~16:10 — M211 cycle 1 review: ok. Milestone COMPLETE. 2 findings (backlog class).
+
+### Reviewer report (verbatim)
+
+> Reviewer: M211 review cycle 1 done. Filed 2 findings (F-01 low/style dead-import stubs in task_assign.rs lines 600-620, F-02 low/spec stale slug+WP rollback doc referencing non-existent lane_notify.rs; actual module is task_assign.rs). Both resolved as backlog-class with empty fixed_in per M201/M209 precedent. Verdict: ok. Notes: cold build (make clean) PASS — AC-01 9/9, AC-02 28/28, AC-03 17/17 match runner evidence exactly; cargo fmt + clippy clean; consumer-surface-lint clean; M200 regression fixture genuinely exercises the original dispatch bug (bogus herdr bin forces ENOENT, only_typed_dispatcher test asserts no AssignmentDispatched event after every rejection path). Lifecycle -> complete, spec -> verified. Commit a3e845b.
+
+### Final R5 state
+
+| Field | Value |
+|---|---|
+| lifecycle | complete |
+| execution_status | done |
+| spec_status | **verified** |
+| Findings | 2 filed, 2 resolved-no-commit (F-01 low dead-import stubs, F-02 low stale slug + WP rollback doc) |
+| Reviews.json | 1 record, verdict=ok, reviewer=reviewer-211 |
+| Commits | 6 total for M211: 3 step + 1 lifecycle evidence + 1 review cycle 1 + 1 orchestrator pre-empt |
+
+### Cycle counts (M211)
+
+- Cycle 1: dispatch → R5 PASS (clean) → dispatch reviewer → 2 backlog findings → ok
+- Total review cycles: 1 (clean)
+
+### What worked
+
+1. **The tightened runner contract held the discipline gate.** The M209 R5 reject taught the lesson; the M211 runner's pre-notify gate showed all 3 steps done and 3 ACs with real per-AC evidence. Zero discipline failure. The "pre-notify gate" pattern in the contract is a clean enforcement mechanism.
+2. **The orchestrator's F-02 pre-empt worked again.** M211 had 3 placeholder AC verifications; the orchestrator fixed all 3 in commit `a543561`. The runner stamped real evidence against the pre-empted fields without confusion.
+3. **The reviewer's cold build discipline was exemplary.** `make clean` + cargo nextest confirmed all 3 ACs match the runner's evidence exactly. M200 regression fixture genuinely exercises the original dispatch bug (the reviewer verified this by reading the test code, not just running it).
+4. **Backlog-class finding handling is now consistent.** Both findings filed, both resolved with no commit per the M201/M209 precedent. The reviewer is making scope calls correctly: the slug is stale (F-02) because the file name was never renamed when the title changed in 09412e2, but that's a plan-hygiene issue, not a M211 implementation issue.
+
+### What didn't work
+
+1. **The file name for M211 is still wrong.** The file is named `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` but the spec title is "mp autopilot typed task assignment — orchestrator dispatch through herdr argv." This is the same root cause as F-02 in the reviewer's report: when I made the 09412e2 spec-tighten commit, I changed the title but the file name was not renamed. The mp CLI works by ID, not by file name, so this is cosmetic — but it's a real hygiene issue. Should be fixed at the end of the session via `git mv` (or by re-creating the milestone with the correct slug).
+2. **The dead-import stubs (F-01) are a small code-smell.** The runner added 3 `#[allow(dead_code)]` helper stubs to suppress unused-import warnings. This is a real but minor issue. The fix would be to either use the helpers or remove them. Backlog.
+
+### F-01 / F-02 backlog candidates (for end of session)
+
+> **F-01 (M211):** Remove `#[allow(dead_code)]` helper stubs in `crates/mp/src/autopilot/task_assign.rs:600-620` (3 stubs: `_session_path_type`, `_cursor_type`, `_session_type`). Either use them or remove.
+>
+> **F-02 (M211):** Rename milestone file from `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` to a slug matching the current title. Or update the spec title to match the file name. Or accept the mismatch as cosmetic.
+>
+> **F-01 (M209, also outstanding):** Fix pre-existing `doc_overindented_list_items` clippy lint in `crates/mp-model/src/milestone.rs:157-158` (M202-era regression from clippy 1.98).
+
+### Pre-empts applied (M211)
+
+- `a543561 M211: orch-fix pre-empt — distinct per-AC verification commands (avoid M207/M209 F-02)`: 3 AC verification fields updated to mirror the step-level test names. All 3 were placeholders.
+
+### Going idle
+
+Closing the M211 tab, building a fresh one for M212. M212 is the BIG milestone in this session (8 ACs, 8 steps, effort=L, risk=high — the orchestrator verifier). The runner's contract will be the same M211 version (with the discipline gate) since it worked.
