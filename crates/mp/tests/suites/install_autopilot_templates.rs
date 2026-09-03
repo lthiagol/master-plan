@@ -23,7 +23,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::common::{isolated_harness_env, mp_bin, path_with_install_bin, repo_root, run_with_retry};
+use crate::common::{
+    isolated_harness_env, mp_bin, path_with_install_bin, repo_root, run_with_retry,
+};
 use tempfile::TempDir;
 
 fn run_install(install_root: &TempDir, harness: &str) -> std::process::Output {
@@ -98,7 +100,9 @@ fn install_autopilot_copies_canonical_skills_into_isolated_root() {
     let global_skill_dir = home.join(".agents/skills");
     assert!(
         !global_skill_dir.join("mp-flow/SKILL.md").exists()
-            || !global_skill_dir.join("mp-flow").starts_with(&install_root.path()),
+            || !global_skill_dir
+                .join("mp-flow")
+                .starts_with(install_root.path()),
         "isolated install must not mutate the developer global ~/.agents/skills"
     );
 
@@ -214,7 +218,9 @@ fn install_autopilot_harness_templates_use_canonical_terminology() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let planner = install_root.path().join("harness/opencode/agents/mp-planner.md");
+    let planner = install_root
+        .path()
+        .join("harness/opencode/agents/mp-planner.md");
     assert!(
         planner.is_file(),
         "mp-planner harness template should land at {planner:?}"
