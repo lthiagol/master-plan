@@ -591,13 +591,27 @@ pub struct CanonicalLifecycleState {
 /// dimension and exposes the verdict + the revisions the caller
 /// must reconcile. AC-04 contract: "never restore stale session
 /// projections over newer plan evidence".
+///
+/// **F-03 (cycle 2):** the comparison is now anchored on
+/// *timestamps* (`session_at`, `canonical_at` — both RFC3339),
+/// not on lexicographic ordering of `source_revision` strings.
+/// `source_revision` is a content hash
+/// ([`crate::autopilot::ac_projection::canonical_revision`]) with
+/// no chronological component, so lex order had no relation to
+/// "newer". Timestamp comparison uses RFC3339 string order which
+/// is chronological for a consistent time-zone format; the
+/// `source_revision` strings are still reported so the caller can
+/// log / diff them, but the *ordering decision* is the timestamp.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum DimensionVerdict {
-    /// Session and canonical revisions match. No action.
+    /// Session and canonical revisions match (same timestamp AND
+    /// same content hash). No action.
     InSync {
         /// The revision both sides agree on.
         revision: String,
+        /// The timestamp both sides agree on.
+        at: String,
     },
     /// Canonical is newer than the session's projection. The
     /// resume path must NOT restore the session's stale value.
@@ -606,6 +620,10 @@ pub enum DimensionVerdict {
     CanonicalNewer {
         session_revision: String,
         canonical_revision: String,
+        /// RFC3339 timestamp the session recorded the projection at.
+        session_at: String,
+        /// RFC3339 timestamp the canonical snapshot was taken at.
+        canonical_at: String,
     },
     /// Session is ahead of the canonical state. The plan has
     /// regressed (or the session is feeding back a not-yet-
@@ -614,6 +632,10 @@ pub enum DimensionVerdict {
     SessionNewer {
         session_revision: String,
         canonical_revision: String,
+        /// RFC3339 timestamp the session recorded the projection at.
+        session_at: String,
+        /// RFC3339 timestamp the canonical snapshot was taken at.
+        canonical_at: String,
     },
     /// Dimension is unknown to the cross-checker (e.g. an AC key
     /// present in the session's projection but absent from the
@@ -690,15 +712,28 @@ pub fn cross_check_canonical(
     let mut report = CrossCheckReport::default();
 
     // ── ACs: compare each (milestone, ac) projection's
-    // `source_revision` against the canonical revision. ──
+    // `source_revision` + `projected_at` against the canonical
+    // revision + `canonical_at`. F-03 fix: ordering is
+    // timestamp-based, with `source_revision` as a stable
+    // tiebreaker. The session-side timestamp falls back to
+    // `session.last_updated` when `projected_at` is unset
+    // (legacy projections pre-dating M207). ──
+    let session_fallback_at = session.last_updated.clone();
     for (milestone_id, projections) in &session.ac_projections {
         for (ac_id, projection) in projections {
             let key = CanonicalAcKey::new(milestone_id.clone(), ac_id.clone());
             let key_str = format!("{milestone_id}/{ac_id}");
+            let session_at = projection
+                .projected_at
+                .clone()
+                .unwrap_or_else(|| session_fallback_at.clone());
             let verdict = match snapshot.ac_revisions.get(&key) {
-                Some(canonical) => {
-                    compare_revisions(&projection.source_revision, &canonical.source_revision)
-                }
+                Some(canonical) => compare_revisions(
+                    &projection.source_revision,
+                    &canonical.source_revision,
+                    &session_at,
+                    &canonical.canonical_at,
+                ),
                 None => DimensionVerdict::UnknownToCanonical,
             };
             record_dimension(
@@ -725,8 +760,12 @@ pub fn cross_check_canonical(
                 // presence of a canonical record is the in-sync
                 // signal. Mismatch (session saw one verdict,
                 // canonical has a different one) is reported via
-                // `working_on_stale` below.
+                // `working_on_stale` below. The `at` field carries
+                // the session's last_updated so the F-03 fix's
+                // timestamp contract is symmetric across all
+                // dimensions.
                 revision: "review-record-present".to_string(),
+                at: session.last_updated.clone(),
             })
             .unwrap_or(DimensionVerdict::UnknownToCanonical);
         record_dimension(
@@ -747,11 +786,15 @@ pub fn cross_check_canonical(
                     DimensionVerdict::CanonicalNewer {
                         session_revision: lifecycle_state.last_state_change_at.clone(),
                         canonical_revision: canonical.lifecycle_at.clone(),
+                        session_at: lifecycle_state.last_state_change_at.clone(),
+                        canonical_at: canonical.lifecycle_at.clone(),
                     }
                 } else {
                     DimensionVerdict::SessionNewer {
                         session_revision: lifecycle_state.last_state_change_at.clone(),
                         canonical_revision: canonical.lifecycle_at.clone(),
+                        session_at: lifecycle_state.last_state_change_at.clone(),
+                        canonical_at: canonical.lifecycle_at.clone(),
                     }
                 }
             }
@@ -834,25 +877,81 @@ pub struct CanonicalReviewKey {
     pub cycle: u32,
 }
 
-fn compare_revisions(session_rev: &str, canonical_rev: &str) -> DimensionVerdict {
-    if session_rev == canonical_rev {
-        DimensionVerdict::InSync {
+/// F-03 (cycle 2): the canonical `source_revision` is a
+/// content-only hash with no chronological component
+/// ([`crate::autopilot::ac_projection::canonical_revision`]). It
+/// is therefore *unsafe* to use lexicographic comparison as a
+/// proxy for "newer" — two revisions of different content have
+/// unpredictable lex order, which produced the M225 F-03 bug
+/// (misclassified `CanonicalNewer` / `SessionNewer` half the
+/// time, allowing stale session restoration over newer canonical
+/// state).
+///
+/// The fix anchors the ordering on RFC3339 timestamps:
+/// - `session_at` is `AcProjection::projected_at` (when set;
+///   falls back to the session's `last_updated`).
+/// - `canonical_at` is `CanonicalAcState::canonical_at`.
+///
+/// RFC3339 with a consistent timezone is chronologically ordered
+/// by string comparison. When the timestamps tie, we fall back
+/// to lexicographic `source_revision` order as a *deterministic*
+/// tiebreaker — this is stable across runs but no longer the
+/// load-bearing signal.
+fn compare_revisions(
+    session_rev: &str,
+    canonical_rev: &str,
+    session_at: &str,
+    canonical_at: &str,
+) -> DimensionVerdict {
+    // Same hash + same timestamp → fully in sync.
+    if session_rev == canonical_rev && session_at == canonical_at {
+        return DimensionVerdict::InSync {
             revision: session_rev.to_string(),
-        }
-    } else if canonical_rev > session_rev {
-        // The canonical revision is "greater" in lexicographic
-        // order. The hash strings the projection module uses are
-        // stable and ordered by the canonical's `last_updated`
-        // timestamp + content hash, so lexicographic comparison is
-        // a reliable proxy for "newer".
+            at: session_at.to_string(),
+        };
+    }
+    // Timestamp comparison: identical-zone RFC3339 strings are
+    // chronologically ordered by `>`.
+    if canonical_at > session_at {
+        return DimensionVerdict::CanonicalNewer {
+            session_revision: session_rev.to_string(),
+            canonical_revision: canonical_rev.to_string(),
+            session_at: session_at.to_string(),
+            canonical_at: canonical_at.to_string(),
+        };
+    }
+    if session_at > canonical_at {
+        return DimensionVerdict::SessionNewer {
+            session_revision: session_rev.to_string(),
+            canonical_revision: canonical_rev.to_string(),
+            session_at: session_at.to_string(),
+            canonical_at: canonical_at.to_string(),
+        };
+    }
+    // Timestamps tie but content differs → use the source_revision
+    // as a stable, deterministic tiebreaker. This is NOT a
+    // chronological signal; it just makes the verdict reproducible
+    // across runs so tests can assert on it.
+    if canonical_rev > session_rev {
         DimensionVerdict::CanonicalNewer {
             session_revision: session_rev.to_string(),
             canonical_revision: canonical_rev.to_string(),
+            session_at: session_at.to_string(),
+            canonical_at: canonical_at.to_string(),
         }
-    } else {
+    } else if session_rev > canonical_rev {
         DimensionVerdict::SessionNewer {
             session_revision: session_rev.to_string(),
             canonical_revision: canonical_rev.to_string(),
+            session_at: session_at.to_string(),
+            canonical_at: canonical_at.to_string(),
+        }
+    } else {
+        // Identical on both axes — the equality guard above
+        // would have caught this, but stay defensive.
+        DimensionVerdict::InSync {
+            revision: session_rev.to_string(),
+            at: session_at.to_string(),
         }
     }
 }
@@ -1193,6 +1292,113 @@ mod tests {
         let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
         assert!(matches!(ac_verdict, DimensionVerdict::SessionNewer { .. }));
         assert!(!report.canonical_wins_anywhere);
+    }
+
+    // ── F-03 (cycle 2) regression: the M225 F-03 bug was that
+    // `compare_revisions` used lexicographic ordering of the
+    // content-hash `source_revision` as a proxy for "newer",
+    // which is incorrect because the hash has no chronological
+    // component. The fix anchors the verdict on the *timestamp*
+    // (`canonical_at` vs session-side `projected_at` /
+    // `last_updated`). This test pins the chronological rule:
+    // even when the lex order of the source_revision strings
+    // disagrees with the timestamp order, the verdict must
+    // follow the timestamp. ──
+
+    #[test]
+    fn m225_f03_timestamp_order_wins_over_lex_hash_order() {
+        // Build a session whose projection's source_revision is
+        // lexicographically LARGER than the canonical's, but whose
+        // timestamp is EARLIER. The verdict must be
+        // `CanonicalNewer` (timestamp wins), NOT `SessionNewer`
+        // (lex order would say so).
+        let mut session = sample_session();
+        if let Some(map) = session.ac_projections.get_mut("207") {
+            if let Some(p) = map.get_mut("AC-01") {
+                p.source_revision = "zzz-late-rev".into(); // lex-larger
+                p.projected_at = Some("2025-01-01T00:00:00Z".into()); // earlier
+            }
+        }
+        let mut snapshot = CanonicalSnapshot::empty();
+        snapshot.ac_revisions.insert(
+            CanonicalAcKey::new("207", "AC-01"),
+            CanonicalAcState {
+                status: "passed".into(),
+                source_revision: "aaa-early-rev".into(), // lex-smaller
+                canonical_at: "2026-09-03T00:00:00Z".into(), // later
+            },
+        );
+        let report = cross_check_canonical(&session, &snapshot);
+        let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
+        // The fix must produce CanonicalNewer, not SessionNewer.
+        assert!(
+            matches!(ac_verdict, DimensionVerdict::CanonicalNewer { .. }),
+            "F-03: timestamp order must win over lex hash order, got {ac_verdict:?}"
+        );
+        // And `canonical_wins_anywhere` must be set.
+        assert!(report.canonical_wins_anywhere);
+    }
+
+    #[test]
+    fn m225_f03_chronological_earlier_loses_to_later_regardless_of_hash() {
+        // Inverse: session has a lex-SMALLER source_revision but
+        // a LATER timestamp. The verdict must be `SessionNewer`,
+        // NOT `CanonicalNewer` (which lex order would say).
+        let mut session = sample_session();
+        if let Some(map) = session.ac_projections.get_mut("207") {
+            if let Some(p) = map.get_mut("AC-01") {
+                p.source_revision = "aaa-early-rev".into(); // lex-smaller
+                p.projected_at = Some("2026-12-31T00:00:00Z".into()); // later
+            }
+        }
+        let mut snapshot = CanonicalSnapshot::empty();
+        snapshot.ac_revisions.insert(
+            CanonicalAcKey::new("207", "AC-01"),
+            CanonicalAcState {
+                status: "passed".into(),
+                source_revision: "zzz-late-rev".into(), // lex-larger
+                canonical_at: "2025-01-01T00:00:00Z".into(), // earlier
+            },
+        );
+        let report = cross_check_canonical(&session, &snapshot);
+        let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
+        assert!(
+            matches!(ac_verdict, DimensionVerdict::SessionNewer { .. }),
+            "F-03: later session timestamp must beat earlier canonical, got {ac_verdict:?}"
+        );
+    }
+
+    #[test]
+    fn m225_f03_tied_timestamps_use_lex_as_stable_tiebreaker() {
+        // When the timestamps tie, the fix falls back to
+        // lexicographic `source_revision` order as a *deterministic*
+        // tiebreaker. This is NOT a chronological signal — it is
+        // just to make the verdict reproducible. The test pins
+        // this: identical timestamps, different hashes, lex wins.
+        let mut session = sample_session();
+        if let Some(map) = session.ac_projections.get_mut("207") {
+            if let Some(p) = map.get_mut("AC-01") {
+                p.source_revision = "aaa-smaller".into();
+                p.projected_at = Some("2026-06-01T00:00:00Z".into());
+            }
+        }
+        let mut snapshot = CanonicalSnapshot::empty();
+        snapshot.ac_revisions.insert(
+            CanonicalAcKey::new("207", "AC-01"),
+            CanonicalAcState {
+                status: "passed".into(),
+                source_revision: "zzz-larger".into(),
+                canonical_at: "2026-06-01T00:00:00Z".into(), // same as session
+            },
+        );
+        let report = cross_check_canonical(&session, &snapshot);
+        let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
+        // Tie → lex tiebreaker → "zzz-larger" > "aaa-smaller" →
+        // canonical is the lex-larger side → CanonicalNewer.
+        assert!(
+            matches!(ac_verdict, DimensionVerdict::CanonicalNewer { .. }),
+            "F-03: tied timestamps must fall back to lex order, got {ac_verdict:?}"
+        );
     }
 
     // ── cross-cutting: the four primitives compose without
