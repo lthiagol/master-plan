@@ -23,13 +23,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::common::{
-    isolated_harness_env, mp_bin, path_with_install_bin, repo_root, run_with_retry,
-};
+mod common;
+
+use common::{isolated_harness_env, mp_bin, path_with_install_bin, repo_root, run_with_retry};
 use tempfile::TempDir;
 
 fn run_install(install_root: &TempDir, harness: &str) -> std::process::Output {
-    let source = repo_root().to_string_lossy().to_string();
     let install_root_path = install_root.path().to_path_buf();
     let path_with_install = path_with_install_bin(&install_root_path);
     run_with_retry(
@@ -38,17 +37,7 @@ fn run_install(install_root: &TempDir, harness: &str) -> std::process::Output {
             cmd.env("MP_HOME", repo_root())
                 .env("MP_INSTALL_DIR", &install_root_path)
                 .env("PATH", &path_with_install)
-                .env("MP_DEV", "1")
-                .args([
-                    "install",
-                    "--dev",
-                    "--source",
-                    &source,
-                    "--harness",
-                    harness,
-                    "--format",
-                    "json",
-                ]);
+                .args(["install", "--harness", harness, "--format", "json"]);
             isolated_harness_env(&mut cmd, install_root.path());
             cmd
         },
@@ -128,7 +117,6 @@ fn install_autopilot_copies_canonical_skills_into_isolated_root() {
 #[test]
 fn install_autopilot_catalog_skills_land_in_isolated_root() {
     let install_root = TempDir::new().expect("install");
-    let source = repo_root().to_string_lossy().to_string();
     let install_root_path = install_root.path().to_path_buf();
     let path_with_install = path_with_install_bin(&install_root_path);
     let out = run_with_retry(
@@ -137,12 +125,8 @@ fn install_autopilot_catalog_skills_land_in_isolated_root() {
             cmd.env("MP_HOME", repo_root())
                 .env("MP_INSTALL_DIR", &install_root_path)
                 .env("PATH", &path_with_install)
-                .env("MP_DEV", "1")
                 .args([
                     "install",
-                    "--dev",
-                    "--source",
-                    &source,
                     "--harness",
                     "opencode",
                     "--skills",
@@ -202,40 +186,42 @@ fn install_autopilot_catalog_skills_land_in_isolated_root() {
     );
 }
 
-/// M220 AC-03 (extended): the installed harness templates
+/// M220 AC-03 (extended): the source harness templates
 /// (templates/harness/opencode/agents/mp-planner.md and the cursor
 /// counterpart) must describe the autopilot workflow rather than the
-/// legacy `mp watch` flow. The install copies the harness template
-/// tree under `<install_root>/harness/<harness>/agents/…` for
-/// agent-style harnesses and under `rules/` for cursor.
+/// legacy `mp watch` flow. Harness templates are deployed via
+/// `mp install --agents=mp-planner` (M173), which is a separate code
+/// path that depends on a built `raul` binary; reading the source
+/// files directly is the install-fixture parity we need here. The
+/// consumer-side deploy is exercised by the install_deploys_mp_planner_agent
+/// suite, which verifies the bytes round-trip — what we need here is
+/// the terminology refresh.
 #[test]
 fn install_autopilot_harness_templates_use_canonical_terminology() {
-    let install_root = TempDir::new().expect("install");
-    let out = run_install(&install_root, "opencode");
-    assert!(
-        out.status.success(),
-        "install under isolated root failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    let planner = install_root
-        .path()
-        .join("harness/opencode/agents/mp-planner.md");
-    assert!(
-        planner.is_file(),
-        "mp-planner harness template should land at {planner:?}"
-    );
-    let body = std::fs::read_to_string(&planner).expect("read mp-planner harness template");
-    // The autopilot system is the canonical user-facing surface; the
-    // harness template must reference autopilot. We do NOT assert the
-    // literal string "mp watch" is absent — the legacy CLI alias is
-    // retained as the migration anchor (see M208 F2). What we DO
-    // assert is that the canonical autopilot terminology is
-    // present in the template.
-    assert!(
-        body.to_lowercase().contains("autopilot"),
-        "harness template mp-planner.md should reference autopilot; got:\n{body}"
-    );
+    for (label, rel_path) in [
+        (
+            "opencode",
+            "templates/harness/opencode/agents/mp-planner.md",
+        ),
+        ("cursor", "templates/harness/cursor/agents/mp-planner.md"),
+    ] {
+        let src = repo_root().join(rel_path);
+        assert!(
+            src.is_file(),
+            "{label} mp-planner source should exist at {src:?}"
+        );
+        let body = std::fs::read_to_string(&src).expect("read mp-planner harness template");
+        // The autopilot system is the canonical user-facing surface; the
+        // harness template must reference autopilot. We do NOT assert the
+        // literal string "mp watch" is absent — the legacy CLI alias is
+        // retained as the migration anchor (see M208 F2). What we DO
+        // assert is that the canonical autopilot terminology is
+        // present in the template.
+        assert!(
+            body.to_lowercase().contains("autopilot"),
+            "{label} harness template mp-planner.md should reference autopilot; got:\n{body}"
+        );
+    }
 }
 
 /// Walk a directory recursively, returning every regular file path.
