@@ -60,9 +60,10 @@ pub use recovery::{
 };
 pub use role::{
     builtin_role_default, pane_index_for, resolve_role_config, resolve_role_config_full,
-    resolve_role_config_with_provenance, role_pane_slots, PaneSlots, ResolvedRoleConfig,
-    ResolvedRoleConfigWithProvenance, Role, RoleConfigOverride, RoleConfigSource, RoleSlot,
-    Topology,
+    resolve_role_config_with_provenance, role_pane_slots, tighten, topology_policy,
+    topology_preflight, PaneSlots, MilestoneKind, ResolvedRoleConfig,
+    ResolvedRoleConfigWithProvenance, ReviewBypassPolicy, Role, RoleConfigOverride,
+    RoleConfigSource, RoleSlot, Topology, TopologyMode, TopologyPolicy, TopologyPreflightError,
 };
 #[allow(unused_imports)]
 use schema::validate_value as _;

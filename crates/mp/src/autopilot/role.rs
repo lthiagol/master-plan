@@ -545,6 +545,225 @@ pub fn resolve_role_config_with_provenance(
     }
 }
 
+// ─── M209 / AC-04: topology-mode tightening ─────────────────────────
+
+/// Topology-mode decision policy. The decision matrix (C3 in the
+/// spec) cannot offer the same paths in a 1-pane topology as it does
+/// in 3-pane: a single pane means there is no independent reviewer
+/// channel, so the agent cannot ship a milestone with backlog — only
+/// trivial work / tracks is supported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TopologyMode {
+    /// All decision-matrix paths apply. Default for 3-pane.
+    FullMatrix,
+    /// Orchestrator+Reviewer share a supervisor pane, so there is no
+    /// independent reviewer channel. The matrix forbids
+    /// ship-with-backlog; only `cycle-next` or `escalate` is allowed.
+    /// Default for 2-pane.
+    NoShipWithBacklog,
+    /// Every role collapsed into one pane. Only tracks / trivial
+    /// work are supported; full milestones are rejected by preflight
+    /// unless an explicit recorded review-bypass policy exists.
+    /// Default for 1-pane.
+    SingleAgentTrackOnly,
+}
+
+impl TopologyMode {
+    /// Wire-string form (used by diagnostic surfaces and the future
+    /// `mp autopilot config schema`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            TopologyMode::FullMatrix => "full_matrix",
+            TopologyMode::NoShipWithBacklog => "no_ship_with_backlog",
+            TopologyMode::SingleAgentTrackOnly => "single_agent_track_only",
+        }
+    }
+}
+
+impl fmt::Display for TopologyMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Per-topology decision policy: the mode plus the cycle budget
+/// (the maximum number of cycles a milestone may run through before
+/// the driver escalates). Tightened budgets in smaller topologies
+/// make the role collapse's quality trade-off explicit.
+///
+/// `three_agent -> FullMatrix / 4 cycles`
+/// `two_agent   -> NoShipWithBacklog / 3 cycles`
+/// `one_agent   -> SingleAgentTrackOnly / 2 cycles`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TopologyPolicy {
+    pub mode: TopologyMode,
+    pub cycle_budget: u32,
+}
+
+impl TopologyPolicy {
+    /// Convenience: returns true when this policy allows a milestone
+    /// to ship with backlog still open.
+    pub fn allows_ship_with_backlog(&self) -> bool {
+        self.mode == TopologyMode::FullMatrix
+    }
+
+    /// Convenience: returns true when this policy allows an
+    /// independent external review pass.
+    pub fn allows_external_review(&self) -> bool {
+        // 2-pane combines orchestrator+reviewer on one pane — the
+        // "review" surface still exists but is not independent of
+        // the orchestrator. 1-pane collapses every role.
+        matches!(self.mode, TopologyMode::FullMatrix)
+    }
+}
+
+/// Tighten the decision matrix based on the topology. Pure mapping
+/// per AC-04.
+pub fn topology_policy(topology: Topology) -> TopologyPolicy {
+    match topology {
+        Topology::ThreeAgent => TopologyPolicy {
+            mode: TopologyMode::FullMatrix,
+            cycle_budget: 4,
+        },
+        Topology::TwoAgent => TopologyPolicy {
+            mode: TopologyMode::NoShipWithBacklog,
+            cycle_budget: 3,
+        },
+        Topology::OneAgent => TopologyPolicy {
+            mode: TopologyMode::SingleAgentTrackOnly,
+            cycle_budget: 2,
+        },
+    }
+}
+
+/// Preflight error returned when a topology / milestone-kind
+/// combination is not allowed. The gate's job is to surface the
+/// rejection loudly *before* the runner starts, with the policy
+/// attached so the operator can adapt (switch topology, change
+/// milestone kind, or record a bypass).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TopologyPreflightError {
+    /// 1-pane topology was selected for a full milestone; the
+    /// caller must either switch topology or record a review-bypass
+    /// policy.
+    FullMilestoneRequiresReviewer { policy: TopologyPolicy },
+    /// 2-pane topology was asked for a ship-with-backlog path; the
+    /// resolver must pick `cycle-next` or `escalate` instead.
+    /// (Reserved — the matrix C-layer surfaces this; the preflight
+    /// is a structural check, not a path decision. Surfaced here so
+    /// a future test can pin the matrix-side wiring.)
+    ShipWithBacklogDisabled { policy: TopologyPolicy },
+}
+
+impl fmt::Display for TopologyPreflightError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TopologyPreflightError::FullMilestoneRequiresReviewer { policy } => write!(
+                f,
+                "full milestones require a topology with an independent reviewer (got {} topology, cycle budget={}); switch topology or record a review-bypass policy",
+                policy.mode, policy.cycle_budget
+            ),
+            TopologyPreflightError::ShipWithBacklogDisabled { policy } => write!(
+                f,
+                "ship-with-backlog path is disabled under {} topology (cycle budget={}); pick cycle-next or escalate instead",
+                policy.mode, policy.cycle_budget
+            ),
+        }
+    }
+}
+
+impl std::error::Error for TopologyPreflightError {}
+
+/// Outcome class the preflight gate inspects. Tracks and full
+/// milestones differ: tracks are trivial and allowed in 1-pane; full
+/// milestones are not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MilestoneKind {
+    /// Full milestone — the standard reviewer / orchestrator gated
+    /// flow applies.
+    Full,
+    /// Track / trivial work — the runner executes inline; reviewer
+    /// is not invoked.
+    Track,
+}
+
+/// Recorded / unrecorded review-bypass override. The preflight gate
+/// looks for an on-disk record (a future milestone will own
+/// `AutopilotConfig::review_bypass`); for M209 we model the gate's
+/// input as a structured value so callers can plumb the disk check
+/// later without changing the gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ReviewBypassPolicy {
+    /// No bypass requested. Default.
+    #[default]
+    None,
+    /// Bypass requested via an unrecorded mechanism (CLI flag,
+    /// runtime override). Not honored for 1-pane full milestones.
+    Unrecorded,
+    /// Bypass recorded on disk in the project's autopilot config.
+    /// Honored for 1-pane full milestones.
+    Recorded,
+}
+
+impl ReviewBypassPolicy {
+    /// True when the bypass is on disk. The preflight gate accepts
+    /// only recorded bypasses for the 1-pane full-milestone case.
+    pub fn is_recorded(&self) -> bool {
+        matches!(self, ReviewBypassPolicy::Recorded)
+    }
+
+    /// True when any bypass is set (recorded or unrecorded).
+    pub fn is_set(&self) -> bool {
+        !matches!(self, ReviewBypassPolicy::None)
+    }
+}
+
+/// Preflight gate: validate a topology decision against the
+/// would-be milestone kind and an explicit review-bypass override.
+///
+/// Per spec: "Starting a full milestone in 1-pane is rejected unless
+/// an explicit recorded review-bypass policy exists." The 2-pane
+/// ship-with-backlog path is a matrix-side decision (resolved
+/// downstream); the structural preflight only enforces the
+/// 1-pane/full-milestone rule.
+pub fn topology_preflight(
+    topology: Topology,
+    kind: MilestoneKind,
+    review_bypass: ReviewBypassPolicy,
+) -> Result<TopologyPolicy, TopologyPreflightError> {
+    let policy = topology_policy(topology);
+    match (topology, kind) {
+        (Topology::OneAgent, MilestoneKind::Full) => {
+            // A1's carve-out: tracks are the 1-pane use case; full
+            // milestones need an independent reviewer. A bypass is
+            // honored only when recorded on disk — an unrecorded
+            // override is a no-op here so a stray CLI flag cannot
+            // quietly bypass review.
+            if review_bypass.is_recorded() {
+                Ok(policy)
+            } else {
+                Err(TopologyPreflightError::FullMilestoneRequiresReviewer { policy })
+            }
+        }
+        // Tracks are accepted under every topology.
+        (_, MilestoneKind::Track) => Ok(policy),
+        // 2-pane + full + non-1-pane — accept the policy; the
+        // ship-with-backlog restriction is matrix-side.
+        _ => Ok(policy),
+    }
+}
+
+/// Convenience: tighten the decision matrix and run the preflight
+/// gate in one call. The two are split because future tests / agents
+/// want to inspect the policy independently of the gate.
+pub fn tighten(
+    topology: Topology,
+    kind: MilestoneKind,
+    review_bypass: ReviewBypassPolicy,
+) -> Result<TopologyPolicy, TopologyPreflightError> {
+    topology_preflight(topology, kind, review_bypass)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -865,5 +1084,156 @@ mod tests {
             assert!(!resolved.harness.is_empty(), "{role} harness has built-in");
             assert!(!resolved.skill.is_empty(), "{role} skill has built-in");
         }
+    }
+
+    // ─── AC-04: topology tightening ─────────────────────────────────
+
+    #[test]
+    fn topology_policy_three_agent_is_full_matrix_with_four_cycle_budget() {
+        let p = topology_policy(Topology::ThreeAgent);
+        assert_eq!(p.mode, TopologyMode::FullMatrix);
+        assert_eq!(p.cycle_budget, 4);
+        assert!(p.allows_ship_with_backlog());
+        assert!(p.allows_external_review());
+    }
+
+    #[test]
+    fn topology_policy_two_agent_is_no_ship_with_backlog_with_three_cycle_budget() {
+        let p = topology_policy(Topology::TwoAgent);
+        assert_eq!(p.mode, TopologyMode::NoShipWithBacklog);
+        assert_eq!(p.cycle_budget, 3);
+        assert!(!p.allows_ship_with_backlog());
+        assert!(
+            !p.allows_external_review(),
+            "two_agent's reviewer is co-located with orchestrator"
+        );
+    }
+
+    #[test]
+    fn topology_policy_one_agent_is_single_agent_track_only_with_two_cycle_budget() {
+        let p = topology_policy(Topology::OneAgent);
+        assert_eq!(p.mode, TopologyMode::SingleAgentTrackOnly);
+        assert_eq!(p.cycle_budget, 2);
+        assert!(!p.allows_ship_with_backlog());
+        assert!(!p.allows_external_review());
+    }
+
+    #[test]
+    fn preflight_accepts_full_milestone_in_three_agent_without_bypass() {
+        let policy = topology_preflight(Topology::ThreeAgent, MilestoneKind::Full, ReviewBypassPolicy::None).unwrap();
+        assert_eq!(policy.mode, TopologyMode::FullMatrix);
+    }
+
+    #[test]
+    fn preflight_accepts_full_milestone_in_two_agent_without_bypass() {
+        // 2-pane + full milestone is allowed (the matrix handles the
+        // ship-with-backlog restriction downstream).
+        let policy = topology_preflight(Topology::TwoAgent, MilestoneKind::Full, ReviewBypassPolicy::None).unwrap();
+        assert_eq!(policy.mode, TopologyMode::NoShipWithBacklog);
+    }
+
+    #[test]
+    fn preflight_rejects_full_milestone_in_one_agent_without_recorded_bypass() {
+        // The spec's headline rule.
+        let err =
+            topology_preflight(Topology::OneAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
+                .unwrap_err();
+        match err {
+            TopologyPreflightError::FullMilestoneRequiresReviewer { policy } => {
+                assert_eq!(policy.mode, TopologyMode::SingleAgentTrackOnly);
+                assert_eq!(policy.cycle_budget, 2);
+            }
+            other => panic!("expected FullMilestoneRequiresReviewer, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn preflight_rejects_full_milestone_in_one_agent_with_unrecorded_bypass() {
+        // A CLI flag / runtime override is not enough — the bypass
+        // must be on disk to qualify.
+        let err = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::Unrecorded,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            TopologyPreflightError::FullMilestoneRequiresReviewer { .. }
+        ));
+    }
+
+    #[test]
+    fn preflight_accepts_full_milestone_in_one_agent_with_recorded_bypass() {
+        // Recorded bypass is the one explicit override the gate
+        // honors for the 1-pane/full-milestone case.
+        let policy = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::Recorded,
+        )
+        .unwrap();
+        assert_eq!(policy.mode, TopologyMode::SingleAgentTrackOnly);
+    }
+
+    #[test]
+    fn preflight_accepts_track_under_any_topology() {
+        // Tracks are the carve-out's whole point — they must be
+        // accepted under every topology.
+        for topology in [Topology::OneAgent, Topology::TwoAgent, Topology::ThreeAgent] {
+            let policy =
+                topology_preflight(topology, MilestoneKind::Track, ReviewBypassPolicy::None)
+                    .unwrap();
+            assert_eq!(policy.mode, topology_policy(topology).mode);
+        }
+    }
+
+    #[test]
+    fn review_bypass_default_is_unset() {
+        // Pin the default so a future change to `ReviewBypassPolicy`
+        // doesn't silently start honoring bypasses.
+        let b = ReviewBypassPolicy::default();
+        assert!(!b.is_set());
+        assert!(!b.is_recorded());
+    }
+
+    #[test]
+    fn review_bypass_recorded_and_unrecorded_are_distinguished() {
+        assert!(ReviewBypassPolicy::Recorded.is_recorded());
+        assert!(!ReviewBypassPolicy::Unrecorded.is_recorded());
+        assert!(ReviewBypassPolicy::Unrecorded.is_set());
+        assert!(ReviewBypassPolicy::Recorded.is_set());
+    }
+
+    #[test]
+    fn topology_mode_wire_strings() {
+        // The as_str strings feed into `mp autopilot config schema`
+        // (future) and into diagnostic JSON. Pin so a rename is a
+        // deliberate test change.
+        assert_eq!(TopologyMode::FullMatrix.as_str(), "full_matrix");
+        assert_eq!(
+            TopologyMode::NoShipWithBacklog.as_str(),
+            "no_ship_with_backlog"
+        );
+        assert_eq!(
+            TopologyMode::SingleAgentTrackOnly.as_str(),
+            "single_agent_track_only"
+        );
+    }
+
+    #[test]
+    fn topology_preflight_error_displays_actionable_message() {
+        let err =
+            topology_preflight(Topology::OneAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
+                .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("record a review-bypass"),
+            "display must hint at the bypass: {msg}"
+        );
+        assert!(
+            msg.contains("single_agent_track_only") || msg.contains("SingleAgentTrackOnly"),
+            "display must name the topology mode for diagnosis: {msg}"
+        );
     }
 }
