@@ -3,9 +3,9 @@
     "id": "211",
     "title": "mp autopilot typed task assignment — orchestrator dispatch through herdr argv",
     "slug": "mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,7 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.671732+00:00",
+    "lifecycle_at": "2026-09-03T16:25:46.494311+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -35,9 +35,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.021148+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T16:25:46.494315+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.021148+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T16:25:46.494315+00:00"
       },
       "specify": {
         "status": "done",
@@ -68,22 +76,22 @@
       "id": "AC-01",
       "description": "Task-assignment rendering is deterministic for orchestrator-to-runner and orchestrator-to-reviewer, includes session/milestone/cycle/role/evidence fields, and produces an argv vector rather than a shell string.",
       "verification": "cargo nextest run -p mp --test autopilot_task_assignment_golden --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_task_assignment_golden --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-02",
       "description": "Before dispatch, validation rejects empty payloads, unknown target panes, invalid role directions, missing session identity, and shell metacharacter interpolation; no herdr call or session mutation occurs on rejection.",
       "verification": "cargo nextest run -p mp --test autopilot_task_assignment_validation --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_task_assignment_validation --no-fail-fast exit 0 (28/28 pass)"
     },
     {
       "id": "AC-03",
       "description": "A regression fixture reproduces the M200 text-only assignment mistake: only the typed dispatcher can append AssignmentDispatched, and a prose-only or empty assignment is rejected before execution with TaskAssignmentShapeViolation.",
       "verification": "cargo nextest run -p mp --test autopilot_task_assignment_m200_regression --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_task_assignment_m200_regression --no-fail-fast exit 0 (17/17 pass)"
     }
   ],
   "design_decisions": [
@@ -118,7 +126,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_task_assignment_golden --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 211 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -139,7 +147,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_task_assignment_validation --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 211 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -160,7 +168,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_task_assignment_m200_regression --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 211 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -172,7 +180,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
