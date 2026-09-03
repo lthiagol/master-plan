@@ -49,10 +49,16 @@ fn flat_key_resolves_to_autopilot_row() {
 #[test]
 fn value_for_key_round_trips_autopilot_key() {
     let true_payload = serde_json::json!({ "ui": { "show_autopilot_tab": true } });
-    assert_eq!(value_for_key(&true_payload, "ui.show_autopilot_tab"), "true");
+    assert_eq!(
+        value_for_key(&true_payload, "ui.show_autopilot_tab"),
+        "true"
+    );
 
     let false_payload = serde_json::json!({ "ui": { "show_autopilot_tab": false } });
-    assert_eq!(value_for_key(&false_payload, "ui.show_autopilot_tab"), "false");
+    assert_eq!(
+        value_for_key(&false_payload, "ui.show_autopilot_tab"),
+        "false"
+    );
 
     // Absent key returns an empty string — the Settings lane
     // surfaces the empty current value as "unset" rather than crashing.

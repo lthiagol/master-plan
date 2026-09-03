@@ -137,7 +137,12 @@ fn jump_lane_digit_dispatch_routes_to_autopilot_when_visible() {
 #[test]
 fn footer_per_tab_for_autopilot_is_empty_by_design() {
     let kb = Keybinds::default();
-    let s = kb.footer_per_tab(Lane::Autopilot, raul::tui::app::ContentState::List, false, false);
+    let s = kb.footer_per_tab(
+        Lane::Autopilot,
+        raul::tui::app::ContentState::List,
+        false,
+        false,
+    );
     assert!(
         s.is_empty(),
         "footer_per_tab(Autopilot, List) must be empty per D-07; got {s:?}"
@@ -182,7 +187,10 @@ struct AutopilotDigit {
 
 impl AutopilotDigit {
     fn new(position: usize) -> Self {
-        assert!(position >= 1 && position <= 9, "digit position out of range");
+        assert!(
+            position >= 1 && position <= 9,
+            "digit position out of range"
+        );
         let ch = char::from_digit(position as u32, 10).expect("valid digit");
         Self { ch }
     }
