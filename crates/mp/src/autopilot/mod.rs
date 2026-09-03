@@ -36,6 +36,7 @@ pub mod ac_projection;
 pub mod events;
 pub mod list;
 pub mod notes;
+pub mod recovery;
 pub mod schema;
 pub mod session;
 pub mod transitions;
@@ -45,6 +46,10 @@ pub use ac_projection::{
     ProjectionWriteOutcome, canonical_revision, project_ac_status,
 };
 pub use events::{EventCursor, EventKind, OrchestrationEvent, events_by_kind};
+pub use recovery::{
+    RecoveredSession, append_event_unchecked, reconcile_event_cursor, recover_session,
+    recover_session_at,
+};
 pub use list::{SessionListEntry, list_sessions};
 pub use notes::{
     NoteError, NoteKind, RunnerNote, build_note, derive_cycle,
