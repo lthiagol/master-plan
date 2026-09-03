@@ -69,21 +69,21 @@
     {
       "id": "AC-01",
       "description": "`Lane::Autopilot` exists; `Lane::Watch` is gone. The lane list under both visible (toggle on) and hidden (toggle off) states matches the documented behavior, including the `JumpLane` digit dispatch and the footer hint.",
-      "verification": "cargo nextest run -p raul --test tui_tab_bar --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test lane_autopilot_rename --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "ui.show_autopilot_tab controls visibility. If it is absent and ui.show_watch_tab exists, reads use the legacy value without rewriting; the next explicit Settings save persists the new key. When both exist, the new key wins.",
-      "verification": "cargo nextest run -p raul --test tui_tab_bar --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_settings_key_migration --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "The Settings lane's `SETTINGS_KEYS` entry reads `ui.show_autopilot_tab` as the displayed key; the digit-jump dispatch routes to the Autopilot lane correctly.",
-      "verification": "cargo nextest run -p raul --test tui_tab_bar --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test settings_autopilot_key --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
