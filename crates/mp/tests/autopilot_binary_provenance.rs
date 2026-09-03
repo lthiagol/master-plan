@@ -19,11 +19,11 @@
 //! - The spawn pipeline refuses to write session.json when
 //!   check_binary_provenance returns Err.
 
-use mp::autopilot::spawn::{
-    check_binary_provenance, BinaryProvenanceMismatch, MIN_SESSION_SCHEMA_VERSION,
-    MpBinaryProvenance,
-};
 use mp::autopilot::session::SESSION_SCHEMA_VERSION;
+use mp::autopilot::spawn::{
+    check_binary_provenance, BinaryProvenanceMismatch, MpBinaryProvenance,
+    MIN_SESSION_SCHEMA_VERSION,
+};
 use tempfile::TempDir;
 
 #[test]

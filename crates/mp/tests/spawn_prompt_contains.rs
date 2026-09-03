@@ -18,8 +18,8 @@
 //! dangerous direct-edit instruction.
 
 use mp::autopilot::prompts::spawn::{
-    render_role_prompt, render_topology_prompts, RoleReexport as Role,
-    SpawnPromptInputs, TopologyReexport as Topology,
+    render_role_prompt, render_topology_prompts, RoleReexport as Role, SpawnPromptInputs,
+    TopologyReexport as Topology,
 };
 use mp::autopilot::role::{resolve_role_config, ResolvedRoleConfig};
 
@@ -29,14 +29,7 @@ fn rc(role: Role) -> ResolvedRoleConfig {
 }
 
 fn inputs(role: Role) -> SpawnPromptInputs {
-    SpawnPromptInputs::new(
-        "master-plan",
-        "sess-alpha",
-        "M210",
-        0,
-        rc(role),
-    )
-    .unwrap()
+    SpawnPromptInputs::new("master-plan", "sess-alpha", "M210", 0, rc(role)).unwrap()
 }
 
 #[test]

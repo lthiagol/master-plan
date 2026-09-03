@@ -94,7 +94,9 @@ fn every_role_prompt_rejects_unknown_states() {
     // If any of these appear in a prompt, that's drift — the
     // M207 enum doesn't define them and the verifier would
     // reject the role's transition attempt.
-    let unknown = ["complete", "approved", "started", "queued", "failed", "skipped"];
+    let unknown = [
+        "complete", "approved", "started", "queued", "failed", "skipped",
+    ];
     for role in Role::ALL {
         let prompt = render_role_prompt(role, &inputs(role));
         for state in unknown {
@@ -119,9 +121,18 @@ fn prompts_instruct_typed_transition_commands_only() {
         );
         // Anti-patterns the prompt must NOT contain.
         let lc = prompt.to_ascii_lowercase();
-        assert!(!lc.contains("echo '{"), "role {role} prompt mentions raw echo writes");
-        assert!(!lc.contains("jq '"), "role {role} prompt mentions raw jq edits");
-        assert!(!lc.contains("sed -i '"), "role {role} prompt mentions raw sed edits");
+        assert!(
+            !lc.contains("echo '{"),
+            "role {role} prompt mentions raw echo writes"
+        );
+        assert!(
+            !lc.contains("jq '"),
+            "role {role} prompt mentions raw jq edits"
+        );
+        assert!(
+            !lc.contains("sed -i '"),
+            "role {role} prompt mentions raw sed edits"
+        );
     }
 }
 

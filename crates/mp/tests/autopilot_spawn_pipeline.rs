@@ -18,13 +18,11 @@
 //!   the agent start argv.
 
 use mp::autopilot::prompts::spawn::{
-    render_topology_prompts, RoleReexport as Role, SpawnPromptInputs,
-    TopologyReexport as Topology,
+    RoleReexport as Role, SpawnPromptInputs, TopologyReexport as Topology,
 };
 use mp::autopilot::role::{resolve_role_config, ResolvedRoleConfig};
 use mp::autopilot::spawn::{
-    spawn_session, HerdrSpawnOps, MockHerdrSpawnOps, MockHerdrSpawnOpsSnapshot, SpawnError,
-    SpawnInputs, SpawnedPane,
+    spawn_session, MockHerdrSpawnOps, SpawnError, SpawnInputs,
 };
 use mp::paths::PlanContext;
 use std::path::PathBuf;
@@ -35,6 +33,7 @@ fn rc(role: Role) -> ResolvedRoleConfig {
     resolve_role_config(None, None, &builtin)
 }
 
+#[allow(dead_code)]
 fn inputs(_role: Role, r: ResolvedRoleConfig) -> SpawnPromptInputs {
     SpawnPromptInputs::new("master-plan", "sess-alpha", "M210", 0, r).unwrap()
 }
@@ -108,7 +107,13 @@ fn three_pane_pipeline_succeeds_end_to_end() {
     // Per-pane bundles persisted.
     assert_eq!(outcome.bundles.len(), 3);
     let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
-    assert!(loaded.roles.orchestrator.as_ref().unwrap().pane_id.is_some());
+    assert!(loaded
+        .roles
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .pane_id
+        .is_some());
     assert!(loaded.roles.runner.as_ref().unwrap().pane_id.is_some());
     assert!(loaded.roles.reviewer.as_ref().unwrap().pane_id.is_some());
 }
@@ -129,7 +134,13 @@ fn two_pane_pipeline_succeeds_with_supervisor_bundle() {
     let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
     // Orchestrator + reviewer pane ids collapse into the
     // supervisor pane id.
-    let supervisor_pane_id = loaded.topology.orchestrator.as_ref().unwrap().pane_id.clone();
+    let supervisor_pane_id = loaded
+        .topology
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .pane_id
+        .clone();
     assert_eq!(
         loaded.topology.reviewer.as_ref().unwrap().pane_id,
         supervisor_pane_id
@@ -153,7 +164,13 @@ fn one_pane_pipeline_succeeds_with_collapsed_bundle() {
     assert_eq!(snap.send_calls.len(), 1);
     let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
     // All three roles collapse into the supervisor pane id.
-    let supervisor_pane_id = loaded.topology.orchestrator.as_ref().unwrap().pane_id.clone();
+    let supervisor_pane_id = loaded
+        .topology
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .pane_id
+        .clone();
     assert_eq!(
         loaded.topology.runner.as_ref().unwrap().pane_id,
         supervisor_pane_id
@@ -287,7 +304,7 @@ fn pane_ids_only_persisted_after_successful_starts() {
 fn harness_extra_flags_forwarded_on_agent_start_argv() {
     let tmp = TempDir::new().unwrap();
     let ctx = ctx_in(tmp.path());
-    let (si, mut ops) = make_inputs(&ctx, Topology::ThreeAgent);
+    let (si, ops) = make_inputs(&ctx, Topology::ThreeAgent);
     spawn_session(&ops, &si).expect("pipeline should succeed");
     let snap = ops.snapshot();
     // Each role's start argv includes its role's harness kind

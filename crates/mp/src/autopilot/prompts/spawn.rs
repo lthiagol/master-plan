@@ -307,10 +307,7 @@ pub fn render_role_prompt(role: Role, inputs: &SpawnPromptInputs) -> String {
     // mirrors the state-machine enum so a drifted prompt that
     // mentions an unknown state is caught by the verifier.
     let _ = writeln!(out, "## Allowed role states");
-    let _ = writeln!(
-        out,
-        "Your current `role_state.<role>.state` is one of:"
-    );
+    let _ = writeln!(out, "Your current `role_state.<role>.state` is one of:");
     for state in ALLOWED_ROLE_STATES {
         let _ = writeln!(out, "  - `{state}`");
     }
@@ -352,14 +349,8 @@ pub fn render_role_prompt(role: Role, inputs: &SpawnPromptInputs) -> String {
 /// `RoleState` enum in `transitions.rs`). Kept here as a `const`
 /// slice so a future enum addition forces a prompt + verifier
 /// update in lockstep.
-pub const ALLOWED_ROLE_STATES: &[&str] = &[
-    "idle",
-    "starting",
-    "working",
-    "blocked",
-    "done",
-    "unknown",
-];
+pub const ALLOWED_ROLE_STATES: &[&str] =
+    &["idle", "starting", "working", "blocked", "done", "unknown"];
 
 /// The exact typed `mp autopilot session transition` commands the
 /// role may issue. The list is role-specific: the runner never
@@ -437,7 +428,10 @@ pub fn render_topology_prompts(
             BundledPrompt {
                 label: "supervisor".into(),
                 roles: vec![Role::Orchestrator, Role::Reviewer],
-                prompt: render_collapsed_bundle(&[(&p_o, Role::Orchestrator), (&p_v, Role::Reviewer)]),
+                prompt: render_collapsed_bundle(&[
+                    (&p_o, Role::Orchestrator),
+                    (&p_v, Role::Reviewer),
+                ]),
             },
             BundledPrompt {
                 label: "role-runner-1".into(),
@@ -491,7 +485,10 @@ pub enum HarnessFlagError {
     /// Harness kind is not in the v1 supported set (opencode /
     /// cursor / pi). The caller must register the harness first
     /// (via the harness registry) before re-attempting the spawn.
-    Unsupported { harness: String, supported: Vec<String> },
+    Unsupported {
+        harness: String,
+        supported: Vec<String>,
+    },
 }
 
 impl std::fmt::Display for HarnessFlagError {
@@ -543,11 +540,7 @@ pub fn harness_extra_flags(rc: &ResolvedRoleConfig) -> Result<Vec<String>, Harne
         other => {
             return Err(HarnessFlagError::Unsupported {
                 harness: other.to_string(),
-                supported: vec![
-                    "opencode".into(),
-                    "cursor".into(),
-                    "pi".into(),
-                ],
+                supported: vec!["opencode".into(), "cursor".into(), "pi".into()],
             });
         }
     }
@@ -575,14 +568,7 @@ mod tests {
     fn sample_inputs(role: Role) -> SpawnPromptInputs {
         let builtin = crate::autopilot::role::builtin_role_default(role);
         let rc = resolve_role_config(None, None, &builtin);
-        SpawnPromptInputs::new(
-            "master-plan",
-            "sess-alpha",
-            "M210",
-            0,
-            rc,
-        )
-        .unwrap()
+        SpawnPromptInputs::new("master-plan", "sess-alpha", "M210", 0, rc).unwrap()
     }
 
     #[test]
@@ -707,10 +693,7 @@ mod tests {
         let inputs = sample_inputs(Role::Runner);
         let bundles = render_topology_prompts(&inputs, &inputs, &inputs, Topology::TwoAgent);
         assert_eq!(bundles.len(), 2);
-        assert_eq!(
-            bundles[0].roles,
-            vec![Role::Orchestrator, Role::Reviewer]
-        );
+        assert_eq!(bundles[0].roles, vec![Role::Orchestrator, Role::Reviewer]);
         // 2-pane supervisor: O + V concatenated with a seam.
         assert!(bundles[0].prompt.contains("─── role: orchestrator ───"));
         assert!(bundles[0].prompt.contains("─── role: reviewer ───"));
@@ -733,7 +716,11 @@ mod tests {
 
     #[test]
     fn harness_extra_flags_opencode_appends_skill_and_model() {
-        let mut rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Runner));
+        let mut rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Runner),
+        );
         rc.harness = "opencode".into();
         rc.model = Some("anthropic/claude-opus-4-1".into());
         rc.skill = "mp-runner".into();
@@ -751,7 +738,11 @@ mod tests {
 
     #[test]
     fn harness_extra_flags_cursor_uses_agent_instead_of_skill() {
-        let mut rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Reviewer));
+        let mut rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Reviewer),
+        );
         rc.harness = "cursor".into();
         rc.skill = "mp-runner".into();
         rc.model = Some("anthropic/claude-opus-4-1".into());
@@ -764,20 +755,25 @@ mod tests {
 
     #[test]
     fn harness_extra_flags_pi_uses_skill_flag() {
-        let mut rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Runner));
+        let mut rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Runner),
+        );
         rc.harness = "pi".into();
         rc.skill = "mp-runner".into();
         rc.model = None;
         let flags = harness_extra_flags(&rc).unwrap();
-        assert_eq!(
-            flags,
-            vec!["--skill".to_string(), "mp-runner".to_string()]
-        );
+        assert_eq!(flags, vec!["--skill".to_string(), "mp-runner".to_string()]);
     }
 
     #[test]
     fn harness_extra_flags_omits_model_when_unset() {
-        let mut rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Orchestrator));
+        let mut rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Orchestrator),
+        );
         rc.harness = "opencode".into();
         rc.model = None;
         let flags = harness_extra_flags(&rc).unwrap();
@@ -786,7 +782,11 @@ mod tests {
 
     #[test]
     fn harness_extra_flags_rejects_unsupported_harness_before_pane_creation() {
-        let mut rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Runner));
+        let mut rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Runner),
+        );
         rc.harness = "claude-code".into();
         rc.skill = "mp-runner".into();
         let err = harness_extra_flags(&rc).unwrap_err();
@@ -802,7 +802,11 @@ mod tests {
 
     #[test]
     fn spawn_prompt_inputs_rejects_empty_project_or_session_or_milestone() {
-        let rc = resolve_role_config(None, None, &crate::autopilot::role::builtin_role_default(Role::Runner));
+        let rc = resolve_role_config(
+            None,
+            None,
+            &crate::autopilot::role::builtin_role_default(Role::Runner),
+        );
         assert!(SpawnPromptInputs::new("", "s", "m", 0, rc.clone()).is_err());
         assert!(SpawnPromptInputs::new("p", "", "m", 0, rc.clone()).is_err());
         assert!(SpawnPromptInputs::new("p", "s", "", 0, rc).is_err());
@@ -813,9 +817,6 @@ mod tests {
         // Pin the v1 autopilot-harness set so adding a new kind
         // is an explicit edit (and forces a verifier + golden
         // re-pin).
-        assert_eq!(
-            SUPPORTED_AUTOPILOT_HARNESSES,
-            &["opencode", "cursor", "pi"]
-        );
+        assert_eq!(SUPPORTED_AUTOPILOT_HARNESSES, &["opencode", "cursor", "pi"]);
     }
 }

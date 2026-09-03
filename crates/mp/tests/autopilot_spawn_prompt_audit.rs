@@ -37,7 +37,7 @@ fn rc(role: Role, model: Option<&str>) -> ResolvedRoleConfig {
     r
 }
 
-fn inputs(role: Role, rc: ResolvedRoleConfig) -> SpawnPromptInputs {
+fn inputs(_role: Role, rc: ResolvedRoleConfig) -> SpawnPromptInputs {
     SpawnPromptInputs::new("master-plan", "sess-alpha", "M210", 0, rc).unwrap()
 }
 
@@ -150,12 +150,34 @@ fn three_pane_session_persists_three_role_prompts_and_three_bundles() {
         &ro,
         &rr,
         &rv,
-        &[("role-orchestrator-1", "%1"), ("role-runner-1", "%2"), ("role-reviewer-1", "%3")],
+        &[
+            ("role-orchestrator-1", "%1"),
+            ("role-runner-1", "%2"),
+            ("role-reviewer-1", "%3"),
+        ],
     );
     // Per-role source prompts are populated.
-    assert!(session.roles.orchestrator.as_ref().unwrap().spawn_prompt_rendered.is_some());
-    assert!(session.roles.runner.as_ref().unwrap().spawn_prompt_rendered.is_some());
-    assert!(session.roles.reviewer.as_ref().unwrap().spawn_prompt_rendered.is_some());
+    assert!(session
+        .roles
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
+    assert!(session
+        .roles
+        .runner
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
+    assert!(session
+        .roles
+        .reviewer
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
     // prompt_bundles has three entries.
     assert_eq!(session.prompt_bundles.len(), 3);
     for label in ["role-orchestrator-1", "role-runner-1", "role-reviewer-1"] {
@@ -191,7 +213,11 @@ fn two_pane_supervisor_bundle_carries_orchestrator_and_reviewer_prompts() {
     let roles_in_supervisor: Vec<String> = supervisor
         .get("roles")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|s| s.as_str().map(str::to_string)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|s| s.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
     assert!(roles_in_supervisor.contains(&"orchestrator".to_string()));
     assert!(roles_in_supervisor.contains(&"reviewer".to_string()));
@@ -225,7 +251,11 @@ fn one_pane_supervisor_bundle_carries_all_three_role_prompts() {
     let roles_in_supervisor: Vec<String> = supervisor
         .get("roles")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|s| s.as_str().map(str::to_string)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|s| s.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
     assert!(roles_in_supervisor.contains(&"orchestrator".to_string()));
     assert!(roles_in_supervisor.contains(&"runner".to_string()));
@@ -262,14 +292,36 @@ fn persisted_session_round_trips_via_load_session() {
         &ro,
         &rr,
         &rv,
-        &[("role-orchestrator-1", "%1"), ("role-runner-1", "%2"), ("role-reviewer-1", "%3")],
+        &[
+            ("role-orchestrator-1", "%1"),
+            ("role-runner-1", "%2"),
+            ("role-reviewer-1", "%3"),
+        ],
     );
     mp::autopilot::session::save_session(&ctx, "sess-alpha", &session).unwrap();
     let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
     assert_eq!(loaded.prompt_bundles.len(), 3);
-    assert!(loaded.roles.orchestrator.as_ref().unwrap().spawn_prompt_rendered.is_some());
-    assert!(loaded.roles.runner.as_ref().unwrap().spawn_prompt_rendered.is_some());
-    assert!(loaded.roles.reviewer.as_ref().unwrap().spawn_prompt_rendered.is_some());
+    assert!(loaded
+        .roles
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
+    assert!(loaded
+        .roles
+        .runner
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
+    assert!(loaded
+        .roles
+        .reviewer
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .is_some());
     assert!(loaded.binary_provenance.is_some());
 }
 

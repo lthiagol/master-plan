@@ -33,7 +33,7 @@ fn rc(role: Role, harness: &str, model: Option<&str>) -> ResolvedRoleConfig {
     r
 }
 
-fn inputs(role: Role, rc: ResolvedRoleConfig) -> SpawnPromptInputs {
+fn inputs(_role: Role, rc: ResolvedRoleConfig) -> SpawnPromptInputs {
     SpawnPromptInputs::new("master-plan", "sess-alpha", "M210", 0, rc).unwrap()
 }
 
@@ -43,7 +43,11 @@ fn first_lines(prompt: &str, n: usize) -> String {
 
 #[test]
 fn golden_three_pane_orchestrator_prompt_byte_stable() {
-    let rc = rc(Role::Orchestrator, "opencode", Some("anthropic/claude-opus-4-1"));
+    let rc = rc(
+        Role::Orchestrator,
+        "opencode",
+        Some("anthropic/claude-opus-4-1"),
+    );
     let i = inputs(Role::Orchestrator, rc);
     let prompt = render_role_prompt(Role::Orchestrator, &i);
     // The first 8 lines are the load-bearing header (role
@@ -96,7 +100,11 @@ fn golden_three_pane_runner_prompt_byte_stable() {
 
 #[test]
 fn golden_three_pane_reviewer_prompt_byte_stable() {
-    let rc = rc(Role::Reviewer, "opencode", Some("anthropic/claude-opus-4-1"));
+    let rc = rc(
+        Role::Reviewer,
+        "opencode",
+        Some("anthropic/claude-opus-4-1"),
+    );
     let i = inputs(Role::Reviewer, rc);
     let prompt = render_role_prompt(Role::Reviewer, &i);
     let expected_header = "\
@@ -125,8 +133,7 @@ fn golden_three_pane_yields_three_separate_bundles_in_canonical_order() {
     let io = inputs(Role::Orchestrator, rc.clone());
     let ir = inputs(Role::Runner, rc.clone());
     let iv = inputs(Role::Reviewer, rc);
-    let bundles: Vec<BundledPrompt> =
-        render_topology_prompts(&io, &ir, &iv, Topology::ThreeAgent);
+    let bundles: Vec<BundledPrompt> = render_topology_prompts(&io, &ir, &iv, Topology::ThreeAgent);
     assert_eq!(bundles.len(), 3);
     // Canonical declaration order: Orchestrator, Runner, Reviewer.
     assert_eq!(bundles[0].label, "role-orchestrator-1");
@@ -149,10 +156,7 @@ fn golden_two_pane_supervisor_bundle_concatenates_orchestrator_then_reviewer() {
     let runner = &bundles[1];
     // Supervisor carries both O and V roles.
     assert_eq!(supervisor.label, "supervisor");
-    assert_eq!(
-        supervisor.roles,
-        vec![Role::Orchestrator, Role::Reviewer]
-    );
+    assert_eq!(supervisor.roles, vec![Role::Orchestrator, Role::Reviewer]);
     // Named seam between O and V sections — the supervisor's
     // only cue for "you're in O-mode vs V-mode".
     assert!(supervisor.prompt.contains("─── role: orchestrator ───"));
@@ -223,9 +227,17 @@ fn golden_topology_collapses_are_byte_stable_for_each_topology() {
     // deterministic, so the audit surface
     // (roles.<role>.spawn_prompt_rendered, prompt_bundles) is
     // reproducible across re-spawns.
-    let rc_o = rc(Role::Orchestrator, "opencode", Some("anthropic/claude-opus-4-1"));
+    let rc_o = rc(
+        Role::Orchestrator,
+        "opencode",
+        Some("anthropic/claude-opus-4-1"),
+    );
     let rc_r = rc(Role::Runner, "opencode", Some("anthropic/claude-opus-4-1"));
-    let rc_v = rc(Role::Reviewer, "opencode", Some("anthropic/claude-opus-4-1"));
+    let rc_v = rc(
+        Role::Reviewer,
+        "opencode",
+        Some("anthropic/claude-opus-4-1"),
+    );
     let io = inputs(Role::Orchestrator, rc_o);
     let ir = inputs(Role::Runner, rc_r);
     let iv = inputs(Role::Reviewer, rc_v);

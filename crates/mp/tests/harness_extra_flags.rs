@@ -72,10 +72,7 @@ fn golden_pi_uses_skill_flag() {
     let flags = harness_extra_flags(&r).unwrap();
     // Pi v1 surfaces skill via the same --skill flag as opencode
     // (per harness/registry V1_ENTRIES model_flag pattern).
-    assert_eq!(
-        flags,
-        vec!["--skill".to_string(), "mp-runner".to_string()]
-    );
+    assert_eq!(flags, vec!["--skill".to_string(), "mp-runner".to_string()]);
 }
 
 #[test]

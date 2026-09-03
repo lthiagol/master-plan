@@ -168,8 +168,12 @@ impl std::fmt::Display for BinaryProvenanceMismatch {
                  session schema is newer than this binary can preserve. \
                  Rebuild mp (cargo build --release) or install the latest \
                  version (`make install`) before re-spawning.",
-                recorded.version, recorded.schema_version, recorded.build_kind,
-                current.version, current.schema_version, current.build_kind,
+                recorded.version,
+                recorded.schema_version,
+                recorded.build_kind,
+                current.version,
+                current.schema_version,
+                current.build_kind,
             ),
             BinaryProvenanceMismatch::SchemaBelowFloor { recorded, floor } => write!(
                 f,
@@ -254,17 +258,11 @@ pub enum SpawnError {
     /// `herdr pane split` failed for a specific pane ordinal.
     PaneCreateFailed { ordinal: usize, stderr: String },
     /// `herdr agent start` failed for a specific pane.
-    AgentStartFailed {
-        label: String,
-        stderr: String,
-    },
+    AgentStartFailed { label: String, stderr: String },
     /// `herdr agent send` failed for a specific pane (prompt
     /// delivery is the contract; a half-delivered prompt leaves
     /// the pane in a broken state).
-    PromptSendFailed {
-        label: String,
-        stderr: String,
-    },
+    PromptSendFailed { label: String, stderr: String },
     /// The harness kind was not in the v1 supported set —
     /// caught *before* any pane creation so a stray harness id
     /// never burns a workspace.
@@ -279,18 +277,16 @@ pub enum SpawnError {
 impl std::fmt::Display for SpawnError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SpawnError::WorkspaceEnsureFailed { name, stderr } => write!(
-                f,
-                "herdr workspace ensure {name} failed: {stderr}"
-            ),
+            SpawnError::WorkspaceEnsureFailed { name, stderr } => {
+                write!(f, "herdr workspace ensure {name} failed: {stderr}")
+            }
             SpawnError::PaneCreateFailed { ordinal, stderr } => write!(
                 f,
                 "herdr pane split failed for pane ordinal {ordinal}: {stderr}"
             ),
-            SpawnError::AgentStartFailed { label, stderr } => write!(
-                f,
-                "herdr agent start failed for pane {label:?}: {stderr}"
-            ),
+            SpawnError::AgentStartFailed { label, stderr } => {
+                write!(f, "herdr agent start failed for pane {label:?}: {stderr}")
+            }
             SpawnError::PromptSendFailed { label, stderr } => write!(
                 f,
                 "herdr agent send (prompt delivery) failed for pane {label:?}: {stderr}"
@@ -400,9 +396,7 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
                 });
             }
         };
-        let out = Command::new(&bin)
-            .args(["pane", "split"])
-            .output();
+        let out = Command::new(&bin).args(["pane", "split"]).output();
         match out {
             Ok(o) if o.status.success() => {
                 let stdout = String::from_utf8_lossy(&o.stdout).into_owned();
@@ -664,8 +658,7 @@ impl HerdrSpawnOps for MockHerdrSpawnOps {
 
     fn send_prompt(&self, pane_id: &str, text: &str) -> Result<(), SpawnError> {
         let mut g = self.inner.borrow_mut();
-        g.send_calls
-            .push((pane_id.to_string(), text.to_string()));
+        g.send_calls.push((pane_id.to_string(), text.to_string()));
         if let Some(outcome) = g.send_outcomes.first().cloned() {
             let _ = g.send_outcomes.remove(0);
             return match outcome {
@@ -680,7 +673,10 @@ impl HerdrSpawnOps for MockHerdrSpawnOps {
     }
 
     fn delete_pane(&self, pane_id: &str) {
-        self.inner.borrow_mut().delete_calls.push(pane_id.to_string());
+        self.inner
+            .borrow_mut()
+            .delete_calls
+            .push(pane_id.to_string());
     }
 }
 
@@ -755,9 +751,7 @@ pub fn spawn_session<O: HerdrSpawnOps>(
         (Role::Runner, &inputs.role_r),
         (Role::Reviewer, &inputs.role_v),
     ] {
-        if let Err(HarnessFlagError::Unsupported { harness, supported }) =
-            harness_extra_flags(rc)
-        {
+        if let Err(HarnessFlagError::Unsupported { harness, supported }) = harness_extra_flags(rc) {
             let _ = role;
             return Err(SpawnError::UnsupportedHarness { harness, supported });
         }
@@ -850,7 +844,9 @@ pub fn spawn_session<O: HerdrSpawnOps>(
 
     // Step 4: persist the session with pane IDs, role configs,
     // provenance, and the audit prompt bundles.
-    let path = persist_session(inputs, &handles, &bundles, &current, &inputs_o, &inputs_r, &inputs_v)?;
+    let path = persist_session(
+        inputs, &handles, &bundles, &current, &inputs_o, &inputs_r, &inputs_v,
+    )?;
 
     Ok(SpawnOutcome {
         panes: handles,
@@ -897,11 +893,12 @@ fn persist_session(
     inputs_r: &SpawnPromptInputs,
     inputs_v: &SpawnPromptInputs,
 ) -> Result<PathBuf, SpawnError> {
-    let path = SessionPath::new(inputs.ctx, inputs.session_id)
-        .map_err(|e| SpawnError::WorkspaceEnsureFailed {
+    let path = SessionPath::new(inputs.ctx, inputs.session_id).map_err(|e| {
+        SpawnError::WorkspaceEnsureFailed {
             name: inputs.session_id.to_string(),
             stderr: format!("bad session id: {e}"),
-        })?;
+        }
+    })?;
     let mut session = if path.file.exists() {
         match crate::autopilot::session::load_session(inputs.ctx, inputs.session_id) {
             Ok(s) => s,
@@ -933,15 +930,9 @@ fn persist_session(
         pane_id: h.pane_id.clone(),
         label: Some(h.label.clone()),
     };
-    let orch_pane_ref = orch_handle
-        .or(supervisor_handle)
-        .map(pane_ref);
-    let runner_pane_ref = runner_handle
-        .or(supervisor_handle)
-        .map(pane_ref);
-    let reviewer_pane_ref = reviewer_handle
-        .or(supervisor_handle)
-        .map(pane_ref);
+    let orch_pane_ref = orch_handle.or(supervisor_handle).map(pane_ref);
+    let runner_pane_ref = runner_handle.or(supervisor_handle).map(pane_ref);
+    let reviewer_pane_ref = reviewer_handle.or(supervisor_handle).map(pane_ref);
     session.topology = PaneLayout {
         orchestrator: orch_pane_ref,
         runner: runner_pane_ref,
@@ -966,11 +957,7 @@ fn persist_session(
         }),
         runner: Some(RoleConfig {
             role: RoleName::Runner,
-            pane_id: session
-                .topology
-                .runner
-                .as_ref()
-                .map(|p| p.pane_id.clone()),
+            pane_id: session.topology.runner.as_ref().map(|p| p.pane_id.clone()),
             model: inputs.role_r.model.clone(),
             harness: Some(inputs.role_r.harness.clone()),
             skill: Some(inputs.role_r.skill.clone()),
@@ -1011,11 +998,9 @@ fn persist_session(
     // Binary provenance record (AC-07).
     session.binary_provenance = Some(provenance.clone());
 
-    save_session_at(&path.file, &session).map_err(|e| {
-        SpawnError::WorkspaceEnsureFailed {
-            name: inputs.session_id.to_string(),
-            stderr: format!("save session.json: {e:#}"),
-        }
+    save_session_at(&path.file, &session).map_err(|e| SpawnError::WorkspaceEnsureFailed {
+        name: inputs.session_id.to_string(),
+        stderr: format!("save session.json: {e:#}"),
     })?;
     Ok(path.file)
 }
@@ -1033,10 +1018,9 @@ fn rendered_for(i: &SpawnPromptInputs) -> String {
 }
 
 fn load_provenance(file: &Path) -> Result<MpBinaryProvenance> {
-    let raw = std::fs::read_to_string(file)
-        .with_context(|| format!("read {}", file.display()))?;
-    let v: serde_json::Value = serde_json::from_str(&raw)
-        .with_context(|| format!("parse {}", file.display()))?;
+    let raw = std::fs::read_to_string(file).with_context(|| format!("read {}", file.display()))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", file.display()))?;
     let p = v
         .get("binary_provenance")
         .ok_or_else(|| anyhow!("missing binary_provenance field"))?;
@@ -1131,7 +1115,10 @@ mod tests {
         // current to meet.
         assert!(!current.satisfies(&recorded));
         let err = check_binary_provenance(Some(&recorded), &current).unwrap_err();
-        assert!(matches!(*err, BinaryProvenanceMismatch::SchemaTooNew { .. }));
+        assert!(matches!(
+            *err,
+            BinaryProvenanceMismatch::SchemaTooNew { .. }
+        ));
     }
 
     #[test]
@@ -1164,7 +1151,10 @@ mod tests {
         };
         let current = MpBinaryProvenance::current();
         let err = check_binary_provenance(Some(&recorded), &current).unwrap_err();
-        assert!(matches!(*err, BinaryProvenanceMismatch::SchemaTooNew { .. }));
+        assert!(matches!(
+            *err,
+            BinaryProvenanceMismatch::SchemaTooNew { .. }
+        ));
     }
 
     #[test]
@@ -1178,7 +1168,10 @@ mod tests {
         };
         let current = MpBinaryProvenance::current();
         let err = check_binary_provenance(Some(&recorded), &current).unwrap_err();
-        assert!(matches!(*err, BinaryProvenanceMismatch::BinaryPathMismatch { .. }));
+        assert!(matches!(
+            *err,
+            BinaryProvenanceMismatch::BinaryPathMismatch { .. }
+        ));
     }
 
     #[test]
