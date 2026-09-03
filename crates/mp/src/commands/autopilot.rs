@@ -1,4 +1,4 @@
-//! M207: `mp autopilot` command dispatch.
+//! M207 / M209: `mp autopilot` command dispatch.
 //!
 //! The CLI surface (`AutopilotCmd`) is defined in
 //! [`crate::cli::autopilot`]; this module owns the runtime behavior
@@ -10,9 +10,16 @@
 //! - `session show`    -> typed load + emit
 //! - `note add`        -> typed insert + atomic save
 //! - `session transition` -> typed transition + atomic save
+//! - `config get/set`  -> umbrella-scoped read/write of the
+//!   `autopilot.*` namespace; thin wrapper around `mp config`
+//!   semantics so the dedicated surface can grow its own UX (schema
+//!   validation, deep unset, raul Settings write-through) without
+//!   disturbing the umbrella command.
 //!
-//! All write paths route through [`crate::autopilot::save_session`]
-//! so the schema gate runs before the disk write.
+//! All session-write paths route through
+//! [`crate::autopilot::save_session`] so the schema gate runs before
+//! the disk write. Config writes route through
+//! [`crate::config_cmd::config_set`] / [`crate::config_cmd::config_get`].
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
@@ -21,10 +28,14 @@ use serde_json::json;
 use crate::autopilot::notes::build_note;
 use crate::autopilot::{
     self, AcStatus, AutopilotSession, NoteKind, OrchestrationEvent, ProjectionKey, RoleName,
-    RoleState, TransitionError,
+    RoleState, Topology as AutopilotTopology, TransitionError,
 };
-use crate::cli::{AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs};
-use crate::commands::common::{emit, emit_fields};
+use crate::cli::{
+    AutopilotCmd, AutopilotConfigCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs,
+    TransitionArgs,
+};
+use crate::commands::common::{emit, emit_and_exit_on_fail, emit_fields};
+use crate::config_cmd::{config_get, config_set};
 use crate::paths::PlanContext;
 
 /// Top-level dispatch.
@@ -39,6 +50,7 @@ pub(crate) fn cmd_autopilot(
         AutopilotCmd::Note { cmd } => match cmd {
             AutopilotNoteCmd::Add(args) => cmd_autopilot_note_add(ctx, args, format, fields),
         },
+        AutopilotCmd::Config { cmd } => cmd_autopilot_config(ctx, cmd, format, fields),
     }
 }
 
@@ -206,6 +218,92 @@ impl SessionShowReport {
         }
     }
 }
+
+// ─── M209: `mp autopilot config …` dispatch ─────────────────────────
+
+/// M209: dispatch for `mp autopilot config {get,set}`. The args are
+/// the same as `mp config {get,set} autopilot.<key>` — the dedicated
+/// surface exists so the autopilot UX can grow (deep unset, schema
+/// hints, raul Settings write-through) without touching the umbrella
+/// `mp config` command.
+fn cmd_autopilot_config(
+    ctx: &PlanContext,
+    cmd: AutopilotConfigCmd,
+    format: crate::cli::OutputFormat,
+    fields: &[String],
+) -> Result<()> {
+    match cmd {
+        AutopilotConfigCmd::Get { key } => cmd_autopilot_config_get(ctx, &key, format, fields),
+        AutopilotConfigCmd::Set { key, value, dry_run } => {
+            cmd_autopilot_config_set(ctx, &key, &value, dry_run, format, fields)
+        }
+    }
+}
+
+fn cmd_autopilot_config_get(
+    ctx: &PlanContext,
+    key: &str,
+    format: crate::cli::OutputFormat,
+    fields: &[String],
+) -> Result<()> {
+    let normalized = ensure_autopilot_prefix(key);
+    let value = config_get(ctx, &normalized)?;
+    emit_fields(
+        format,
+        &json!({
+            "ok": true,
+            "key": normalized,
+            "value": value,
+        }),
+        fields,
+    )
+}
+
+fn cmd_autopilot_config_set(
+    ctx: &PlanContext,
+    key: &str,
+    value: &str,
+    dry_run: bool,
+    format: crate::cli::OutputFormat,
+    _fields: &[String],
+) -> Result<()> {
+    let normalized = ensure_autopilot_prefix(key);
+    let report = config_set(ctx, &normalized, value, dry_run)?;
+    let payload = json!({
+        "ok": report.ok,
+        "dry_run": report.dry_run,
+        "key": normalized,
+        "value": report.value,
+        "errors": report.errors,
+        "warnings": report.warnings,
+    });
+    // Mirror the umbrella `mp config set` contract: non-zero exit
+    // on validation failure so callers can `set && use`. The set
+    // report has no per-field projection surface today, so
+    // `_fields` is reserved for a future schema-aware projection.
+    emit_and_exit_on_fail(format, &payload, report.ok)
+}
+
+/// M209: accept either `autopilot.topology` or `topology` so the
+/// user does not have to type the prefix twice. Anything else is a
+/// structured error surfaced by `config_get` / `config_set` (which
+/// already know the `autopilot.` prefix).
+fn ensure_autopilot_prefix(key: &str) -> String {
+    if key.starts_with("autopilot.") {
+        key.to_string()
+    } else {
+        format!("autopilot.{key}")
+    }
+}
+
+// Silence unused-imports: `AutopilotTopology` is reserved for a
+// future `mp autopilot config schema` surface that lists the
+// allowed topology values. The S3 commit uses `Topology` via
+// `config_get_autopilot` (config_cmd.rs) where string round-trips
+// matter more than the enum — the constant lives on for cross-module
+// discoverability.
+#[allow(dead_code)]
+const _AUTOPILOT_TOPOLOGY: AutopilotTopology = AutopilotTopology::ThreeAgent;
 
 // Reserved: a future command (e.g. `mp autopilot ac project …`)
 // will route through the projection helpers below. The re-export

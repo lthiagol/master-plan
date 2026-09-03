@@ -40,7 +40,8 @@ pub use activity::ActivityCmd;
 pub use agent::{AgentCmd, HarnessCmd, SkillCmd};
 pub use annotation::AnnotationCmd;
 pub use autopilot::{
-    AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs,
+    AutopilotCmd, AutopilotConfigCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs,
+    TransitionArgs,
 };
 pub use backlog::BacklogCmd;
 pub use brief::BriefCmd;

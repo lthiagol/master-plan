@@ -106,6 +106,10 @@ pub fn config_get(ctx: &PlanContext, key: &str) -> Result<Value> {
         }
         return config_get_agent(&cfg, rest);
     }
+    // M209: autopilot section. Same dotted-key shape as agent.*.
+    if let Some(rest) = key.strip_prefix("autopilot.") {
+        return config_get_autopilot(&cfg, rest);
+    }
     // M154: review-side integrations — same dotted-key surface as
     // agent.automation.*. The accessor methods own the defaults so
     // `mp config get review.hunk` returns the effective value (not
@@ -207,6 +211,10 @@ fn apply_config_set(cfg: &mut ProjectConfig, key: &str, value: &str) -> Result<(
             other => bail!("unknown review field: review.{other} (expected hunk|hunk_author)"),
         }
         return Ok(());
+    }
+    // M209: autopilot.<field> path mirrors agent.<role>.<field>.
+    if let Some(rest) = key.strip_prefix("autopilot.") {
+        return set_autopilot_field(cfg, rest, value);
     }
     // M182 S4 (external review F-10): the sort-rebind contract is
     // `sort.<lane> <sortkey>` — the lane is the first dot-segment after
@@ -917,6 +925,129 @@ fn validate_automation_field(field: &str) -> Result<()> {
         | "auto_remediate" => Ok(()),
         other => bail!(
             "unknown automation field: agent.automation.{other} (expected one of: commit_after_execute, push_after_review, branch_strategy, auto_remediate)"
+        ),
+    }
+}
+
+// --- M209: autopilot section --------------------------------------------
+
+/// M209: `mp config get autopilot.<rest>`. The dispatch mirrors
+/// `agent.<role>.<field>`: `autopilot.topology` (string choice),
+/// `autopilot.refresh_secs` (non-negative integer), and
+/// `autopilot.roles.<role>.<field>` where `<role>` is one of
+/// `orchestrator | runner | reviewer` and `<field>` is one of
+/// `model | harness | skill | extras`.
+fn config_get_autopilot(cfg: &ProjectConfig, rest: &str) -> Result<Value> {
+    if rest == "topology" {
+        return Ok(json!(cfg.autopilot.topology.clone().unwrap_or_else(default_topology)));
+    }
+    if rest == "refresh_secs" {
+        return Ok(json!(cfg.autopilot.refresh_secs));
+    }
+    if let Some(role_rest) = rest.strip_prefix("roles.") {
+        let (role, field) = split_autopilot_role_field(role_rest)?;
+        let ovr = cfg.autopilot.roles.get(role).cloned().unwrap_or_default();
+        return Ok(match field {
+            "model" => json!(ovr.model),
+            "harness" => json!(ovr.harness),
+            "skill" => json!(ovr.skill),
+            "extras" => json!(ovr.extras),
+            other => bail!(
+                "unknown autopilot role field: autopilot.roles.<role>.{other} (expected model|harness|skill|extras)"
+            ),
+        });
+    }
+    bail!(
+        "unknown autopilot key: autopilot.{rest} (expected topology|refresh_secs|roles.<role>.<field>)"
+    )
+}
+
+/// M209: apply one `autopilot.<rest> = <value>` mutation.
+fn set_autopilot_field(cfg: &mut ProjectConfig, rest: &str, value: &str) -> Result<()> {
+    if rest == "topology" {
+        validate_topology(value)?;
+        cfg.autopilot.topology = Some(value.to_string());
+        return Ok(());
+    }
+    if rest == "refresh_secs" {
+        let n: i64 = value.parse().map_err(|_| {
+            anyhow::anyhow!("autopilot.refresh_secs must be a non-negative integer (got {value:?})")
+        })?;
+        if n < 0 {
+            bail!("autopilot.refresh_secs cannot be negative (got {n})");
+        }
+        cfg.autopilot.refresh_secs = Some(n as u64);
+        return Ok(());
+    }
+    if let Some(role_rest) = rest.strip_prefix("roles.") {
+        let (role, field) = split_autopilot_role_field(role_rest)?;
+        validate_autopilot_role(role)?;
+        validate_autopilot_role_field(field)?;
+        let entry = cfg.autopilot.roles.entry(role.to_string()).or_default();
+        match field {
+            "model" => entry.model = Some(value.to_string()),
+            "harness" => entry.harness = Some(value.to_string()),
+            "skill" => entry.skill = Some(value.to_string()),
+            "extras" => bail!(
+                "autopilot.roles.<role>.extras must be a JSON object (set per key instead: \
+                 e.g. `mp autopilot config set autopilot.roles.<role>.extras.<key> <value>`)"
+            ),
+            other => bail!(
+                "unknown autopilot role field: autopilot.roles.<role>.{other} (expected model|harness|skill|extras)"
+            ),
+        }
+        // Drop empty entries so a fully-cleared role doesn't leave
+        // an empty object on disk (parity with `agent.<role>`).
+        if entry.is_empty() {
+            cfg.autopilot.roles.remove(role);
+        }
+        return Ok(());
+    }
+    bail!(
+        "unknown autopilot key: autopilot.{rest} (expected topology|refresh_secs|roles.<role>.<field>)"
+    )
+}
+
+fn split_autopilot_role_field(rest: &str) -> Result<(&str, &str)> {
+    let (role, field) = rest
+        .split_once('.')
+        .ok_or_else(|| anyhow::anyhow!("expected autopilot.roles.<role>.<field>, got autopilot.roles.{rest}"))?;
+    Ok((role, field))
+}
+
+fn default_topology() -> String {
+    // Keep the literal string, not the enum, so the config getter
+    // reports the same shape the user wrote.
+    "three-agent".to_string()
+}
+
+fn validate_topology(value: &str) -> Result<()> {
+    if value.is_empty() {
+        bail!("autopilot.topology cannot be empty");
+    }
+    let parsed = value.parse::<crate::autopilot::role::Topology>();
+    match parsed {
+        Ok(_) => Ok(()),
+        Err(_) => bail!(
+            "autopilot.topology must be one of one-agent|two-agent|three-agent (got {value:?})"
+        ),
+    }
+}
+
+fn validate_autopilot_role(role: &str) -> Result<()> {
+    match role {
+        "orchestrator" | "runner" | "reviewer" => Ok(()),
+        other => bail!(
+            "unknown autopilot role: autopilot.roles.{other} (expected orchestrator|runner|reviewer)"
+        ),
+    }
+}
+
+fn validate_autopilot_role_field(field: &str) -> Result<()> {
+    match field {
+        "model" | "harness" | "skill" | "extras" => Ok(()),
+        other => bail!(
+            "unknown autopilot role field: autopilot.roles.<role>.{other} (expected model|harness|skill|extras)"
         ),
     }
 }

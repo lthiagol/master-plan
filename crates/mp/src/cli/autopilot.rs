@@ -1,4 +1,4 @@
-//! M207: `mp autopilot` CLI surface.
+//! M207 / M209: `mp autopilot` CLI surface.
 //!
 //! Subcommand tree (clap derives the `Commands::Autopilot` variant
 //! from this enum):
@@ -6,8 +6,10 @@
 //! ```text
 //! mp autopilot session list
 //! mp autopilot session show <id>
-//! mp autopilot note add --session <id> --kind <kind> --body <body> [--cycle <n>] [--milestone <id>]
 //! mp autopilot session transition --session <id> --role <role> --state <state> [--working-on <m:n>]
+//! mp autopilot note add --session <id> --kind <kind> --body <body> [--cycle <n>] [--milestone <id>]
+//! mp autopilot config get <key>
+//! mp autopilot config set <key> <value> [--dry-run]
 //! ```
 
 use clap::{Args, Subcommand};
@@ -24,6 +26,14 @@ pub enum AutopilotCmd {
     Note {
         #[command(subcommand)]
         cmd: AutopilotNoteCmd,
+    },
+    /// Read or write autopilot config under the `autopilot.*`
+    /// dotted-key namespace (mirrors `mp config get/set` but
+    /// scoped to the autopilot section). See
+    /// `crates/mp/src/commands/autopilot.rs::cmd_autopilot_config_*`.
+    Config {
+        #[command(subcommand)]
+        cmd: AutopilotConfigCmd,
     },
 }
 
@@ -100,4 +110,33 @@ pub struct TransitionArgs {
     /// Defaults to `mp-cli`.
     #[arg(long, default_value = "mp-cli")]
     pub actor: String,
+}
+
+/// `mp autopilot config …` subcommands. Shortcut for `mp config
+/// get/set autopilot.<key>` so the dedicated surface can grow
+/// (e.g. schema-aware help, deep unset) without touching the
+/// umbrella `mp config` command.
+#[derive(Subcommand, Debug)]
+pub enum AutopilotConfigCmd {
+    /// Read a single `autopilot.*` value. Same dotted-key path as
+    /// `mp config get autopilot.<key>`.
+    Get {
+        /// Dotted key (e.g. `autopilot.topology`,
+        /// `autopilot.roles.runner.harness`).
+        key: String,
+    },
+    /// Write a single `autopilot.*` value. Validates against the
+    /// role / field allow-list and the topology choice enum so a
+    /// typo never lands on disk.
+    Set {
+        /// Dotted key (e.g. `autopilot.topology`,
+        /// `autopilot.roles.runner.harness`).
+        key: String,
+        /// New value. Pass an empty string to clear a string field.
+        value: String,
+        /// Stage the change and report what *would* land without
+        /// persisting.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }

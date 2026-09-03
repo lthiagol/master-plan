@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -56,6 +58,14 @@ pub struct ProjectConfig {
         String,
         std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
     >,
+    /// M209: project-level autopilot config (`autopilot.topology`,
+    /// `autopilot.refresh_secs`, `autopilot.roles.<role>.*`). Read
+    /// and written through `mp autopilot config {get,set}`. Skipped
+    /// from serialization when entirely default so the golden
+    /// `tests/fixtures/json-shape/config.json` does not need to
+    /// grow on every autopilot milestone.
+    #[serde(default, skip_serializing_if = "AutopilotConfig::is_default")]
+    pub autopilot: AutopilotConfig,
 }
 
 /// M154: review-side integrations. The two knobs here gate the hunk
@@ -103,6 +113,72 @@ impl Default for ReviewConfig {
 fn default_review_hunk_author() -> String {
     "mp".to_string()
 }
+
+/// M209: project-level autopilot configuration. The section powers
+/// `mp autopilot config get/set autopilot.{topology,refresh_secs,
+/// roles.<role>.{model,harness,skill,extras}}` and is the global
+/// default tier of the resolution chain
+/// ([`crate::autopilot::role::resolve_role_config_full`]).
+///
+/// On-disk shape:
+/// ```json
+/// {
+///   "autopilot": {
+///     "topology": "three-agent",
+///     "refresh_secs": 30,
+///     "roles": {
+///       "runner": { "model": "anthropic/claude-opus-4-1", "harness": "opencode", ... },
+///       "orchestrator": { ... }
+///     }
+///   }
+/// }
+/// ```
+///
+/// Skipped from serialization when entirely default so the
+/// `tests/fixtures/json-shape/config.json` golden does not need to
+/// grow on every autopilot milestone. The whole section appears as
+/// soon as the user runs `mp autopilot config set …`.
+///
+/// `roles` values use
+/// [`crate::autopilot::role::RoleConfigOverride`] (re-exported via
+/// `crate::autopilot::RoleConfigOverride`) so the editor surface
+/// `autopilot.roles.<role>.<field>` matches the resolver's input
+/// shape exactly.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutopilotConfig {
+    /// Pane count: `one-agent | two-agent | three-agent`. Stored as a
+    /// String (not the [`crate::autopilot::role::Topology`] enum)
+    /// so a typo reports a validation error rather than corrupting
+    /// the config file with an unknown enum variant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topology: Option<String>,
+    /// Per-role defaults. Each value is a
+    /// [`crate::autopilot::role::RoleConfigOverride`] (via the
+    /// `AutopilotRoleOverride` alias below — using a BTreeMap key
+    /// instead of a fixed-role enum so adding a future role lands
+    /// without a config-schema migration).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub roles: BTreeMap<String, AutopilotRoleOverride>,
+    /// Refresh interval for the autopilot driver. Optional;
+    /// missing means "use the built-in default at the driver".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_secs: Option<u64>,
+}
+
+impl AutopilotConfig {
+    /// True when no operator has run `mp autopilot config set …`
+    /// yet — used by tests and the `mp autopilot config show` path
+    /// to omit the section entirely from JSON output.
+    pub fn is_default(&self) -> bool {
+        self.topology.is_none() && self.roles.is_empty() && self.refresh_secs.is_none()
+    }
+}
+
+/// Alias so [`ProjectConfig`] can name the per-role override shape
+/// without forcing every consumer of `config::*` to also depend on
+/// `autopilot::role`. Re-exported from [`crate::autopilot`] as
+/// `RoleConfigOverride` for the resolver path.
+pub type AutopilotRoleOverride = crate::autopilot::role::RoleConfigOverride;
 
 /// M149 + M147: per-role agent configuration consumed by `mp watch`
 /// (M149) and project-level automation policy consulted at handoff
