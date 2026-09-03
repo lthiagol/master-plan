@@ -359,7 +359,11 @@ fn f01_regression_reviewer_prompt_uses_reviewer_template_not_runner() {
     assert!(
         reviewer_prompt.contains("# Spawn prompt — role: reviewer"),
         "reviewer prompt must use Reviewer template header, got: {}",
-        &reviewer_prompt.lines().take(3).collect::<Vec<_>>().join("\n")
+        reviewer_prompt
+            .lines()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("\n")
     );
     assert!(
         reviewer_prompt.contains("You are the REVIEWER"),
