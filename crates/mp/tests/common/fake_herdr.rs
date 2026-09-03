@@ -57,6 +57,24 @@
 //! values are emitted as fractional seconds (`printf "%.3f"`) so the
 //! script can call `sleep` with one portable argument (no
 //! sub-millisecond arithmetic in pure POSIX sh).
+//!
+//! # Reuse requirement (M227 / S3)
+//!
+//! **Any new autopilot test that needs to inject a fake `herdr`
+//! binary MUST use [`FakeHerdrBuilder`] instead of writing a
+//! bespoke shell script.** The two ad-hoc builders that exist
+//! outside this module today
+//! (`watch_bridge_fastpath::install_fake_herdr`,
+//! `watch_sequential::install_fake_herdr_with_log`,
+//! `watch_non_dry_run::install_fake_herdr`,
+//! `watch_no_double_spawn::install_fake_herdr_with_existing_panes`,
+//! `suites/status_readiness::install_fake_herdr_for_preconditions`)
+//! are pre-M227 and out of scope; future autopilot suites (M225,
+//! M226, and beyond) compose off this primitive, and the contract
+//! is one source of truth for argv shape, response payloads, and
+//! the killpg-ready grandchild fork. Adding a second primitive
+//! would multiply the surface and re-introduce the flake paths
+// M227 closed.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -442,12 +460,6 @@ impl FakeHerdrBuilder {
         }
         out.push_str("        ;;\n");
 
-        // Help text for `pane split --help` (used by the version
-        // gate).
-        out.push_str("      split)\n");
-        // already handled above — fall through to default
-        out.push_str("        ;;\n");
-
         out.push_str("      *)\n");
         out.push_str("        exit 0\n");
         out.push_str("        ;;\n");
@@ -542,7 +554,6 @@ fn emit_sleep_branch(out: &mut String, ms: u64) {
         "        if [ -n {secs_quoted} ]; then sleep {secs_quoted}; fi\n",
         secs_quoted = shell_quote(&secs)
     ));
-    let _ = ms; // ms is consumed by secs above
 }
 
 fn shell_quote(s: &str) -> String {
@@ -660,46 +671,34 @@ mod tests {
     }
 
     #[test]
-    fn pane_get_grandchild_sleep_writes_pid_and_holds_open() {
+    fn pane_get_grandchild_sleep_writes_pid_file() {
+        // The grandchild-sleep pattern is exercised end-to-end in
+        // the integration test
+        // `mp_run_herdr_with_timeout_kills_grandchild_in_process_group`
+        // (watch_bridge_report.rs). Here we only assert the
+        // script-side contract: the script forks a `sleep` and
+        // writes its PID to the supplied file before `wait`ing.
+        // Run the script with a tiny sleep so the test stays
+        // under a second; the script's natural exit reaps the
+        // grandchild synchronously, so nextest's leak detector
+        // sees a clean teardown.
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("sleep.pid");
         let fake = FakeHerdrBuilder::new()
-            .pane_get_grandchild_sleep(60, &pid_file)
+            .pane_get_grandchild_sleep(1, &pid_file)
             .install(dir.path());
-        // Drive the script in a detached child so we don't block on
-        // its `wait` (the script intentionally sleeps 60 s). Use a
-        // `spawn()` without `wait()` so the parent can move on
-        // once the pid file appears; the helper will be reaped
-        // when the tempdir drops at end of test.
-        let script = fake.path().to_path_buf();
-        let pid_file_for_thread = pid_file.clone();
-        let _ = std::process::Command::new(&script)
+        let out = std::process::Command::new(fake.path())
             .args(["pane", "get", "%1"])
-            .spawn();
-        // The thread isn't needed any more — the child runs on its
-        // own. Keep the spawn handle alive long enough to read the
-        // pid file, then return.
-        let _ = pid_file_for_thread;
-        let mut pid: i32 = 0;
-        for _ in 0..200 {
-            if let Ok(s) = std::fs::read_to_string(&pid_file) {
-                if let Ok(n) = s.trim().parse::<i32>() {
-                    if n > 0 {
-                        pid = n;
-                        break;
-                    }
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        assert!(pid > 0, "grandchild pid was never written");
-        // Best-effort cleanup so a CI re-run doesn't leave the
-        // child sleep alive across runs. SIGKILL (uncatchable) is
-        // fine — the script intentionally has no trap, and the
-        // test's whole point is that the killpg path works.
-        unsafe {
-            libc::kill(pid, libc::SIGKILL);
-        }
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "fake herdr must exit 0 after the grandchild sleep completes: stderr={}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let pid_text = std::fs::read_to_string(&pid_file).unwrap_or_default();
+        let pid: i32 = pid_text.trim().parse().expect("pid file must be integer");
+        assert!(pid > 0, "grandchild pid must be positive: {pid}");
     }
 
     #[test]
