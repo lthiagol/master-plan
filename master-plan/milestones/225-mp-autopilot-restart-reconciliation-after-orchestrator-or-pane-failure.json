@@ -3,9 +3,9 @@
     "id": "225",
     "title": "mp autopilot restart + reconciliation after orchestrator or pane failure",
     "slug": "mp-autopilot-restart-reconciliation-after-orchestrator-or-pane-failure",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -28,8 +28,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-03T22:03:57.629900+00:00",
+    "lifecycle_at": "2026-09-03T22:20:41.727550+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -41,7 +40,7 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T21:57:54.385704+00:00"
+        "at": "2026-09-03T22:20:59.604570+00:00"
       },
       "external-review": {
         "status": "done",
@@ -51,13 +50,17 @@
         "status": "done",
         "at": "2026-09-03T14:13:31.018751+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T22:20:41.727551+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-03T22:03:57.629901+00:00"
+        "status": "done",
+        "at": "2026-09-03T22:20:41.727551+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T21:57:54.385704+00:00"
+        "at": "2026-09-03T22:20:59.604570+00:00"
       },
       "specify": {
         "status": "done",
@@ -231,11 +234,11 @@
       "severity": "high",
       "category": "spec-gap",
       "description": "M225 primitives (was_already_applied, classify_pane_loss, recover_event_tail, cross_check_canonical) are exported at crates/mp/src/autopilot/mod.rs:115-121 but NEVER called by any production code path. The spec's 'no duplicate dispatch', 'no fabricated completion', and 'resume from last valid event sequence' are unimplemented at runtime — they exist only as pure functions tested in isolation. The autopilot runtime path is cmd_autopilot_start (crates/mp/src/commands/autopilot.rs:162-179) which delegates to cmd_watch (crates/mp/src/commands/watch.rs:296-367), which uses crate::watch::reconcile (M152) — not M225. Existing recovery::recover_session (M207) is also only called by tests, not by any production code. The spec's in_scope items 'Resume from last valid event sequence', 'Reconcile herdr workspace/panes, session roles, milestone criteria, reviews, and lifecycle state', and 'No duplicate dispatch' are not enforced.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "af5eb95",
       "created": "2026-09-03",
-      "resolved": "",
+      "resolved": "2026-09-03",
       "phase": "external",
       "anchor": {
         "path": "crates/mp/src/autopilot/reconcile.rs"
@@ -246,11 +249,11 @@
       "severity": "high",
       "category": "test-coverage",
       "description": "The 4 M225 integration tests (m225_ac01..04 at crates/mp/tests/watch_resume.rs:347-580) are unit-style assertions over pure functions. They construct in-memory OrchestrationEvents and call pure functions directly. They never invoke a subprocess, never use FakeHerdrBuilder (M227), never simulate SIGINT/SIGKILL, never test that mp watch --resume or mp autopilot start actually deduplicates or validates against canonical state. The spec describes runtime restart behavior; the tests verify type definitions only. The orchestrator's review prompt explicitly requires 'the harness's death scripting must be USED, not just available' — confirmed false: zero grep matches for FakeHerdrBuilder or common::fake_herdr in watch_resume.rs. M227 reuse requirement (crates/mp/tests/common/fake_herdr.rs:62-77: 'Any new autopilot test that needs to inject a fake herdr binary MUST use FakeHerdrBuilder') is bypassed because the tests don't inject anything.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "aaaebd3",
       "created": "2026-09-03",
-      "resolved": "",
+      "resolved": "2026-09-03",
       "phase": "external",
       "anchor": {
         "path": "crates/mp/tests/watch_resume.rs"
@@ -261,11 +264,11 @@
       "severity": "medium",
       "category": "correctness",
       "description": "compare_revisions uses lexicographic ordering of source_revision strings as a proxy for 'newer' (crates/mp/src/autopilot/reconcile.rs:837-858). The function comment claims 'hash strings the projection module uses are stable and ordered by the canonical's last_updated timestamp + content hash, so lexicographic comparison is a reliable proxy for newer' — but canonical_revision (crates/mp/src/autopilot/ac_projection.rs:161-176) produces only a 16-hex-char content hash via DefaultHasher with no chronological component. Two revisions of different content have unpredictable lexicographic order, so the cross-check can misclassify a dimension half the time, allowing stale session restoration over newer canonical state — the exact M200 failure mode the spec is preventing. Latent because F-01 means the function is dead code today, but the test m225_ac04_canonical_newer_revision_never_restored_over_plan_evidence (crates/mp/tests/watch_resume.rs:528-580) sidesteps the bug by manually setting p.source_revision='a-older-rev' rather than using real hash strings. Real source_revisions will not produce lexicographic-ordered test outcomes.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer",
-      "fixed_in": "",
+      "fixed_in": "404dd75",
       "created": "2026-09-03",
-      "resolved": "",
+      "resolved": "2026-09-03",
       "phase": "external",
       "anchor": {
         "path": "crates/mp/src/autopilot/reconcile.rs",
