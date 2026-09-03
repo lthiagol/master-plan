@@ -890,6 +890,40 @@ mod s3_tests {
     }
 
     #[test]
+    fn s3_gate_blocks_worktree_mismatch_when_reviewer_on_different_worktree() {
+        // F-01 regression: the gate must refuse a reviewer that
+        // silently landed on a different worktree than the runner.
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let other_wt = std::path::Path::new("/tmp/different-wt");
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: other_wt,
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("worktree mismatch must block");
+        match err {
+            ReviewEnvError::WorktreeMismatch {
+                ref expected,
+                ref actual,
+                ref hint,
+            } => {
+                assert_eq!(*expected, "/tmp/different-wt");
+                assert_eq!(*actual, env.worktree_path.display().to_string());
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected WorktreeMismatch, got {other:?}"),
+        }
+        assert_eq!(err.kind(), "worktree-mismatch");
+    }
+
+    #[test]
     fn s3_gate_escalates_to_clean_room_on_shared_target_dir() {
         let env = fixture_env();
         let runner = fixture_runner();
