@@ -3,9 +3,9 @@
     "id": "210",
     "title": "mp autopilot spawn-prompt template + harness-extra-flags translation",
     "slug": "mp-autopilot-spawn-prompt-template-harness-extra-flags-translation",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -20,7 +20,7 @@
     "effort": "L",
     "risk": "high",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -28,7 +28,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T19:37:19.188212+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-03T19:40:56.149194+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -42,9 +43,17 @@
         "status": "done",
         "at": "2026-09-03T19:37:19.188214+00:00"
       },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T19:40:56.149194+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.983416+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-03T19:40:56.149194+00:00"
       },
       "self-review": {
         "status": "done",
@@ -301,5 +310,45 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "spec-gap",
+      "description": "rendered_for in crates/mp/src/autopilot/spawn.rs:1008-1018 maps a SpawnPromptInputs to its Role by skill name: 'mp-coordinator' -> Orchestrator, _ -> Runner. Since the Reviewer's built-in skill is 'mp-runner' (builtin_role_default at crates/mp/src/autopilot/role.rs:417), Reviewer inputs fall through to the _ arm and persist_session writes the RUNNER prompt (Runner boundaries block, Runner typed transition commands including 'mp milestone complete' and 'mp milestone step done', Runner lane-notify format) into roles.reviewer.spawn_prompt_rendered. This is a direct AC-04 contract violation: the per-role source prompt for Reviewer is the Runner's prompt, not the Reviewer's. Anyone reading roles.reviewer.spawn_prompt_rendered via 'mp autopilot session show' sees role: runner content under the reviewer slot. The AC-04 audit tests (autopilot_spawn_prompt_audit.rs:139-189 and :269-326) don't catch it because make_session_with_bundles calls render_role_prompt(Role::Reviewer, &iv) directly with the right role, bypassing the buggy rendered_for(). The AC-06 integration tests (autopilot_spawn_pipeline.rs:84-117) exercise the production persist_session() yet only assert pane_id.is_some(), never the spawn_prompt_rendered content. Fix: refactor rendered_for(role: Role, i: &SpawnPromptInputs) to take the role explicitly, and update the three call sites in persist_session to pass Role::Orchestrator/Runner/Reviewer respectively. The three inputs_o/inputs_r/inputs_v already exist for this purpose.",
+      "status": "open",
+      "author": "reviewer-210",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/src/autopilot/spawn.rs",
+        "new_range": {
+          "start_line": 1015,
+          "end_line": 1015
+        },
+        "side": "new"
+      }
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "doc-drift",
+      "description": "The module-level doc comment at crates/mp/src/autopilot/prompts/spawn.rs:16 states 'Returns a Vec<(PaneLabel, BundledPrompt)> so the caller can deliver one bundle per physical pane', but the actual signature is 'pub fn render_topology_prompts(...) -> Vec<BundledPrompt>'. BundledPrompt already carries the label field, so the return type is correctly self-contained; the doc comment is stale and should be updated to 'Returns a Vec<BundledPrompt> where each BundledPrompt.label identifies the physical pane.'",
+      "status": "open",
+      "author": "reviewer-210",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/src/autopilot/prompts/spawn.rs",
+        "new_range": {
+          "start_line": 16,
+          "end_line": 16
+        },
+        "side": "new"
+      }
+    }
+  ]
 }

@@ -2105,6 +2105,14 @@
       "body": "F-01 is a test-coverage concern, not a behavior bug. The implementation is correct and all 9 AC verification commands pass. The AC-08 tests in crates/raul/tests/m205_sort_cycle.rs verify label names but do not invoke the actual load_persisted_sort_keys loader in crates/raul/src/tui/runner_helpers.rs:613-649. The pre-existing m182_s5_choice_survives_simulated_restart test covers the round-trip for legacy keys (Id/Stage/Priority/Updated) but not for Created/ResolvedAt/Tags or for the unknown-value-fallback arm. Recommend either (a) writing a test that directly invokes the loader with a mocked mp config map and asserts the per-lane default is restored for unrecognized values, or (b) trimming the AC-08 tests to the pre-existing coverage and noting that AC-08 is verified by the pre-existing round-trip test. This finding does not block M205 — the implementation is functionally complete; it documents a maintenance gap for future test tightening.",
       "finding_id": "F-01",
       "created_at": "2026-09-02T06:53:44.326757+00:00"
+    },
+    {
+      "id": "C-22",
+      "milestone_id": "210",
+      "author": "reviewer-210",
+      "body": "Cycle 1 verdict: changes-needed (deferred). F-01 (HIGH, spec-gap) is a real AC-04 contract violation: rendered_for in crates/mp/src/autopilot/spawn.rs:1008-1018 maps a SpawnPromptInputs to its Role by skill name with a fallback that catches the Reviewer's 'mp-runner' built-in, persisting the Runner prompt under roles.reviewer.spawn_prompt_rendered. F-02 (LOW, doc-drift) is a stale doc comment for render_topology_prompts at crates/mp/src/autopilot/prompts/spawn.rs:16. AC verification on cold build (make clean + cargo nextest --no-fail-fast): 56/56 pass (AC-01 9/9, AC-02 9/9, AC-03 8/8, AC-04 5/5, AC-05 8/8, AC-06 9/9, AC-07 8/8). mp reviews pass --verdict changes-needed was blocked by the execution_status=in-progress gate (the milestone auto-transitioned to remediation on filing F-01). Verdict call will land on cycle 2 after the runner fixes F-01 and re-executes.",
+      "finding_id": "F-01",
+      "created_at": "2026-09-03T19:41:59.105038+00:00"
     }
   ],
   "handoffs": [
