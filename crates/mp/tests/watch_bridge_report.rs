@@ -6,14 +6,26 @@
 //! the env vars are unset. The tests use a fake `herdr` binary on
 //! PATH so the assertions are observable end-to-end through the
 //! subprocess boundary (not mocked at the library layer).
+//!
+//! M227 / WP2: the cold-start warmup dance is replaced by the
+//! shared [`crate::common::fake_herdr`] harness's `warmup()` +
+//! `clear_log()` helpers, which encode the same priming trick as
+//! an explicit API. The new test
+//! `mp_run_herdr_with_timeout_kills_grandchild` adds the
+//! deterministic descendant-termination proof the AC-02 wording
+//! calls for: a hung `herdr` that has forked a `sleep` grandchild
+//! must have both the parent and the grandchild reaped when the
+//! bounded subprocess helper times out, with no fixed sleeps in
+//! the test body — readiness synchronization via a pid file.
 
 mod common;
 
+use crate::common::fake_herdr::{FakeHerdr, FakeHerdrBuilder};
 use crate::common::{mp_bin, repo_root, TestEnv};
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
+use std::time::Duration;
 
 /// Per-test mutex: subprocess tests share the global PATH for the
 /// duration of the test process. Serialize them so a parallel test
@@ -122,24 +134,6 @@ fn set_test_env(path: &Path, pane: Option<&str>) -> EnvGuard {
     guard
 }
 
-fn install_fake_herdr(dir: &Path, body: &str) -> std::path::PathBuf {
-    let script = format!("#!/bin/sh\n{body}\n");
-    let bin = dir.join("herdr");
-    fs::write(&bin, script).unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&bin).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&bin, perms).unwrap();
-    }
-    bin
-}
-
-fn record_log_path(dir: &Path) -> std::path::PathBuf {
-    dir.join("herdr-calls.log")
-}
-
 /// Run `mp` with explicit `set` and `unset` env controls so a test
 /// can guarantee `HERDR_PANE_ID` is *absent* (not just absent from
 /// the helper's view). `TestEnv::run_with_env` only sets vars; it
@@ -219,6 +213,18 @@ fn create_ready_milestone(env: &TestEnv, id: &str, title: &str) -> String {
     new_id
 }
 
+/// M227 / WP2: warmup + clear-log is the deterministic
+/// readiness-synchronization pattern. Pre-spawns the fake herdr so
+/// the next `Command::new("herdr")` (from inside `mp milestone
+/// complete`) does not pay the shell cold-start cost, then clears
+/// the argv log so subsequent assertions see only real calls.
+/// Replaces the previous inline `Command::new(...).output()` +
+/// `fs::remove_file(&log)` dance.
+fn warm_and_clear(fake: &FakeHerdr) {
+    fake.warmup();
+    fake.clear_log();
+}
+
 // ─── emit_stage_done_best_effort directly (library surface) ──────────────────
 
 #[test]
@@ -229,12 +235,7 @@ fn emit_stage_done_best_effort_noop_when_herdr_pane_id_unset() {
     // invocations on a fake herdr: there should be none.
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
-    let _bin = install_fake_herdr(
-        &bin_dir,
-        &format!(r#"echo "argv: $*" >> "{log}""#, log = log.display()),
-    );
+    let fake = FakeHerdrBuilder::new().install(&bin_dir);
 
     let _env = set_test_env(&bin_dir, None);
 
@@ -242,7 +243,7 @@ fn emit_stage_done_best_effort_noop_when_herdr_pane_id_unset() {
         mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
     assert!(!emitted, "should be a no-op without HERDR_PANE_ID");
 
-    let log_text = fs::read_to_string(&log).unwrap_or_default();
+    let log_text = fake.read_log();
     assert!(
         log_text.is_empty(),
         "fake herdr should not have been invoked: {log_text}"
@@ -254,26 +255,16 @@ fn emit_stage_done_best_effort_invokes_herdr_once_with_sentinel() {
     let _g = PATH_LOCK.lock().unwrap();
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
-    let _bin = install_fake_herdr(
-        &bin_dir,
-        &format!(r#"echo "argv: $*" >> "{log}""#, log = log.display()),
-    );
+    let fake = FakeHerdrBuilder::new().install(&bin_dir);
 
     let _env = set_test_env(&bin_dir, Some("wA:p3"));
 
-    // Warm up the fake herdr so first-iteration shell cold-start
-    // (~220ms on macOS) doesn't run inside the bounded subprocess
-    // timeout (500ms). Without this, parallel test load makes the
-    // cold start exceed the deadline and the helper swallows the
-    // herdr call as a timeout — surfacing as a flaky
-    // log-doesn't-exist assertion. The warmup writes a line to the
-    // log which we then clear.
-    let _ = Command::new(bin_dir.join("herdr"))
-        .args(["pane", "report-agent", "warmup"])
-        .output();
-    let _ = fs::remove_file(&log);
+    // M227 / WP2: deterministic cold-start priming via the
+    // shared harness. Warmup pre-spawns the fake so the real call
+    // from `mp milestone complete` does not race on shell
+    // cold-start under parallel nextest; clear_log ensures the
+    // assertion below sees only the real call.
+    warm_and_clear(&fake);
 
     let emitted =
         mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
@@ -282,12 +273,7 @@ fn emit_stage_done_best_effort_invokes_herdr_once_with_sentinel() {
         "should have emitted when HERDR_PANE_ID + herdr set"
     );
 
-    let log_text = fs::read_to_string(&log).unwrap_or_else(|e| {
-        panic!(
-            "expected herdr-calls.log at {} but read failed: {e}",
-            log.display()
-        )
-    });
+    let log_text = fake.read_log();
     // Exactly one report-agent call (the canonical --source mp --agent mp-runner
     // --custom-status mp-stage-done shape).
     let report_lines: Vec<&str> = log_text
@@ -340,13 +326,14 @@ fn emit_stage_done_best_effort_swallows_herdr_failure_without_panicking() {
     let _g = PATH_LOCK.lock().unwrap();
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let _bin = install_fake_herdr(&bin_dir, "exit 1");
+    let fake = FakeHerdrBuilder::new()
+        .pane_report_agent_failure(1, "no thank you")
+        .install(&bin_dir);
 
     let _env = set_test_env(&bin_dir, Some("wA:p3"));
 
-    // Warm up so first-iteration cold-start doesn't dominate timing.
-    let _ = Command::new(bin_dir.join("herdr")).output();
+    // M227 / WP2: deterministic warmup via shared harness.
+    warm_and_clear(&fake);
 
     let emitted =
         mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
@@ -365,9 +352,9 @@ fn mp_milestone_complete_succeeds_when_herdr_fails() {
     let _g = PATH_LOCK.lock().unwrap();
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    // Fake herdr that always fails — the bridge is broken end-to-end.
-    let _bin = install_fake_herdr(&bin_dir, "exit 2");
+    let _fake = FakeHerdrBuilder::new()
+        .pane_report_agent_failure(2, "broken bridge")
+        .install(&bin_dir);
 
     let new_path = bin_dir.display().to_string();
     let id = create_ready_milestone(&env, "152", "bridge broken-e2e");
@@ -380,9 +367,8 @@ fn mp_milestone_complete_succeeds_when_herdr_fails() {
     // for parity with the broken-bridge end-to-end.
     let _env = set_test_env(&bin_dir, Some("wA:p3"));
 
-    // Warm up the fake herdr so its shell cold-start doesn't push
-    // the subprocess past the 500ms deadline.
-    let _ = Command::new(bin_dir.join("herdr")).output();
+    // M227 / WP2: deterministic warmup via shared harness.
+    _fake.warmup();
 
     let out = env.run_with_env(
         &[("PATH", &new_path), ("HERDR_PANE_ID", "wA:p3")],
@@ -409,20 +395,14 @@ fn mp_milestone_complete_inside_herdr_pane_emits_report_agent_call() {
     let _g = PATH_LOCK.lock().unwrap();
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
     // Fake herdr: pane report-agent logs argv; pane get returns an
     // envelope without custom_status (so emit_stage_done_best_effort
     // never sees a stale sentinel from a previous test).
-    let body = format!(
-        r#"case "$1 $2" in
-  "pane report-agent") echo "argv: $*" >> "{log}" ;;
-  "pane get") echo '{{"id":"cli:pane:get","result":{{"pane":{{"custom_status":"","pane_id":"wA:p3"}}}}}}' ;;
-  *) echo ok ;;
-esac"#,
-        log = log.display()
-    );
-    let _bin = install_fake_herdr(&bin_dir, &body);
+    let fake = FakeHerdrBuilder::new()
+        .pane_get_response(
+            r#"{"id":"cli:pane:get","result":{"pane":{"custom_status":"","pane_id":"wA:p3"}}}"#,
+        )
+        .install(&bin_dir);
 
     let id = create_ready_milestone(&env, "150", "bridge report target");
 
@@ -431,16 +411,11 @@ esac"#,
     // cause cross-test interference under parallel execution).
     let _env = set_test_env(&bin_dir, Some("wA:p3"));
 
-    // Warm up the fake herdr so its shell cold-start (~220ms on
-    // macOS) doesn't run inside the bounded subprocess timeout
-    // (500ms). Parallel test load pushes cold-start past the
-    // deadline; warm-up amortizes it. The warmup writes a line to
-    // the log which we then clear so the assertion below sees only
-    // the real `mp milestone complete` call.
-    let _ = Command::new(bin_dir.join("herdr"))
-        .args(["pane", "report-agent", "warmup"])
-        .output();
-    let _ = fs::remove_file(&log);
+    // M227 / WP2: deterministic cold-start priming via the shared
+    // harness. Warmup amortizes shell cold-start; clear_log
+    // ensures the assertion below sees only the real `mp milestone
+    // complete` call.
+    warm_and_clear(&fake);
 
     let out = env.run_with_env(
         &[("PATH", &bin_dir.display().to_string())],
@@ -458,12 +433,7 @@ esac"#,
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let log_text = fs::read_to_string(&log).unwrap_or_else(|e| {
-        panic!(
-            "expected herdr-calls.log at {} but read failed: {e}",
-            log.display()
-        )
-    });
+    let log_text = fake.read_log();
     let report_lines: Vec<&str> = log_text
         .lines()
         .filter(|l| l.contains("pane report-agent"))
@@ -495,12 +465,7 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
     let _g = PATH_LOCK.lock().unwrap();
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
-    let _bin = install_fake_herdr(
-        &bin_dir,
-        &format!(r#"echo "argv: $*" >> "{log}""#, log = log.display()),
-    );
+    let fake = FakeHerdrBuilder::new().install(&bin_dir);
 
     let id = create_ready_milestone(&env, "151", "bridge report no-op target");
 
@@ -510,8 +475,9 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
     // entry on drop.
     let _env = set_test_env(&bin_dir, None);
 
-    // Warm up the fake herdr.
-    let _ = Command::new(bin_dir.join("herdr")).output();
+    // M227 / WP2: deterministic warmup via shared harness.
+    fake.warmup();
+    fake.clear_log();
 
     let out = run_mp_with_env(
         &env,
@@ -525,7 +491,7 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let log_text = fs::read_to_string(&log).unwrap_or_default();
+    let log_text = fake.read_log();
     let report_lines: Vec<&str> = log_text
         .lines()
         .filter(|l| l.contains("pane report-agent"))
@@ -533,5 +499,103 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
     assert!(
         report_lines.is_empty(),
         "no report-agent call expected without HERDR_PANE_ID: {report_lines:?}"
+    );
+}
+
+// ─── Deterministic process-group timeout (M227 / WP2 / AC-02) ────────────────
+
+/// M227 / WP2 / AC-02: prove that
+/// [`mp::watch::bridge::run_herdr_with_timeout`] kills the entire
+/// process group (parent sh + grandchild sleep) when the deadline
+/// fires — without fixed sleeps in the test body.
+///
+/// **Readiness synchronization:** the fake herdr's `pane get`
+/// branch (the bridge poll's subcommand) writes the
+/// grandchild's PID to `sleep.pid` before `wait`ing. The helper
+/// itself spawns the script and runs `try_wait` every 20 ms;
+/// once it has fired `killpg` and `child.wait()` returned, the
+/// grandchild must be reaped. The test polls the pid file
+/// until it appears (no sleeps — only short poll intervals),
+/// joins the helper, and asserts both the timeout error AND the
+/// grandchild's absence via `libc::kill(pid, 0) == -1` (ESRCH).
+///
+/// The unit-level mirror test in
+/// `crates/mp/src/watch/bridge.rs::run_herdr_with_timeout_kills_entire_process_group`
+/// pins the same contract from inside the helper; this test pins
+/// it from the integration surface (the helper's public API as
+/// invoked by `watch_bridge_report`'s real callers).
+#[cfg(unix)]
+#[test]
+fn mp_run_herdr_with_timeout_kills_grandchild_in_process_group() {
+    let _g = PATH_LOCK.lock().unwrap();
+    let env = TestEnv::new();
+    let bin_dir = env.tmp.path().join("fake-bin");
+    let pid_file = bin_dir.join("sleep.pid");
+    let fake = FakeHerdrBuilder::new()
+        .pane_get_grandchild_sleep(30, &pid_file)
+        .install(&bin_dir);
+
+    // M227 / WP2: deterministic cold-start priming. The killpg
+    // path itself does not depend on cold-start (the helper
+    // outlives the warmup), but the warmup keeps the test under
+    // the unit's parallel budget.
+    fake.warmup();
+
+    // Drive the bounded subprocess helper in a thread; the
+    // helper itself spawns the fake herdr script as its child.
+    // The script forks `sleep 30 &` (the grandchild we want to
+    // prove is reaped) and writes its PID to `pid_file` so we
+    // can synchronize on readiness.
+    let script_path = fake.path().to_path_buf();
+    let helper = std::thread::spawn(move || {
+        mp::watch::bridge::run_herdr_with_timeout(&script_path, &["pane", "get", "wA:p3"], 300)
+    });
+
+    // Poll for the pid file (no fixed sleeps — readiness
+    // synchronization on the script's own write). 500 × 10 ms
+    // gives the script plenty of headroom even under parallel
+    // load; the helper fires `killpg` after 300 ms regardless.
+    let mut grandchild_pid: i32 = 0;
+    for _ in 0..500 {
+        if let Ok(s) = std::fs::read_to_string(&pid_file) {
+            if let Ok(n) = s.trim().parse::<i32>() {
+                if n > 0 {
+                    grandchild_pid = n;
+                    break;
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        grandchild_pid > 0,
+        "grandchild pid was never written; readiness signal missing: {pid_file:?}"
+    );
+
+    let result = helper.join().expect("helper thread panic");
+    assert!(
+        result.is_err(),
+        "bounded helper must time out on a wedged herdr: {result:?}"
+    );
+
+    // After the helper returns, the entire process group (sh +
+    // sleep grandchild) must be gone. Walk the pid list until
+    // ESRCH (kill returns -1) or a small wall-clock budget
+    // elapses; the reaping is asynchronous with respect to the
+    // helper returning.
+    let mut reaped = false;
+    for _ in 0..100 {
+        // SAFETY: kill(pid, 0) is a liveness probe; no signal is
+        // delivered, only the existence check is performed.
+        let rc = unsafe { libc::kill(grandchild_pid, 0) };
+        if rc == -1 {
+            reaped = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        reaped,
+        "grandchild pid {grandchild_pid} survived killpg — process-group cleanup is broken"
     );
 }
