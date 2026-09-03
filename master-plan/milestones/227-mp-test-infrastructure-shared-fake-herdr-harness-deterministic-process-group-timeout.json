@@ -64,7 +64,7 @@
     {
       "id": "AC-01",
       "description": "Spawn, prompt, list, version, delayed response, nonzero exit, and signal-ignore behaviors are configured through one shared fake-herdr helper used by representative watch tests.",
-      "verification": "cargo nextest run -p mp --test watch_herdr_wait --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test watch_herdr_wait --test watch_herdr_start --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
@@ -78,7 +78,7 @@
     {
       "id": "AC-03",
       "description": "Migrated watch tests preserve their prior assertions and no additional ad-hoc fake-herdr script builder is introduced by M210-M226 steps.",
-      "verification": "cargo nextest run -p mp --test watch_herdr_start --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test watch_herdr_start --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
