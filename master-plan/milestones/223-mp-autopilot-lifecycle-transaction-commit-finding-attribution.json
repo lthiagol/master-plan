@@ -3,9 +3,9 @@
     "id": "223",
     "title": "mp autopilot lifecycle transaction + commit/finding attribution",
     "slug": "mp-autopilot-lifecycle-transaction-commit-finding-attribution",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,7 +26,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T14:11:35.243522+00:00",
+    "lifecycle_at": "2026-09-03T21:20:12.650825+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -36,9 +36,17 @@
         "status": "done",
         "at": "2026-09-03T14:13:30.546516+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T21:20:12.650828+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:13:30.646178+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T21:20:12.650828+00:00"
       },
       "specify": {
         "status": "done",
@@ -68,22 +76,22 @@
       "id": "AC-01",
       "description": "A fixture executes runner completion, independent review claim, finding add, remediation, finding resolution with actual fixed_in commit, reviews pass, and lifecycle complete; each state and evidence revision is asserted.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (46/46 pass; m223_ac01::full_closure_preserves_per_ac_evidence_and_reaches_complete + closure_records_each_step_done_with_revision cover the full sequence)"
     },
     {
       "id": "AC-02",
       "description": "Commit policy rejects missing or fabricated fixed_in hashes, ambiguous grouped remediation commits, and lifecycle metadata commits that overwrite per-AC evidence.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (46/46 pass; m223_ac02::rejects_missing/fabricated/ambiguous_grouped/lifecycle_metadata + lifecycle_metadata_without_evidence_manifest + closure_rejects_grouped_fix cover the rejection matrix)"
     },
     {
       "id": "AC-03",
       "description": "A failure injected at every lifecycle command boundary is restart-safe: completed writes remain auditable, incomplete transitions do not fabricate success, and rerun is idempotent.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (46/46 pass; m223_ac03::rerun_with_same_keys_is_pure_idempotent + failure_at_step_done/ac_stamp/resolve_finding_boundary_is_resumable + rerun_does_not_overwrite_existing_evidence + partial_failure_journal_is_isolated + journal_resume_from_real_journal_reaches_complete cover the boundary matrix)"
     }
   ],
   "design_decisions": [
@@ -113,7 +121,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-01 passes through lifecycle complete with independent reviewer attribution.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -134,7 +142,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-02 rejects fabricated, missing, and ambiguous commit attribution.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -157,7 +165,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-03 passes for every injected boundary.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -171,7 +179,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
