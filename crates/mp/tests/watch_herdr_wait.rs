@@ -6,9 +6,18 @@
 //! `agent send <target> <text>` followed by `pane send-keys <pane>
 //! Enter`. S5 verifies the lifecycle poll treats plan.json lifecycle
 //! as the sole completion gate and tolerates agent-status failures.
+//!
+//! M227 / WP1: the test-only fake-herdr shell scripts are now built
+//! via the shared [`crate::common::fake_herdr`] harness so future
+//! autopilot suites can compose off the same primitive without
+//! re-deriving a script per test. The one custom script (the binary
+//! argv capture for the multiline preservation assertion) stays
+//! inline because the binary-format trick is not what the harness
+//! is for.
 
 mod common;
 
+use crate::common::fake_herdr::FakeHerdrBuilder;
 use crate::common::TestEnv;
 use mp::watch::{
     deliver_prompt, lifecycle_advanced_past, read_agent_status, read_lifecycle_via_mp, send_prompt,
@@ -16,34 +25,7 @@ use mp::watch::{
     ReadinessOptions, WaitOptions, WaitOutcome,
 };
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::time::Instant;
-
-fn install_fake_herdr(dir: &Path, body: &str) -> PathBuf {
-    let script = format!("#!/bin/sh\n{body}\n");
-    let bin = dir.join("herdr");
-    fs::write(&bin, script).unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&bin).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&bin, perms).unwrap();
-    }
-    bin
-}
-
-fn record_log_path(dir: &Path) -> PathBuf {
-    dir.join("herdr-calls.log")
-}
-
-fn fake_with_logging(log: &Path, body: &str) -> String {
-    format!(
-        r#"echo "argv: $*" >> "{log}"
-{body}"#,
-        log = log.display()
-    )
-}
 
 fn pane(id: &str) -> PaneHandle {
     PaneHandle {
@@ -59,14 +41,12 @@ fn pane(id: &str) -> PaneHandle {
 fn deliver_prompt_issues_send_then_enter() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(&bin_dir, &fake_with_logging(&log, "echo ok"));
+    let fake = FakeHerdrBuilder::new().install(&bin_dir);
 
     let p = pane("%5");
-    deliver_prompt(&bin, &p, "do the thing").unwrap();
+    deliver_prompt(fake.path(), &p, "do the thing").unwrap();
 
-    let log_text = fs::read_to_string(&log).unwrap();
+    let log_text = fake.read_log();
     assert!(
         log_text.contains("agent send %5 do the thing"),
         "deliver_prompt should call `agent send <pane> <text>`: {log_text}"
@@ -93,6 +73,11 @@ fn deliver_prompt_preserves_multiline_text_at_herdr_boundary() {
     // the prompt (argv index 3) round-trips byte-for-byte. The real
     // herdr accepts argv prompt text; we pin the argv shape here so a
     // switch to a different transport doesn't silently truncate.
+    //
+    // The binary argv capture is bespoke (the shared harness logs
+    // argv as text); we install it directly via the helper's
+    // install pattern but with a custom body. Keeping the capture
+    // format here pins the boundary contract.
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
     let captured = bin_dir.join("argv.bin");
@@ -119,7 +104,15 @@ PYEOF
 "#,
         captured = captured.display()
     );
-    let bin = install_fake_herdr(&bin_dir, &body);
+    let bin = bin_dir.join("herdr");
+    fs::write(&bin, body).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&bin).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&bin, perms).unwrap();
+    }
 
     let p = pane("%7");
     let prompt = "# header\n\nline one\nline two\n\n- bullet\n- bullet\n";
@@ -181,27 +174,19 @@ PYEOF
 fn send_prompt_blocks_on_readiness_then_delivers() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = record_log_path(&bin_dir);
-    fs::create_dir_all(&bin_dir).unwrap();
     // Fake that reports idle on the first agent-wait call.
-    let body = fake_with_logging(
-        &log,
-        r#"case "$2" in
-  wait) echo '{"status":"idle"}' ;;
-  send) echo ok ;;
-  *) echo ok ;;
-esac"#,
-    );
-    let bin = install_fake_herdr(&bin_dir, &body);
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_response(r#"{"status":"idle"}"#)
+        .install(&bin_dir);
 
     let p = pane("%9");
     let opts = ReadinessOptions {
         timeout_ms: 1_000,
         poll_interval_ms: 1,
     };
-    send_prompt(&bin, &p, "go", &opts).unwrap();
+    send_prompt(fake.path(), &p, "go", &opts).unwrap();
 
-    let log_text = fs::read_to_string(&log).unwrap();
+    let log_text = fake.read_log();
     // Readiness call must precede the send.
     let wait_idx = log_text.find("agent wait %9 --status idle").unwrap();
     let send_idx = log_text.find("agent send %9 go").unwrap();
@@ -212,15 +197,10 @@ esac"#,
 fn wait_for_readiness_times_out_when_never_idle() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
     // Fake that always reports working.
-    let bin = install_fake_herdr(
-        &bin_dir,
-        r#"case "$2" in
-  wait) echo '{"status":"working"}' ;;
-  *) echo ok ;;
-esac"#,
-    );
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_response(r#"{"status":"working"}"#)
+        .install(&bin_dir);
 
     let p = pane("%4");
     // Small timeout + small poll → loop bails in ~50ms of real time.
@@ -230,7 +210,7 @@ esac"#,
         timeout_ms: 50,
         poll_interval_ms: 5,
     };
-    let err = wait_for_readiness_with(&bin, &p, &opts, Instant::now).unwrap_err();
+    let err = wait_for_readiness_with(fake.path(), &p, &opts, Instant::now).unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("readiness timeout") && msg.contains("working"),
@@ -242,31 +222,28 @@ esac"#,
 fn wait_for_readiness_returns_when_idle_immediately() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(&bin_dir, r#"echo '{"status":"idle"}'"#);
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_response(r#"{"status":"idle"}"#)
+        .install(&bin_dir);
 
     let p = pane("%3");
     let opts = ReadinessOptions {
         timeout_ms: 1_000,
         poll_interval_ms: 1,
     };
-    wait_for_readiness_with(&bin, &p, &opts, Instant::now).unwrap();
+    wait_for_readiness_with(fake.path(), &p, &opts, Instant::now).unwrap();
 }
 
 #[test]
 fn deliver_prompt_propagates_send_failure() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(
-        &bin_dir,
-        r#"case "$2" in
-  send) echo "send failed" 1>&2; exit 2 ;;
-  *) echo ok ;;
-esac"#,
-    );
+    let fake = FakeHerdrBuilder::new()
+        .agent_send_failure(2, "send failed")
+        .install(&bin_dir);
+
     let p = pane("%6");
-    let err = deliver_prompt(&bin, &p, "text").unwrap_err();
+    let err = deliver_prompt(fake.path(), &p, "text").unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("agent send failed") && msg.contains("send failed"),
@@ -278,22 +255,26 @@ esac"#,
 fn read_agent_status_parses_json_status_field() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(&bin_dir, r#"echo '{"status":"working"}'"#);
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_response(r#"{"status":"working"}"#)
+        .install(&bin_dir);
+
     let p = pane("%7");
-    let status = read_agent_status(&bin, &p).unwrap();
+    let status = read_agent_status(fake.path(), &p).unwrap();
     assert_eq!(status, "working");
 }
 
 #[test]
 fn read_agent_status_falls_back_to_idle_on_zero_exit_success() {
+    // No JSON, exit 0 → synthesize "idle". The shared harness emits
+    // an empty payload from `agent read` and `agent wait` by default;
+    // `read_agent_status` parses JSON first and falls back when the
+    // shape is unparseable.
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    // No JSON, exit 0 —synthesize "idle".
-    let bin = install_fake_herdr(&bin_dir, r#"echo "ok""#);
+    let fake = FakeHerdrBuilder::new().install(&bin_dir);
     let p = pane("%8");
-    let status = read_agent_status(&bin, &p).unwrap();
+    let status = read_agent_status(fake.path(), &p).unwrap();
     assert_eq!(status, "idle");
 }
 

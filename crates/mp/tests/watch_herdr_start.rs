@@ -1,12 +1,11 @@
 //! M149 S3 / AC-02, AC-04 + M197 WP2 / AC-03: herdr agent start
 //! abstraction.
 //!
-//! Strategy: write a fake `herdr` shell script and pass its path
-//! directly to `spawn_pane` / `ensure_pane`. The fake records argv to
-//! a file and emits a deterministic pane-id. This verifies mp builds
-//! the correct `herdr pane split … && herdr agent start … --kind …
-//! --pane …` two-step shape and parses the pane id from herdr's
-//! output, without requiring a real herdr server or PATH
+//! Strategy: install a fake `herdr` shell script via the shared
+//! [`crate::common::fake_herdr`] harness and pass its path directly
+//! to `spawn_pane` / `ensure_pane`. The fake records argv to a file
+//! and emits deterministic pane ids, which lets tests assert the
+//! argv shape without requiring a real herdr server or PATH
 //! manipulation. Pure helpers (kind resolution, list-output parsing,
 //! label format) are covered by unit tests in
 //! `crates/mp/src/watch/herdr.rs`.
@@ -15,86 +14,40 @@
 //! <harness argv>` shape is gone. The fake script now has to handle
 //! `pane split` (returns a new pane id) and `agent start` (takes
 //! `--kind` and `--pane` instead of `--cwd` and `--`).
+//!
+//! M227 / WP1: the per-test fake-herdr shell-script builders
+//! scattered across watch_herdr_wait / watch_herdr_start /
+//! watch_bridge_report are consolidated into the shared harness so
+//! future autopilot suites can compose off the same primitive.
 
 mod common;
 
+use crate::common::fake_herdr::FakeHerdrBuilder;
 use crate::common::TestEnv;
 use mp::config::RoleConfig;
 use mp::watch::{
     ensure_pane, find_existing_pane, parse_pane_id_from_start_output, resolve_harness_kind,
     spawn_pane, Role,
 };
-use std::fs;
-use std::path::{Path, PathBuf};
-
-/// Install a fake `herdr` script at `<dir>/herdr` and return the path.
-/// The script branches on `$2` (the herdr subcommand: list / start /
-/// split / anything-else) and emits the canned shapes the tests need.
-/// Every invocation is appended to `<log>` so argv-shape assertions
-/// can read it back. M197: the fake handles `pane split` (returns a
-/// new pane id) and `agent start` (expects `--kind` / `--pane`).
-fn install_fake_herdr(dir: &Path, log: &Path) -> PathBuf {
-    let script = format!(
-        r#"#!/bin/sh
-echo "argv: $*" >> "{log}"
-case "$2" in
-  list)
-    echo '{{"agents":[{{"name":"role-runner-1","pane_id":"%fake-runner"}},{{"name":"role-coordinator-1","pane_id":"%fake-coord"}}]}}'
-    ;;
-  split)
-    echo '{{"pane_id":"%new-pane-7"}}'
-    ;;
-  start)
-    echo '{{"pane_id":"%spawned-42","status":"started"}}'
-    ;;
-  *)
-    echo '{{}}'
-    ;;
-esac
-"#,
-        log = log.display()
-    );
-    let bin = dir.join("herdr");
-    fs::write(&bin, script).unwrap();
-    set_executable(&bin);
-    bin
-}
-
-fn install_custom_fake(dir: &Path, name: &str, body: &str) -> PathBuf {
-    let script = format!("#!/bin/sh\n{body}\n");
-    let bin = dir.join(name);
-    fs::write(&bin, script).unwrap();
-    set_executable(&bin);
-    bin
-}
-
-fn set_executable(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(path).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(path, perms).unwrap();
-    }
-}
 
 #[test]
 fn spawn_pane_invokes_herdr_agent_start_with_correct_argv() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = env.tmp.path().join("herdr-calls.log");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(&bin_dir, &log);
+    let fake = FakeHerdrBuilder::new()
+        .pane_split_response(r#"{"pane_id":"%new-pane-7"}"#)
+        .agent_start_response(r#"{"pane_id":"%spawned-42","status":"started"}"#)
+        .install(&bin_dir);
 
     let kind = resolve_harness_kind(&RoleConfig {
         harness: Some("opencode".into()),
         ..Default::default()
     });
-    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%new-pane-7", &[]).unwrap();
+    let handle = spawn_pane(fake.path(), "role-runner-1", &kind, "%new-pane-7", &[]).unwrap();
     assert!(!handle.reused);
     assert_eq!(handle.pane_id, "%spawned-42");
 
-    let log_text = fs::read_to_string(&log).unwrap();
+    let log_text = fake.read_log();
     assert!(
         log_text.contains("agent start role-runner-1"),
         "expected `agent start <label>` in herdr argv log: {log_text}"
@@ -123,15 +76,17 @@ fn spawn_pane_invokes_herdr_agent_start_with_correct_argv() {
 fn ensure_pane_reuses_existing_when_label_matches() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = env.tmp.path().join("herdr-calls.log");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_fake_herdr(&bin_dir, &log);
+    let fake = FakeHerdrBuilder::new()
+        .agent_list_response(
+            r#"{"agents":[{"name":"role-runner-1","pane_id":"%fake-runner"},{"name":"role-coordinator-1","pane_id":"%fake-coord"}]}"#,
+        )
+        .install(&bin_dir);
 
     let rc = RoleConfig {
         harness: Some("opencode".into()),
         ..Default::default()
     };
-    let handle = ensure_pane(&bin, Role::Runner, 1, &rc, env.tmp.path()).unwrap();
+    let handle = ensure_pane(fake.path(), Role::Runner, 1, &rc, env.tmp.path()).unwrap();
     assert!(
         handle.reused,
         "ensure_pane should reuse when label exists: {:?}",
@@ -140,7 +95,7 @@ fn ensure_pane_reuses_existing_when_label_matches() {
     assert_eq!(handle.pane_id, "%fake-runner");
     // M197: when reusing, no `pane split` or `agent start` should
     // be called — the list hit is the entire lifecycle.
-    let log_text = fs::read_to_string(&log).unwrap_or_default();
+    let log_text = fake.read_log();
     assert!(
         !log_text.contains("agent start") && !log_text.contains("pane split"),
         "reuse path must not call pane split / agent start: {log_text}"
@@ -151,35 +106,25 @@ fn ensure_pane_reuses_existing_when_label_matches() {
 fn ensure_pane_spawns_via_pane_split_then_agent_start() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    let log = env.tmp.path().join("herdr-calls.log");
-    fs::create_dir_all(&bin_dir).unwrap();
     // Custom fake whose `list` returns no agents, so ensure_pane
     // must take the spawn path. M197: spawn now means
     // `pane split --cwd <path>` followed by
     // `agent start <label> --kind <kind> --pane <pane-id>`.
-    let bin = install_custom_fake(
-        &bin_dir,
-        "herdr",
-        &format!(
-            r#"echo "argv: $*" >> "{log}"
-case "$2" in
-  list) echo '{{"agents":[]}}';;
-  split) echo '{{"pane_id":"%new-pane-9"}}';;
-  start) echo '{{"pane_id":"%spawned-99"}}';;
-esac"#,
-            log = log.display()
-        ),
-    );
+    let fake = FakeHerdrBuilder::new()
+        .agent_list_response(r#"{"agents":[]}"#)
+        .pane_split_response(r#"{"pane_id":"%new-pane-9"}"#)
+        .agent_start_response(r#"{"pane_id":"%spawned-99","status":"started"}"#)
+        .install(&bin_dir);
 
     let rc = RoleConfig {
         harness: Some("cursor".into()),
         ..Default::default()
     };
-    let handle = ensure_pane(&bin, Role::Coordinator, 1, &rc, env.tmp.path()).unwrap();
+    let handle = ensure_pane(fake.path(), Role::Coordinator, 1, &rc, env.tmp.path()).unwrap();
     assert!(!handle.reused);
     assert_eq!(handle.pane_id, "%spawned-99");
 
-    let log_text = fs::read_to_string(&log).unwrap();
+    let log_text = fake.read_log();
     // The two-step shape:
     //   1) `pane split --cwd <project_root>`
     //   2) `agent start <label> --kind cursor --pane %new-pane-9`
@@ -214,15 +159,14 @@ esac"#,
 fn spawn_pane_falls_back_to_label_when_output_unparseable() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_custom_fake(
-        &bin_dir,
-        "herdr",
-        r#"echo "agent booting (no pane id here)""#,
-    );
+    // Unparseable `agent start` output → spawn_pane falls back to
+    // the label as the pane id.
+    let fake = FakeHerdrBuilder::new()
+        .agent_start_response("agent booting (no pane id here)")
+        .install(&bin_dir);
 
     let kind = "opencode".to_string();
-    let handle = spawn_pane(&bin, "role-runner-1", &kind, "%pane-id", &[]).unwrap();
+    let handle = spawn_pane(fake.path(), "role-runner-1", &kind, "%pane-id", &[]).unwrap();
     assert_eq!(
         handle.pane_id, "role-runner-1",
         "label fallback when pane id can't be parsed"
@@ -233,26 +177,20 @@ fn spawn_pane_falls_back_to_label_when_output_unparseable() {
 fn list_panes_failure_does_not_block_spawn() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
     // Custom fake whose `list` exits non-zero. ensure_pane should
     // fall through to spawn rather than error out — a transient
     // list failure must not block the run.
-    let bin = install_custom_fake(
-        &bin_dir,
-        "herdr",
-        r#"case "$2" in
-  list) echo "list failed" 1>&2; exit 2 ;;
-  split) echo '{"pane_id":"%p"}' ;;
-  start) echo '{"pane_id":"%ok"}' ;;
-  *) echo '{}' ;;
-esac"#,
-    );
+    let fake = FakeHerdrBuilder::new()
+        .agent_list_failure(2, "list failed")
+        .pane_split_response(r#"{"pane_id":"%p"}"#)
+        .agent_start_response(r#"{"pane_id":"%ok","status":"started"}"#)
+        .install(&bin_dir);
 
     let rc = RoleConfig {
         harness: Some("opencode".into()),
         ..Default::default()
     };
-    let handle = ensure_pane(&bin, Role::Runner, 1, &rc, env.tmp.path()).unwrap();
+    let handle = ensure_pane(fake.path(), Role::Runner, 1, &rc, env.tmp.path()).unwrap();
     assert_eq!(handle.pane_id, "%ok");
     assert!(!handle.reused);
 }
@@ -300,10 +238,11 @@ fn find_pane_returns_none_for_empty_or_unrelated_list() {
 fn spawn_pane_propagates_non_zero_exit_as_error() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let bin = install_custom_fake(&bin_dir, "herdr", r#"echo "boom" 1>&2; exit 1"#);
+    let fake = FakeHerdrBuilder::new()
+        .agent_start_failure(1, "boom")
+        .install(&bin_dir);
 
-    let err = spawn_pane(&bin, "role-runner-1", "opencode", "%pane-id", &[]).unwrap_err();
+    let err = spawn_pane(fake.path(), "role-runner-1", "opencode", "%pane-id", &[]).unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("failed") && msg.contains("boom"),

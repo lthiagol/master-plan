@@ -590,5 +590,6 @@ pub fn json_from_stdout(stdout: &[u8]) -> serde_json::Value {
     serde_json::from_str(&text[start..]).expect("stdout JSON after preamble")
 }
 
+pub mod fake_herdr;
 pub mod lib_api;
 pub mod review_queue_fixture;
