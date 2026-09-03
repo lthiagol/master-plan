@@ -112,7 +112,7 @@ pub type PaneSlots = Vec<RoleSlot>;
 /// Serialized kebab-case so the CLI surface
 /// (`autopilot.topology = three-agent` in config.json) matches the
 /// Rust enum naming.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Topology {
     /// Single pane — every role collapsed into one agent (tracks and
@@ -123,7 +123,8 @@ pub enum Topology {
     /// no independent review channel.
     TwoAgent,
     /// Three panes — one pane per role; the canonical topology with
-    /// independent review.
+    /// independent review. Default — the canonical 3-pane setup.
+    #[default]
     ThreeAgent,
 }
 
@@ -144,12 +145,6 @@ impl Topology {
             Topology::TwoAgent => 2,
             Topology::ThreeAgent => 3,
         }
-    }
-}
-
-impl Default for Topology {
-    fn default() -> Self {
-        Topology::ThreeAgent
     }
 }
 
@@ -886,7 +881,7 @@ pub fn resolve_with_legacy_fallback(
             // exists (and we proceed) or we surface the typed
             // error so the operator knows reviewer must be set
             // through the new surface.
-            if autopilot_override.is_none() || autopilot_override.map_or(true, |o| o.is_empty()) {
+            if autopilot_override.is_none() || autopilot_override.is_none_or(|o| o.is_empty()) {
                 return Err(RoleResolutionError::UnsupportedReviewerFallback);
             }
             None
@@ -1642,10 +1637,12 @@ mod tests {
         // not in the autopilot role schema — the function stuffs
         // them into `extras` under stable keys so a downstream
         // caller can pick them up.
-        let mut legacy_runner = LegacyRoleConfig::default();
-        legacy_runner.harness = Some("opencode".to_string());
-        legacy_runner.command = Some(vec!["opencode".to_string(), "--flag".to_string()]);
-        legacy_runner.thinking_level = Some("high".to_string());
+        let legacy_runner = LegacyRoleConfig {
+            harness: Some("opencode".to_string()),
+            command: Some(vec!["opencode".to_string(), "--flag".to_string()]),
+            model: None,
+            thinking_level: Some("high".to_string()),
+        };
         let resolved = resolve_with_legacy_fallback(Role::Runner, None, Some(&legacy_runner), None)
             .expect("runner + legacy with command/thinking should succeed");
         assert_eq!(
