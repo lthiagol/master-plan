@@ -1,0 +1,175 @@
+{
+  "milestone": {
+    "id": "218",
+    "title": "mp autopilot hard gate — refuse to start without herdr ≥ 0.7.x",
+    "slug": "mp-autopilot-hard-gate-refuse-to-start-without-herdr-0-7-x",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.931674+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.931674+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.272547+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.272547+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.931674+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "`mp autopilot start` refuses to run if `herdr` is not on PATH or if its version is below 0.7.x; the error message includes an install hint (command to install herdr) and a link to the upgrade docs. The gate is mandatory; `--force` does not bypass it (herdr is a hard architectural requirement, not a convenience)."
+  },
+  "problem": {
+    "description": "M197 built the herdr version-gate machinery (in `crates/mp/src/watch/herdr_version.rs`) but only as a precondition for `mp watch` — silently falling back to surface the diagnostic at spawn time. The new autopilot design treats herdr as a hard architectural requirement (one pane-set, three roles, workspace naming all depend on it). A missing or incompatible herdr must be a hard refusal, not a diagnostic surface, because the user's mental model is 'this is an automation that drives the milestone through a real workspace,' not 'this is a CLI that shells out to herdr.'"
+  },
+  "scope": {
+    "in_scope": [
+      "`mp autopilot start` invokes the M197 `detect_herdr_cli` precondition early in the command pipeline. If `which herdr` returns nothing, error with: 'mp autopilot requires herdr installed; install via <brew|build from source>: <command>'. Exit code 78 (EX_CONFIG).",
+      "If herdr is found but its shape / version flag doesn't match 0.7.x, error with: 'mp autopilot requires herdr >= 0.7.x; detected <version>; upgrade via <command>'. Same exit code.",
+      "The gate is wired into the same precondition function used by `mp watch` today; refactor so both call sites share the code path.",
+      "Surface the gate in `mp doctor` (project health) — already partially shipped in M197, expand to surface the autopilot-specific error string when invoked from a plan that has autopilot/ in its master-plan/."
+    ],
+    "out_of_scope": [
+      "Removing the diagnostic but non-blocking path from `mp doctor` — that's a product call; the gate stays as a non-blocking doctor surface for visibility even when `mp autopilot start` is not invoked.",
+      "Replacing the M178 fallback \"herdr spawn failed with diagnostics\" — that's still the right behavior when herdr is present but a specific spawn fails; this milestone elevates presence+version to a hard gate.",
+      "Harness-specific policies for which versions of opencode/cursor/pi are required — out of scope; the gate is herdr-only."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp autopilot start <id>` against an environment without `herdr` on PATH exits 78 with the documented install-hint error message and never reaches the spawn-pipeline.",
+      "verification": "manual: in an environment with PATH that excludes herdr (e.g., a clean container), ran `mp autopilot start <id>` and confirmed exit 78 and the documented error.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp autopilot start <id>` against herdr < 0.7.x (stubbed) exits 78 with the documented upgrade-hint error message.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The precondition function is called by both `mp autopilot start` and `mp watch` (legacy alias) — no divergence in gate behavior between the two.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "exit_code_choice",
+      "choice": "Exit 78 (EX_CONFIG from sysexits.h) — matches the 'configuration error, not a runtime error' semantics.",
+      "rationale": "Allows shell scripts to distinguish 'herdr missing/old' (configuration) from 'milestone failed' (runtime) by exit code alone."
+    },
+    {
+      "area": "force_handling",
+      "choice": "`--force` does NOT bypass the herdr gate. herdr is required by design; `--force` keeps its existing role (bypass double-spawn guard, M178).",
+      "rationale": "Bypassing the gate leaves the user with a session that has no workspace — every other step depends on herdr being usable."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot hard gate",
+      "goal": "All ACs for mp autopilot hard gate pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/autopilot/gate.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: `mp autopilot start <id>` against an environment without `herdr` on PATH exits 78 with the documented install-hint error message and never reaches the spawn-pipeline.",
+      "files": [
+        "crates/mp/src/autopilot/gate.rs"
+      ],
+      "tests": "manual: in an environment with PATH that excludes herdr (e.g., a clean container), ran `mp autopilot start <id>` and confirmed exit 78 and the documented error.",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 218 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: `mp autopilot start <id>` against herdr < 0.7.x (stubbed) exits 78 with the documented upgrade-hint error message.",
+      "files": [
+        "crates/mp/src/autopilot/gate.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_low_version --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 218 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: The precondition function is called by both `mp autopilot start` and `mp watch` (legacy alias) — no divergence in gate behavior between the two.",
+      "files": [
+        "crates/mp/src/autopilot/gate.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_gate_shared_with_watch --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 218 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

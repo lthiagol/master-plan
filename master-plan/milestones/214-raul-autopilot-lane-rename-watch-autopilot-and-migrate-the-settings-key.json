@@ -1,0 +1,176 @@
+{
+  "milestone": {
+    "id": "214",
+    "title": "raul Autopilot lane — rename Watch → Autopilot and migrate the settings key",
+    "slug": "raul-autopilot-lane-rename-watch-autopilot-and-migrate-the-settings-key",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.789119+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.789120+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.139576+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.139576+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.789120+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The raul UI exposes a single `Autopilot` lane in place of the `Watch` lane; the toggle key in `mp config.json` reads `ui.show_autopilot_tab` going forward and honors the legacy `ui.show_watch_tab` once for backward compatibility (then is rewritten). All internal identifiers (Lane enum variant, module paths, render dispatch) rename in lockstep."
+  },
+  "problem": {
+    "description": "Today's raul surface has a `Lane::Watch` variant hidden by default behind `ui.show_watch_tab` (M198). The autopilot redesign renames the lane to `Lane::Autopilot` to match the new CLI surface (`mp autopilot`) and the role-name family (orchestrator / runner / reviewer). Renames must be coherent across the enum, module paths (`crates/raul/src/tui/watch.rs` → `autopilot.rs`), the render dispatch, the settings key, and the `Lane::ordered_visible` single filter point that M198 fixed as the canonical visibility gate. The legacy `ui.show_watch_tab` value must continue to work for one release (F3 scrubs the consumer surface) so consumers with the old key do not lose access to the lane."
+  },
+  "scope": {
+    "in_scope": [
+      "Rename `Lane::Watch` → `Lane::Autopilot` in `crates/raul/src/tui/app.rs` and all call sites (`action.rs`, `keybinds.rs`, `view_state.rs`, `runner.rs`, `lane_cache.rs`, `render/watch.rs`, `runner_helpers.rs`).",
+      "Rename `crates/raul/src/tui/watch.rs` module → `crates/raul/src/tui/autopilot.rs`; update `mod.rs` and `Cargo.toml` (only if paths require explicit references).",
+      "Update the `SETTINGS_KEYS` entry in `crates/raul/src/tui/modes/settings.rs` from `ui.show_watch_tab` to `ui.show_autopilot_tab`. The `display_name` and `description` in the Settings lane reflect the new name.",
+      "Single-read back-compat: on Settings read, if `ui.show_autopilot_tab` is unset but `ui.show_watch_tab` is set, the Settings lane surfaces the legacy value as the current value (no rewrite). F3 scrubs the legacy key out of consumer projects."
+    ],
+    "out_of_scope": [
+      "Picker and live status graph for the new lane — D2 and D3.",
+      "Auto-refresh behavior — E.",
+      "Scrubbing the legacy key from consumer surfaces — F3.",
+      "Renaming internal `Watch`-prefixed identifiers that are not user-visible (e.g., private helper functions, internal log tags). Those stay as-is to keep the diff small."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`Lane::Autopilot` exists; `Lane::Watch` is gone. The lane list under both visible (toggle on) and hidden (toggle off) states matches the documented behavior, including the `JumpLane` digit dispatch and the footer hint.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Setting `ui.show_autopilot_tab` to true via `mp config set` makes the Autopilot lane visible in raul's tab bar; setting it to false hides it. The legacy `ui.show_watch_tab` value (if present) is honored once.",
+      "verification": "manual: ran `mp config set ui.show_autopilot_tab true`, opened raul, observed the lane; then ran `mp config set ui.show_autopilot_tab false` (after manually setting the legacy key); confirmed the lane is hidden.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The Settings lane's `SETTINGS_KEYS` entry reads `ui.show_autopilot_tab` as the displayed key; the digit-jump dispatch routes to the Autopilot lane correctly.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "rename_strategy",
+      "choice": "Rename in one milestone across enum, module, render dispatch, settings key — all together.",
+      "rationale": "Half-renames are exactly the kind of drift the project log's hygiene sweep (M195) warns about. Doing it as one milestone means one review pass."
+    },
+    {
+      "area": "back_compat_shim",
+      "choice": "Single-read shim reads `ui.show_watch_tab` once if `ui.show_autopilot_tab` is unset; subsequent writes go to the new key. The legacy value is not rewritten silently — users see the new key after their first save.",
+      "rationale": "Avoids surprise rewrites; F3 scrubs the legacy key outright once consumers have migrated."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of raul Autopilot lane",
+      "goal": "All ACs for raul Autopilot lane pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/raul/src/tui/autopilot.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: `Lane::Autopilot` exists; `Lane::Watch` is gone. The lane list under both visible (toggle on) and hidden (toggle off) states matches the documented behavior, including the `JumpLane` digit dispatch an",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test lane_autopilot_rename --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 214 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: Setting `ui.show_autopilot_tab` to true via `mp config set` makes the Autopilot lane visible in raul's tab bar; setting it to false hides it. The legacy `ui.show_watch_tab` value (if present) is honor",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: ran `mp config set ui.show_autopilot_tab true`, opened raul, observed the lane; then ran `mp config set ui.show_autopilot_tab false` (after manually setting the legacy key); confirmed the lane is hidden.",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 214 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: The Settings lane's `SETTINGS_KEYS` entry reads `ui.show_autopilot_tab` as the displayed key; the digit-jump dispatch routes to the Autopilot lane correctly.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test settings_autopilot_key --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 214 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

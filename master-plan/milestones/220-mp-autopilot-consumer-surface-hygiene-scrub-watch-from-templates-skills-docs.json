@@ -1,0 +1,175 @@
+{
+  "milestone": {
+    "id": "220",
+    "title": "mp autopilot consumer-surface hygiene — scrub `Watch` from templates, skills, docs",
+    "slug": "mp-autopilot-consumer-surface-hygiene-scrub-watch-from-templates-skills-docs",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:24:31.851367+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:25:03.006438+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.343526+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.343526+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:25:03.006438+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "User-facing files under `templates/skills/**`, `templates/harness/**`, and `docs/**` use the `autopilot` terminology where the autopilot system is being described; internal milestone IDs (M149/M178/M179/M190/M197/M198) and lesson codes from the project log stay as-is. The `make consumer-surface-lint` target flags any regression."
+  },
+  "problem": {
+    "description": "The `Watch` terminology is shipped into consumer projects via `mp init` (the templates tree) and the docs. After A2-M208 (CLI rename), D1 (lane rename), and F2 (deprecation warning), consumers who adopt fresh see `Watch`-named files / skills / lane descriptions. The replacement terminology is `autopilot` — keeping the consumer surface in lockstep with the command surface. Internal identifiers stay (lesson codes, milestone IDs) because they are the project's own internal vocabulary and rewriting them creates double churn."
+  },
+  "scope": {
+    "in_scope": [
+      "Update `templates/skills/**` and `templates/harness/**` so user-facing descriptions and example workflows use `autopilot` (e.g., `Role: orchestrator in an mp autopilot session` instead of `Role: runner in an mp watch session`).",
+      "Update `docs/**` so user-facing pages (the `docs/autopilot/` subtree for the new system; `docs/mp/commands.md`; `docs/agent-guide/README.md`) describe the autopilot flow.",
+      "Run `make consumer-surface-lint` and resolve any failures — the lint rule (per M195) flags internal milestone IDs and lesson codes inside consumer-facing files; this milestone extends it to also flag stale 'Watch' terminology.",
+      "Add a one-line `make install` note: after pulling these changes, run `make install` so the consumer's installed copies refresh."
+    ],
+    "out_of_scope": [
+      "Removing `mp watch` from the codebase — that's a follow-up after consumers migrate.",
+      "Renaming internal source files (e.g., `crates/mp/src/watch/` → `crates/mp/src/autopilot/`) — separate track; keeps the diff minimal for this milestone.",
+      "Internal milestone IDs and lesson codes — stay as-is per the consumer-surface scope rule (M195)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "All user-facing files in `templates/skills/**`, `templates/harness/**`, and `docs/**` describe the autopilot flow with no `watch`-prefixed user-facing terminology (lane label, skill description, command example).",
+      "verification": "manual: searched `rg -l '\\b[Mm]p watch\\b|\\b[Wt]atch (lane|tab|skill|process|automation)\\b'` in the consumer surface; expected empty result.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`make consumer-surface-lint` passes — no internal milestone IDs (MXXX), no lesson codes (LXX), no stale `Watch` references in the consumer surface.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`make install` copies refreshed templates to installed skills / harness directories under `~/.config/...` so consumer end-users see the new skill descriptions on next session.",
+      "verification": "manual: ran `make install`, opened `~/.config/opencode/agents/mp-orchestrator/SKILL.md` (or equivalent) and confirmed the description references autopilot, not watch.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "scope_of_rename",
+      "choice": "Rename `Watch` → `Autopilot` in user-facing language only; internal `watch` folder names, log prefixes, and TypeScript-like module identifiers stay.",
+      "rationale": "M195 already drew this line (consumer surface self-contained); following it keeps this milestone small and reversible."
+    },
+    {
+      "area": "lint_target",
+      "choice": "Extend `make consumer-surface-lint` with a stale-Watch check (regex against user-facing prose patterns).",
+      "rationale": "Matches M195's existing lint pattern (leak guard); prevents regressions."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot consumer-surface hygiene",
+      "goal": "All ACs for mp autopilot consumer-surface hygiene pass with stamped evidence.",
+      "rollback": "Revert the new module under templates/skills/** to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: All user-facing files in `templates/skills/**`, `templates/harness/**`, and `docs/**` describe the autopilot flow with no `watch`-prefixed user-facing terminology (lane label, skill description, comma",
+      "files": [
+        "templates/skills/**"
+      ],
+      "tests": "manual: searched `rg -l '\\b[Mm]p watch\\b|\\b[Wt]atch (lane|tab|skill|process|automation)\\b'` in the consumer surface; expected empty result.",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 220 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: `make consumer-surface-lint` passes — no internal milestone IDs (MXXX), no lesson codes (LXX), no stale `Watch` references in the consumer surface.",
+      "files": [
+        "templates/skills/**"
+      ],
+      "tests": "make consumer-surface-lint → exit 0",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 220 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `make install` copies refreshed templates to installed skills / harness directories under `~/.config/...` so consumer end-users see the new skill descriptions on next session.",
+      "files": [
+        "templates/skills/**"
+      ],
+      "tests": "manual: ran `make install`, opened `~/.config/opencode/agents/mp-orchestrator/SKILL.md` (or equivalent) and confirmed the description references autopilot, not watch.",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 220 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

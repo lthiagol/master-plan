@@ -1,0 +1,176 @@
+{
+  "milestone": {
+    "id": "208",
+    "title": "mp autopilot CLI rename — pivot `mp watch` to `mp autopilot` with legacy alias",
+    "slug": "mp-autopilot-cli-rename-pivot-mp-watch-to-mp-autopilot-with-legacy-alias",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.539371+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.539372+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.906506+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.906506+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.539372+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Users invoke `mp autopilot [start|status|stop|output|result|config|session]` instead of `mp watch`; `mp watch` continues to work as a deprecated alias that issues a notice pointing at the new command."
+  },
+  "problem": {
+    "description": "`mp watch` is overloaded — it is simultaneously the verb (\"watch this milestone be driven\"), the surface verb in the raul Watch lane (M198), and the noun for the watched agent (M149). The new autopilot system replaces the 2-pane runner+coordinator model with a 3-pane orchestrator+runner+reviewer architecture, so the verb changes meaning. We need a single top-level command (`mp autopilot`) that owns start, status, stop, output, result, config, and session verbs; the old `mp watch` alias is kept for one release with a deprecation notice (F2), then removed."
+  },
+  "scope": {
+    "in_scope": [
+      "Introduce `mp autopilot [start|status|stop|output|result|config|session|<args>...]` as the primary command tree, delegating to the same internal implementation that powers today's `mp watch`.",
+      "Add `mp watch` as a thin alias that prints a deprecation notice on stderr (F2 will move the notice into a non-blocking warning; this milestone just keeps the alias functional).",
+      "Update internal references from `watch` to `autopilot` in the cargo workspace (folder names stay `crates/mp/src/watch/` for the first pass; a later follow-on can rename, but renaming is out of scope here to keep this milestone small and reversible).",
+      "Update integration tests that referenced `mp watch` directly to call `mp autopilot` (legacy alias is tested separately under F2)."
+    ],
+    "out_of_scope": [
+      "Removing the `mp watch` alias — that's F2.",
+      "Renaming the source folder `crates/mp/src/watch/` to `crates/mp/src/autopilot/` — kept as `watch/` until the rest of the autopilot system stabilizes; a follow-on track can do the rename later.",
+      "Renaming the raul `Lane::Watch` to `Lane::Autopilot` — that's D1.",
+      "Updating the consumer surface (skills, docs, templates) — that's F3."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "`mp autopilot --help` lists the autopilot verb tree (start, status, stop, output, result, config, session) with descriptions matching today's `mp watch` and `mp watch-control` sub-commands.",
+      "verification": "manual: ran `mp autopilot --help`; output contained all seven verb subcommands with one-line descriptions.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp watch --help` still works and continues to match `mp autopilot --help` argument-by-argument; running `mp watch` with the same args as today's `mp watch` produces the same exit code and JSON output as `mp autopilot`.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp autopilot status`, `mp autopilot session list`, and `mp autopilot session show` all work against an in-flight legacy `mp watch` session (the alias wires the same backend).",
+      "verification": "manual: started a session via `mp watch` (legacy alias), then queried via `mp autopilot session list` and saw the same session; queried `mp autopilot status` and saw non-empty output.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "command_tree_organization",
+      "choice": "`mp autopilot <verb>` is a top-level clap subcommand tree; `mp autopilot session <verb>` is a nested subcommand for session bookkeeping.",
+      "rationale": "Single root keeps the namespace flat; session becomes a first-class entity per the A1 schema, so its verbs cluster under one branch."
+    },
+    {
+      "area": "alias_implementation",
+      "choice": "`mp watch` is implemented as a clap-level alias (clap supports `alias = \"watch\"` on the autopilot command) so both names walk the same code path.",
+      "rationale": "Avoids divergent behavior; the alias lives or dies with the clap definition, and F2's removal is a one-line change."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot CLI rename",
+      "goal": "All ACs for mp autopilot CLI rename pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/commands/autopilot.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: `mp autopilot --help` lists the autopilot verb tree (start, status, stop, output, result, config, session) with descriptions matching today's `mp watch` and `mp watch-control` sub-commands.",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "manual: ran `mp autopilot --help`; output contained all seven verb subcommands with one-line descriptions.",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 208 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: `mp watch --help` still works and continues to match `mp autopilot --help` argument-by-argument; running `mp watch` with the same args as today's `mp watch` produces the same exit code and JSON output",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_alias_equivalence --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 208 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `mp autopilot status`, `mp autopilot session list`, and `mp autopilot session show` all work against an in-flight legacy `mp watch` session (the alias wires the same backend).",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "manual: started a session via `mp watch` (legacy alias), then queried via `mp autopilot session list` and saw the same session; queried `mp autopilot status` and saw non-empty output.",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 208 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

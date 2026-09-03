@@ -1,0 +1,311 @@
+{
+  "milestone": {
+    "id": "216",
+    "title": "raul Autopilot lane — live status graph + multi-milestone queue rendering (manual refresh only)",
+    "slug": "raul-autopilot-lane-live-status-graph-multi-milestone-queue-rendering-manual-refresh-only",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.859401+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.136966+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.205544+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.205544+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.136966+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The Autopilot lane renders a live status graph (per-pane: pane ID, role, last notify, last verifier verdict, cycle count) and a multi-milestone queue view when the active session has more than one milestone; manual `r` refreshes against `mp autopilot session show` and `mp autopilot-control status`."
+  },
+  "problem": {
+    "description": "Once a session is running, the raul user needs visibility into what is happening in each pane of the herdr workspace — without leaving the raul window to inspect herdr panes directly. The status graph subscribes (via manual refresh) to the session.json + control-plane state and renders it. Cycle-flow events (C3: WaitingRunner → Reviewing → Deciding, etc.) drive which fields are highlighted. The multi-milestone queue view handles the locked decision that autopilot supports single-milestone OR queue mode (the same pane-set reused across milestones)."
+  },
+  "scope": {
+    "in_scope": [
+      "Per-pane row in the status graph: human-readable tab label (Orchestrator / Runner / Reviewer), pane ID (small caps), role skill name, current stage from session.json (Dispatching / WaitingRunner / Reviewing / Deciding / AwaitingUser — from C3), last notify (role, cycle number, AC pass count), last verifier verdict (`Pass` / `Cycle-next` / `Ship-with-backlog` / `Escalate`), cycle counter.",
+      "Multi-milestone queue view: when the session has more than one milestone, render an ordered queue with per-milestone state (current stage, cycle, last verdict). Highlight the active milestone.",
+      "Manual refresh: `r` re-reads `mp autopilot session show <id>` and `mp autopilot-control status` via the existing M178 adapter pattern (W179 S4 — `run_preflight` is the predecessor); render is updated from the result.",
+      "Verdict / violation surfacing: when C2's verifier emits a typed `Violation`, the status graph shows a 'role violation' badge on the offending pane with the violation name (no detail-dump; click to expand)."
+    ],
+    "out_of_scope": [
+      "Auto-refresh polling — E (this milestone ships with manual `r` only).",
+      "Picker + override panel logic — D2.",
+      "Cycle-flow execution — C3.",
+      "Steering or pause/cancel controls — separate small track, not in this redesign."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Status graph renders per-pane rows with all five fields (label, pane ID, role skill, last notify, last verdict) in golden-file tests; formatting matches the lane's existing text/cursor conventions.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Multi-milestone queue view renders when session has > 1 milestone; the active milestone is highlighted.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`r` re-reads `mp autopilot session show <id>` and `mp autopilot-control status`; render updates from the result. A fake `mp autopilot session show` (returning a stable snapshot) is used as the test fixture.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "When C2's verifier emits a typed `Violation`, the offending pane row shows a 'role violation' badge; click-to-expand reveals violation name + evidence hint. Golden-file tests cover each violation variant.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Per-milestone detail view: pressing Enter on a milestone row expands an inline detail panel showing (a) cycle-flow timeline (per-cycle blocks for done cycles with runner/reviewer/verifier/decision events; active cycle highlighted with cycle-stage, next-action via C3's predict_next_action, drifted seconds, cycle-cap counter); (b) findings block (open count + recently fixed list); (c) rolling history window (last 10 events from session.json queue[i] and activity.json). Tested with golden-file fixtures pinning each field's rendering against a sample session state.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "User-facing recovery controls on the Autopilot lane (per the log's untested list: 'pause / cancel / steer from raul'): (a) **Pause** (`<space>` from the autopilot lane or `Ctrl-P`): orchestrator-pane halts dispatching on the next cycle boundary without teardown — the session stays alive, lanes can finish their current work, no new cycle is dispatched. (b) **Cancel** (`<x>` from the autopilot lane, with confirmation prompt): orchestrator emits a typed `cancel` message to all lane panes; reviewer cleans up its own session-bound notes; session transitions to terminal `cancelled` state and remains in session.json for the history view. (c) **Steer** (`<:` from the autopilot lane opens a small text buffer; user types a message, `<Enter>` sends it via `herdr agent prompt <lane-pane-id> \"...\"` to a targeted lane — useful for one-off course-correction without restarting a cycle). Each control is exercised in tests; pause + cancel are reversible (re-running the lane resumes), steer is fire-and-forget.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Per-AC visualization: in the per-milestone detail view, below the cycle-flow timeline, render an `ACs (passed / total)` row-by-row breakdown sourced from session.json `queue[i].ac_pass_fail`. Each row shows AC id + description (truncated) + status (passed / failed / pending) + the stamped evidence string. Failed ACs are visually distinct (red marker); pending ACs are neutral. The list scrolls if it overflows the panel. Golden-file tests cover the three status paths and overflow scrolling.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Active-session telemetry aggregates: in the detail view, alongside `drifted` (time-since-last-state-change for the active stage), render cross-milestone aggregates — total time-in-active-stage across all three panes, attempts-per-stage (how many times each cycle stage has been entered across the queue), per-AC pass/fail counts across milestones. Aggregates are computed from session.json state on each refresh; they reset on session start. Golden-file tests cover a synthetic session with one shipped milestone + one in-flight + one pending milestone.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "refresh_source",
+      "choice": "Manual `r` calls both `mp autopilot session show <id>` (for queued milestones + persisted overrides) and `mp autopilot-control status` (for live pane state).",
+      "rationale": "Two sources cover both persistent and live state, matching the dual-source pattern in M179 S4 (`mp watch --dry-run` + M178 status)."
+    },
+    {
+      "area": "violation_presentation",
+      "choice": "Badge + click-to-expand rather than always showing detail.",
+      "rationale": "Detail is verbose; the badge highlights the lane needs attention without crowding the at-a-glance view."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of raul Autopilot lane",
+      "goal": "All ACs for raul Autopilot lane pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/raul/src/tui/autopilot.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: Status graph renders per-pane rows with all five fields (label, pane ID, role skill, last notify, last verdict) in golden-file tests; formatting matches the lane's existing text/cursor conventions.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_status_graph --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 216 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: Multi-milestone queue view renders when session has > 1 milestone; the active milestone is highlighted.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_queue_view --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 216 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `r` re-reads `mp autopilot session show <id>` and `mp autopilot-control status`; render updates from the result. A fake `mp autopilot session show` (returning a stable snapshot) is used as the test fi",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_manual_refresh --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 216 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S04",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement and verify: When C2's verifier emits a typed `Violation`, the offending pane row shows a 'role violation' badge; click-to-expand reveals violation name + evidence hint. Golden-file tests cover each violation vari",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_violation_badge --no-fail-fast",
+      "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 216 AC-04 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Implement the per-milestone detail panel in crates/raul/src/tui/autopilot.rs. Enter on a milestone row expands the panel; second Enter collapses. Renders the cycle-flow timeline by reading queue[i] from session.json (refetched on each r press or auto-refresh tick); renders next-action via a stub that calls C3's predict_next_action once it lands in M213; renders drifted seconds from poller's snapshot diff (M217); renders cycle-cap from session.json; renders findings from milestone JSON via mp reviews finding list; renders history window from activity.json tail. Golden-file tests pin each field's rendering.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 216 AC-05 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Implement pause/cancel/steer controls on the autopilot lane in crates/raul/src/tui/autopilot.rs. Each control: pause sets a flag in session.json (`session.controls.paused: true`); orchestrator's cycle flow checks this on every cycle boundary. Cancel sends a typed `cancel` shell command to each lane pane and transitions session.status to `cancelled`. Steer opens a small text-input buffer; on Enter the buffer's text becomes `herdr agent prompt <target-pane-id> \"<text>\"`. Each control has golden-file tests.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-06 evidence is stamped via `mp milestone criterion pass 216 AC-06 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Per-AC visualization row set in the detail view. Reuses M216 AC-05's existing panel; adds an `ACs` section below the cycle-flow timeline. Reads `queue[i].ac_pass_fail` from session.json (refetched on `r`/auto-refresh). Each row: `AC-XX  desc-trunc-40  [passed|failed|pending]  evidence-trunc-60`. Failed ACs render with a red marker; pending with neutral. Fits cleanly into the existing detail-panel scroll viewport.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-07 evidence is stamped via `mp milestone criterion pass 216 AC-07 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP1",
+      "order": 8,
+      "action": "Implement active-session telemetry computation in `crates/raul/src/tui/autopilot.rs`. Aggregates pull from session.json at refresh tick: (a) time-in-active-stage = sum of (now - last_state_change_at) for each pane in Working/Reviewing/Deciding; (b) attempts-per-stage = count of cycle-flow transitions per Dispatching/WaitingRunner/Reviewing/Deciding/AwaitingUser state across the queue; (c) per-AC pass/fail counts = sum of status from queue[*].ac_pass_fail. Render as a labeled key-value block in the detail panel above the cycle-flow timeline.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-08 evidence is stamped via `mp milestone criterion pass 216 AC-08 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

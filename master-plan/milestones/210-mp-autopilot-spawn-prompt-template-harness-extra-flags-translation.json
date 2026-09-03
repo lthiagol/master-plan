@@ -1,0 +1,236 @@
+{
+  "milestone": {
+    "id": "210",
+    "title": "mp autopilot spawn-prompt template + harness-extra-flags translation",
+    "slug": "mp-autopilot-spawn-prompt-template-harness-extra-flags-translation",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.628052+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:51:39.518293+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.983416+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.983416+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:51:39.518293+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "When mp autopilot spawns a fresh pane in the herdr workspace, the pane boots with a session-bound system prompt that names the project, the session id, the milestone, the pane's role (which skill to load), the role's explicit `what you cannot do` boundaries, and the lane-notify wire format — so the agent's first context window is grounded in role + contract before any freeform work begins."
+  },
+  "problem": {
+    "description": "In M201 cycle 1 and M203, the runner pane's context drift caused it to forget its role boundaries; it fabricated lifecycle state, called `mp reviews pass` directly, and otherwise did what achieved the goal without honoring the role. Skills alone (`mp-runner` etc.) drift in long contexts. The fix is a session-bound system prompt at spawn time (per the simplification conversation): the spawn pipeline renders a template per role that includes project metadata (so the agent knows which project it's driving), the session id (so it can correlate with session.json), the milestone id, the role's `Boundaries` block (in code, not in SKILL.md), and the lane-notify format. Multi-skill load: in 2-pane mode the supervisor pane gets both O and V prompt contents concatenated (or rendered separately) so it carries both contracts. The harness-extra-flags translation turns `role.skill` into the harness-specific flag (opencode's `--skill`, cursor's `--agent`)."
+  },
+  "scope": {
+    "in_scope": [
+      "Render the spawn prompt from a template in `crates/mp/src/autopilot/prompts/spawn.rs` per role. Inputs: session.json (workspace, session id, milestone id, queue position), resolved RoleConfig (model, harness, skill, extras), the per-role `Boundaries` block (hardcoded per role, in code per the locked decision).",
+      "Three role templates (O, R, V); the 2-pane supervisor bundle concatenates O + V; 1-pane concatenates O + R + V.",
+      "`harness_extra_flags(rc)` translation: opencode → `--skill <name> --model <id>`; cursor → `--agent <name> --model <id>`; pi → equivalent PI config injection. Returns the argv list to append to `herdr agent start`.",
+      "Spawn-prompt rendering is pure: same inputs → same prompt. Tested via golden-file fixtures per role + topology.",
+      "On spawn, the template is rendered once, written into the session.json `roles.<role>.spawn_prompt_rendered` field for audit, and passed to the herdr spawn call."
+    ],
+    "out_of_scope": [
+      "The lane-notify wire format (B2's downstream of the lane's reply messages) — that's C1.",
+      "Decision-matrix templates — those land with C3.",
+      "Per-role SKILL.md content (the `mp-orchestrator` etc. skills ship as part of a separate track, not under B2).",
+      "Harness-side permission policies — out per the simplification decision; the `Boundaries` block in the spawn prompt is the only boundary mechanism at spawn time."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Spawn-prompt rendering is deterministic: same RoleConfig + session.json slice → byte-identical prompt string. Golden-file tests cover all three roles in 3-pane, plus the O+V concatenation for 2-pane and O+R+V for 1-pane.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Each rendered spawn prompt contains the project name, the session id, the milestone id, the role name (and skill name), the explicit `Boundaries you must respect` block, and the task-assignment wire format from C1. The Boundaries block now specifies the typed state writes the role is expected to make on session.json.roles.<role>.state at each phase boundary (instead of telling the role to send a notify shell command).",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`harness_extra_flags(RoleConfig)` returns the documented argv list per harness (opencode, cursor, pi). Translated flags include `--skill/--agent` for the role's skill and `--model` for the role's model.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Spawning a session writes `roles.<role>.spawn_prompt_rendered` into session.json for audit; subsequent `mp autopilot session show <id>` shows the rendered prompts.",
+      "verification": "manual: started a session, opened session.json, and confirmed the rendered prompts were stored per role.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Each role's spawn prompt contains the typed shape of session.json state writes the role is expected to make, including the JSON paths and the valid state values for that role (e.g., runner.state ∈ {Working, Done}; reviewer.state ∈ {Idle, Reviewing}; orchestrator.state ∈ {Dispatching, WaitingRunner, Reviewing, Deciding, AwaitingUser}).",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "prompt_source_of_truth",
+      "choice": "Prompts are hardcoded into `crates/mp/src/autopilot/prompts/spawn.rs` (per the locked decision). The SKILL.md files are a teaching layer that drifts from enforcement; the verifier (C2) catches drift.",
+      "rationale": "Updating 'what runner cannot do' requires a code commit. Slight friction, no drift between spawn prompt and what the verifier enforces."
+    },
+    {
+      "area": "supervisor_pane_prompt_concatenation",
+      "choice": "2-pane and 1-pane topologies concatenate role prompts in role-of-responsibility order (O first, then R, then V) with a separator line that names the seam.",
+      "rationale": "A single, deterministic concatenation gives the supervisor pane a system prompt that contains all three contract sections; the separator lets the supervisor agent see the seam explicitly so it knows when it's in O-mode vs V-mode."
+    },
+    {
+      "area": "harness_flag_translation",
+      "choice": "`harness_extra_flags` is a per-harness function (opencode, cursor, pi). Adding a new harness means adding one match arm — doesn't touch the role enum.",
+      "rationale": "Keeps the role enum independent of harness quirks. New harness support becomes a small additive change."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot spawn-prompt template + harness-extra-flags translation",
+      "goal": "All ACs for mp autopilot spawn-prompt template + harness-extra-flags translation pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/autopilot/prompts/spawn.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: Spawn-prompt rendering is deterministic: same RoleConfig + session.json slice → byte-identical prompt string. Golden-file tests cover all three roles in 3-pane, plus the O+V concatenation for 2-pane a",
+      "files": [
+        "crates/mp/src/autopilot/prompts/spawn.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test spawn_prompt_golden --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 210 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: Each rendered prompt contains the project name, the session id, the milestone id, the role name (and skill name), the explicit `Boundaries you must respect` block for that role, and the lane-notify sh",
+      "files": [
+        "crates/mp/src/autopilot/prompts/spawn.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test spawn_prompt_contains --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 210 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `harness_extra_flags(RoleConfig)` returns the documented argv list per harness (opencode, cursor, pi). Translated flags include `--skill/--agent` for the role's skill and `--model` for the role's mode",
+      "files": [
+        "crates/mp/src/autopilot/prompts/spawn.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test harness_extra_flags --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 210 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S04",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement and verify: Spawning a session writes `roles.<role>.spawn_prompt_rendered` into session.json for audit; subsequent `mp autopilot session show <id>` shows the rendered prompts.",
+      "files": [
+        "crates/mp/src/autopilot/prompts/spawn.rs"
+      ],
+      "tests": "manual: started a session, opened session.json, and confirmed the rendered prompts were stored per role.",
+      "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 210 AC-04 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Per-role state-write directives: render the typed session.json updates each role makes (runner writes roles.runner.state + roles.runner.working_on; reviewer writes roles.reviewer.state; orchestrator writes roles.orchestrator.state). The state values are constrained to the typed enums.",
+      "files": [
+        "crates/mp/src/autopilot/prompts/spawn.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 210 AC-05 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

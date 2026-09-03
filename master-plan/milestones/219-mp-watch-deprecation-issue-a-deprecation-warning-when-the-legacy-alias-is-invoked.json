@@ -1,0 +1,175 @@
+{
+  "milestone": {
+    "id": "219",
+    "title": "mp watch deprecation — issue a deprecation warning when the legacy alias is invoked",
+    "slug": "mp-watch-deprecation-issue-a-deprecation-warning-when-the-legacy-alias-is-invoked",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-02",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.968318+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.968318+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.308546+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.308546+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-02T21:25:02.968318+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "`mp watch` continues to function (A2 ships the alias) but prints a deprecation warning to stderr on every invocation pointing the user at `mp autopilot`; the warning is non-blocking and survives shell pipelines; after the consumer-surface hygiene sweep (F3), `mp watch` is removed entirely."
+  },
+  "problem": {
+    "description": "A2 pivots `mp watch` to a thin alias of `mp autopilot`. Without a deprecation notice, users (and CI pipelines) keep invoking the old name silently. After one release of notice, F3 removes the alias. The notice must be visible but not blocking — exit code, stdout, and pipelines all keep working; only stderr gains a one-line warning."
+  },
+  "scope": {
+    "in_scope": [
+      "Add a deprecation hook in the alias layer (clap-level `alias` callback) that prints `mp watch is deprecated; use 'mp autopilot' instead.` to stderr.",
+      "Make sure the deprecation message is emitted ONCE per invocation (not once per subcommand — for `mp watch status` style invocations, only the top-level triggers the message).",
+      "Survive pipelines: stderr-only; do not corrupt stdout JSON (the new `mp autopilot` output is unchanged).",
+      "Document the deprecation timeline (one release notice, then removal under F3) in `docs/autopilot/migration.md`."
+    ],
+    "out_of_scope": [
+      "Removing `mp watch` — that's a follow-up after F3 lands and consumers have migrated.",
+      "Adding a 'show what's new' message — kept simple: one line, one language.",
+      "Telemetry / opt-in stats on `mp watch` usage — not needed for the deprecation itself."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Invoking `mp watch --help`, `mp watch status`, or `mp autopilot status` (after the legacy alias was used) prints the documented deprecation warning to stderr and produces no change to stdout.",
+      "verification": "manual: ran `mp watch --help 2>stderr.log 1>stdout.log`; confirmed the warning appears in stderr.log and stdout.log contains only the help text.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "`mp autopilot --help` (the canonical name) does NOT print the deprecation warning.",
+      "verification": "manual: ran `mp autopilot --help 2>stderr.log`; confirmed stderr.log is empty.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The deprecation message text matches the documented string (`mp watch is deprecated; use 'mp autopilot' instead.`) byte-for-byte.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "warning_channel",
+      "choice": "stderr only, single line, no color (works in non-tty contexts and CI logs).",
+      "rationale": "Stdout is reserved for the actual command output (especially JSON when `--format json`); stderr is the conventional deprecation channel."
+    },
+    {
+      "area": "warning_deduplication",
+      "choice": "Emit once per invocation (not once per subcommand or per session). Avoid spammy warnings on long-running polling.",
+      "rationale": "Long sessions shouldn't generate 1 warning per status call."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp watch deprecation",
+      "goal": "All ACs for mp watch deprecation pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/commands/autopilot.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: Invoking `mp watch --help`, `mp watch status`, or `mp autopilot status` (after the legacy alias was used) prints the documented deprecation warning to stderr and produces no change to stdout.",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "manual: ran `mp watch --help 2>stderr.log 1>stdout.log`; confirmed the warning appears in stderr.log and stdout.log contains only the help text.",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 219 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: `mp autopilot --help` (the canonical name) does NOT print the deprecation warning.",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "manual: ran `mp autopilot --help 2>stderr.log`; confirmed stderr.log is empty.",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 219 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: The deprecation message text matches the documented string (`mp watch is deprecated; use 'mp autopilot' instead.`) byte-for-byte.",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_deprecation_text --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 219 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

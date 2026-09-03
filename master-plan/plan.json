@@ -8721,7 +8721,7 @@
     {
       "id": "200",
       "title": "Keybind deconflict — clean defaults for the upcoming Settings 2.0 surface",
-      "spec_status": "implemented",
+      "spec_status": "verified",
       "execution_status": "done",
       "blocked_by": ""
     },
@@ -8749,7 +8749,7 @@
     {
       "id": "204",
       "title": "raul unified filter modal + active-filter chips with sort/filter persistence",
-      "spec_status": "implemented",
+      "spec_status": "verified",
       "execution_status": "done",
       "blocked_by": ""
     },
@@ -8765,6 +8765,118 @@
       "title": "raul Path tab rework — 2-line description preview + stage chip + status overlay",
       "spec_status": "verified",
       "execution_status": "done",
+      "blocked_by": ""
+    },
+    {
+      "id": "207",
+      "title": "mp autopilot session.json schema — durable per-session state for autopilot drives",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "208",
+      "title": "mp autopilot CLI rename — pivot `mp watch` to `mp autopilot` with legacy alias",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "209",
+      "title": "mp autopilot roles + topology — Role enum, RoleConfig resolution, and role-to-pane mapping",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "210",
+      "title": "mp autopilot spawn-prompt template + harness-extra-flags translation",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "211",
+      "title": "mp autopilot lane-notification wire format — shell-command, never printed text",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "212",
+      "title": "mp autopilot orchestrator verifier — independent state-reads + role-boundary violation detection",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "213",
+      "title": "mp autopilot cycle flow + decision matrix + topology tightening",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "214",
+      "title": "raul Autopilot lane — rename Watch → Autopilot and migrate the settings key",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "215",
+      "title": "raul Autopilot lane — picker and per-drive override panel",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "216",
+      "title": "raul Autopilot lane — live status graph + multi-milestone queue rendering (manual refresh only)",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "217",
+      "title": "raul Autopilot lane — auto-refresh policy + idle poller",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "218",
+      "title": "mp autopilot hard gate — refuse to start without herdr ≥ 0.7.x",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "219",
+      "title": "mp watch deprecation — issue a deprecation warning when the legacy alias is invoked",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "220",
+      "title": "mp autopilot consumer-surface hygiene — scrub `Watch` from templates, skills, docs",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "221",
+      "title": "raul TUI mouse support — click and double-click across all lanes (Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot)",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "222",
+      "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
+      "spec_status": "ready",
+      "execution_status": "planned",
       "blocked_by": ""
     }
   ],

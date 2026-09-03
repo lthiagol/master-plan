@@ -1,0 +1,202 @@
+{
+  "milestone": {
+    "id": "215",
+    "title": "raul Autopilot lane — picker and per-drive override panel",
+    "slug": "raul-autopilot-lane-picker-and-per-drive-override-panel",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.826251+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.102557+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.176292+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.176292+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.102557+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The Autopilot lane surfaces a milestone picker (filtered to autopilot-eligible lifecycles per A1's session.json model) and a per-drive override panel that captures topology, per-role model/harness/skill overrides, and refresh interval — overrides persist into session.json on Start and override `mp config.json` defaults for that session only."
+  },
+  "problem": {
+    "description": "The legacy Watch lane (M179) shipped with a picker and ordered queue, but the autopilot redesign adds per-drive overrides (per the locked decisions: persisted in session.json, override only this session). The picker needs to honor the role-config resolution chain from B1 (session.json wins over config.json). The override panel must be testable in isolation (rendered view + persisted form) without touching the verifier or the cycle flow."
+  },
+  "scope": {
+    "in_scope": [
+      "Picker surface in the Autopilot lane: list drivable milestones from `mp list milestones` filtered by `lifecycle ∈ {approved, in-progress, remediation}` (per A1's session.json model); cursor navigation via existing `tab_move_*` keybinds; toggle selection (`space`); preserve selection insertion order so the queue passed to `mp autopilot start` matches what the user picked (M179 precedent).",
+      "Per-drive override panel: a separate buffer (e.g., `<o>` to open) that captures topology (3-agent default), per-role model/harness/skill/extras overrides for orchestrator, runner, and reviewer, and refresh interval (default 2s). Validation: numeric refresh_secs; non-empty role names; harness in {opencode, cursor, pi}.",
+      "Persistence: on `Start` (`<s>` from the picker), the picker + override values are written into session.json as `config_overrides` + `roles.<role>` per-session overrides (A1's schema). The dry-run preflight (`mp autopilot --dry-run <ids>` from C2's verifier) honors the overrides.",
+      "Refusal paths: empty selection refuses to Start; `mp autopilot session list` shows the new session with its override values."
+    ],
+    "out_of_scope": [
+      "Live status graph (per-pane rendering, verifier-event rendering) — D3.",
+      "Auto-refresh of the picker / panel — E.",
+      "Cycle flow during execution — C3."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Picker renders drivable milestones from `mp list milestones`, filtered to the autopilot-eligible lifecycles; toggle selection preserves insertion order; cursor moves correctly across the list.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Override panel captures topology, per-role model/harness/skill/extras, and refresh interval; invalid values (numeric refresh_secs, empty role names, unknown harness) are rejected with an inline error before persistence.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "On Start, the override values are written to session.json's `config_overrides` and `roles.<role>` blocks; `mp autopilot session show <id>` returns the values; the next `mp autopilot --dry-run` honors them as session-scoped overrides (winning over config.json).",
+      "verification": "manual: opened the Autopilot lane, picked two milestones, set per-role overrides (e.g., runner model to a different id), clicked Start, ran `mp autopilot session show`, and confirmed the persisted overrides; ran `mp autopilot --dry-run` with a fresh selection and confirmed it used the config.json defaults.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Picker's `Mode:` toggles between (a) drivable milestones (current behavior) and (b) past sessions — listing each `master-plan/autopilot/<id>/session.json` folder with id, status, last_updated, and a hover-preview of the queued milestones. <Enter> on a past session opens a read-only replay: per-cycle panels like the live detail view, but no Start/Override/control affordances. Read-only is enforced: the lane refuses to invoke `mp autopilot` verbs against a past session (they would create a new session, which is the wrong affordance for replay).",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "panel_buffer_model",
+      "choice": "Override panel is a separate buffer (own keybind map) rather than an in-place editor; `esc` returns to the picker.",
+      "rationale": "Avoids cross-contamination of keybinds between list navigation and form editing; matches M179's surface pattern."
+    },
+    {
+      "area": "validation_strategy",
+      "choice": "Inline validation: each field rejects invalid input before the user can leave it; overrides are persisted only when all fields pass.",
+      "rationale": "Prevents half-formed session.json from polluting plan state; bad input is local to the panel."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of raul Autopilot lane",
+      "goal": "All ACs for raul Autopilot lane pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/raul/src/tui/autopilot.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: Picker renders drivable milestones from `mp list milestones`, filtered to the autopilot-eligible lifecycles; toggle selection preserves insertion order; cursor moves correctly across the list.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_picker --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 215 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: Override panel captures topology, per-role model/harness/skill/extras, and refresh interval; invalid values (numeric refresh_secs, empty role names, unknown harness) are rejected with an inline error ",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test autopilot_overrides_validation --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 215 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: On Start, the override values are written to session.json's `config_overrides` and `roles.<role>` blocks; `mp autopilot session show <id>` returns the values; the next `mp autopilot --dry-run` honors ",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: opened the Autopilot lane, picked two milestones, set per-role overrides (e.g., runner model to a different id), clicked Start, ran `mp autopilot session show`, and confirmed the persisted overrides; ran `mp autopilot --dry-run` with a fresh selection and confirmed it used the config.json defaults.",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 215 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement picker's mode toggle (drivable / past). The past-sessions mode reads `master-plan/autopilot/` directory entries; each entry's session.json is parsed minimally (id, status, last_updated) for the row. <Enter> opens a read-only replay buffer that renders the same per-cycle panels as M216 but with all control affordances (Start/Override/Steer/Cancel) disabled. Golden-file tests pin the picker row layout and the replay panel.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 215 AC-04 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

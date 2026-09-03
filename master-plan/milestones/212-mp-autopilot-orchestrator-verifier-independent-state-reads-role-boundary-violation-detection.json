@@ -1,0 +1,235 @@
+{
+  "milestone": {
+    "id": "212",
+    "title": "mp autopilot orchestrator verifier — independent state-reads + role-boundary violation detection",
+    "slug": "mp-autopilot-orchestrator-verifier-independent-state-reads-role-boundary-violation-detection",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.710525+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T12:03:34.662880+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.058954+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:29.058954+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T12:03:34.662880+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Before the orchestrator accepts any lane's 'done' notification, it independently verifies state via `mp show milestone`, `reviews.json`, and `activity.json` — and detects seven named role-boundary violations (e.g., runner called `mp reviews pass`, reviewer modified code, notify arrived before the lane was started). Violations surface as typed events on the raul autopilot tab and trigger topology-aware remediation."
+  },
+  "problem": {
+    "description": "Lessons 3 (M201 cycle 1 fabricated lifecycle claim) and 4 (M203 runner self-completed via `mp reviews pass`) from the project log both stem from the orchestrator trusting the lane's report. The fix is independent state-reads (three sources, not one) and seven named violation detectors. Permission policies at the harness layer were considered and rejected per the simplification conversation — the orchestrator's verifier is the safety net, catching violations after the fact with enough specificity that remediation can be targeted (reject + resend in 3-pane; reject + escalate in 2-pane and 1-pane)."
+  },
+  "scope": {
+    "in_scope": [
+      "`crates/mp/src/autopilot/verifier.rs` exports a `Verifier` struct that runs after each lane notification. It cross-references the lane's claimed state against three sources: `mp show milestone <id> --fields lifecycle,execution_status,spec_status`; the latest verdict in `reviews.json` for that milestone; the last three activity.json entries filtered by milestone subject.",
+      "Seven typed violation detectors, each returns an `Option<Violation>`: (1) Runner called `mp reviews pass`; (2) Runner called `mp reviews claim` or `mp reviews finding add`; (3) Runner modified `master-plan/` directly; (4) Reviewer modified code (`git diff crates/..` attributable to reviewer pane ID); (5) Reviewer called `mp reviews pass` before orchestrator prompt; (6) Notify arrived before the lane was started; (7) Orchestrator committed code attributable to its own pane ID.",
+      "`Violation` enum: `RunnerReviewViolation`, `RunnerClaimViolation`, `RunnerPlanEditViolation`, `ReviewerCodeEditViolation`, `ReviewerPrematurePassViolation`, `PreStartNotificationViolation`, `OrchestratorCodeEditViolation`. Each carries the evidence (activity event id, git log SHA, diff hunk).",
+      "Topology-aware remediation hook (C3 owns the policy decision; the verifier exposes a `recommend_remediation(violation, topology) -> Remediation` that C3 consults): 3-pane → `Resend(corrective_message)`; 2-pane → `EscalateToUser(violation)`; 1-pane → `EscalateToUser(violation)` (no independence to recover)."
+    ],
+    "out_of_scope": [
+      "The cycle-flow sequencing and decision matrix — that's C3; C2 only exposes detectors.",
+      "The lane-notification wire format — that's C1.",
+      "Per-AC evidence restoration enforcement (lesson 2 from the log) — separate small track item; C2 doesn't address it.",
+      "Harness-side permission policies — out per the simplification decision."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "The verifier reads the three sources (milestone JSON, reviews.json, activity.json) and cross-checks them against the lane notification. Mismatches (e.g., lane claims `lifecycle=executed` but milestone JSON says `lifecycle=approved`) are detected as typed mismatches.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Each of the seven violation detectors fires on a hand-crafted fixture reproducing the original lesson (e.g., M203's runner calling `mp reviews pass` is detected by detector #1).",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`recommend_remediation` returns `Resend` for any violation under 3-pane, `EscalateToUser` under 2-pane or 1-pane.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Regression test for M201 cycle 1: a fabricated `lifecycle=executed` notification with no matching activity.json event and a milestone at `lifecycle=approved` is rejected by the verifier as a typed mismatch.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Documentation: `docs/mp/autopilot-verifier.md` describes (a) the `mp reviews pass` writing pattern (writes to milestone JSON + reviews.json; does NOT add an activity.json event by default), so future agents don't look for a `review-pass` event in activity.json as proof of completion; (b) the M200 recovery lesson (review-pass lost to activity.json truncation; verifier cross-checks three sources to catch it); (c) the multi-source verification convention (milestone JSON + reviews.json + activity.json).",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "detector_implementation",
+      "choice": "Each detector is a small typed function (e.g., `fn detect_runner_review_violation(events: &[ActivityEntry], pane_id: &str) -> Option<RunnerReviewViolation>`); the Verifier composes them.",
+      "rationale": "Pure functions are testable in isolation; new detectors add without changing existing ones."
+    },
+    {
+      "area": "evidence_capture",
+      "choice": "Violations carry structured evidence (activity event id, git log SHA, diff hunk) so remediation can act on specifics, not just 'something violated'.",
+      "rationale": "Forensic without being heavy; matches the M190 sequencer's evidence pattern."
+    },
+    {
+      "area": "topology_decision_in_verifier",
+      "choice": "`recommend_remediation` lives in C2 (verifier), but the policy enum (`Resend` / `EscalateToUser`) is shared with C3 (cycle flow).",
+      "rationale": "C2 owns the surface; C3 owns the cycle-flow consumption."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot orchestrator verifier",
+      "goal": "All ACs for mp autopilot orchestrator verifier pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/autopilot/verifier.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: The verifier reads the three sources (milestone JSON, reviews.json, activity.json) and cross-checks them against the lane notification. Mismatches (e.g., lane claims `lifecycle=executed` but milestone",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_state_cross_check --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 212 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: Each of the seven violation detectors fires on a hand-crafted fixture reproducing the original lesson (e.g., M203's runner calling `mp reviews pass` is detected by detector #1).",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_seven_violations --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 212 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `recommend_remediation` returns `Resend` for any violation under 3-pane, `EscalateToUser` under 2-pane or 1-pane.",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_topology_remediation --no-fail-fast",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 212 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S04",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement and verify: Regression test for M201 cycle 1: a fabricated `lifecycle=executed` notification with no matching activity.json event and a milestone at `lifecycle=approved` is rejected by the verifier as a typed mis",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_m201_cycle1_regression --no-fail-fast",
+      "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 212 AC-04 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Write `docs/mp/autopilot-verifier.md` covering the `mp reviews pass` writing pattern, the M200 recovery lesson, and the three-source verification convention.",
+      "files": [
+        "docs/mp/autopilot-verifier.md"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 212 AC-05 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

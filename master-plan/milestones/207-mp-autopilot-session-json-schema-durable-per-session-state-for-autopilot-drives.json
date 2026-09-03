@@ -1,0 +1,235 @@
+{
+  "milestone": {
+    "id": "207",
+    "title": "mp autopilot session.json schema — durable per-session state for autopilot drives",
+    "slug": "mp-autopilot-session-json-schema-durable-per-session-state-for-autopilot-drives",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-02",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-02T21:25:02.489148+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.073648+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.873605+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-02T21:24:28.873605+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T13:17:21.073648+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Every autopilot session has a single canonical, durable, versioned state file (session.json) that downstream milestones consume as source of truth for pane IDs, role config, queue state, and verifier verdicts."
+  },
+  "problem": {
+    "description": "Today's mp watch keeps state in scattered files — `master-plan/.mp/watch.state.json` for the v2 control plane (M178), `master-plan/.mp/watch.log` for the structured log, and the milestone's own spec for execution. Recovering what happened to a session, especially after a crash or SIGINT (per M152), requires joining three files. The new mp autopilot design needs a single durable per-session record: pane IDs across orchestrator/runner/reviewer, role-config snapshots (so re-spawn reuses the same config), the milestone queue with per-milestone sub-state (cycle, stage, last notify), the topology in effect, and verifier verdicts. Reusing M178's control-plane shape gives a head start; this milestone adapts it to per-session folders and multi-milestone queues (with herdr workspace name `<project-name>-autopilot`)."
+  },
+  "scope": {
+    "in_scope": [
+      "Define session.json schema: id, schema_version, herdr_workspace, topology, roles (per-role pane_id + model + harness + skill), config_overrides, queue (ordered milestone list with per-milestone stage/cycle/verifier_verdict/last_notify/evidence_refs), status, last_updated.",
+      "Validation: session.json validates against the project mini_schema (M188) with bounded read (32 MiB cap) and project-root containment.",
+      "Create-or-migrate scaffolding: when `mp autopilot start` runs against a plan with no autopilot/ dir, create the folder and write the schema-versioned session.json.",
+      "Document the schema in `docs/autopilot/session-format.md` so A2 (CLI rename), B (config+spawn), and C (verifier) can all reference it."
+    ],
+    "out_of_scope": [
+      "The actual session lifecycle verbs (start/stop/pause/resume) — those land in B (config+spawn) and C (cycle governance).",
+      "Reading or surfacing session.json from raul — that's D1-D3.",
+      "Migration of legacy mp watch state into the new shape — covered by A2's legacy alias work.",
+      "Multi-session concurrency control — sessions are independent; this milestone is one session at a time."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "session.json validates against the project mini_schema (M188) when written via the autopilot start path and when loaded by `mp autopilot session show <id>`. Bounded read (32 MiB cap) and project-root containment apply.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "A sample session.json with the full schema (3-pane topology, 2 milestones in queue, role config snapshots, evidence_refs pointing at lifecycle / execution_status / spec_status / reviews.json verdict) round-trips through read+write without data loss.",
+      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "`mp autopilot session list` shows all sessions in the plan with id, status, last_updated; `mp autopilot session show <id>` renders the full session.json in canonical view.",
+      "verification": "manual: started an autopilot via `mp autopilot start`, then ran `mp autopilot session list && mp autopilot session show <id>` and confirmed the queue + role-config panes match what was started.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "session.json extends with a `runner_notes: Vec<RunnerNote>` array (per the log's milestone-folder proposal: 'runner_notes.json — the runner's commentary on its own execution'). Each note has `kind ∈ {Workaround, Surprise, Blocker, Escalation, Question, Decision}`, `body: string`, `cycle: u8`, `at: timestamp`. Lanes write notes via `mp autopilot note <session-id> --kind Workaround --body \"...\"`. Tests pin a round-trip with one note per kind.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "session.json extends with `ac_pass_fail: Vec<AcPassFail>` per queued milestone (where `AcPassFail = { id: AC-XX, status: passed|failed|pending, evidence: string }`). This is the data source for the per-AC visualization (M216, latent surface #3) and the aggregate telemetry (M216, latent surface #4). Round-trip test fixture covers all three statuses per AC across multiple milestones in the queue.",
+      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "schema_host",
+      "choice": "Per-session folder at `master-plan/autopilot/<id>/session.json` rather than a single global file.",
+      "rationale": "Each session is a self-contained unit — easy to archive, diff, and recover. Concurrent writes serialize within one file; per-session folders unlock parallel-session writes (one per project checkout)."
+    },
+    {
+      "area": "schema_versioning",
+      "choice": "Explicit `schema_version: integer` field; loaders reject unknown versions with a typed error. Bump on any breaking change.",
+      "rationale": "The legacy mp watch state file (M152) already does this. Reusing the pattern means future migration paths compose cleanly."
+    },
+    {
+      "area": "queue_shape",
+      "choice": "Queue is an ordered list; per-milestone sub-state is a typed object (not a sparse map).",
+      "rationale": "Order matters for sequential execution (M179 ordered queue precedent); typed objects give the verifier a stable shape regardless of which milestone it's checking."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation of mp autopilot session.json schema",
+      "goal": "All ACs for mp autopilot session.json schema pass with stamped evidence.",
+      "rollback": "Revert the new module under crates/mp/src/autopilot/session.rs to the pre-milestone state; plan-zone changes roll back via git."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S01",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement and verify: session.json validates against the project mini_schema (M188) when written via the autopilot start path and when loaded by `mp autopilot session show <id>`. Bounded read (32 MiB cap) and project-root ",
+      "files": [
+        "crates/mp/src/autopilot/session.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_session_schema --no-fail-fast",
+      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 207 AC-01 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S02",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement and verify: A sample session.json with the full schema (3-pane topology, 2 milestones in queue, role config snapshots, evidence_refs pointing at lifecycle / execution_status / spec_status / reviews.json verdict) ",
+      "files": [
+        "crates/mp/src/autopilot/session.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_session_roundtrip --no-fail-fast",
+      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 207 AC-02 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S03",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Implement and verify: `mp autopilot session list` shows all sessions in the plan with id, status, last_updated; `mp autopilot session show <id>` renders the full session.json in canonical view.",
+      "files": [
+        "crates/mp/src/autopilot/session.rs"
+      ],
+      "tests": "manual: started an autopilot via `mp autopilot start`, then ran `mp autopilot session list && mp autopilot session show <id>` and confirmed the queue + role-config panes match what was started.",
+      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 207 AC-03 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add `runner_notes: Vec<RunnerNote>` to the session.json schema with typed kinds per the log's proposal. Wire `mp autopilot note <session-id> --kind <K> --body \"<text>\"` to append to the array. Round-trip test fixture covers one note per kind.",
+      "files": [
+        "crates/mp/src/autopilot/session.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 207 AC-04 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Add `ac_pass_fail` per queued milestone to the session.json schema. Wire a new `mp autopilot record-ac <session-id> --milestone <MID> --ac <AC> --status <passed|failed|pending> --evidence \"<text>\"` command. Round-trip test fixture pins the schema across the three statuses and across multiple milestones in the queue.",
+      "files": [
+        "crates/mp/src/autopilot/session.rs"
+      ],
+      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 207 AC-05 --evidence`.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
