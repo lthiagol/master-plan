@@ -12,8 +12,9 @@
 //!   String`. Same inputs → byte-identical output (AC-01).
 //! - [`render_topology_prompts`] — collapses the per-role prompts
 //!   for a given [`crate::autopilot::role::Topology`]. Returns a
-//!   `Vec<(PaneLabel, BundledPrompt)>` so the caller can deliver
-//!   one bundle per physical pane (AC-01, AC-04).
+//!   `Vec<BundledPrompt>` where each [`BundledPrompt`].label
+//!   identifies the physical pane, so the caller can deliver one
+//!   bundle per pane (AC-01, AC-04).
 //! - [`render_collapsed_bundle`] — convenience that returns the
 //!   joined string for a single pane (used by collapsed
 //!   topologies in 1-/2-pane modes).
