@@ -22,3 +22,6 @@ mod init_root_agents;
 
 #[path = "suites/init_transactional.rs"]
 mod init_transactional;
+
+#[path = "suites/install_autopilot_templates.rs"]
+mod install_autopilot_templates;
