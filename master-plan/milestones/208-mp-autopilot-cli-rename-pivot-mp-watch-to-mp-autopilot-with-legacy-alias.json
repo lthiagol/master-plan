@@ -69,28 +69,28 @@
     {
       "id": "AC-01",
       "description": "`mp autopilot --help` lists the autopilot verb tree (start, status, stop, output, result, config, session) with descriptions matching today's `mp watch` and `mp watch-control` sub-commands.",
-      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_cli_tree --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "`mp watch` and `mp autopilot` accept the same arguments and return identical exit codes and stdout bytes; the only permitted difference is the single legacy deprecation line on `mp watch` stderr.",
-      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test watch_alias_equivalence --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "A versioned legacy watch-state fixture migrates once into the M207 session schema; status/list/show preserve session identity, queue order, pane IDs, and lifecycle state. Re-running migration is idempotent.",
-      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Unknown, corrupt, or partially migrated legacy state fails with a typed diagnostic and leaves both the legacy source and any existing autopilot session unchanged.",
-      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
