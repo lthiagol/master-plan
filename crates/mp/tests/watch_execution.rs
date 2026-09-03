@@ -2590,3 +2590,348 @@ mod m226_ac03 {
         assert!(review.actor.contains("reviewer-pane"));
     }
 }
+
+// ─── M226 cycle 2 regression: F-01 / F-02 / F-03 production-path tests ──
+//
+// Each cycle-1 M226 AC test exercises the library API surface
+// (e.g. `dispatch_assignment`, `LifecycleClosure::execute`,
+// `topology_preflight`). Cycle 2 added production wiring:
+// - F-01: `SystemDriveOps::ensure_pane` consults the session
+//   event log via `was_already_applied` before spawning a fresh
+//   `herdr agent start`.
+// - F-02: `complete_milestone` drives the M223 closure ceremony
+//   end-to-end via `LifecycleClosure::from_journal` + `validate_complete`
+//   before applying the lifecycle transition.
+// - F-03: `cmd_watch_drive` calls `topology_preflight` for every
+//   milestone id before any herdr spawn, run-state write, or
+//   sequencer dispatch.
+//
+// These regression tests assert the production paths actually
+// invoke the wired primitives — not just the library API.
+// Removing the wiring breaks each test; the regression test is
+// the audit trail that survives a refactor.
+
+mod m226_f_regression {
+    use crate::common::fake_herdr::FakeHerdrBuilder;
+    use crate::common::TestEnv;
+    use mp::autopilot::events::{EventKind, OrchestrationEvent};
+    use mp::autopilot::session::{
+        load_session, sample_session_for_tests, save_session, AutopilotSession,
+    };
+    use mp::autopilot::spawn::MpBinaryProvenance;
+    use mp::config::RoleConfig;
+    use mp::paths::PlanContext;
+    use mp::watch::{DriveOps, Role, RoleConfigs, SystemDriveOps};
+    use serde_json::json;
+    use std::path::Path;
+
+    fn ctx_in(dir: &Path) -> PlanContext {
+        PlanContext {
+            project_root: dir.to_path_buf(),
+            plan_dir: dir.join("master-plan"),
+        }
+    }
+
+    fn session_with_dispatched_event() -> AutopilotSession {
+        let mut s = sample_session_for_tests("m226-f01");
+        s.binary_provenance = Some(MpBinaryProvenance::current());
+        s.events.push(OrchestrationEvent::new(
+            1,
+            EventKind::AssignmentDispatched,
+            "runner:M226",
+            json!({
+                "pane_label": "role-runner-1",
+                "target_pane": "%dispatched",
+                "milestone_id": "m226-f01",
+                "cycle": 1,
+            }),
+        ));
+        s.event_cursor.last_seq = 1;
+        s
+    }
+
+    /// F-01 production regression: `SystemDriveOps::ensure_pane`
+    /// consults the session event log via `was_already_applied`
+    /// before spawning. Stage a session with a prior
+    /// `AssignmentDispatched` event, set the session id on the
+    /// ops, and call `ensure_pane`. The wired check must return a
+    /// cached `PaneHandle` (reused=true) and the fake herdr log
+    /// must NOT contain `agent start`.
+    #[test]
+    fn m226_f01_production_path_dispatch_assignment_consults_session() {
+        let env = TestEnv::new();
+        let bin_dir = env.tmp.path().join("fake-bin");
+        let fake = FakeHerdrBuilder::new()
+            .agent_start_response(r#"{"pane_id":"%spawned-1","status":"started"}"#)
+            .install(&bin_dir);
+        fake.clear_log();
+
+        // Stage a session with a prior AssignmentDispatched event
+        // for role-runner-1. The session id matches the milestone
+        // id (the autopilot drive model has one session per
+        // milestone).
+        let ctx = ctx_in(env.tmp.path());
+        let session = session_with_dispatched_event();
+        save_session(&ctx, "m226-f01", &session).unwrap();
+
+        let role_configs = RoleConfigs {
+            runner: RoleConfig::default(),
+            coordinator: RoleConfig::default(),
+        };
+        let mut ops = SystemDriveOps::new(
+            env.tmp.path().join("mp-not-used"),
+            fake.path(),
+            env.tmp.path(),
+            "m226-f01",
+            role_configs,
+        );
+        ops.set_session_id("m226-f01");
+
+        // Drive ensure_pane through the production path. The
+        // wired dedup check must consult the session event log
+        // and short-circuit before invoking herdr.
+        let handle = SystemDriveOps::ensure_pane(&mut ops, Role::Runner).unwrap();
+
+        // The returned handle must be reused (the dispatch
+        // dedup fired); the fake log must NOT contain a fresh
+        // `agent start`.
+        assert!(
+            handle.reused,
+            "M226 F-01: dispatch dedup must mark handle as reused"
+        );
+        let log = fake.read_log();
+        assert!(
+            !log.contains("agent start"),
+            "M226 F-01: FakeHerdrBuilder must NOT log `agent start` after dispatch dedup; got: {log}"
+        );
+
+        // Sanity: the on-disk session is unchanged (the dedup
+        // does not mutate session state).
+        let reloaded = load_session(&ctx, "m226-f01").unwrap();
+        assert_eq!(
+            reloaded.events.len(),
+            1,
+            "M226 F-01: session events must remain stable"
+        );
+    }
+
+    /// F-01 negative regression: when the session has NO prior
+    /// dispatch event, the wired check falls through to the
+    /// normal herdr spawn path. The fake herdr log MUST contain
+    /// `agent start`.
+    #[test]
+    fn m226_f01_production_path_falls_through_when_no_prior_dispatch() {
+        let env = TestEnv::new();
+        let bin_dir = env.tmp.path().join("fake-bin");
+        let fake = FakeHerdrBuilder::new()
+            .agent_start_response(r#"{"pane_id":"%spawned-1","status":"started"}"#)
+            .install(&bin_dir);
+        fake.clear_log();
+
+        // No session file on disk — load_session fails, the
+        // dedup check falls through to the normal spawn.
+        let role_configs = RoleConfigs {
+            runner: RoleConfig::default(),
+            coordinator: RoleConfig::default(),
+        };
+        let mut ops = SystemDriveOps::new(
+            env.tmp.path().join("mp-not-used"),
+            fake.path(),
+            env.tmp.path(),
+            "m226-f01-no-session",
+            role_configs,
+        );
+        ops.set_session_id("m226-f01-no-session");
+
+        let handle = SystemDriveOps::ensure_pane(&mut ops, Role::Runner).unwrap();
+        assert!(
+            !handle.reused,
+            "M226 F-01: a fresh spawn must NOT mark handle as reused"
+        );
+        let log = fake.read_log();
+        assert!(
+            log.contains("agent start"),
+            "M226 F-01: a fresh spawn MUST log `agent start`; got: {log}"
+        );
+    }
+
+    /// F-02 production regression: `mp milestone complete` drives
+    /// the M223 closure ceremony end-to-end via
+    /// `LifecycleClosure` + `validate_complete`. Stage a milestone
+    /// with NO findings (clean path) and verify completion
+    /// succeeds. Then stage a milestone with an OPEN finding and
+    /// verify completion refuses with the typed reason.
+    #[test]
+    fn m226_f02_production_path_lifecycle_closure_runs_on_complete() {
+        let env = TestEnv::new();
+        // Clean path: no findings.
+        let payload = json!({
+            "title": "M226 F-02 clean",
+            "intent": {"outcome": "test"},
+            "problem": {"description": "test"},
+            "scope": {"in_scope": ["a"], "out_of_scope": ["b", "c"]},
+            "acceptance_criteria": [{
+                "description": "only",
+                "verification": "manual: ok"
+            }],
+            "spec_status": "ready",
+        })
+        .to_string();
+        let out = env.run(&["milestone", "create", "--json", &payload]);
+        assert!(out.status.success());
+        let id = serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["milestone"]
+            ["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        env.run(&["milestone", "set-spec-status", &id, "review"]);
+        env.run(&["milestone", "set-spec-status", &id, "ready"]);
+        env.run(&["milestone", "approve", &id]);
+        // Complete must succeed (the LifecycleClosure gate
+        // accepts milestones with no open findings).
+        let out = env.run(&[
+            "milestone",
+            "complete",
+            &id,
+            "--evidence",
+            "manual: M226 F-02 clean path",
+            "--skip-review",
+        ]);
+        assert!(
+            out.status.success(),
+            "M226 F-02: clean-path complete must succeed; stderr={}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        // Open-findings path: create a milestone, add an open
+        // self-phase finding, attempt completion — must refuse.
+        let payload2 = json!({
+            "title": "M226 F-02 with open finding",
+            "intent": {"outcome": "test"},
+            "problem": {"description": "test"},
+            "scope": {"in_scope": ["a"], "out_of_scope": ["b", "c"]},
+            "acceptance_criteria": [{
+                "description": "only",
+                "verification": "manual: ok"
+            }],
+            "spec_status": "ready",
+        })
+        .to_string();
+        let out = env.run(&["milestone", "create", "--json", &payload2]);
+        assert!(out.status.success());
+        let id2 = serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["milestone"]
+            ["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        env.run(&["milestone", "set-spec-status", &id2, "review"]);
+        env.run(&["milestone", "set-spec-status", &id2, "ready"]);
+        env.run(&["milestone", "approve", &id2]);
+        // Add a finding via `mp reviews finding add` so it lands
+        // in the milestone's findings array.
+        let add = env.run(&[
+            "reviews",
+            "finding",
+            "add",
+            &id2,
+            "--severity",
+            "high",
+            "--category",
+            "test",
+            "--desc",
+            "test open finding",
+        ]);
+        assert!(
+            add.status.success(),
+            "finding add failed: stderr={}",
+            String::from_utf8_lossy(&add.stderr)
+        );
+        // Complete must refuse because the LifecycleClosure
+        // gate (validate_complete) sees an open finding without
+        // a ResolveFinding journal entry.
+        let out = env.run(&[
+            "milestone",
+            "complete",
+            &id2,
+            "--evidence",
+            "manual: should refuse",
+            "--skip-review",
+        ]);
+        assert!(
+            !out.status.success(),
+            "M226 F-02: complete must FAIL when a finding is open"
+        );
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let combined = format!("{stdout}\n{stderr}");
+        assert!(
+            combined.contains("LifecycleClosure") || combined.contains("open"),
+            "M226 F-02: refusal must surface the gate reason; got: {combined}"
+        );
+    }
+
+    /// F-03 production regression: `mp autopilot start` (which
+    /// delegates to `cmd_watch_drive`) refuses a 1-pane + Full
+    /// milestone BEFORE any herdr spawn or sequencer dispatch.
+    /// Configure `autopilot.topology=one-agent` and a Full
+    /// milestone; the typed `TopologyPreflightError` must surface
+    /// in the JSON report.
+    #[test]
+    fn m226_f03_production_path_topology_preflight_refuses_one_pane_full() {
+        let env = TestEnv::new();
+        // Create a Full milestone (change_kind="full" by default).
+        let payload = json!({
+            "title": "M226 F-03 1-pane full",
+            "intent": {"outcome": "test"},
+            "problem": {"description": "test"},
+            "scope": {"in_scope": ["a"], "out_of_scope": ["b", "c"]},
+            "acceptance_criteria": [{
+                "description": "only",
+                "verification": "manual: ok"
+            }],
+            "spec_status": "ready",
+        })
+        .to_string();
+        let out = env.run(&["milestone", "create", "--json", &payload]);
+        assert!(out.status.success());
+        let id = serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["milestone"]
+            ["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        env.run(&["milestone", "set-spec-status", &id, "review"]);
+        env.run(&["milestone", "set-spec-status", &id, "ready"]);
+        env.run(&["milestone", "approve", &id]);
+
+        // Set autopilot topology to one-agent. Use the
+        // `mp autopilot config set` command path.
+        let set = env.run(&[
+            "autopilot",
+            "config",
+            "set",
+            "autopilot.topology",
+            "one-agent",
+        ]);
+        assert!(
+            set.status.success(),
+            "M226 F-03: `mp autopilot config set autopilot.topology one-agent` failed; stderr={}",
+            String::from_utf8_lossy(&set.stderr)
+        );
+
+        // Run `mp autopilot start <id>`. The topology preflight
+        // must refuse BEFORE any herdr spawn.
+        let out = env.run(&["autopilot", "start", &id]);
+        assert!(
+            !out.status.success(),
+            "M226 F-03: 1-pane + Full must be refused at the topology gate"
+        );
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        let combined = format!("{stdout}\n{stderr}");
+        assert!(
+            combined.contains("topology_preflight")
+                || combined.contains("full_milestone_requires_reviewer"),
+            "M226 F-03: refusal must surface the topology preflight reason; got: {combined}"
+        );
+    }
+}
