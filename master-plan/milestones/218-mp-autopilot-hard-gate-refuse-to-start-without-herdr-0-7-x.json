@@ -3,8 +3,8 @@
     "id": "218",
     "title": "mp autopilot hard gate — refuse to start without herdr ≥ 0.7.x",
     "slug": "mp-autopilot-hard-gate-refuse-to-start-without-herdr-0-7-x",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,7 +17,7 @@
     "effort": "S",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -25,11 +25,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T20:09:09.836067+00:00",
+    "lifecycle_at": "2026-09-03T20:13:09.415644+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:02.931674+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T20:13:13.756537+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T20:09:09.836069+00:00"
+        "at": "2026-09-03T20:13:13.756537+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T20:13:13.788561+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.272547+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T20:13:13.788563+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T20:13:09.415645+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T20:09:09.836069+00:00"
+        "at": "2026-09-03T20:13:13.756537+00:00"
       },
       "specify": {
         "status": "done",
@@ -211,5 +227,20 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "doc-consistency",
+      "description": "In doctor.rs, the autopilot_herdr_gate DoctorCheck.message uses Debug formatting for the GateReason enum (produces 'HerdrMissing', 'HerdrBelowFloor', 'HerdrIncompatibleShape' in CamelCase). The JSON envelope in autopilot/gate.rs serializes the same reason as kebab-case ('herdr-missing', 'herdr-below-floor', 'herdr-incompatible-shape') via #[serde(rename_all = \"kebab-case\")]. Downstream tooling that greps/ parses the doctor JSON for the typed reason has to match two different forms (CamelCase in message, kebab-case elsewhere). Suggested fix: render via a small helper that maps GateReason -> kebab-case static str so the doctor surface matches the JSON contract. Not a blocker - AC-04 only requires availability/version/shape/install-upgrade guidance, and the message carries the full sentence including the typed reason. Filing as low per cycle-1 full-pass discipline; safe to defer to a follow-up.",
+      "status": "fixed",
+      "author": "reviewer-218",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03",
+      "summary": "Doctor message formats GateReason as Debug (CamelCase) instead of the kebab-case the JSON envelope uses",
+      "rationale": "Visual inspection of crates/mp/src/doctor.rs:311 - the message is built via format!(\"autopilot herdr gate: refused ({:?}) - {}\", err.reason, err.message). {:?} produces the Rust enum variant name (HerdrMissing, HerdrBelowFloor, HerdrIncompatibleShape) rather than the kebab-case string the rest of the system surfaces. Operators or automation that greps for 'herdr-missing' in 'mp doctor' output will not match."
+    }
+  ]
 }

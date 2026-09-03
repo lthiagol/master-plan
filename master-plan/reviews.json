@@ -1959,6 +1959,14 @@
       "reviewed_at": "2026-09-03",
       "notes": "F-01 fixed in 829b348: rendered_for(role, inputs) now takes the explicit Role enum, skill-name fallback removed. Call sites in persist_session pass Role::Orchestrator/Runner/Reviewer explicitly. F-01 regression test in 4d5117a (autopilot_spawn_pipeline.rs:2 tests) is load-bearing: it asserts Reviewer's persisted prompt contains Reviewer markers and lacks Runner markers — would fail under the original buggy code. F-02 fixed in d938f93: render_topology_prompts doc comment now says Vec<BundledPrompt> matching the actual signature. Cycle 2 test totals (cargo nextest --no-fail-fast): spawn_prompt_golden 9/9, spawn_prompt_contains 9/9, harness_extra_flags 8/8, autopilot_spawn_prompt_audit 5/5, spawn_prompt_state_contract 8/8, autopilot_spawn_pipeline 11/11 (+2 regression tests), autopilot_binary_provenance 8/8 = 58/58. cargo fmt --all -- --check exit 0. No new blockers.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "218",
+      "verdict": "ok",
+      "reviewer": "reviewer-218",
+      "reviewed_at": "2026-09-03",
+      "notes": "All 4 ACs verified via cold-build (make clean + cargo nextest). 9/9, 12/12, 9/9, 10/10 all pass. Exit code 78 (EX_CONFIG) verified live for mp autopilot start and mp watch. Shared gate between cmd_autopilot_start and cmd watch pinned by black-box tests. Install hint clear. --force does NOT bypass the gate (verified live). Doctor surfaces the gate verdict non-mutating. F-01 (low): doctor message uses {:?} (Debug) for GateReason instead of the kebab-case the JSON envelope uses; resolved as low-priority cosmetic nit safe to defer.",
+      "milestone_completed_at": "2026-09-03"
     }
   ],
   "comments": [
