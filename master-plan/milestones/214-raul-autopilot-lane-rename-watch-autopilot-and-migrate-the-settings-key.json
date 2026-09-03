@@ -91,8 +91,8 @@
       "id": "AC-04",
       "description": "After the rename, every Autopilot picker/control action is reachable through canonical keyboard dispatch and documented in the lane footer/help. Enter/Space selection, Up/Down navigation, start, stop, refresh, and clear queue use the existing Action/apply_action pipeline.",
       "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_modes --no-fail-fast exit 0 (22/22 pass)"
     }
   ],
   "design_decisions": [
@@ -197,7 +197,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
       "done_when": "AC-04 proves every existing picker/control action is keyboard reachable.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
