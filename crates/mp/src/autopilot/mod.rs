@@ -51,9 +51,11 @@
 //! [`ac_projection`].
 
 pub mod ac_projection;
+pub mod commit_policy;
 pub mod cycle;
 pub mod events;
 pub mod gate;
+pub mod lifecycle;
 pub mod list;
 pub mod migrate;
 pub mod notes;
@@ -71,6 +73,10 @@ pub use ac_projection::{
     canonical_revision, project_ac_status, AcProjection, AcStatus, PerMilestoneProjections,
     ProjectionKey, ProjectionRevision, ProjectionWriteOutcome,
 };
+pub use commit_policy::{
+    classify_subject, lifecycle_metadata_overwrites_evidence, validate_fixed_in, CommitIndex,
+    CommitInspection, CommitKind, PolicyError,
+};
 pub use cycle::{
     apply_decision_matrix, build_reviewer_activation, classify_liveness,
     cycle_state_machine_to_json, predict_next_action, reviewer_mode_for_cycle, start_cycle,
@@ -83,6 +89,12 @@ pub use events::{events_by_kind, EventCursor, EventKind, OrchestrationEvent};
 pub use gate::{
     check_autopilot_herdr_gate, check_autopilot_herdr_gate_default, AutopilotGateError, GateReason,
     EX_AUTOPILOT_GATE, HERDR_INSTALL_HINT,
+};
+pub use lifecycle::{
+    validate_evidence_shape as validate_lifecycle_evidence, ClosureJournal, ClosureOutcome,
+    CommitAttestation, JournalEntry, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
+    NullAttestation, TransitionKind, TransitionOutcome as LifecycleTransitionOutcome,
+    TransitionRejectReason, Clock, ClockT, LIFECYCLE_TRANSITION_ORDER,
 };
 pub use list::{list_sessions, SessionListEntry};
 pub use migrate::{
