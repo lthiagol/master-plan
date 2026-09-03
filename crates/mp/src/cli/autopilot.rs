@@ -1,9 +1,14 @@
-//! M207 / M209: `mp autopilot` CLI surface.
+//! M207 / M208 / M209: `mp autopilot` CLI surface.
 //!
 //! Subcommand tree (clap derives the `Commands::Autopilot` variant
 //! from this enum):
 //!
 //! ```text
+//! mp autopilot start [IDS]... [--dry-run] [--log-file PATH] [--stall-timeout-ms N] [--poll-interval-ms N] [--resume] [--force] [--detach]
+//! mp autopilot status [--summary]
+//! mp autopilot stop [--pid N] [--timeout-secs N]
+//! mp autopilot output [--max-bytes N] [--timeout-ms N] [--role ROLE]
+//! mp autopilot result [--force]
 //! mp autopilot session list
 //! mp autopilot session show <id>
 //! mp autopilot session transition --session <id> --role <role> --state <state> [--working-on <m:n>]
@@ -11,11 +16,58 @@
 //! mp autopilot config get <key>
 //! mp autopilot config set <key> <value> [--dry-run]
 //! ```
+//!
+//! M208: `start` is the new home of `mp watch <ids...>`; the legacy
+//! `mp watch` command is kept as a deprecation alias that prints a
+//! single notice on stderr and walks the same code path.
 
 use clap::{Args, Subcommand};
 
 #[derive(Subcommand, Debug)]
 pub enum AutopilotCmd {
+    /// M208: drive one or more milestones through their lifecycle.
+    /// Replaces `mp watch <ids...>` — same args, same exit codes, same
+    /// JSON output. Use `--dry-run` to preview without spawning agents.
+    Start(AutopilotStartArgs),
+    /// M208: read the latest autopilot run's control-plane state
+    /// (queue, active milestone, lifecycle, stage, target, role, pane
+    /// ids, log path, run outcome). Replaces `mp watch-control status`.
+    Status {
+        /// Summary only (classification + pid_alive). Default false.
+        #[arg(long)]
+        summary: bool,
+    },
+    /// M208: gracefully stop the recorded autopilot run by signaling
+    /// its PID. No-op (stable response) when no live run exists.
+    Stop {
+        /// Override the recorded PID.
+        #[arg(long)]
+        pid: Option<u32>,
+        /// Max seconds to wait before giving up. Default 30s.
+        #[arg(long, default_value_t = 30)]
+        timeout_secs: u64,
+    },
+    /// M208: read bounded, structured output from the active pane.
+    Output {
+        /// Max bytes to read from the pane. Default 4096.
+        #[arg(long, default_value_t = 4096)]
+        max_bytes: usize,
+        /// Max milliseconds to wait for the herdr subprocess to
+        /// produce output. Default 5000ms.
+        #[arg(long, default_value_t = 5_000)]
+        timeout_ms: u64,
+        /// Override the role to read from.
+        #[arg(long)]
+        role: Option<String>,
+    },
+    /// M208: read the latest terminal outcome (run_outcome + per
+    /// milestone outcome log).
+    Result {
+        /// Always read the on-disk file; do not consult any cached
+        /// state from this process. Default false.
+        #[arg(long)]
+        force: bool,
+    },
     /// Per-session folder operations (`<plan_dir>/autopilot/<id>/session.json`).
     Session {
         #[command(subcommand)]
@@ -35,6 +87,45 @@ pub enum AutopilotCmd {
         #[command(subcommand)]
         cmd: AutopilotConfigCmd,
     },
+}
+
+/// M208: `mp autopilot start [IDS]...` — argument shape mirrors the
+/// legacy `mp watch <ids...>` so the deprecation alias can dispatch
+/// through the same code path with identical exit codes and stdout.
+#[derive(Args, Debug)]
+pub struct AutopilotStartArgs {
+    /// One or more milestone IDs to process (e.g. `135` or `M135`).
+    /// Processed sequentially in the order given.
+    #[arg(value_name = "IDS")]
+    pub ids: Vec<String>,
+    /// Print the execution plan (milestone states, next actions,
+    /// herdr commands) without modifying `plan.json` or spawning
+    /// any agents.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Override the structured-log path (default:
+    /// `<plan_dir>/.mp/watch.log`).
+    #[arg(long)]
+    pub log_file: Option<std::path::PathBuf>,
+    /// Max milliseconds the lifecycle poll waits before flagging
+    /// the agent as hung. Default: 1_800_000 (30 min).
+    #[arg(long)]
+    pub stall_timeout_ms: Option<u64>,
+    /// Lifecycle poll interval in milliseconds. Default: 1000.
+    #[arg(long)]
+    pub poll_interval_ms: Option<u64>,
+    /// Re-attach to any herdr role panes that already exist for the
+    /// active milestones. Crash / SIGINT recovery path.
+    #[arg(long, conflicts_with = "force")]
+    pub resume: bool,
+    /// Bypass the double-spawn guard.
+    #[arg(long, conflicts_with = "resume")]
+    pub force: bool,
+    /// Detach-safe mode: client exits once state is persisted; the
+    /// driver runs detached and is re-discoverable via
+    /// `mp autopilot status`.
+    #[arg(long)]
+    pub detach: bool,
 }
 
 /// `mp autopilot session …` subcommands.

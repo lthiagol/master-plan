@@ -31,8 +31,8 @@ use crate::autopilot::{
     RoleState, Topology as AutopilotTopology, TransitionError,
 };
 use crate::cli::{
-    AutopilotCmd, AutopilotConfigCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs,
-    TransitionArgs,
+    AutopilotCmd, AutopilotConfigCmd, AutopilotNoteCmd, AutopilotSessionCmd, AutopilotStartArgs,
+    NoteArgs, TransitionArgs,
 };
 use crate::commands::common::{emit, emit_and_exit_on_fail, emit_fields};
 use crate::config_cmd::{config_get, config_set};
@@ -46,12 +46,60 @@ pub(crate) fn cmd_autopilot(
     fields: &[String],
 ) -> Result<()> {
     match cmd {
+        AutopilotCmd::Start(args) => cmd_autopilot_start(ctx, args, format),
+        AutopilotCmd::Status { summary } => {
+            crate::commands::watch_control::cmd_watch_control_status(ctx, summary, format, fields)
+        }
+        AutopilotCmd::Stop { pid, timeout_secs } => {
+            crate::commands::watch_control::cmd_watch_control_stop(
+                ctx,
+                pid,
+                timeout_secs,
+                format,
+                fields,
+            )
+        }
+        AutopilotCmd::Output {
+            max_bytes,
+            timeout_ms,
+            role,
+        } => crate::commands::watch_control::cmd_watch_control_output(
+            ctx, max_bytes, timeout_ms, role, format, fields,
+        ),
+        AutopilotCmd::Result { force } => {
+            crate::commands::watch_control::cmd_watch_control_result(ctx, force, format, fields)
+        }
         AutopilotCmd::Session { cmd } => cmd_autopilot_session(ctx, cmd, format, fields),
         AutopilotCmd::Note { cmd } => match cmd {
             AutopilotNoteCmd::Add(args) => cmd_autopilot_note_add(ctx, args, format, fields),
         },
         AutopilotCmd::Config { cmd } => cmd_autopilot_config(ctx, cmd, format, fields),
     }
+}
+
+/// M208: `mp autopilot start [IDS]...` dispatches to the same internal
+/// `cmd_watch` that powers `mp watch`. The legacy `mp watch` alias is
+/// a thin wrapper around this function (with a deprecation notice on
+/// stderr). AC-02 contract: identical exit codes + stdout; the only
+/// permitted difference between `mp watch` and `mp autopilot start`
+/// is the single legacy deprecation line on `mp watch` stderr.
+pub(crate) fn cmd_autopilot_start(
+    ctx: &PlanContext,
+    args: AutopilotStartArgs,
+    format: crate::cli::OutputFormat,
+) -> Result<()> {
+    crate::commands::watch::cmd_watch(
+        ctx,
+        args.ids,
+        args.dry_run,
+        args.log_file,
+        args.stall_timeout_ms,
+        args.poll_interval_ms,
+        args.resume,
+        args.force,
+        args.detach,
+        format,
+    )
 }
 
 fn cmd_autopilot_session(
