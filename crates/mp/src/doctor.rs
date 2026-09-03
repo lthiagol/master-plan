@@ -298,6 +298,36 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
         message: herdr_shape.message.clone(),
     });
 
+    // M218 / S04 / AC-04: autopilot herdr hard-gate surface. Doctor
+    // reports the structured gate verdict so the operator sees the
+    // same diagnostic `mp autopilot start` / `mp watch` would
+    // refuse with, without having to actually attempt a drive.
+    // The check is non-blocking for the overall `mp doctor` ok
+    // flag — the gate is enforced at command time, not by doctor.
+    // The four contract surfaces (availability, version, shape,
+    // install/upgrade guidance) are emitted in the message so
+    // `mp doctor` is the operator's single pane-of-glass for
+    // "will the autopilot work?".
+    let autopilot_gate_message = match crate::autopilot::check_autopilot_herdr_gate_default() {
+        Ok(()) => format!(
+            "autopilot herdr gate: ready (herdr {}, ≥ {})",
+            herdr_shape
+                .parsed_version
+                .as_deref()
+                .unwrap_or("(version unknown)"),
+            crate::watch::REQUIRED_HERDR_VERSION_FLOOR
+        ),
+        Err(err) => format!(
+            "autopilot herdr gate: refused ({:?}) — {}",
+            err.reason, err.message
+        ),
+    };
+    checks.push(DoctorCheck {
+        name: "autopilot_herdr_gate".to_string(),
+        ok: herdr_shape.compatible,
+        message: autopilot_gate_message,
+    });
+
     let in_repo = cfg.workflow.plan.in_repo.unwrap_or(true);
     if !in_repo {
         let gitignore = ctx.project_root.join(".gitignore");
