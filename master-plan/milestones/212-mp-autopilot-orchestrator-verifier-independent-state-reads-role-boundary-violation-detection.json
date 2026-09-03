@@ -3,8 +3,8 @@
     "id": "212",
     "title": "mp autopilot orchestrator verifier — independent state-reads + role-boundary violation detection",
     "slug": "mp-autopilot-orchestrator-verifier-independent-state-reads-role-boundary-violation-detection",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -20,7 +20,7 @@
     "effort": "L",
     "risk": "high",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -28,11 +28,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T16:46:26.384600+00:00",
+    "lifecycle_at": "2026-09-03T16:56:37.126107+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-03T12:03:34.662880+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T16:56:43.028371+00:00"
       },
       "draft": {
         "status": "done",
@@ -40,15 +44,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T16:46:26.384601+00:00"
+        "at": "2026-09-03T16:56:43.028371+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T16:56:43.067525+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.058954+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T16:56:43.067527+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T16:56:37.126108+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T16:46:26.384601+00:00"
+        "at": "2026-09-03T16:56:43.028371+00:00"
       },
       "specify": {
         "status": "done",
@@ -333,5 +349,33 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "lint-pipeline",
+      "description": "make lint (cargo clippy --all-targets -- -D warnings) is red on a pre-existing doc comment in crates/mp-model/src/milestone.rs:157-158 introduced by 6204555 (M202 cycle 3). The doc_overindented_list_items lint (Rust 1.98) flags over-indented wrapped doc bullets. M212 does not touch mp-model and the -p mp --tests --no-deps clippy scope is clean. Tracking because it surfaces through make ci after make dev-env. Per orchestrator direction (M209/M211 precedent): file for visibility, resolve with no commit (status=fixed, fixed_in=empty). Recommend a future backlog milestone to normalize the doc comment.",
+      "status": "fixed",
+      "author": "reviewer-212",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03",
+      "anchor": {
+        "path": "crates/mp-model/src/milestone.rs",
+        "new_range": {
+          "start_line": 157,
+          "end_line": 157
+        },
+        "side": "new"
+      },
+      "summary": "pre-existing mp-model/src/milestone.rs:157-158 doc-overindented-list-items lint from M202 cycle 3 (out of scope for M212)",
+      "rationale": "M212 reviewer cold build confirmed: M212 verifier code (crates/mp/src/autopilot/verifier.rs + 8 test targets) is clean for -p mp --tests --no-deps -- -D warnings (exit 0). The mp-model lint is a pre-existing regression from M202 that the runner cannot fix within M212 scope. Filing per M209/M211 precedent so the lint remains visible.",
+      "tags": [
+        "backlog",
+        "lint-pipeline",
+        "out-of-scope"
+      ]
+    }
+  ]
 }
