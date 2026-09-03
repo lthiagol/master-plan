@@ -368,6 +368,11 @@ pub(super) fn run(cli: Cli) -> Result<()> {
             detach,
         } => {
             ctx.ensure_plan_exists()?;
+            // M208: deprecation notice on stderr. The legacy `mp watch`
+            // walks the same code path as `mp autopilot start` so exit
+            // codes and stdout are identical; the only difference is the
+            // single deprecation line below.
+            eprintln!("warning: `mp watch` is deprecated; use `mp autopilot start` instead");
             cmd_watch_mod::cmd_watch(
                 &ctx,
                 ids,
