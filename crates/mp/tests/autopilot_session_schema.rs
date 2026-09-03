@@ -39,7 +39,10 @@ fn load_session_validates_against_embedded_schema() {
     // Re-validate the loaded document against the embedded schema.
     let value = serde_json::to_value(&loaded).unwrap();
     let errs = validate_session_value(&value).unwrap();
-    assert!(errs.is_empty(), "loaded session failed validation: {errs:?}");
+    assert!(
+        errs.is_empty(),
+        "loaded session failed validation: {errs:?}"
+    );
 }
 
 #[test]
@@ -92,7 +95,10 @@ fn load_session_rejects_outside_project_root() {
     )
     .unwrap();
     let err = load_session_from(&foreign_dir, project.path()).unwrap_err();
-    assert!(matches!(err, mp::autopilot::session::SessionLoadError::OutsideProjectRoot { .. }));
+    assert!(matches!(
+        err,
+        mp::autopilot::session::SessionLoadError::OutsideProjectRoot { .. }
+    ));
 }
 
 #[test]
@@ -205,10 +211,7 @@ fn bounded_read_uses_32_mib_session_limit() {
     fs::write(&path, body).unwrap();
     let err = load_session(&ctx, "big").unwrap_err();
     let msg = format!("{err}");
-    assert!(
-        msg.contains("exceeds") || msg.contains("32"),
-        "got {msg}"
-    );
+    assert!(msg.contains("exceeds") || msg.contains("32"), "got {msg}");
 }
 
 #[test]
@@ -228,5 +231,8 @@ fn autopilot_session_value_round_trips_through_typed_struct() {
     expected.last_updated = back.last_updated.clone();
     // The value path is the source of truth for the loader; the
     // typed struct accepts whatever the loader produces.
-    assert_eq!(serde_json::to_value(&back).unwrap(), serde_json::to_value(&expected).unwrap());
+    assert_eq!(
+        serde_json::to_value(&back).unwrap(),
+        serde_json::to_value(&expected).unwrap()
+    );
 }

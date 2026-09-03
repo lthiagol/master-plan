@@ -67,7 +67,7 @@ fn session_status_label(status: &SessionStatus) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::autopilot::session::{save_session, sample_session_for_tests};
+    use crate::autopilot::session::{sample_session_for_tests, save_session};
     use crate::paths::PlanContext;
     use std::path::Path;
     use tempfile::TempDir;

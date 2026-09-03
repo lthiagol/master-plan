@@ -6,7 +6,9 @@
 //! execution_status / spec_status / reviews.json verdict) — survives
 //! serialize -> bounded read -> deserialize without data loss.
 
-use mp::autopilot::{load_session, sample_session_for_tests, save_session, RoleName, SessionStatus};
+use mp::autopilot::{
+    load_session, sample_session_for_tests, save_session, RoleName, SessionStatus,
+};
 use mp::paths::PlanContext;
 use tempfile::TempDir;
 
