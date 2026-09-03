@@ -2443,3 +2443,146 @@ mod m226_ac02 {
     }
 }
 
+mod m226_ac03 {
+    //! AC-03 — topology certification + completion.
+    //!
+    //! - Two-pane: topology_policy returns NoShipWithBacklog mode
+    //!   and allows_ship_with_backlog() is false (M209).
+    //! - One-pane: topology_preflight with a Full milestone and
+    //!   no recorded bypass returns
+    //!   Err(FullMilestoneRequiresReviewer) (M209).
+    //! - Completion: a fresh LifecycleClosure run drives a
+    //!   milestone to lifecycle=complete with per-AC evidence
+    //!   preserved (M223).
+    use super::m226_fixtures::*;
+    use mp::autopilot::lifecycle::{Clock, LifecycleClosure, MilestoneSnapshot};
+    use mp::autopilot::role::{
+        MilestoneKind, ReviewBypassPolicy, Topology, TopologyMode, TopologyPolicy,
+        TopologyPreflightError, topology_policy, topology_preflight,
+    };
+
+    /// Two-pane topology: the policy is NoShipWithBacklog with a
+    /// three-cycle budget. The `allows_ship_with_backlog` flag
+    /// must be false (M209 contract).
+    #[test]
+    fn m226_ac03_two_pane_policy_is_no_ship_with_backlog() {
+        let policy = topology_policy(Topology::TwoAgent);
+        assert_eq!(policy.mode, TopologyMode::NoShipWithBacklog);
+        assert_eq!(policy.cycle_budget, 3);
+        assert!(
+            !policy.allows_ship_with_backlog(),
+            "M226 AC-03 / topology: 2-pane must NOT allow ship-with-backlog"
+        );
+        // The 2-pane mode disables external review (orchestrator +
+        // reviewer share a pane).
+        assert!(
+            !policy.allows_external_review(),
+            "M226 AC-03 / topology: 2-pane review is not independent"
+        );
+        let _ = TopologyPolicy {
+            mode: TopologyMode::NoShipWithBacklog,
+            cycle_budget: 3,
+        };
+    }
+
+    /// One-pane topology: the preflight gate rejects a Full
+    /// milestone without a recorded review-bypass policy
+    /// (M209 contract). A track milestone is accepted; a recorded
+    /// bypass is honored for Full milestones.
+    #[test]
+    fn m226_ac03_one_pane_full_milestone_rejected_without_recorded_bypass() {
+        // No bypass → rejected with FullMilestoneRequiresReviewer.
+        let err = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap_err();
+        match err {
+            TopologyPreflightError::FullMilestoneRequiresReviewer { policy } => {
+                assert_eq!(policy.mode, TopologyMode::SingleAgentTrackOnly);
+                assert_eq!(policy.cycle_budget, 2);
+            }
+            other => panic!(
+                "M226 AC-03 / topology: 1-pane Full must be rejected with FullMilestoneRequiresReviewer, got {other:?}"
+            ),
+        }
+        // Unrecorded bypass is a no-op for 1-pane Full — the M209
+        // contract says only *recorded* bypasses are honored.
+        let err_unrecorded = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::Unrecorded,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err_unrecorded,
+            TopologyPreflightError::FullMilestoneRequiresReviewer { .. }
+        ));
+        // Track milestone is accepted under every topology.
+        let policy_track =
+            topology_preflight(Topology::OneAgent, MilestoneKind::Track, ReviewBypassPolicy::None)
+                .unwrap();
+        assert_eq!(policy_track.mode, TopologyMode::SingleAgentTrackOnly);
+        // Recorded bypass is honored.
+        let policy_recorded = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::Recorded,
+        )
+        .unwrap();
+        assert_eq!(policy_recorded.mode, TopologyMode::SingleAgentTrackOnly);
+    }
+
+    /// Three-pane + Full: the FullMatrix policy is honored and
+    /// the gate returns Ok. The cycle budget is 4 (M209 default).
+    #[test]
+    fn m226_ac03_three_pane_full_milestone_accepted_under_full_matrix() {
+        let policy = topology_preflight(
+            Topology::ThreeAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap();
+        assert_eq!(policy.mode, TopologyMode::FullMatrix);
+        assert_eq!(policy.cycle_budget, 4);
+        assert!(policy.allows_ship_with_backlog());
+        assert!(policy.allows_external_review());
+    }
+
+    /// Completion: a fresh LifecycleClosure run drives a milestone
+    /// to lifecycle=complete with per-AC evidence preserved.
+    /// This pins the M223 closure protocol as the
+    /// topology-respecting completion ceremony: each AC carries
+    /// a distinct cargo nextest command and reaches `passed`
+    /// status. The terminal summary reaches
+    /// ClosureOutcome::reached_complete() == true.
+    #[test]
+    fn m226_ac03_three_pane_drive_to_complete_preserves_evidence() {
+        let commits = CommitIndexFixture::standard();
+        let snapshot =
+            MilestoneSnapshot::ready_for_closure("226-C", &["S1", "S2"], &["AC-01", "AC-02"]);
+        let mut closure = LifecycleClosure::new(snapshot, &commits);
+        let plan = plan_full(
+            "226-C",
+            &["S1", "S2"],
+            &["AC-01", "AC-02"],
+            &[],
+            "R-226C",
+            "sha-fix-1",
+            1,
+        );
+        let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        // ClosureOutcome::reached_complete is the terminal
+        // summary that the certification pins.
+        assert!(
+            outcome.reached_complete(),
+            "M226 AC-03 / completion: drive must reach complete"
+        );
+        assert_evidence_preserved(&closure.milestone, &["AC-01", "AC-02"]);
+        // Independent reviewer attribution recorded.
+        let review = closure.milestone.review("R-226C").unwrap();
+        assert_eq!(review.status, "passed");
+        assert!(review.actor.contains("reviewer-pane"));
+    }
+}
