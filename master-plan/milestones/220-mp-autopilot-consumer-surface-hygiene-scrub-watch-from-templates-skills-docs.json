@@ -3,8 +3,8 @@
     "id": "220",
     "title": "mp autopilot consumer-surface hygiene — scrub `Watch` from templates, skills, docs",
     "slug": "mp-autopilot-consumer-surface-hygiene-scrub-watch-from-templates-skills-docs",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -29,7 +29,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -37,11 +37,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T20:28:03.955237+00:00",
+    "lifecycle_at": "2026-09-03T20:34:47.024371+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:03.006438+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T20:34:50.747650+00:00"
       },
       "draft": {
         "status": "done",
@@ -49,15 +53,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T20:28:03.955239+00:00"
+        "at": "2026-09-03T20:34:50.747650+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T20:34:50.782578+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.343526+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T20:34:50.782580+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T20:34:47.024373+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T20:28:03.955239+00:00"
+        "at": "2026-09-03T20:34:50.747650+00:00"
       },
       "specify": {
         "status": "done",
@@ -235,5 +251,18 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "clippy-doc-lint",
+      "description": "Pre-existing `clippy::doc-overindented-list-items` failure in `crates/mp-model/src/milestone.rs:157-158` (introduced by M202 commit 6204555). `cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings` exits 101; `make lint` (which runs the same target) fails for the same reason. M220 did NOT introduce this — last modification to `crates/mp-model/src/milestone.rs` is the M202 commit; none of M220's 7 commits touched the file. Runner's evidence and R5 pre-notify gate both skipped `make lint`, so the failure went unreported. Per orchestrator's M220 review brief, this is OUT OF SCOPE (M202 doc lint) and should be tracked as a low-severity backlog for the next M202 pass or a generic doc-lint sweep.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    }
+  ]
 }

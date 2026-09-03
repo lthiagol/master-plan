@@ -1967,6 +1967,14 @@
       "reviewed_at": "2026-09-03",
       "notes": "All 4 ACs verified via cold-build (make clean + cargo nextest). 9/9, 12/12, 9/9, 10/10 all pass. Exit code 78 (EX_CONFIG) verified live for mp autopilot start and mp watch. Shared gate between cmd_autopilot_start and cmd watch pinned by black-box tests. Install hint clear. --force does NOT bypass the gate (verified live). Doctor surfaces the gate verdict non-mutating. F-01 (low): doctor message uses {:?} (Debug) for GateReason instead of the kebab-case the JSON envelope uses; resolved as low-priority cosmetic nit safe to defer.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "220",
+      "verdict": "ok",
+      "reviewer": "reviewer-220",
+      "reviewed_at": "2026-09-03",
+      "notes": "Cold build clean. AC-01/02 (consumer-surface-lint): exit 0; AC-03 (install_autopilot_templates): 9/9 pass; AC-04 (suite_init): 33/33 pass. Allowlist audit: 9 stale-Watch hits all legitimately anchor to literal raul lane labels (6) or imperative-verb English in diagnosing-bugs (3). install_autopilot_templates promoted cleanly to crates/mp/tests/ (no raul, no --dev). Role triad (orchestrator/runner/reviewer) consistent with M209 Role enum; legacy coordinator explicitly distinguished. Filed F-01 low-severity backlog (pre-existing M202 doc lint in mp-model/src/milestone.rs:157-158, OUT OF SCOPE per orchestrator brief); resolved without code change per same brief — tracked for next M202 pass.",
+      "milestone_completed_at": "2026-09-03"
     }
   ],
   "comments": [
