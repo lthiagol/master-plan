@@ -65,11 +65,23 @@ impl UiConfig {
     /// raul is read-only; UI prefs live in mp's config so they persist without
     /// raul writing files. Falls back to defaults on any error.
     pub fn load(runner: &MpRunner) -> Self {
-        let mut cfg = Self::default();
         let data: Value = match runner.run("config", &["show"]) {
             Ok(v) => v,
-            Err(_) => return cfg,
+            Err(_) => return Self::default(),
         };
+        Self::from_config_payload(&data)
+    }
+
+    /// Parse a `UiConfig` from a raw `mp config show` JSON payload.
+    /// Extracted from [`UiConfig::load`] so the M214 single-read
+    /// back-compat shim (`ui.show_watch_tab` →
+    /// `ui.show_autopilot_tab`) is unit-testable without a real
+    /// `MpRunner`. Public so the migration test in
+    /// `crates/raul/tests/autopilot_settings_key_migration.rs` can
+    /// pin both the legacy-key fallback and the new-key-wins
+    /// precedence.
+    pub fn from_config_payload(data: &Value) -> Self {
+        let mut cfg = Self::default();
         let ui = &data["config"]["ui"];
         if let Some(c) = ui["color"].as_bool() {
             cfg.color = c;

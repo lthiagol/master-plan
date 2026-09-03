@@ -77,8 +77,8 @@
       "id": "AC-02",
       "description": "ui.show_autopilot_tab controls visibility. If it is absent and ui.show_watch_tab exists, reads use the legacy value without rewriting; the next explicit Settings save persists the new key. When both exist, the new key wins.",
       "verification": "cargo nextest run -p raul --test autopilot_settings_key_migration --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_settings_key_migration --no-fail-fast exit 0 (6/6 pass)"
     },
     {
       "id": "AC-03",
@@ -152,7 +152,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_settings_key_migration --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 214 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
