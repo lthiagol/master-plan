@@ -74,7 +74,83 @@ pub(crate) fn cmd_autopilot(
             AutopilotNoteCmd::Add(args) => cmd_autopilot_note_add(ctx, args, format, fields),
         },
         AutopilotCmd::Config { cmd } => cmd_autopilot_config(ctx, cmd, format, fields),
+        AutopilotCmd::Migrate { dry_run } => cmd_autopilot_migrate(ctx, dry_run, format),
     }
+}
+
+/// M208 / S4: dispatch for `mp autopilot migrate [--dry-run]`.
+/// Surface the typed migration outcome as JSON. The dry-run variant
+/// inspects the legacy file and reports counts without writing; the
+/// real run applies the migration idempotently.
+fn cmd_autopilot_migrate(
+    ctx: &PlanContext,
+    dry_run: bool,
+    format: crate::cli::OutputFormat,
+) -> Result<()> {
+    use crate::autopilot::migrate;
+    let source_path = crate::watch::default_state_path(&ctx.plan_dir);
+    if dry_run {
+        if !source_path.exists() {
+            return emit(
+                format,
+                &json!({
+                    "ok": true,
+                    "dry_run": true,
+                    "outcome": crate::autopilot::MigrationOutcome::NoLegacyState { source_path },
+                }),
+            );
+        }
+        // Inspect the legacy file without writing.
+        let raw = std::fs::read(&source_path)
+            .with_context(|| format!("read legacy watch state at {}", source_path.display()))?;
+        let state: crate::watch::state::WatchState = serde_json::from_slice(&raw)
+            .with_context(|| format!("parse legacy watch state at {}", source_path.display()))?;
+        return emit(
+            format,
+            &json!({
+                "ok": true,
+                "dry_run": true,
+                "outcome": {
+                    "kind": "would_migrate",
+                    "source_path": source_path,
+                    "milestones": state.milestones.len(),
+                    "panes": state.panes.len(),
+                    "schema_version": state.schema_version,
+                },
+            }),
+        );
+    }
+
+    let outcome = match migrate::migrate_legacy_watch_state(ctx) {
+        Ok(o) => o,
+        Err(migrate::MigrationError::CorruptSource { path, reason }) => {
+            bail!(
+                "legacy watch state at {} is corrupt: {}",
+                path.display(),
+                reason
+            )
+        }
+        Err(migrate::MigrationError::UnknownLegacySchema {
+            path,
+            found,
+            expected,
+        }) => bail!(
+            "unknown legacy schema version {found} in {} (expected {expected})",
+            path.display()
+        ),
+        Err(migrate::MigrationError::MigratedSessionInvalid(s)) => {
+            bail!("migration produced an invalid session: {s}")
+        }
+        Err(migrate::MigrationError::Refused(s)) => bail!("migration refused: {s}"),
+    };
+    emit(
+        format,
+        &json!({
+            "ok": true,
+            "dry_run": false,
+            "outcome": outcome,
+        }),
+    )
 }
 
 /// M208: `mp autopilot start [IDS]...` dispatches to the same internal

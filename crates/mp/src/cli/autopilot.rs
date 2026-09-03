@@ -87,6 +87,15 @@ pub enum AutopilotCmd {
         #[command(subcommand)]
         cmd: AutopilotConfigCmd,
     },
+    /// M208 / S4: migrate the legacy `mp watch` state file
+    /// (`.mp/watch.state.json`) into the autopilot session schema.
+    /// Idempotent — re-running on a project that already has the
+    /// migrated session is a no-op.
+    Migrate {
+        /// Preview without writing. Default false.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// M208: `mp autopilot start [IDS]...` — argument shape mirrors the
