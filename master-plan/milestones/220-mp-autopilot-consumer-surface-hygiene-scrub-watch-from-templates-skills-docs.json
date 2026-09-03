@@ -94,7 +94,7 @@
     {
       "id": "AC-03",
       "description": "An isolated-HOME install fixture copies refreshed skills and harness templates and asserts canonical Autopilot terminology without mutating the developer global configuration.",
-      "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test install_autopilot_templates --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
