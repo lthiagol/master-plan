@@ -29,6 +29,13 @@
 //!   against the session's pane layout before any spawn, and
 //!   appends an `AssignmentDispatched` event after the spawn
 //!   outcome is known.
+//! - [`verifier`] — M212's independent state-reads + role-boundary
+//!   violation detection. Cross-checks milestone JSON,
+//!   `reviews.json`, and `activity.json` for every lane notification
+//!   and surfaces typed violations (7 named detectors +
+//!   lifecycle-claim unbacked, unknown actor, evidence contract,
+//!   command-list). Topology-aware remediation lives in
+//!   [`recommend_remediation`].
 //!
 //! The on-disk shape is validated against
 //! `schemas/autopilot-session.schema.json`; that file is the source of
@@ -53,6 +60,7 @@ pub mod schema;
 pub mod session;
 pub mod task_assign;
 pub mod transitions;
+pub mod verifier;
 
 pub use ac_projection::{
     canonical_revision, project_ac_status, AcProjection, AcStatus, PerMilestoneProjections,
@@ -91,4 +99,19 @@ pub use task_assign::{
 pub use transitions::{
     is_valid as is_valid_transition, transition as apply_transition, RoleState, RoleStateRecord,
     TransitionError, TransitionOutcome,
+};
+pub use verifier::{
+    check_command_list, check_evidence_contract, check_evidence_not_overwritten,
+    check_notification, cross_check_state, detect_orchestrator_code_edit_violation,
+    detect_pre_start_notification_violation, detect_reviewer_code_edit_violation,
+    detect_reviewer_premature_pass_violation, detect_runner_claim_violation,
+    detect_runner_plan_edit_violation, detect_runner_review_violation, git_log_for_path,
+    recommend_remediation, validate_evidence_shape, violations_to_json, ActorAttribution,
+    AttributionError, CrossCheckMismatch, EvidenceContractViolation, EvidenceShapeError,
+    Lane, LaneNotification, LifecycleClaimUnbacked, List as ViolationList,
+    OrchestratorCodeEditViolation, PreStartNotificationViolation, Remediation,
+    ReviewerCodeEditViolation, ReviewerPrematurePassViolation, RunnerClaimViolation,
+    RunnerPlanEditViolation, RunnerReviewViolation, UnknownActorViolation,
+    UnsupportedCommandOperator, Verdict, VerifierInputs, VerifierState, VerificationCommand,
+    Violation,
 };
