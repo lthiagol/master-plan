@@ -3,9 +3,9 @@
     "id": "207",
     "title": "mp autopilot session.json schema — durable per-session state for autopilot drives",
     "slug": "mp-autopilot-session-json-schema-durable-per-session-state-for-autopilot-drives",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,7 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.489148+00:00",
+    "lifecycle_at": "2026-09-03T15:28:51.080717+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -33,9 +33,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:28.873605+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T15:28:51.080720+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.873605+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T15:28:51.080720+00:00"
       },
       "specify": {
         "status": "done",
@@ -68,57 +76,57 @@
       "id": "AC-01",
       "description": "Autopilot session I/O validates against mini_schema, uses the shared bounded-read primitive with one explicit 32 MiB session limit, enforces project-root containment, and writes atomically.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_schema --no-fail-fast exit 0 (20/20 pass)"
     },
     {
       "id": "AC-02",
       "description": "A sample session.json with the full schema (3-pane topology, 2 milestones in queue, role config snapshots, evidence_refs pointing at lifecycle / execution_status / spec_status / reviews.json verdict) round-trips through read+write without data loss.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_roundtrip --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-03",
       "description": "`mp autopilot session list` shows all sessions in the plan with id, status, last_updated; `mp autopilot session show <id>` renders the full session.json in canonical view.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_cli --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-04",
       "description": "session.json includes runner_notes with typed kinds, body, cycle, and timestamp. `mp autopilot note` requires `--cycle` or derives it from the active queue item and rejects notes when neither is available.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_runner_notes --no-fail-fast exit 0 (13/13 pass)"
     },
     {
       "id": "AC-05",
       "description": "Per-milestone AC status is synchronized transactionally from the canonical milestone criterion state; session.json stores a projection plus source revision, and stale/conflicting `record-ac` writes are rejected rather than creating a second authority.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_ac_projection --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-06",
       "description": "Every role-state transition is performed through `mp autopilot session transition <session> --role <role> --state <state> [--working-on <value>]`; direct session-file edits are unnecessary. Valid transitions, actor metadata, timestamps, and invalid-transition rejection are tested.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_transitions --no-fail-fast exit 0 (12/12 pass)"
     },
     {
       "id": "AC-07",
       "description": "Each session has an append-only, sequence-numbered event log for dispatches, role transitions, reviews, decisions, controls, notes, and recovery. Writes use temp-file + fsync + atomic rename; interrupted writes recover the last valid revision without truncating prior events.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_recovery --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-08",
       "description": "The documented session schema includes role state, working_on, prompt bundles, controls, last_state_change_at, event cursor/history, queue cycle history, terminal statuses, and version migration behavior consumed by M210-M217.",
       "verification": "cargo nextest run -p mp --test watch_state_file --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_session_full_contract --no-fail-fast exit 0 (15/15 pass)"
     }
   ],
   "design_decisions": [
@@ -319,7 +327,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
