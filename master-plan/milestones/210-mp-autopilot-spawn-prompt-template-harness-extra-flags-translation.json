@@ -3,9 +3,9 @@
     "id": "210",
     "title": "mp autopilot spawn-prompt template + harness-extra-flags translation",
     "slug": "mp-autopilot-spawn-prompt-template-harness-extra-flags-translation",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -28,7 +28,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.628052+00:00",
+    "lifecycle_at": "2026-09-03T19:37:19.188212+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -38,9 +38,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:28.983416+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T19:37:19.188214+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.983416+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T19:37:19.188214+00:00"
       },
       "specify": {
         "status": "done",
@@ -74,50 +82,50 @@
       "id": "AC-01",
       "description": "Spawn-prompt rendering is deterministic: same RoleConfig + session.json slice → byte-identical prompt string. Golden-file tests cover all three roles in 3-pane, plus the O+V concatenation for 2-pane and O+R+V for 1-pane.",
       "verification": "cargo nextest run -p mp --test spawn_prompt_golden --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test spawn_prompt_golden --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-02",
       "description": "Each rendered spawn prompt contains project/session/milestone identity, role and skill, explicit role boundaries, M211 task-assignment contract, and the exact `mp autopilot session transition` commands the role must use; prompts never direct agents to edit session.json directly.",
       "verification": "cargo nextest run -p mp --test spawn_prompt_contains --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test spawn_prompt_contains --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-03",
       "description": "`harness_extra_flags` returns a documented argv list for opencode, Cursor, and Pi, including exact skill/agent and model translation; unsupported harnesses fail before pane creation.",
       "verification": "cargo nextest run -p mp --test harness_extra_flags --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test harness_extra_flags --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-04",
       "description": "Spawning stores both per-role source prompts and the exact bundled prompt delivered to each physical pane, so collapsed topologies are auditable through session show.",
       "verification": "cargo nextest run -p mp --test autopilot_spawn_prompt_audit --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_spawn_prompt_audit --no-fail-fast exit 0 (5/5 pass)"
     },
     {
       "id": "AC-05",
       "description": "Each role prompt contains valid typed session-transition commands and allowed states from M207; golden tests reject unknown states, direct session-file edits, and missing actor/session identity.",
       "verification": "cargo nextest run -p mp --test spawn_prompt_state_contract --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test spawn_prompt_state_contract --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-06",
       "description": "`mp autopilot start` creates or reuses the named herdr workspace, creates the topology pane slots, starts the configured harness in each pane with the rendered prompt, persists pane IDs only after successful starts, and rolls back partial creation on failure.",
       "verification": "cargo nextest run -p mp --test autopilot_spawn_pipeline --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_spawn_pipeline --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-07",
       "description": "Session provenance records the executing mp binary path, version, and build/schema compatibility. A stale binary that cannot preserve the M207 schema is rejected before any plan write with an actionable rebuild/install hint.",
       "verification": "cargo nextest run -p mp --test autopilot_binary_provenance --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_binary_provenance --no-fail-fast exit 0 (8/8 pass)"
     }
   ],
   "design_decisions": [
@@ -156,7 +164,7 @@
       ],
       "tests": "cargo nextest run -p mp --test spawn_prompt_golden --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 210 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -176,7 +184,7 @@
       ],
       "tests": "cargo nextest run -p mp --test spawn_prompt_contains --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 210 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -196,7 +204,7 @@
       ],
       "tests": "cargo nextest run -p mp --test harness_extra_flags --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 210 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -216,7 +224,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_spawn_prompt_audit --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 210 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -236,7 +244,7 @@
       ],
       "tests": "cargo nextest run -p mp --test spawn_prompt_state_contract --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 210 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -257,7 +265,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_spawn_pipeline --no-fail-fast",
       "done_when": "AC-06 passes for one-, two-, and three-pane fixtures plus partial failure.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -278,7 +286,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_binary_provenance --no-fail-fast",
       "done_when": "AC-07 passes with no plan mutation on rejection.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -290,7 +298,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
