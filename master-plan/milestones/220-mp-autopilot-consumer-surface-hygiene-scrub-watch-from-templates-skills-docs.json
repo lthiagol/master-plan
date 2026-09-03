@@ -3,9 +3,9 @@
     "id": "220",
     "title": "mp autopilot consumer-surface hygiene — scrub `Watch` from templates, skills, docs",
     "slug": "mp-autopilot-consumer-surface-hygiene-scrub-watch-from-templates-skills-docs",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -37,7 +37,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:24:31.851367+00:00",
+    "lifecycle_at": "2026-09-03T20:28:03.955237+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -47,9 +47,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.343526+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T20:28:03.955239+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.343526+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T20:28:03.955239+00:00"
       },
       "specify": {
         "status": "done",
@@ -81,29 +89,29 @@
       "id": "AC-01",
       "description": "Consumer files use Autopilot terminology for canonical commands, lane names, skills, and examples. Intentional compatibility references to `mp watch` are allowed only in the dedicated migration/deprecation documentation and must include the replacement command.",
       "verification": "make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make consumer-surface-lint exit 0 (5 patterns clean; stale-watch pattern absorbed 9 allowlisted hits: 6 literal Watch lane label refs + 3 imperative-verb English uses)"
     },
     {
       "id": "AC-02",
       "description": "`make consumer-surface-lint` passes — no internal milestone IDs (MXXX), no lesson codes (LXX), no stale `Watch` references in the consumer surface.",
       "verification": "make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make consumer-surface-lint exit 0 (5 patterns clean: milestone-id, lesson-code, dead-code-review-lessons, dead-dogfood, stale-watch; 9 stale-Watch refs allowlisted as literal lane label / CLI alias / imperative-verb English)"
     },
     {
       "id": "AC-03",
       "description": "An isolated-HOME install fixture copies refreshed skills and harness templates and asserts canonical Autopilot terminology without mutating the developer global configuration.",
       "verification": "cargo nextest run -p mp --test install_autopilot_templates --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test install_autopilot_templates --no-fail-fast exit 0 (9/9 pass: install_autopilot_copies_canonical_skills_into_isolated_root, install_autopilot_catalog_skills_land_in_isolated_root, install_autopilot_harness_templates_use_canonical_terminology, installed_autopilot_skills_have_no_stale_watch_in_descriptions, plus 5 common::* helpers)"
     },
     {
       "id": "AC-04",
       "description": "Installed consumer skills include distinct mp-orchestrator and mp-reviewer roles plus updated mp-runner/mp-flow bindings; role permissions and hand-off commands match the M209/M211/M212/M213 contracts and no stale coordinator-as-orchestrator contract remains.",
       "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_init --no-fail-fast exit 0 (33/33 pass: 28 init_* tests covering init_empty_collections, init_from_repo_markdown, init_json, init_plan_dir, init_refresh, init_root_agents, init_transactional; 5 common::* helpers)"
     }
   ],
   "design_decisions": [
@@ -141,7 +149,7 @@
       ],
       "tests": "make consumer-surface-lint",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 220 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -165,7 +173,7 @@
       ],
       "tests": "make consumer-surface-lint",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 220 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -188,7 +196,7 @@
       ],
       "tests": "cargo nextest run -p mp --test install_autopilot_templates --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 220 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -212,7 +220,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_init --no-fail-fast",
       "done_when": "AC-04 proves installed skill topology and commands match runtime roles.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -224,7 +232,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
