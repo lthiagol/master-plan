@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://master-plan.dev/schemas/autopilot-session.schema.json",
+  "title": "AutopilotSession",
+  "description": "M207: durable per-session state for mp autopilot drives. Per-session folder at master-plan/autopilot/<id>/session.json. Milestone criterion state and review records remain canonical; this file stores revisioned projections and append-only orchestration events.",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "topology",
+    "roles",
+    "queue",
+    "status",
+    "last_updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Session id. Same slug rules as session_id elsewhere in mp."
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped on any breaking change. Loaders reject unknown versions."
+    },
+    "herdr_workspace": {
+      "type": "string",
+      "description": "herdr workspace name (e.g. <project>-autopilot)."
+    },
+    "topology": {
+      "type": "object",
+      "required": ["orchestrator", "runner", "reviewer"],
+      "description": "Live pane ids for each role. Three-pane topology is the v1 default.",
+      "properties": {
+        "orchestrator": { "$ref": "#/$defs/pane_ref" },
+        "runner": { "$ref": "#/$defs/pane_ref" },
+        "reviewer": { "$ref": "#/$defs/pane_ref" }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "required": ["orchestrator", "runner", "reviewer"],
+      "description": "Per-role config snapshots so re-spawn reuses the same model/harness/skill.",
+      "properties": {
+        "orchestrator": { "$ref": "#/$defs/role_config" },
+        "runner": { "$ref": "#/$defs/role_config" },
+        "reviewer": { "$ref": "#/$defs/role_config" }
+      }
+    },
+    "config_overrides": {
+      "type": "object",
+      "description": "Free-form overrides consumed by the autopilot driver. Future milestones extend this shape.",
+      "properties": {
+        "topology": { "type": "string" },
+        "stall_timeout_ms": { "type": "integer", "minimum": 0 },
+        "poll_interval_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "queue": {
+      "type": "array",
+      "description": "Ordered list of milestones the session is driving. Per-milestone sub-state is a typed object (not a sparse map) so the verifier sees a stable shape regardless of which milestone it inspects.",
+      "items": { "$ref": "#/$defs/queue_item" },
+      "minItems": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "paused", "stopped", "completed", "failed"],
+      "description": "Terminal statuses are completed / failed / cancelled (see terminal_status)."
+    },
+    "terminal_status": {
+      "type": "string",
+      "enum": ["completed", "failed", "cancelled"],
+      "description": "Set when the session reaches a terminal state; cleared on resume."
+    },
+    "started_at": { "type": "string" },
+    "last_updated": { "type": "string", "description": "RFC3339 timestamp of the last mutation." },
+    "last_state_change_at": {
+      "type": "string",
+      "description": "RFC3339 timestamp of the last role-state transition. Distinct from last_updated: updates can happen without role state changing."
+    },
+    "role_state": {
+      "$ref": "#/$defs/role_states",
+      "description": "Latest observed role-state per role. Transitions are recorded in events."
+    },
+    "working_on": {
+      "$ref": "#/$defs/working_on",
+      "description": "The (milestone_id, cycle) the runner/coordinator is currently driving. Cleared on idle."
+    },
+    "prompt_bundles": {
+      "type": "object",
+      "description": "Per-stage prompt bundle snapshots (e.g. stage -> template hash)."
+    },
+    "controls": {
+      "$ref": "#/$defs/controls",
+      "description": "Pause / resume / force-cancel controls."
+    },
+    "runner_notes": {
+      "type": "array",
+      "description": "Typed notes the runner leaves for the reviewer. Each note requires a kind, body, and timestamp; cycle is required or derived from working_on.",
+      "items": { "$ref": "#/$defs/runner_note" }
+    },
+    "events": {
+      "type": "array",
+      "description": "Append-only sequence-numbered event log (dispatch, transition, review, decision, control, note, recovery).",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "event_cursor": {
+      "type": "object",
+      "description": "Highest sequence number in events. Strictly monotonic; recovery uses this to detect torn writes.",
+      "required": ["last_seq"],
+      "properties": {
+        "last_seq": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ac_projections": {
+      "type": "object",
+      "description": "Map of milestone_id -> (AC id -> projection). source_revision lets the next sync detect stale writes from racing callers."
+    },
+    "queue_cycle_history": {
+      "type": "array",
+      "description": "Per-cycle record of (milestone, cycle, started_at, completed_at?, outcome).",
+      "items": { "$ref": "#/$defs/cycle_history_entry" }
+    },
+    "schema_migrations": {
+      "type": "array",
+      "description": "Audit of schema_version bumps the file has been through. Append-only.",
+      "items": {
+        "type": "object",
+        "required": ["from_version", "to_version", "at"],
+        "properties": {
+          "from_version": { "type": "integer" },
+          "to_version": { "type": "integer" },
+          "at": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pane_ref": {
+      "type": "object",
+      "required": ["pane_id"],
+      "properties": {
+        "pane_id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" }
+      }
+    },
+    "role_config": {
+      "type": "object",
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["orchestrator", "runner", "reviewer"]
+        },
+        "pane_id": { "type": "string" },
+        "model": { "type": "string" },
+        "harness": { "type": "string" },
+        "skill": { "type": "string" },
+        "config_hash": { "type": "string" }
+      }
+    },
+    "queue_item": {
+      "type": "object",
+      "required": ["milestone_id", "stage", "cycle"],
+      "properties": {
+        "milestone_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9]{2,}(\\.[0-9]+)*$"
+        },
+        "stage": {
+          "type": "string",
+          "enum": ["pending", "in-progress", "executed", "self-reviewed", "reviewed", "complete"]
+        },
+        "cycle": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_notify": { "type": "string" },
+        "verifier_verdict": { "type": "string" },
+        "evidence_refs": {
+          "type": "object",
+          "description": "Pointers to canonical sources of truth so a verifier can cross-check without trusting the projection.",
+          "properties": {
+            "lifecycle": { "type": "string" },
+            "execution_status": { "type": "string" },
+            "spec_status": { "type": "string" },
+            "reviews_verdict": { "type": "string" }
+          }
+        }
+      }
+    },
+    "role_states": {
+      "type": "object",
+      "properties": {
+        "orchestrator": { "$ref": "#/$defs/role_state_record" },
+        "runner": { "$ref": "#/$defs/role_state_record" },
+        "reviewer": { "$ref": "#/$defs/role_state_record" }
+      }
+    },
+    "role_state_record": {
+      "type": "object",
+      "required": ["role", "state"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["orchestrator", "runner", "reviewer"]
+        },
+        "state": {
+          "type": "string",
+          "enum": ["idle", "starting", "working", "blocked", "done", "unknown"]
+        },
+        "since": { "type": "string" },
+        "actor": { "type": "string" },
+        "working_on": { "$ref": "#/$defs/working_on" }
+      }
+    },
+    "working_on": {
+      "type": "object",
+      "required": ["milestone_id", "cycle"],
+      "properties": {
+        "milestone_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cycle": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": ["orchestrator", "runner", "reviewer"]
+        }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "properties": {
+        "paused": { "type": "boolean" },
+        "pause_reason": { "type": "string" },
+        "resume_after": { "type": "string" }
+      }
+    },
+    "runner_note": {
+      "type": "object",
+      "required": ["kind", "body", "timestamp"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["info", "warn", "blocker", "decision", "reminder", "system"]
+        },
+        "body": { "type": "string", "minLength": 1 },
+        "cycle": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "milestone_id": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["seq", "kind", "at"],
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Strictly monotonic per session."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dispatch",
+            "transition",
+            "review",
+            "decision",
+            "control",
+            "note",
+            "recovery"
+          ]
+        },
+        "at": { "type": "string" },
+        "actor": { "type": "string" },
+        "session_id": { "type": "string" },
+        "role": {
+          "type": "string",
+          "enum": ["orchestrator", "runner", "reviewer"]
+        },
+        "milestone_id": { "type": "string" },
+        "cycle": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "payload": { "type": "object" }
+      }
+    },
+    "ac_projection_map": {
+      "type": "object"
+    },
+    "ac_projection": {
+      "type": "object",
+      "required": ["ac_id", "status", "source_revision"],
+      "properties": {
+        "ac_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^AC-[0-9]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in-progress", "passed", "failed", "blocked"]
+        },
+        "evidence": { "type": "string" },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Revision key the projection was sourced from (e.g. <plan-dir-hash>:<milestone-rev>). The next sync must compare against this to reject stale writes."
+        },
+        "projected_at": { "type": "string" }
+      }
+    },
+    "cycle_history_entry": {
+      "type": "object",
+      "required": ["milestone_id", "cycle", "started_at"],
+      "properties": {
+        "milestone_id": { "type": "string", "minLength": 1 },
+        "cycle": { "type": "integer", "minimum": 1 },
+        "started_at": { "type": "string" },
+        "completed_at": { "type": "string" },
+        "outcome": { "type": "string" }
+      }
+    }
+  }
+}

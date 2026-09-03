@@ -1,6 +1,7 @@
 pub mod ac_verify;
 pub mod activity;
 pub mod annotation;
+pub mod autopilot;
 pub mod integration_test_map;
 pub use mp_model;
 pub mod backlog;
