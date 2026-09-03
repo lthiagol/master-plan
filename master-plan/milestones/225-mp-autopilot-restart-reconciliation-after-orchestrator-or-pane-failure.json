@@ -3,9 +3,9 @@
     "id": "225",
     "title": "mp autopilot restart + reconciliation after orchestrator or pane failure",
     "slug": "mp-autopilot-restart-reconciliation-after-orchestrator-or-pane-failure",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -28,7 +28,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T14:12:35.205735+00:00",
+    "lifecycle_at": "2026-09-03T21:57:54.385702+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -38,9 +38,17 @@
         "status": "done",
         "at": "2026-09-03T14:13:30.925071+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T21:57:54.385704+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:13:31.018751+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T21:57:54.385704+00:00"
       },
       "specify": {
         "status": "done",
@@ -70,29 +78,29 @@
       "id": "AC-01",
       "description": "Resume after orchestrator SIGINT continues from the last durable event without duplicate assignment or lifecycle command.",
       "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_resume -E 'test(/m225_ac01/)' --no-fail-fast exit 0 (1/1 pass)"
     },
     {
       "id": "AC-02",
       "description": "Missing/dead panes are classified by role and topology; safe respawn uses the stored prompt and actor rotation, while unsafe ambiguity escalates AwaitingUser.",
       "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_resume -E 'test(/m225_ac02/)' --no-fail-fast exit 0 (1/1 pass)"
     },
     {
       "id": "AC-03",
       "description": "A corrupt or partial event tail recovers the last valid sequence without truncating prior events; incompatible schema/binary fails before mutation.",
       "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_resume -E 'test(/m225_ac03/)' --no-fail-fast exit 0 (1/1 pass)"
     },
     {
       "id": "AC-04",
       "description": "Reconciliation cross-checks canonical criterion/review/lifecycle state and never restores stale session projections over newer plan evidence.",
       "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_resume -E 'test(/m225_ac04/)' --no-fail-fast exit 0 (1/1 pass)"
     }
   ],
   "design_decisions": [
@@ -122,7 +130,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
       "done_when": "AC-01 resumes without duplicate effects.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -143,7 +151,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
       "done_when": "AC-02 covers each topology and pane-loss role.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -166,7 +174,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
       "done_when": "AC-03 preserves prior events and makes no mutation on incompatibility.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -189,7 +197,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
       "done_when": "AC-04 proves canonical newer evidence wins.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -204,7 +212,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
