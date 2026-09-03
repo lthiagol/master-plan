@@ -711,3 +711,111 @@ Closing the M211 tab, building a fresh one for M212. M212 is the BIG milestone i
 ### Going idle
 
 Closing the M212 tab, building a fresh one for M213 (the last of the 5). M213 is the cycle flow + decision matrix — the cycle engine itself, which consumes all the foundation work from M207-M212.
+
+---
+
+## 2026-09-03 ~16:45 — M213 cycle 1 review: ok. Milestone COMPLETE. 5-of-5 foundation done. SESSION RETROSPECTIVE.
+
+### Reviewer report (verbatim)
+
+> Reviewer: M213 review cycle 1 done. Filed 2 findings (F-01, F-02) — both low severity, both resolved as fixed with no code commit per M209/M211/M212 backlog precedent. F-01 (spec_text_drift): AC-04 first clause contradicts the implementation's anti-thrash guarantee (cycle 4 always escalates); step S04 description + synthetic_four_cycle_milestone_with_all_passes_reaches_escalate test confirm the implementation is correct. F-02 (code_duplication): cycle_stale_state_timeout.rs duplicates parse_rfc3339_ms from cycle.rs. Verdict: ok. Lifecycle: complete. Spec: verified. Cold build (make clean + cargo nextest, no incremental cache) confirmed all 62 tests across 7 AC-specific binaries pass on the first run; cargo fmt + clippy -D warnings clean.
+
+### Final R5 state (M213)
+
+| Field | Value |
+|---|---|
+| lifecycle | complete |
+| execution_status | done |
+| spec_status | **verified** |
+| Findings | 2 filed, 2 resolved-no-commit (F-01 low spec-text-drift, F-02 low code-duplication) |
+| Reviews.json | 1 record, verdict=ok, reviewer=reviewer-213 |
+| Commits | 10 total for M213: 7 step + 1 lifecycle evidence + 1 review cycle 1 + 1 orchestrator pre-empt |
+
+### Cycle counts (M213)
+
+- Cycle 1: dispatch → R5 PASS (clean) → dispatch reviewer → 2 backlog findings → ok
+- Total review cycles: 1 (clean)
+- No per-step batching this time (M212 S02-S04+S6-S8 batch was NOT repeated) — better audit trail
+
+---
+
+## SESSION RETROSPECTIVE — 5 milestones, 6 review cycles, ~52 commits
+
+### Aggregate stats
+
+| M | Title | ACs/Steps | Effort/Risk | Cycles | Findings | Findings (resolved) | Commits |
+|---|---|---|---|---|---|---|---|
+| M207 | session.json schema | 8/8 | L/high | 2 (1 reject + clean) | 2 (1 medium, 1 low) | 2/2 | 17 |
+| M209 | roles + topology | 5/5 | M/medium | 1 (1 reject + clean) | 1 (low out-of-scope) | 1/1 | 12 |
+| M211 | typed task assignment | 3/3 | M/medium | 1 (clean) | 2 (both low backlog) | 2/2 | 6 |
+| M212 | orchestrator verifier | 8/8 | L/high | 1 (clean) | 1 (low backlog, M202 doc) | 1/1 | 7 |
+| M213 | cycle flow + decision matrix | 7/7 | M/high | 1 (clean) | 2 (both low backlog) | 2/2 | 10 |
+| **TOTAL** | | **31/31** | 2×L, 3×M / 3×high, 2×medium | **6 review cycles** (4 clean + 2 with finds) | **8** | **8/8** | **~52** |
+
+Cycle budget used: 6 of 20 possible (5 milestones × 4 max each). 30% of the hard cap. The 4-round cap is generous for a 2-agent topology with disciplined contracts.
+
+Total time (rough estimate): ~75 min from M207 cycle 1 to M213 complete. That's ~15 min per milestone on average, which is much faster than the original log's M200-M202 sequence (which took ~6 hours for 3 milestones). The speedup is from:
+- Smaller milestones (M207 was 8 ACs, M200 was 6; M213 is 7 ACs, M202 was 22+)
+- Tighter contracts from the start
+- Pre-emptive F-02 fixes
+- No regression cycles (M207 had 1, M209 had 1 — both for genuine issues, not for review thrash)
+
+### What worked
+
+1. **F-02 pre-empt pattern.** 5 of 5 milestones needed it. The orchestrator fixed the placeholder AC verification fields BEFORE dispatching the runner. Saved a review cycle on every milestone. Total: 5 pre-empt commits (one per milestone). This is now a permanent pattern for any autopilot milestone whose spec was tightened by 09412e2.
+
+2. **Discipline gate in the runner contract.** The M211 contract put a "pre-notify gate" at the top (must show all steps done + real evidence before notifying). The M209 R5 reject was the lesson. M211 and M212 held the gate clean. M213 held the gate clean. The pattern is now established: the gate is the enforcement, the orchestrator's R5 is the verification, the reject-and-send-back is the recovery.
+
+3. **`make clean` before each review cycle.** Every reviewer's cycle 1 ran `make clean` first. Caught M207's real `cargo fmt` drift in 3 files. M209/M211/M212/M213 cold builds all matched the runner's evidence exactly. The cost is real (~10-15 min per cold build) but the alternative (trusting incremental cache) is worse.
+
+4. **Cycle 1 = full pass, cycle 2 = tightened.** M207 was the test case for cycle 2 tightening (M201's lesson). M209-M213 all passed in 1 cycle, so cycle 2 wasn't exercised, but the policy is established.
+
+5. **Backlog-class finding handling.** 6 of 8 findings (75%) were backlog class (out of scope, resolved with no commit). The reviewer correctly applied scope discipline. The pattern: low-severity findings from pre-existing issues (M202 doc lint) or doc-only drift get `fixed_in=empty` and don't block.
+
+6. **Fresh tab between milestones.** Each milestone had a fresh runner + reviewer session ID. No context accumulation. The user-requested pattern worked.
+
+7. **Per-step commits (mostly).** M209, M211, M213 did per-step commits. M207 did per-step commits. M212 batched 6 steps into one commit (S02-S04+S6-S8) — borderline but acceptable per the contract.
+
+8. **Pre-notify gate format in the runner notification.** "Pre-notify gate: pass" was a clean way for the runner to self-attest. The orchestrator R5 still verified, but the notification made the gate visible.
+
+9. **`mp milestone ac bulk` for F-02 pre-empt.** 5 fragment updates in one call. The right primitive for multi-AC spec updates. M118 S1 design decision paying off.
+
+10. **The user's "commit on every handoff" policy.** Worked as designed. ~52 commits + 6 log commits + 5 pre-empt commits = ~63 commits in this session. The audit trail is clean.
+
+### What didn't work
+
+1. **The runner's M209 cycle 1 had a discipline failure.** Skipped per-step `mp milestone step done` for all 5 steps, used generic evidence for all 5 ACs. The orchestrator's R5 caught it; the runner fixed it on the second ask. Cost: one extra turn (no impact on cycle count, since this was a pre-review correction).
+
+2. **The M202 doc-overindented-list-items lint is now a known backlog item.** Three milestones hit it (M209, M211, M212). The reviewer correctly filed as backlog each time, but it's a real `mp` repo issue that should be fixed at the end of the session.
+
+3. **Activity.json is missing entries for ALL 5 milestones.** The runner's `mp milestone step done`, `mp milestone criterion pass`, and `mp milestone complete` calls did NOT add activity events. This is a real `mp` CLI gap (the same one from the original log's M200 review-pass event loss). The milestone JSON is canonical; activity.json is just an audit stream. Filed as a dogfood finding.
+
+4. **M211's file name is stale.** The file is `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` but the spec title is "typed task assignment." Caused by the 09412e2 spec-tighten renaming the title but not the file. Cosmetic but real.
+
+5. **M212 batched 6 steps into one commit.** S02-S04+S6-S8 in commit `6d15e30`. Acceptable per the contract but reduces per-step audit trail. The runner didn't batch in M213 (7 separate commits).
+
+6. **The orchestrator's session is long.** mp-herdr-log2.txt is now ~450+ lines. Not a problem yet, but the original log's R15 lesson (mp-herdr-log.txt truncated during the test) is worth noting.
+
+### Lessons for the next session (M223+)
+
+1. **Pre-empt F-02 by default.** Every autopilot milestone spec from 09412e2 has placeholder AC verifications. The pre-empt is mechanical and saves a review cycle. Bake it into the orchestrator's pre-dispatch checklist.
+
+2. **The discipline gate works.** M211-M213 all held the gate after M209's reject. The contract is the right shape. Don't change it.
+
+3. **Backlog class for out-of-scope findings.** The reviewer is making the right call. Keep the policy.
+
+4. **Activity.json gap is a real `mp` bug.** Should be filed as a dogfood finding for the `mp` team.
+
+5. **M202 doc lint is a real `mp` repo issue.** 3 milestones hit it. Should be fixed (5-line change via `cargo clippy --fix`).
+
+6. **The M211 file name needs renaming.** Cosmetic, but a real hygiene issue.
+
+7. **M212 had a per-step commit batching exception.** The contract allows it; the runner exercised it once. Reasonable.
+
+8. **The cycle matrix (R3) is validated.** Default 2, soft cap 3, hard limit 4. We used 6 of 20. The matrix is correct.
+
+### What to do next (proposed)
+
+The 5 foundation milestones are done. The autopilot system is feature-complete for one cycle. The natural next step is **M223 (mp autopilot lifecycle transaction + commit/finding attribution)** — high priority, 3 ACs, 3 steps. M223 is the closure protocol that the original log's R5/R7/R10 lessons were about. After M223, the system has the full foundation + closure, ready for the next batch (M224, M225, M226, M227, M228, M229).
+
+But the user said "let's do those 5 milestones" — implying 5 was the target. Awaiting user direction.
