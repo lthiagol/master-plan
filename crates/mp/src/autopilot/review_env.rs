@@ -917,6 +917,45 @@ mod s3_tests {
     }
 
     #[test]
+    fn s3_gate_escalates_to_clean_room_on_shared_pid() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        // The reviewer's pid equals the runner's pid — the runner
+        // quietly became the reviewer. The gate must escalate to
+        // clean-room rather than block; without this test AC-03
+        // advertises coverage for the shared-pid branch but does
+        // not exercise it.
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
+            runner_pid: env.pid,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("shared pid escalates, does not block");
+        assert!(decision.is_clean_room(), "expected PassWithCleanRoom");
+        match decision {
+            ReviewEnvDecision::PassWithCleanRoom { commands, reason } => {
+                assert!(!commands.is_empty(), "clean-room must emit a command");
+                assert!(commands[0].contains("cargo clean"));
+                assert!(
+                    commands[0].contains(env.target_dir.to_str().unwrap()),
+                    "command should target the reviewer's target dir"
+                );
+                assert!(
+                    reason.contains("pid"),
+                    "reason must mention the pid: {reason}"
+                );
+            }
+            other => panic!("expected PassWithCleanRoom, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn s3_provenance_issues_lists_isolation_failures() {
         let env = fixture_env();
         let issues = provenance_issues(&env, &env.target_dir, env.pid);

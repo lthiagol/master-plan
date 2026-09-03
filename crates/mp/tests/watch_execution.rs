@@ -1321,6 +1321,43 @@ mod m224_ac03 {
     }
 
     #[test]
+    fn gate_escalates_to_clean_room_on_shared_pid() {
+        // The reviewer's pid equals the runner's — the runner
+        // quietly became the reviewer. AC-03 advertises coverage for
+        // the gate but the shared-pid escalation branch was the
+        // F-02 test gap; this regression pins the typed decision /
+        // reason / commands so a future refactor cannot silently
+        // break the safety path.
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &runner_target(),
+            runner_worktree_path: &env.worktree_path,
+            runner_pid: env.pid,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("shared pid escalates, does not block");
+        assert!(decision.is_clean_room(), "expected PassWithCleanRoom");
+        match decision {
+            ReviewEnvDecision::PassWithCleanRoom { commands, reason } => {
+                assert!(!commands.is_empty());
+                assert!(commands[0].contains("cargo clean"));
+                assert!(commands[0].contains(env.target_dir.to_str().unwrap()));
+                assert!(
+                    reason.contains("pid"),
+                    "reason must explain the shared-pid trigger: {reason}"
+                );
+            }
+            other => panic!("expected PassWithCleanRoom, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn provenance_issues_lists_isolation_failures_for_select_mode() {
         let env = fresh_provenance();
         // Shared target dir + shared pid (matching the reviewer's).
