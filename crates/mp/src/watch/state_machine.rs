@@ -22,10 +22,10 @@ use std::path::Path;
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::watch::{
-    clear_stage_done_sentinel, ensure_pane, lifecycle_advanced_past, read_agent_status,
-    read_custom_status_bounded, read_lifecycle_via_mp, send_prompt, sentinel_matches,
-    LifecycleTarget, PaneHandle, PromptStage, ReadinessOptions, Role, RunOutcome, WaitOptions,
-    WaitOutcome, WatchRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS,
+    clear_stage_done_sentinel, ensure_pane, lifecycle_advanced_past, pane_label_for,
+    read_agent_status, read_custom_status_bounded, read_lifecycle_via_mp, send_prompt,
+    sentinel_matches, LifecycleTarget, PaneHandle, PromptStage, ReadinessOptions, Role, RunOutcome,
+    WaitOptions, WaitOutcome, WatchRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS, DEFAULT_PANE_N,
 };
 
 /// Operations the state machine needs. Implementations:
@@ -368,6 +368,12 @@ pub struct SystemDriveOps {
     /// `SystemDriveOps::new(...)` directly) keep compiling without
     /// a state file — they just get `None` for the live status.
     pub(crate) run_store: Option<crate::watch::WatchRunStore>,
+    /// M226 F-01 wiring: autopilot session id used to consult the
+    /// session event log for prior `AssignmentDispatched` events
+    /// before spawning. Set via [`Self::set_session_id`] by the
+    /// sequencer. When `None`, the dedup short-circuit is skipped
+    /// (legacy callers and tests without an autopilot session).
+    pub(crate) session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -400,6 +406,7 @@ impl SystemDriveOps {
             current_target: None,
             logger: None,
             run_store: None,
+            session_id: None,
         }
     }
 
@@ -465,6 +472,16 @@ impl SystemDriveOps {
     /// writes.
     pub fn set_logger(&mut self, logger: crate::watch::WatchLogger) {
         self.logger = Some(logger);
+    }
+
+    /// M226 F-01 wiring: attach the autopilot session id used for
+    /// the dispatch dedup check inside `ensure_pane`. When set, the
+    /// production spawn path consults the session event log via
+    /// `was_already_applied` before spawning a fresh herdr
+    /// `agent start`. Without a session id, the dedup short-circuit
+    /// is skipped (legacy callers + library tests).
+    pub fn set_session_id(&mut self, session_id: impl Into<String>) {
+        self.session_id = Some(session_id.into());
     }
 
     /// Returns the path the logger writes to (if any). Used in the
@@ -806,6 +823,71 @@ impl DriveOps for SystemDriveOps {
                 format!("{} pane cache hit → {}", role.label(), existing.pane_id),
             );
             return Ok(existing);
+        }
+        // ─── M226 F-01 wiring (dispatch dedup on production spawn) ──
+        // Before issuing a fresh `herdr agent start`, consult the
+        // autopilot session event log for a prior
+        // `AssignmentDispatched` event whose `pane_label` matches
+        // this role's pane. If one exists, the prior process
+        // already delivered this prompt; this process must NOT
+        // re-spawn (M225 AC-01). The check mirrors
+        // `task_assign::dispatch_assignment`'s dedup short-circuit
+        // — the production spawn path now consults the same
+        // session event log so the typed contract holds end-to-end.
+        if let Some(session_id) = self.session_id.clone() {
+            let pane_label = pane_label_for(role, DEFAULT_PANE_N);
+            let ctx = PlanContext {
+                project_root: self.project_root.clone(),
+                plan_dir: self.plan_dir.clone(),
+            };
+            match crate::autopilot::load_session(&ctx, &session_id) {
+                Ok(session) => {
+                    let dispatch_key = crate::autopilot::IdempotencyKey::Dispatch {
+                        pane_label: pane_label.clone(),
+                    };
+                    if crate::autopilot::was_already_applied(&session, &dispatch_key) {
+                        // Synthesize a "reused" PaneHandle from the
+                        // recorded event's stored_pane_id (best
+                        // effort — falls back to the label). The
+                        // herdr spawn is skipped; downstream stages
+                        // observe the cached handle.
+                        let stored_pane_id = session
+                            .events
+                            .iter()
+                            .rev()
+                            .find(|e| e.kind == crate::autopilot::EventKind::AssignmentDispatched)
+                            .and_then(|e| {
+                                e.payload
+                                    .as_ref()
+                                    .and_then(|p| p.get("target_pane"))
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                            })
+                            .unwrap_or_else(|| pane_label.clone());
+                        self.log_event(
+                            "dispatch_dedup",
+                            format!(
+                                "{} AssignmentDispatched already on session; skipping herdr spawn (M226 F-01 / M225 AC-01)",
+                                role.label()
+                            ),
+                        );
+                        let handle = PaneHandle {
+                            label: pane_label.clone(),
+                            pane_id: stored_pane_id,
+                            reused: true,
+                        };
+                        self.pane_cache.insert(role, handle.clone());
+                        return Ok(handle);
+                    }
+                }
+                Err(_) => {
+                    // No session yet — fall through to the normal
+                    // spawn path. This matches the legacy behavior
+                    // when an autopilot session is absent (e.g.,
+                    // `mp watch` invoked without prior `mp autopilot
+                    // session create`).
+                }
+            }
         }
         let rc = match role {
             Role::Runner => &self.runner_config,

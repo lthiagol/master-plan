@@ -489,6 +489,16 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
         role_configs,
     );
     ops.set_logger(logger.clone());
+    // M226 F-01 wiring: stamp the autopilot session id on the
+    // ops so `ensure_pane` consults the session event log for a
+    // prior `AssignmentDispatched` event before spawning. The
+    // session id is the milestone id (the autopilot drive model
+    // has one session per milestone); when `mp autopilot session
+    // create` has not run, the load is non-fatal and the dedup
+    // check falls through to the normal spawn path.
+    if let Some(first_id) = ids.first() {
+        ops.set_session_id(first_id.clone());
+    }
 
     // M180 S5: record one watch-started event. Best-effort — the
     // watch driver must run regardless of journal write success.
