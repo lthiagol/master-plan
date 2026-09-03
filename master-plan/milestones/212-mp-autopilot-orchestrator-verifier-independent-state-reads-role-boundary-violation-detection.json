@@ -72,56 +72,56 @@
     {
       "id": "AC-01",
       "description": "The verifier cross-checks milestone state, latest review verdict, and session event-log entries after a durable event cursor; mismatches and missing revisions are typed errors. It does not rely on an arbitrary last-three activity tail.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_state_cross_check --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Each role-boundary detector is exercised with attributable session fixtures. Detection uses M207 actor tokens and dispatch-bounded repository snapshots; conditions that cannot be attributed are reported as UnknownActor and block automatic acceptance rather than being guessed.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_seven_violations --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "`recommend_remediation` returns `Resend` for any violation under 3-pane, `EscalateToUser` under 2-pane or 1-pane.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_topology_remediation --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Regression test for M201 cycle 1: a fabricated `lifecycle=executed` notification with no matching activity.json event and a milestone at `lifecycle=approved` is rejected by the verifier as a typed mismatch.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_m201_cycle1_regression --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "Documentation: `docs/mp/autopilot-verifier.md` describes (a) the `mp reviews pass` writing pattern (writes to milestone JSON + reviews.json; does NOT add an activity.json event by default), so future agents don't look for a `review-pass` event in activity.json as proof of completion; (b) the M200 recovery lesson (review-pass lost to activity.json truncation; verifier cross-checks three sources to catch it); (c) the multi-source verification convention (milestone JSON + reviews.json + activity.json).",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_verifier_docs --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "Every autopilot mutation carries session id, role, actor token, dispatch id, and sequence number. Review pass attribution is read from the session event log plus reviews.json; missing or mismatched actor identity blocks automatic completion.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_actor_attribution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
       "description": "Before accepting runner completion, the verifier requires every step done and every AC evidence value to contain the exact command, exit code, and observed pass count. Generic summaries and evidence overwritten after completion are rejected; the canonical criterion state is re-read after completion.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_evidence_contract --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-08",
       "description": "Verification commands use a structured command-list representation. Parentheses in nextest filters are preserved as argv; shell control operators such as `&&`, `;`, and newlines are either represented as separate commands or rejected with an actionable typed error, never silently skipped.",
-      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test verifier_command_list --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
