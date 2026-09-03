@@ -8,7 +8,7 @@
 use mp::activity::ActivityLog;
 use mp::autopilot::verifier::{
     check_command_list, check_notification, ActorAttribution, Lane, LaneNotification, Verdict,
-    VerifierInputs, VerifierState, VerificationCommand, Violation,
+    VerificationCommand, VerifierInputs, VerifierState, Violation,
 };
 use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta};
 
@@ -23,18 +23,23 @@ fn attribution() -> ActorAttribution {
 }
 
 fn state_with_real_evidence() -> VerifierState {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: "207".into(),
-        title: "Sample".into(),
-        slug: "sample".into(),
-        lifecycle: "executed".into(),
+    let m = MilestoneFile {
+        milestone: MilestoneMeta {
+            id: "207".into(),
+            title: "Sample".into(),
+            slug: "sample".into(),
+            lifecycle: "executed".into(),
+            ..Default::default()
+        },
+        acceptance_criteria: vec![AcceptanceCriterion {
+            id: "AC-01".into(),
+            description: String::new(),
+            verification: String::new(),
+            status: String::new(),
+            evidence: "cargo nextest run -p mp --test foo exit 0 (3/3 pass)".into(),
+        }],
         ..Default::default()
     };
-    let mut ac = AcceptanceCriterion::default();
-    ac.id = "AC-01".into();
-    ac.evidence = "cargo nextest run -p mp --test foo exit 0 (3/3 pass)".into();
-    m.acceptance_criteria.push(ac);
     VerifierState {
         milestone: m,
         review: None,
@@ -44,14 +49,8 @@ fn state_with_real_evidence() -> VerifierState {
 }
 
 fn notification_with_command(cmd: VerificationCommand) -> LaneNotification {
-    let mut n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let mut n =
+        LaneNotification::runner_done("207", 1, "executed", "done", "implemented", attribution());
     n.verification_commands.push(cmd);
     n
 }
@@ -112,10 +111,7 @@ fn command_list_rejects_semicolon_in_token() {
         argv: vec!["echo".into(), "1; echo 2".into()],
     });
     let err = check_command_list(&n).unwrap_err();
-    assert!(matches!(
-        err,
-        Violation::UnsupportedCommandOperator(_)
-    ));
+    assert!(matches!(err, Violation::UnsupportedCommandOperator(_)));
 }
 
 #[test]
@@ -125,10 +121,7 @@ fn command_list_rejects_newline_in_token() {
         argv: vec!["echo".into(), "1\necho 2".into()],
     });
     let err = check_command_list(&n).unwrap_err();
-    assert!(matches!(
-        err,
-        Violation::UnsupportedCommandOperator(_)
-    ));
+    assert!(matches!(err, Violation::UnsupportedCommandOperator(_)));
 }
 
 #[test]
@@ -144,10 +137,7 @@ fn command_list_rejects_or_or_with_typed_error() {
         ],
     });
     let err = check_command_list(&n).unwrap_err();
-    assert!(matches!(
-        err,
-        Violation::UnsupportedCommandOperator(_)
-    ));
+    assert!(matches!(err, Violation::UnsupportedCommandOperator(_)));
 }
 
 #[test]
@@ -155,14 +145,8 @@ fn command_list_with_multiple_separate_commands_passes() {
     // Multi-command lists are represented as separate
     // VerificationCommand entries, NOT concatenated with `&&`
     // in a single token.
-    let mut n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let mut n =
+        LaneNotification::runner_done("207", 1, "executed", "done", "implemented", attribution());
     n.verification_commands.push(VerificationCommand {
         label: "first".into(),
         argv: vec!["cargo".into(), "fmt".into(), "--check".into()],

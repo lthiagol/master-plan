@@ -7,24 +7,29 @@
 
 use mp::activity::ActivityLog;
 use mp::autopilot::verifier::{
-    check_evidence_contract, check_evidence_not_overwritten, validate_evidence_shape, EvidenceShapeError,
+    check_evidence_contract, check_evidence_not_overwritten, validate_evidence_shape,
+    EvidenceShapeError,
 };
 use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta};
 
 fn milestone_with_ac(id: &str, ac_id: &str, evidence: &str) -> MilestoneFile {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: id.into(),
-        title: "Sample".into(),
-        slug: "sample".into(),
-        lifecycle: "executed".into(),
+    MilestoneFile {
+        milestone: MilestoneMeta {
+            id: id.into(),
+            title: "Sample".into(),
+            slug: "sample".into(),
+            lifecycle: "executed".into(),
+            ..Default::default()
+        },
+        acceptance_criteria: vec![AcceptanceCriterion {
+            id: ac_id.into(),
+            description: String::new(),
+            verification: String::new(),
+            status: String::new(),
+            evidence: evidence.into(),
+        }],
         ..Default::default()
-    };
-    let mut ac = AcceptanceCriterion::default();
-    ac.id = ac_id.into();
-    ac.evidence = evidence.into();
-    m.acceptance_criteria.push(ac);
-    m
+    }
 }
 
 // ──── validate_evidence_shape ──────────────────────────────────
@@ -131,20 +136,23 @@ fn contract_flags_every_ac_with_generic_evidence() {
         activity: ActivityLog::empty(),
         milestone_path: "207.json".into(),
     };
-    let failing = check_evidence_contract(&state, &mp::autopilot::verifier::LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        mp::autopilot::verifier::ActorAttribution {
-            session_id: "s1".into(),
-            role: mp::autopilot::verifier::Lane::Runner,
-            actor_token: "%2".into(),
-            dispatch_id: "dispatch-1".into(),
-            seq: 1,
-        },
-    ));
+    let failing = check_evidence_contract(
+        &state,
+        &mp::autopilot::verifier::LaneNotification::runner_done(
+            "207",
+            1,
+            "executed",
+            "done",
+            "implemented",
+            mp::autopilot::verifier::ActorAttribution {
+                session_id: "s1".into(),
+                role: mp::autopilot::verifier::Lane::Runner,
+                actor_token: "%2".into(),
+                dispatch_id: "dispatch-1".into(),
+                seq: 1,
+            },
+        ),
+    );
     assert_eq!(failing.len(), 1);
     assert_eq!(failing[0].0, "AC-01");
     assert!(failing[0].1.contains("generic summary"));
@@ -163,20 +171,23 @@ fn contract_passes_when_evidence_is_well_formed() {
         activity: ActivityLog::empty(),
         milestone_path: "207.json".into(),
     };
-    let failing = check_evidence_contract(&state, &mp::autopilot::verifier::LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        mp::autopilot::verifier::ActorAttribution {
-            session_id: "s1".into(),
-            role: mp::autopilot::verifier::Lane::Runner,
-            actor_token: "%2".into(),
-            dispatch_id: "dispatch-1".into(),
-            seq: 1,
-        },
-    ));
+    let failing = check_evidence_contract(
+        &state,
+        &mp::autopilot::verifier::LaneNotification::runner_done(
+            "207",
+            1,
+            "executed",
+            "done",
+            "implemented",
+            mp::autopilot::verifier::ActorAttribution {
+                session_id: "s1".into(),
+                role: mp::autopilot::verifier::Lane::Runner,
+                actor_token: "%2".into(),
+                dispatch_id: "dispatch-1".into(),
+                seq: 1,
+            },
+        ),
+    );
     assert!(failing.is_empty());
 }
 

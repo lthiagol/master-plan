@@ -70,8 +70,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::activity::{self, ActivityEvent, ActivityLog};
-use crate::model::MilestoneFile;
 use crate::milestone;
+use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::reviews::{self, ReviewRecord};
 use crate::validate::{effective_execution_status, effective_spec_status};
@@ -388,10 +388,7 @@ pub enum EvidenceShapeError {
     /// completion and the new value differs from the
     /// pre-completion value — a runner that back-fills summaries
     /// after `mp milestone complete` lands is rejected.
-    OverwrittenAfterCompletion {
-        before: String,
-        after: String,
-    },
+    OverwrittenAfterCompletion { before: String, after: String },
 }
 
 impl std::fmt::Display for EvidenceShapeError {
@@ -463,7 +460,7 @@ pub fn validate_evidence_shape(evidence: &str) -> Result<(), EvidenceShapeError>
     // path (`./`), or an absolute path (`/`).
     let first_token = trimmed.split_whitespace().next().unwrap_or("");
     let runnable_prefixes = ["cargo", "make", "rustc", "bash", "sh", "zsh", "nextest"];
-    let starts_runnable = runnable_prefixes.iter().any(|p| first_token == *p)
+    let starts_runnable = runnable_prefixes.contains(&first_token)
         || first_token.starts_with("./")
         || first_token.starts_with('/')
         || first_token.starts_with("scripts/");
@@ -494,12 +491,20 @@ pub fn validate_evidence_shape(evidence: &str) -> Result<(), EvidenceShapeError>
                 while i < bytes.len() && bytes[i].is_ascii_digit() {
                     i += 1;
                 }
-                if i < bytes.len() && bytes[i] == b'/' && i + 1 < bytes.len() && bytes[i + 1].is_ascii_digit() {
+                if i < bytes.len()
+                    && bytes[i] == b'/'
+                    && i + 1 < bytes.len()
+                    && bytes[i + 1].is_ascii_digit()
+                {
                     i += 1;
                     while i < bytes.len() && bytes[i].is_ascii_digit() {
                         i += 1;
                     }
-                    if i < bytes.len() && bytes[i] == b' ' && i + 1 < bytes.len() && &bytes[i + 1..i + 5] == b"pass" {
+                    if i < bytes.len()
+                        && bytes[i] == b' '
+                        && i + 1 < bytes.len()
+                        && &bytes[i + 1..i + 5] == b"pass"
+                    {
                         return true;
                     }
                 }
@@ -710,7 +715,10 @@ impl Remediation {
 /// → `Resend`; 2-pane and 1-pane → `EscalateToUser`. The
 /// corrective message carries the violation kind so the lane
 /// knows what to fix.
-pub fn recommend_remediation(violation: &Violation, topology: crate::autopilot::Topology) -> Remediation {
+pub fn recommend_remediation(
+    violation: &Violation,
+    topology: crate::autopilot::Topology,
+) -> Remediation {
     use crate::autopilot::Topology;
     let corrective_message = format!(
         "verifier rejected cycle: {}. Re-stamp per-AC evidence with real cargo nextest output and re-notify.",
@@ -785,11 +793,13 @@ pub fn detect_runner_plan_edit_violation(
     if !touches_plan_zone {
         return None;
     }
-    Some(Violation::RunnerPlanEditViolation(RunnerPlanEditViolation {
-        milestone_id: notification.milestone_id.clone(),
-        pane_id: notification.attribution.actor_token.clone(),
-        diff_hunk: Some(hunk.to_string()),
-    }))
+    Some(Violation::RunnerPlanEditViolation(
+        RunnerPlanEditViolation {
+            milestone_id: notification.milestone_id.clone(),
+            pane_id: notification.attribution.actor_token.clone(),
+            diff_hunk: Some(hunk.to_string()),
+        },
+    ))
 }
 
 /// Detector 4: Reviewer modified code. Detection uses the
@@ -808,11 +818,13 @@ pub fn detect_reviewer_code_edit_violation(
     if !touches_code {
         return None;
     }
-    Some(Violation::ReviewerCodeEditViolation(ReviewerCodeEditViolation {
-        milestone_id: notification.milestone_id.clone(),
-        pane_id: notification.attribution.actor_token.clone(),
-        diff_hunk: Some(hunk.to_string()),
-    }))
+    Some(Violation::ReviewerCodeEditViolation(
+        ReviewerCodeEditViolation {
+            milestone_id: notification.milestone_id.clone(),
+            pane_id: notification.attribution.actor_token.clone(),
+            diff_hunk: Some(hunk.to_string()),
+        },
+    ))
 }
 
 /// Detector 5: Reviewer called `mp reviews pass` before the
@@ -827,7 +839,10 @@ pub fn detect_reviewer_premature_pass_violation(
     if notification.lane != Lane::Reviewer {
         return None;
     }
-    if !matches!(notification.action.as_str(), "submitted-review-pass" | "completed-review") {
+    if !matches!(
+        notification.action.as_str(),
+        "submitted-review-pass" | "completed-review"
+    ) {
         return None;
     }
     if notification.cycle < orchestrator_prompted_cycle {
@@ -872,10 +887,7 @@ pub fn detect_orchestrator_code_edit_violation(
     if notification.lane != Lane::Orchestrator {
         return None;
     }
-    let hunk = match diff_hunk {
-        Some(h) => h,
-        None => return None,
-    };
+    let hunk = diff_hunk?;
     let touches_code = hunk
         .lines()
         .any(|line| line.starts_with("+++ b/crates/") || line.starts_with("--- a/crates/"));
@@ -903,14 +915,26 @@ pub fn detect_orchestrator_code_edit_violation(
 /// names the field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CrossCheckMismatch {
-    LifecycleMismatch { claimed: String, canonical: String },
-    ExecutionStatusMismatch { claimed: String, canonical: String },
-    SpecStatusMismatch { claimed: String, canonical: String },
+    LifecycleMismatch {
+        claimed: String,
+        canonical: String,
+    },
+    ExecutionStatusMismatch {
+        claimed: String,
+        canonical: String,
+    },
+    SpecStatusMismatch {
+        claimed: String,
+        canonical: String,
+    },
     /// The lane notification references a different milestone
     /// than the verifier is checking — typically a payload
     /// mismatch that the orchestrator should reject before any
     /// detector runs.
-    MilestoneIdMismatch { claimed: String, canonical: String },
+    MilestoneIdMismatch {
+        claimed: String,
+        canonical: String,
+    },
 }
 
 impl std::fmt::Display for CrossCheckMismatch {
@@ -1084,13 +1108,11 @@ pub fn check_notification(
         // journal has no matching event for the claimed
         // transition.
         if state.last_lifecycle_transition().is_none() && canonical_lifecycle == "approved" {
-            violations.push(Violation::LifecycleClaimUnbacked(
-                LifecycleClaimUnbacked {
-                    milestone_id: notification.milestone_id.clone(),
-                    claimed_lifecycle: notification.claimed_lifecycle.clone(),
-                    canonical_lifecycle: canonical_lifecycle.to_string(),
-                },
-            ));
+            violations.push(Violation::LifecycleClaimUnbacked(LifecycleClaimUnbacked {
+                milestone_id: notification.milestone_id.clone(),
+                claimed_lifecycle: notification.claimed_lifecycle.clone(),
+                canonical_lifecycle: canonical_lifecycle.to_string(),
+            }));
         }
     }
 
@@ -1112,10 +1134,9 @@ pub fn check_notification(
     {
         violations.push(v);
     }
-    if let Some(v) = detect_pre_start_notification_violation(
-        notification,
-        inputs.started_dispatch_ids,
-    ) {
+    if let Some(v) =
+        detect_pre_start_notification_violation(notification, inputs.started_dispatch_ids)
+    {
         violations.push(v);
     }
     if let Some(v) = detect_orchestrator_code_edit_violation(
@@ -1143,11 +1164,13 @@ pub fn check_notification(
         let topology = crate::autopilot::Topology::ThreeAgent; // default; C3 plugs its own
         let first_violation = failing
             .first()
-            .map(|(_, detail)| Violation::EvidenceContractViolation(EvidenceContractViolation {
-                milestone_id: notification.milestone_id.clone(),
-                ac_id: "unknown".into(),
-                detail: detail.clone(),
-            }))
+            .map(|(_, detail)| {
+                Violation::EvidenceContractViolation(EvidenceContractViolation {
+                    milestone_id: notification.milestone_id.clone(),
+                    ac_id: "unknown".into(),
+                    detail: detail.clone(),
+                })
+            })
             .unwrap_or_else(|| {
                 // Defensive: failing is non-empty so this branch
                 // is unreachable, but a typed fallback keeps the
@@ -1159,7 +1182,10 @@ pub fn check_notification(
                 })
             });
         let remediation = recommend_remediation(&first_violation, topology);
-        return Verdict::EvidenceContractFailed { failing, remediation };
+        return Verdict::EvidenceContractFailed {
+            failing,
+            remediation,
+        };
     }
 
     // AC-08: command list. Reject shell control operators
@@ -1352,15 +1378,16 @@ mod tests {
     }
 
     fn sample_milestone(id: &str, lifecycle: &str) -> MilestoneFile {
-        let mut m = MilestoneFile::default();
-        m.milestone = MilestoneMeta {
-            id: id.to_string(),
-            title: "Sample".into(),
-            slug: "sample".into(),
-            lifecycle: lifecycle.to_string(),
+        MilestoneFile {
+            milestone: MilestoneMeta {
+                id: id.to_string(),
+                title: "Sample".into(),
+                slug: "sample".into(),
+                lifecycle: lifecycle.to_string(),
+                ..Default::default()
+            },
             ..Default::default()
-        };
-        m
+        }
     }
 
     fn sample_state(id: &str, lifecycle: &str) -> VerifierState {
@@ -1481,14 +1508,14 @@ mod tests {
 
     #[test]
     fn evidence_rejects_missing_exit_code() {
-        let err = validate_evidence_shape("cargo nextest run -p mp --test foo (3/3 pass)").unwrap_err();
+        let err =
+            validate_evidence_shape("cargo nextest run -p mp --test foo (3/3 pass)").unwrap_err();
         assert!(matches!(err, EvidenceShapeError::MissingExitCode(_)));
     }
 
     #[test]
     fn evidence_rejects_missing_pass_count() {
-        let err =
-            validate_evidence_shape("cargo nextest run -p mp --test foo exit 0").unwrap_err();
+        let err = validate_evidence_shape("cargo nextest run -p mp --test foo exit 0").unwrap_err();
         assert!(matches!(err, EvidenceShapeError::MissingPassCount(_)));
     }
 
@@ -1533,7 +1560,10 @@ mod tests {
         let state = sample_state("207", "executed");
         let notification = sample_notification("999", "executed");
         let err = cross_check_state(&notification, &state).unwrap_err();
-        assert!(matches!(err, CrossCheckMismatch::MilestoneIdMismatch { .. }));
+        assert!(matches!(
+            err,
+            CrossCheckMismatch::MilestoneIdMismatch { .. }
+        ));
     }
 
     // ──── Detectors (AC-02) ───────────────────────────────────────
@@ -1845,22 +1875,40 @@ mod tests {
     #[test]
     fn evidence_not_overwritten_passes_when_snapshot_matches() {
         let mut state = sample_state("207", "executed");
-        let mut ac = AcceptanceCriterion::default();
-        ac.id = "AC-01".into();
-        ac.evidence = "cargo nextest run -p mp --test foo exit 0 (3/3 pass)".into();
-        state.milestone.acceptance_criteria.push(ac);
-        let pre = [("AC-01", "cargo nextest run -p mp --test foo exit 0 (3/3 pass)")];
+        state
+            .milestone
+            .acceptance_criteria
+            .push(AcceptanceCriterion {
+                id: "AC-01".into(),
+                description: String::new(),
+                verification: String::new(),
+                status: String::new(),
+                evidence: "cargo nextest run -p mp --test foo exit 0 (3/3 pass)".into(),
+            });
+        let pre = [(
+            "AC-01",
+            "cargo nextest run -p mp --test foo exit 0 (3/3 pass)",
+        )];
         check_evidence_not_overwritten(&state, &pre).unwrap();
     }
 
     #[test]
     fn evidence_not_overwritten_fails_when_back_filled() {
         let mut state = sample_state("207", "executed");
-        let mut ac = AcceptanceCriterion::default();
-        ac.id = "AC-01".into();
-        ac.evidence = "All done".into();
-        state.milestone.acceptance_criteria.push(ac);
-        let pre = [("AC-01", "cargo nextest run -p mp --test foo exit 0 (3/3 pass)")];
+        state
+            .milestone
+            .acceptance_criteria
+            .push(AcceptanceCriterion {
+                id: "AC-01".into(),
+                description: String::new(),
+                verification: String::new(),
+                status: String::new(),
+                evidence: "All done".into(),
+            });
+        let pre = [(
+            "AC-01",
+            "cargo nextest run -p mp --test foo exit 0 (3/3 pass)",
+        )];
         let err = check_evidence_not_overwritten(&state, &pre).unwrap_err();
         assert!(matches!(
             err,
@@ -1872,10 +1920,16 @@ mod tests {
     fn check_evidence_contract_flags_generic_summaries_on_every_ac() {
         let mut state = sample_state("207", "executed");
         for i in 1..=2 {
-            let mut ac = AcceptanceCriterion::default();
-            ac.id = format!("AC-0{i}");
-            ac.evidence = "All steps done".into();
-            state.milestone.acceptance_criteria.push(ac);
+            state
+                .milestone
+                .acceptance_criteria
+                .push(AcceptanceCriterion {
+                    id: format!("AC-0{i}"),
+                    description: String::new(),
+                    verification: String::new(),
+                    status: String::new(),
+                    evidence: "All steps done".into(),
+                });
         }
         let failing = check_evidence_contract(&state, &sample_notification("207", "executed"));
         assert_eq!(failing.len(), 2);

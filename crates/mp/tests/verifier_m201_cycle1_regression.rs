@@ -21,12 +21,14 @@ fn attribution() -> ActorAttribution {
 }
 
 fn m201_fabricated_state() -> VerifierState {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: "201".into(),
-        title: "M201 fixture".into(),
-        slug: "m201-fixture".into(),
-        lifecycle: "approved".into(),
+    let m = MilestoneFile {
+        milestone: MilestoneMeta {
+            id: "201".into(),
+            title: "M201 fixture".into(),
+            slug: "m201-fixture".into(),
+            lifecycle: "approved".into(),
+            ..Default::default()
+        },
         ..Default::default()
     };
     VerifierState {
@@ -89,14 +91,8 @@ fn m201_regression_passes_when_activity_event_present() {
         "201",
         "lifecycle: approved → in-progress",
     ));
-    let notification = LaneNotification::runner_done(
-        "201",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let notification =
+        LaneNotification::runner_done("201", 1, "executed", "done", "implemented", attribution());
     let verdict = check_notification(
         &state,
         &notification,
@@ -135,14 +131,8 @@ fn m201_regression_does_not_fire_when_canonical_lifecycle_already_executed() {
         "201",
         "lifecycle: approved → executed",
     ));
-    let notification = LaneNotification::runner_done(
-        "201",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let notification =
+        LaneNotification::runner_done("201", 1, "executed", "done", "implemented", attribution());
     let verdict = check_notification(
         &state,
         &notification,

@@ -52,8 +52,7 @@ fn doc_describes_mp_reviews_pass_writing_pattern() {
         "documentation must explain activity.json is NOT touched by reviews pass"
     );
     assert!(
-        doc.contains("external-review")
-            && doc.contains("flow_stages"),
+        doc.contains("external-review") && doc.contains("flow_stages"),
         "documentation must explain the milestone JSON flow_stages side effect"
     );
 }
@@ -144,7 +143,10 @@ fn doc_describes_actor_attribution_with_five_fields() {
     // AC-06: every autopilot mutation carries session_id, role,
     // actor_token, dispatch_id, and seq. The documentation
     // documents all five fields.
-    assert!(doc.contains("session_id"), "documentation must list session_id");
+    assert!(
+        doc.contains("session_id"),
+        "documentation must list session_id"
+    );
     assert!(doc.contains("role"), "documentation must list role");
     assert!(
         doc.contains("actor_token"),

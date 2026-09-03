@@ -4,11 +4,11 @@
 //! reviews.json; missing or mismatched actor identity blocks
 //! automatic completion.
 
+use mp::activity::ActivityLog;
 use mp::autopilot::verifier::{
     check_notification, ActorAttribution, AttributionError, Lane, LaneNotification, Verdict,
     VerifierInputs,
 };
-use mp::activity::ActivityLog;
 use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta};
 
 fn attribution() -> ActorAttribution {
@@ -21,19 +21,27 @@ fn attribution() -> ActorAttribution {
     }
 }
 
-fn state_with_evidence(milestone_id: &str, evidence: &str) -> mp::autopilot::verifier::VerifierState {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: milestone_id.into(),
-        title: "Sample".into(),
-        slug: "sample".into(),
-        lifecycle: "executed".into(),
+fn state_with_evidence(
+    milestone_id: &str,
+    evidence: &str,
+) -> mp::autopilot::verifier::VerifierState {
+    let m = MilestoneFile {
+        milestone: MilestoneMeta {
+            id: milestone_id.into(),
+            title: "Sample".into(),
+            slug: "sample".into(),
+            lifecycle: "executed".into(),
+            ..Default::default()
+        },
+        acceptance_criteria: vec![AcceptanceCriterion {
+            id: "AC-01".into(),
+            description: String::new(),
+            verification: String::new(),
+            status: String::new(),
+            evidence: evidence.into(),
+        }],
         ..Default::default()
     };
-    let mut ac = AcceptanceCriterion::default();
-    ac.id = "AC-01".into();
-    ac.evidence = evidence.into();
-    m.acceptance_criteria.push(ac);
     mp::autopilot::verifier::VerifierState {
         milestone: m,
         review: None,
@@ -56,7 +64,10 @@ fn attribution_must_carry_all_five_fields() {
 fn attribution_validate_rejects_missing_session_id() {
     let mut attr = attribution();
     attr.session_id = "".into();
-    assert_eq!(attr.validate().unwrap_err(), AttributionError::MissingSessionId);
+    assert_eq!(
+        attr.validate().unwrap_err(),
+        AttributionError::MissingSessionId
+    );
 }
 
 #[test]
@@ -100,14 +111,8 @@ fn unknown_actor_blocks_automatic_acceptance() {
         "207",
         "cargo nextest run -p mp --test foo exit 0 (3/3 pass)",
     );
-    let mut n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let mut n =
+        LaneNotification::runner_done("207", 1, "executed", "done", "implemented", attribution());
     n.attribution.actor_token = "".into();
     let verdict = check_notification(
         &state,
@@ -144,7 +149,10 @@ fn attribution_session_id_mismatch_against_session_event_log() {
     // surfaced separately by the cross-check (see
     // AttributionError::SessionMismatch). The validate method
     // itself succeeds because the field is non-empty.
-    assert!(err.is_ok(), "structural validate passes for non-empty fields");
+    assert!(
+        err.is_ok(),
+        "structural validate passes for non-empty fields"
+    );
     // The mismatch would surface when the verifier compares
     // attribution against the loaded session — covered by
     // check_notification which surfaces UnknownActor on any

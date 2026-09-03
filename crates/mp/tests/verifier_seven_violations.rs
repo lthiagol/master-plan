@@ -134,8 +134,7 @@ fn detector_4_does_not_fire_for_plan_zone_only() {
 #[test]
 fn detector_5_reviewer_premature_pass_violation_fires_when_cycle_pre_prompt() {
     let n = reviewer_done("207", "submitted-review-pass", 0);
-    let v =
-        detect_reviewer_premature_pass_violation(&n, 1).expect("expected violation");
+    let v = detect_reviewer_premature_pass_violation(&n, 1).expect("expected violation");
     assert!(matches!(v, Violation::ReviewerPrematurePassViolation(_)));
 }
 
@@ -168,8 +167,8 @@ fn detector_6_does_not_fire_for_known_dispatch() {
 fn detector_7_orchestrator_code_edit_violation_fires_on_pane_match() {
     let n = orchestrator_done("207");
     let hunk = "+++ b/crates/mp/src/lib.rs\n+ oops";
-    let v = detect_orchestrator_code_edit_violation(&n, Some(hunk), "%1")
-        .expect("expected violation");
+    let v =
+        detect_orchestrator_code_edit_violation(&n, Some(hunk), "%1").expect("expected violation");
     assert!(matches!(v, Violation::OrchestratorCodeEditViolation(_)));
 }
 
@@ -302,13 +301,14 @@ fn activity_lifecycle_transition_subject_filter_works() {
 
 #[allow(dead_code)]
 fn milestone(id: &str) -> MilestoneFile {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: id.to_string(),
-        title: "Sample".into(),
-        slug: "sample".into(),
-        lifecycle: "executed".to_string(),
+    MilestoneFile {
+        milestone: MilestoneMeta {
+            id: id.to_string(),
+            title: "Sample".into(),
+            slug: "sample".into(),
+            lifecycle: "executed".to_string(),
+            ..Default::default()
+        },
         ..Default::default()
-    };
-    m
+    }
 }

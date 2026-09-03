@@ -5,8 +5,7 @@
 
 use mp::activity::{ActivityEvent, ActivityLog};
 use mp::autopilot::verifier::{
-    cross_check_state, ActorAttribution, CrossCheckMismatch, Lane, LaneNotification,
-    VerifierState,
+    cross_check_state, ActorAttribution, CrossCheckMismatch, Lane, LaneNotification, VerifierState,
 };
 use mp::model::{MilestoneFile, MilestoneMeta};
 use mp::reviews::ReviewRecord;
@@ -22,16 +21,16 @@ fn attribution() -> ActorAttribution {
 }
 
 fn sample_milestone(id: &str, lifecycle: &str) -> MilestoneFile {
-    let mut m = MilestoneFile::default();
-    m.milestone = MilestoneMeta {
-        id: id.to_string(),
-        title: "Sample".into(),
-        slug: "sample".into(),
-        lifecycle: lifecycle.to_string(),
+    MilestoneFile {
+        milestone: MilestoneMeta {
+            id: id.to_string(),
+            title: "Sample".into(),
+            slug: "sample".into(),
+            lifecycle: lifecycle.to_string(),
+            ..Default::default()
+        },
         ..Default::default()
-    };
-    // Empty acceptance criteria so the evidence contract doesn't fire.
-    m
+    }
 }
 
 fn state_with_milestone(id: &str, lifecycle: &str) -> VerifierState {
@@ -52,28 +51,16 @@ fn cross_check_accepts_matching_lifecycle() {
     // to the legacy-vs-canonical derivation rules.
     state.milestone.milestone.execution_status = "done".into();
     state.milestone.milestone.spec_status = "implemented".into();
-    let n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let n =
+        LaneNotification::runner_done("207", 1, "executed", "done", "implemented", attribution());
     assert!(cross_check_state(&n, &state).is_ok());
 }
 
 #[test]
 fn cross_check_rejects_lifecycle_mismatch_with_typed_error() {
     let state = state_with_milestone("207", "approved");
-    let n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "in-progress",
-        "ready",
-        attribution(),
-    );
+    let n =
+        LaneNotification::runner_done("207", 1, "executed", "in-progress", "ready", attribution());
     let err = cross_check_state(&n, &state).unwrap_err();
     assert!(
         matches!(err, CrossCheckMismatch::LifecycleMismatch { .. }),
@@ -84,14 +71,7 @@ fn cross_check_rejects_lifecycle_mismatch_with_typed_error() {
 #[test]
 fn cross_check_rejects_execution_status_mismatch() {
     let state = state_with_milestone("207", "in-progress");
-    let n = LaneNotification::runner_done(
-        "207",
-        1,
-        "in-progress",
-        "done",
-        "ready",
-        attribution(),
-    );
+    let n = LaneNotification::runner_done("207", 1, "in-progress", "done", "ready", attribution());
     let err = cross_check_state(&n, &state).unwrap_err();
     assert!(matches!(
         err,
@@ -119,16 +99,13 @@ fn cross_check_rejects_spec_status_mismatch() {
 #[test]
 fn cross_check_rejects_milestone_id_mismatch() {
     let state = state_with_milestone("207", "executed");
-    let n = LaneNotification::runner_done(
-        "999",
-        1,
-        "executed",
-        "done",
-        "implemented",
-        attribution(),
-    );
+    let n =
+        LaneNotification::runner_done("999", 1, "executed", "done", "implemented", attribution());
     let err = cross_check_state(&n, &state).unwrap_err();
-    assert!(matches!(err, CrossCheckMismatch::MilestoneIdMismatch { .. }));
+    assert!(matches!(
+        err,
+        CrossCheckMismatch::MilestoneIdMismatch { .. }
+    ));
 }
 
 #[test]
@@ -163,14 +140,8 @@ fn cross_check_does_not_rely_on_arbitrary_activity_tail() {
     // milestone at lifecycle=approved is rejected as a typed
     // mismatch.
     let state = state_with_milestone("207", "approved");
-    let n = LaneNotification::runner_done(
-        "207",
-        1,
-        "executed",
-        "in-progress",
-        "ready",
-        attribution(),
-    );
+    let n =
+        LaneNotification::runner_done("207", 1, "executed", "in-progress", "ready", attribution());
     // The cross_check_state helper itself produces a typed
     // LifecycleMismatch — proves the verifier does NOT rely on
     // arbitrary activity tail slicing.
