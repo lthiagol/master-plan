@@ -1,5 +1,10 @@
 use anyhow::{bail, Context, Result};
 
+use crate::autopilot::reconcile::{
+    cross_check_canonical, CanonicalAcKey, CanonicalAcState, CanonicalLifecycleState,
+    CanonicalSnapshot, CrossCheckReport,
+};
+use crate::autopilot::session::AutopilotSession;
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::{store, validate};
@@ -290,6 +295,57 @@ pub fn complete_milestone(
     // one transition event. Same-state evidence refreshes emit no event.
     let lc_was = m.milestone.lifecycle.clone();
 
+    // ─── M225 F-01 wiring (AC-04: no fabricated completion) ──────────
+    // Before flipping the lifecycle, run the M225 cross-check
+    // against every autopilot session that references this
+    // milestone. The check asks: "is the session's projection of
+    // this milestone newer than the canonical plan evidence?"
+    // If `canonical_wins_anywhere` is true, the plan has
+    // evidence that the session has not yet seen — completing
+    // now would race a newer plan update. The M200 R5 lesson
+    // is "never let the runner fabricate completion against
+    // newer plan evidence"; this guard enforces it.
+    let cross_check = cross_check_milestone(ctx, &m);
+    if cross_check.canonical_wins_anywhere {
+        // Build a structured "what changed" summary for the
+        // operator. Each `CanonicalNewer` dimension names the
+        // session projection that is stale.
+        let stale_dims: Vec<String> = cross_check
+            .ac
+            .iter()
+            .filter(|(_, v)| {
+                matches!(
+                    v,
+                    crate::autopilot::reconcile::DimensionVerdict::CanonicalNewer { .. }
+                )
+            })
+            .map(|(k, _)| format!("ac[{k}]"))
+            .chain(
+                cross_check
+                    .lifecycles
+                    .iter()
+                    .filter(|(_, v)| {
+                        matches!(
+                            v,
+                            crate::autopilot::reconcile::DimensionVerdict::CanonicalNewer { .. }
+                        )
+                    })
+                    .map(|(k, _)| format!("lifecycle[{k}]")),
+            )
+            .collect();
+        let msg = format!(
+            "mp milestone complete {id}: refused by M225 AC-04 cross-check; \
+             canonical plan evidence is newer than the autopilot session's \
+             projection on {} dimension(s): [{}]. The plan has been updated \
+             since the session was last reconciled. Run `mp autopilot session \
+             show <id>` to inspect the session, then re-run completion once \
+             the session has caught up.",
+            stale_dims.len(),
+            stale_dims.join(", "),
+        );
+        anyhow::bail!("{msg}");
+    }
+
     // Completion requires all self-review work to be resolved. Legacy
     // empty-phase findings count as self-review work.
     if m.has_open_self_findings() {
@@ -452,4 +508,88 @@ pub(crate) fn format_gate_errors(errors: &[validate::ValidationIssue]) -> String
         .map(|e| format!("{}: {}", e.code, e.message))
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+/// M225 F-01 / AC-04 wiring helper: build a `CanonicalSnapshot`
+/// from the milestone JSON's current state, find any autopilot
+/// session that references this milestone, and run
+/// `cross_check_canonical` against the session's projection.
+///
+/// Returns an empty `CrossCheckReport` (no canonical_wins_anywhere)
+/// when:
+/// - The plan has no autopilot session for this milestone
+///   (most milestones; only the ones driven through the
+///   autopilot subsystem have a session).
+/// - The session file is missing / unreadable (load failure is
+///   surfaced as a no-op so the completion can proceed; the
+///   plan is still authoritative).
+///
+/// Returns the merged report when at least one session is found
+/// — `canonical_wins_anywhere` is true if any session has a stale
+/// projection that the plan has since overwritten.
+fn cross_check_milestone(ctx: &PlanContext, m: &MilestoneFile) -> CrossCheckReport {
+    let mut merged = CrossCheckReport::default();
+    // Build the canonical side from the milestone JSON we just
+    // loaded. The plan's current state IS the canonical state
+    // for this milestone.
+    let mut snapshot = CanonicalSnapshot::empty();
+    let canonical_at = m
+        .milestone
+        .lifecycle_at
+        .clone()
+        .unwrap_or_else(|| m.milestone.updated.clone());
+    for ac in &m.acceptance_criteria {
+        let key = CanonicalAcKey::new(m.milestone.id.clone(), ac.id.clone());
+        snapshot.ac_revisions.insert(
+            key,
+            CanonicalAcState {
+                status: ac.status.clone(),
+                // The plan's AC has no separate "source_revision" —
+                // use the AC id as a stable identifier. The F-03
+                // timestamp ordering makes this safe; the F-03
+                // regression tests pin the rule.
+                source_revision: ac.id.clone(),
+                canonical_at: canonical_at.clone(),
+            },
+        );
+    }
+    snapshot.lifecycle_revisions.insert(
+        m.milestone.id.clone(),
+        CanonicalLifecycleState {
+            lifecycle: m.milestone.lifecycle.clone(),
+            lifecycle_at: canonical_at,
+        },
+    );
+
+    // Walk every session under the plan dir, run the cross-check
+    // against each, and merge the reports. A single session
+    // with a stale dimension is enough to refuse completion.
+    let session_ids = match crate::autopilot::list_session_ids(ctx) {
+        Ok(ids) => ids,
+        Err(_) => return merged,
+    };
+    for session_id in session_ids {
+        let session: AutopilotSession = match crate::autopilot::load_session(ctx, &session_id) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        // The session-side timestamp is the session's
+        // `last_updated`. M225's `cross_check_canonical` uses
+        // this as the fallback when `AcProjection::projected_at`
+        // is unset (legacy projections pre-dating M207).
+        let report = cross_check_canonical(&session, &snapshot);
+        if report.canonical_wins_anywhere {
+            merged.canonical_wins_anywhere = true;
+            for (k, v) in report.ac {
+                merged.ac.insert(k, v);
+            }
+            for (k, v) in report.reviews {
+                merged.reviews.insert(k, v);
+            }
+            for (k, v) in report.lifecycles {
+                merged.lifecycles.insert(k, v);
+            }
+        }
+    }
+    merged
 }

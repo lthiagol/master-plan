@@ -297,13 +297,73 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // Query herdr agent list and reconcile against the (optional)
     // recorded watch state. Default `mp watch` refuses to spawn a
     // second role pane when one already exists for the active
-    // milestone. `--resume` opts in to re-attaching to live panes;
+    // milestones. `--resume` opts in to re-attaching to live panes;
     // `--force` skips the check (still re-uses on resume). A corrupt
     // or absent herdr list is treated as "no live panes" so the
     // check never blocks startup.
     let herdr_list_json = crate::watch::list_panes(&herdr_bin).unwrap_or_default();
     let recorded_state = crate::watch::WatchState::load(ctx).ok().flatten();
     let reconciliation = crate::watch::reconcile(recorded_state.as_ref(), &herdr_list_json);
+
+    // ─── M225 F-01 wiring (AC-03: resume from last valid event) ─────────
+    // On every `mp watch` / `cmd_autopilot_start` invocation, run
+    // `run_startup_recovery_all` over every session.json under the
+    // plan dir. Each session is loaded, the M225 cursor-vs-events
+    // gate is consulted, and a `Recovered` verdict writes the
+    // session back when the cursor moved. `Rejected` reports are
+    // logged but do NOT block the run — a corrupt session in one
+    // id does not stop other sessions from executing (the F-01
+    // contract is "resume safely; never fabricate completion").
+    let startup_recovery = match crate::autopilot::run_startup_recovery_all(
+        ctx,
+        &crate::autopilot::spawn::MpBinaryProvenance::current(),
+    ) {
+        Ok(reports) => reports,
+        Err(e) => {
+            // Recovery scan itself failed (e.g. read_dir error).
+            // Log + continue; the resume gate below still runs.
+            logger
+                .log(&WatchLogEntry::new(
+                    "startup_recovery_failed",
+                    format!("{e}"),
+                ))
+                .ok();
+            Vec::new()
+        }
+    };
+    for report in &startup_recovery {
+        match &report.outcome {
+            crate::autopilot::StartupRecoveryOutcome::Recovered {
+                prev_cursor,
+                next_cursor,
+                event_count,
+            } => {
+                logger
+                    .log(&WatchLogEntry::new(
+                        "startup_recovery_recovered",
+                        format!(
+                            "session={} prev_cursor={} next_cursor={} events={}",
+                            report.session_id, prev_cursor, next_cursor, event_count
+                        ),
+                    ))
+                    .ok();
+            }
+            crate::autopilot::StartupRecoveryOutcome::Rejected {
+                reason,
+                event_count,
+            } => {
+                logger
+                    .log(&WatchLogEntry::new(
+                        "startup_recovery_rejected",
+                        format!(
+                            "session={} events={} reason={}",
+                            report.session_id, event_count, reason
+                        ),
+                    ))
+                    .ok();
+            }
+        }
+    }
     let live_panes: Vec<(&'static str, &str)> = [
         (
             "runner",
@@ -324,6 +384,61 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     .filter_map(|(role, id)| id.map(|id| (role, id)))
     .collect();
     let has_live_panes = !live_panes.is_empty();
+
+    // ─── M225 F-01 wiring (AC-02: pane loss classification) ─────────
+    // The M152 reconciler classifies every role pane as Live /
+    // Dead / Missing. M225 adds a typed classification on top of
+    // `Dead`: re-spawn may be `Safe` (stored prompt + actor
+    // available) or `AwaitingUser` (no stored prompt, role
+    // removed from topology, etc.). The M225 contract is "no
+    // fabricated completion after pane restart" — a `Dead` pane
+    // with `AwaitingUser` outcome means the operator must
+    // intervene; the drive loop must not silently re-spawn.
+    let runner_dead = matches!(reconciliation.runner, crate::watch::PaneStatus::Dead { .. });
+    let coordinator_dead = matches!(
+        reconciliation.coordinator,
+        crate::watch::PaneStatus::Dead { .. }
+    );
+    if runner_dead || coordinator_dead {
+        for (role_label, is_dead) in [("runner", runner_dead), ("coordinator", coordinator_dead)] {
+            if !is_dead {
+                continue;
+            }
+            let role = match role_label {
+                "runner" => crate::autopilot::RoleName::Runner,
+                _ => crate::autopilot::RoleName::Reviewer, // legacy 2-pane coord
+            };
+            let stored_prompt: Option<String> = None;
+            let stored_actor: Option<String> = None;
+            let input = crate::autopilot::PaneLossInput {
+                role,
+                pane_live: false,
+                topology_role_present: true,
+                stored_prompt: stored_prompt.as_deref(),
+                stored_actor: stored_actor.as_deref(),
+            };
+            let outcome = crate::autopilot::classify_pane_loss(&input);
+            match outcome {
+                crate::autopilot::PaneLossOutcome::SafeRespawn { .. } => {
+                    logger
+                        .log(&WatchLogEntry::new(
+                            "pane_loss_safe_respawn",
+                            format!("role={role_label}: stored prompt/actor absent; defaulting to re-spawn via state machine"),
+                        ))
+                        .ok();
+                }
+                crate::autopilot::PaneLossOutcome::AwaitingUser { reason } => {
+                    logger
+                        .log(&WatchLogEntry::new(
+                            "pane_loss_awaiting_user",
+                            format!("role={role_label} reason={reason}"),
+                        ))
+                        .ok();
+                }
+            }
+        }
+    }
+
     if has_live_panes && !resume && !force {
         // AC-03 default: refuse to double-spawn. Surface every live
         // pane the user might want to attach to so they can pick

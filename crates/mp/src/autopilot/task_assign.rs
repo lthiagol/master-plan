@@ -423,6 +423,14 @@ pub enum AssignmentOutcome {
     /// `herdr` could not be spawned (binary missing, permission
     /// error, etc.). The argv is still recorded for forensics.
     SpawnError { argv: Vec<String>, error: String },
+    /// M225 F-01 / AC-01: the dispatch was suppressed because an
+    /// `AssignmentDispatched` event for the same `pane_label` is
+    /// already in the session's event log. The prior process
+    /// already delivered this prompt; this process must NOT
+    /// re-spawn (the M225 contract is "no duplicate dispatch").
+    /// The `reason` carries the M225 wiring note so the
+    /// structured audit row explains the no-op.
+    AlreadyApplied { pane_label: String, reason: String },
 }
 
 impl AssignmentOutcome {
@@ -437,6 +445,7 @@ impl AssignmentOutcome {
             AssignmentOutcome::Success { .. } => "success",
             AssignmentOutcome::NonZeroExit { .. } => "non_zero_exit",
             AssignmentOutcome::SpawnError { .. } => "spawn_error",
+            AssignmentOutcome::AlreadyApplied { .. } => "already_applied",
         }
     }
 
@@ -463,6 +472,11 @@ impl AssignmentOutcome {
                 "argv": argv,
                 "error": error,
             }),
+            AssignmentOutcome::AlreadyApplied { pane_label, reason } => json!({
+                "outcome": "already_applied",
+                "pane_label": pane_label,
+                "reason": reason,
+            }),
         }
     }
 }
@@ -472,6 +486,33 @@ impl AssignmentOutcome {
 /// beyond the exit status + stderr text.
 pub fn execute_assignment(herdr_bin: &Path, argv: &[String]) -> std::io::Result<ExitStatus> {
     Command::new(herdr_bin).args(argv).status()
+}
+
+/// M225 F-01 / AC-01 wiring helper: derive the pane label the
+/// idempotency key is keyed on. The assignment's `target_pane`
+/// is the `%1`-style pane id, not the human-readable label; the
+/// F-01 dedup must key on the same shape the
+/// `AssignmentDispatched` event records. The session's pane
+/// layout carries the label; if the target pane is unknown to
+/// the layout, the call returns the `target_pane` string as a
+/// best-effort fallback (a fresh dispatch will create the label
+/// via the spawn pipeline).
+fn target_pane_label(payload: &TaskAssignment, session: &AutopilotSession) -> String {
+    for slot in [
+        session.topology.orchestrator.as_ref(),
+        session.topology.runner.as_ref(),
+        session.topology.reviewer.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if slot.pane_id == payload.target_pane {
+            if let Some(label) = &slot.label {
+                return label.clone();
+            }
+        }
+    }
+    payload.target_pane.clone()
 }
 
 /// Single read/write path the orchestrator uses to dispatch a
@@ -513,6 +554,28 @@ pub fn dispatch_assignment(
             "session load failed: {e}"
         ))
     })?;
+    // Step 2.5: M225 F-01 wiring (AC-01: no duplicate dispatch).
+    // Before invoking herdr, consult the session's event log for
+    // an `AssignmentDispatched` event whose `pane_label` matches
+    // this dispatch. If one exists, the prior process already
+    // delivered this prompt; this process must NOT re-spawn. The
+    // outcome is a typed `AlreadyApplied` so the verifier can
+    // distinguish "no-op duplicate" from "fresh dispatch" in
+    // its review.
+    let dispatch_key = crate::autopilot::IdempotencyKey::Dispatch {
+        pane_label: target_pane_label(payload, &session),
+    };
+    if crate::autopilot::was_already_applied(&session, &dispatch_key) {
+        return Ok((
+            AssignmentOutcome::AlreadyApplied {
+                pane_label: target_pane_label(payload, &session),
+                reason: "AssignmentDispatched event already recorded for this pane_label; \
+                         M225 AC-01 forbids re-spawn"
+                    .to_string(),
+            },
+            ctx.plan_dir.clone(),
+        ));
+    }
     // Step 3: validate pane membership against the loaded layout.
     validate_pane_membership(payload, &session.topology)?;
     // Step 4: render the argv.

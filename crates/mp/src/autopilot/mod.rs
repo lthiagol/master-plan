@@ -120,8 +120,9 @@ pub use reconcile::{
     TailRejectReason,
 };
 pub use recovery::{
-    append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
-    RecoveredSession,
+    append_event_unchecked, list_session_ids, reconcile_event_cursor, recover_session,
+    recover_session_at, run_startup_recovery, run_startup_recovery_all, RecoveredSession,
+    StartupRecoveryOutcome, StartupRecoveryReport,
 };
 pub use review_env::{
     build_provenance, clean_room_commands, gate, provenance_issues, select_mode, ActorIdentity,
