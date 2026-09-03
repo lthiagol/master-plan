@@ -3,8 +3,8 @@
     "id": "211",
     "title": "mp autopilot typed task assignment — orchestrator dispatch through herdr argv",
     "slug": "mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,7 +17,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -25,11 +25,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T16:25:46.494311+00:00",
+    "lifecycle_at": "2026-09-03T16:30:20.699760+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:51:39.549780+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T16:30:27.145504+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T16:25:46.494315+00:00"
+        "at": "2026-09-03T16:30:27.145504+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T16:30:27.180767+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.021148+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T16:30:27.180769+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T16:30:20.699761+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T16:25:46.494315+00:00"
+        "at": "2026-09-03T16:30:27.145504+00:00"
       },
       "specify": {
         "status": "done",
@@ -183,5 +199,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "style",
+      "description": "Dead-import stubs in crates/mp/src/autopilot/task_assign.rs: lines 600-620 add three #[allow(dead_code)] helper stubs (_session_path_type, _cursor_type, _session_type) solely to suppress unused-import warnings for SessionPath, EventCursor, and AutopilotSession. None of those types are referenced elsewhere in the file. Cleaner fix: drop the three imports entirely (the public re-exports in mod.rs already pull them from events/session modules, not task_assign). No behavioral impact; cosmetic only.",
+      "status": "fixed",
+      "author": "reviewer-211",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "spec",
+      "description": "Stale slug + rollback doc reference a file that does not exist. The milestone slug 'mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text' and WP1's rollback line ('Revert the new module under crates/mp/src/autopilot/lane_notify.rs to the pre-milestone state') both name crates/mp/src/autopilot/lane_notify.rs, which is not in the tree. The actual implementation lives at crates/mp/src/autopilot/task_assign.rs. Either rename the slug and update the rollback doc to match task_assign.rs, or document why the early 'lane_notify' framing was kept as a name while the module was implemented as task_assign. No behavioral impact; affects operator runbook and rollback clarity.",
+      "status": "fixed",
+      "author": "reviewer-211",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    }
+  ]
 }
