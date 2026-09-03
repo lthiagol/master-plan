@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
+    "depends_on": [
+      "208"
+    ],
     "effort": "S",
     "risk": "low",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -44,10 +46,10 @@
     }
   },
   "intent": {
-    "outcome": "`mp watch` continues to function (A2 ships the alias) but prints a deprecation warning to stderr on every invocation pointing the user at `mp autopilot`; the warning is non-blocking and survives shell pipelines; after the consumer-surface hygiene sweep (F3), `mp watch` is removed entirely."
+    "outcome": "The legacy mp watch spelling remains functional for the documented compatibility window and emits one stderr warning per invocation. Alias removal is a later explicitly scheduled change after migration telemetry or a release decision; M220 does not remove it."
   },
   "problem": {
-    "description": "A2 pivots `mp watch` to a thin alias of `mp autopilot`. Without a deprecation notice, users (and CI pipelines) keep invoking the old name silently. After one release of notice, F3 removes the alias. The notice must be visible but not blocking — exit code, stdout, and pipelines all keep working; only stderr gains a one-line warning."
+    "description": "M208 preserves the alias for compatibility. This milestone provides a deterministic non-blocking warning while retaining the invocation spelling through dispatch so canonical autopilot calls remain silent."
   },
   "scope": {
     "in_scope": [
@@ -65,22 +67,22 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Invoking `mp watch --help`, `mp watch status`, or `mp autopilot status` (after the legacy alias was used) prints the documented deprecation warning to stderr and produces no change to stdout.",
-      "verification": "manual: ran `mp watch --help 2>stderr.log 1>stdout.log`; confirmed the warning appears in stderr.log and stdout.log contains only the help text.",
+      "description": "Each legacy `mp watch` invocation, including help and status, emits exactly one documented warning on stderr while preserving canonical stdout and exit code. Canonical `mp autopilot` invocations never warn and prior alias use has no effect.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "`mp autopilot --help` (the canonical name) does NOT print the deprecation warning.",
-      "verification": "manual: ran `mp autopilot --help 2>stderr.log`; confirmed stderr.log is empty.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "The deprecation message text matches the documented string (`mp watch is deprecated; use 'mp autopilot' instead.`) byte-for-byte.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -95,6 +97,11 @@
       "area": "warning_deduplication",
       "choice": "Emit once per invocation (not once per subcommand or per session). Avoid spammy warnings on long-running polling.",
       "rationale": "Long sessions shouldn't generate 1 warning per status call."
+    },
+    {
+      "area": "invocation_spelling",
+      "choice": "CLI parsing retains whether the user entered watch or autopilot and passes that origin to one top-level warning hook; backend subcommands remain shared.",
+      "rationale": "A transparent clap alias alone cannot selectively warn unless invocation origin is retained."
     }
   ],
   "work_packages": [
@@ -110,11 +117,11 @@
       "id": "S01",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement and verify: Invoking `mp watch --help`, `mp watch status`, or `mp autopilot status` (after the legacy alias was used) prints the documented deprecation warning to stderr and produces no change to stdout.",
+      "action": "Emit exactly one warning for each legacy watch invocation while preserving canonical stdout and exit status; canonical autopilot invocations remain silent.",
       "files": [
         "crates/mp/src/commands/autopilot.rs"
       ],
-      "tests": "manual: ran `mp watch --help 2>stderr.log 1>stdout.log`; confirmed the warning appears in stderr.log and stdout.log contains only the help text.",
+      "tests": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 219 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -134,7 +141,7 @@
       "files": [
         "crates/mp/src/commands/autopilot.rs"
       ],
-      "tests": "manual: ran `mp autopilot --help 2>stderr.log`; confirmed stderr.log is empty.",
+      "tests": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 219 AC-02 --evidence`.",
       "status": "pending",
       "covers_ac": [

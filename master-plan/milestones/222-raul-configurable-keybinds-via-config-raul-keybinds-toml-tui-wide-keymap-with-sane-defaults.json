@@ -11,9 +11,12 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "214",
+      "216"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-03",
@@ -29,6 +32,14 @@
         "status": "done",
         "at": "2026-09-03T13:17:54.584443+00:00"
       },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:01:32.253459+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:01:32.350971+00:00"
+      },
       "specify": {
         "status": "done",
         "at": "2026-09-03T13:17:54.584443+00:00"
@@ -36,60 +47,78 @@
     }
   },
   "intent": {
-    "outcome": "Every raul lane's key-binding is read from a per-user TOML config (`~/.config/raul/keybinds.toml`) at startup, with the existing hardcoded values as defaults when the file is absent. The user can remap any keybind without rebuilding raul. Existing keyboard paths stay canonical; the config is additive."
+    "outcome": "raul loads a validated global and per-lane keyboard map from ~/.config/raul/keybinds.toml, preserves hardcoded defaults when absent or invalid, supports atomic reload, and exposes the effective map read-only in Settings."
   },
   "problem": {
-    "description": "All keybinds are hardcoded in each lane's app.rs / keybinds.rs. Remapping (e.g. `<space>` pause on the autopilot lane → `<F1>`) requires rebuilding raul and reinstalling. The M198 follow-on (Settings 2.0) shipped a typed config schema for `ui.*` values but did not extend to keymaps. This milestone adds the config surface for keymaps, plumbs it into the existing keybind dispatch in each lane, and surfaces a Settings affordance to view/edit the current keymap."
+    "description": "Keybinds are hardcoded across global and lane dispatchers. Users need an override file without duplicating defaults or risking lockout. The plan therefore needs one action registry, one key parser, deterministic conflict handling, atomic reload, and a read-only Settings view; editing remains external."
   },
   "scope": {
     "in_scope": [
-      "Define `crates/raul/src/tui/keybinds.rs::Keybinds` (or extend the existing module) to load `~/.config/raul/keybinds.toml` at startup with the schema: each lane's section (e.g. `[autopilot]`, `[milestones]`) maps action names (e.g. `pause`, `cancel`, `refresh`) to keyboard codes (e.g. `\"<space>\"`, `\"<F1>\"`, `\"r\"`).",
-      "Default values for every keybind are stored in code; the TOML only overrides.",
-      "Per-lane loading: each lane's app.rs reads its section at construction time; an unknown action in the TOML is ignored (with a one-line warning on stderr); an unparseable key string is treated as the default.",
-      "Live reload via SIGHUP: a running raul instance re-reads the TOML when it receives SIGHUP; the change applies on the next input cycle. (Reload is non-blocking — failures degrade silently to the previous keymap.)",
-      "Settings lane exposes the active keymap as a read-only view (per the M198 precedent); edits happen in the user's TOML, not in-app.",
-      "Cross-platform: keyboard strings use ratatui's KeyCode display (`\"<space>\"`, `\"<F1>\"`, `\"<Enter>\"`); the parser handles the same set as ratatui accepts."
+      "Typed action registry covering global actions and every lane action; TOML contains only overrides.",
+      "Canonical key/chord syntax shared with the existing parser, including documented aliases and modifiers.",
+      "Validation for unknown actions, malformed keys, duplicate bindings, reserved recovery keys, and per-section fallback.",
+      "Atomic startup/reload with previous-map retention on failure; SIGHUP on Unix plus an explicit in-app reload action on all supported platforms.",
+      "Read-only effective-keymap view in Settings."
     ],
     "out_of_scope": [
-      "In-app keymap editor (Settings lane surfaces the active map; editing happens externally).",
-      "Mouse bindings (M221's mouse handler is a separate surface; keybinds.toml is keyboard-only).",
-      "Per-role keybinds inside the autopilot tab (e.g. `<space>` for orchestrator vs `<space>` for runner). The autopilot tab's existing per-role keymap is unchanged; the TOML applies to the lane as a whole.",
-      "Backwards-incompatible default changes (defaults preserve current behavior; the TOML is opt-in)."
+      "In-app keymap editor, mouse bindings, and per-autopilot-role keymaps.",
+      "Macros, multi-key sequences, and conditional/contextual bindings beyond global plus active-lane sections."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "At startup, each lane loads its section from `~/.config/raul/keybinds.toml`. When the file is absent, every lane uses its hardcoded default keymap; behavior unchanged. Verified by running the full raul regression without the file present.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "At startup one shared Keybinds service loads global and per-lane overrides. With no file, every existing default remains unchanged; lanes do not parse the file independently.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Adding a `[autopilot] pause = \"<F1>\"` line to the TOML causes the autopilot lane to respond to `<F1>` instead of `<space>` on the next input cycle. Verified by a fixture that drops a TOML with a custom autoparallel pause key and asserts the lane's dispatch calls accept `<F1>` and reject `<space>`.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "A fixture remaps autopilot.pause to F1, reloads, and proves F1 invokes the canonical pause action while the prior Space binding no longer does; other actions retain defaults.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Unknown actions in the TOML are ignored (with a stderr warning); unparseable key strings fall back to the default. Verified by a fixture that injects both kinds of bad entries and asserts the warning + the lane still uses defaults for those actions.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Unknown actions warn and are ignored; malformed keys or conflicting bindings reject only the affected section and retain its previous/default map. Diagnostics name section, action, and value without aborting raul.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "SIGHUP reload: sending SIGHUP to a running raul causes the keymap to be reloaded from disk on the next input cycle. A test that writes a new TOML, sends SIGHUP (via a child-process helper), and asserts the new keymap is live in <100ms.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Reload parses and validates a complete candidate before atomically swapping it. SIGHUP requests reload on Unix without doing I/O in the signal handler; an explicit reload action works on all platforms. Reload does not wait for user input, and failure preserves the previous map.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Settings lane exposes the active keymap as a read-only view per lane (per M198 precedent). Edits happen externally in the user's TOML, not in-app.",
-      "verification": "manual: opening Settings shows the current keymap per lane; verified against a representative TOML with overrides in `~/.config/raul/keybinds.toml`.",
+      "description": "Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance.",
+      "verification": "cargo nextest run -p raul --test tui_settings --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "The action registry enumerates every configurable global and lane action. Unknown names cannot shadow actions; global recovery actions remain reachable; duplicate key assignments within an active section are rejected with deterministic diagnostics.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Parser regressions cover the full documented key surface: underscore and dash aliases, double_quote/double-quote, page_up/page-down, BackTab/Backtab/back-tab, mixed case, modifiers, and combinations such as Ctrl+double-quote and Ctrl+page-up.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Migration from existing project `keybinds.*` configuration is deterministic: user-level keybinds.toml overrides legacy project bindings, legacy bindings override hardcoded defaults, reads never rewrite either source, and use of the legacy source emits one migration hint.",
+      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -117,6 +146,18 @@
       "name": "Configurable keymap (TUI-wide)",
       "goal": "TOML keymap config loads at startup; each lane reads its section; SIGHUP triggers live reload; Settings shows the active map.",
       "rollback": "Revert keybinds.toml loading to a no-op; full regression stays green."
+    },
+    {
+      "id": "WP2",
+      "name": "Registry and parser",
+      "goal": "Define complete configurable actions, canonical key syntax, and deterministic validation/conflict behavior.",
+      "rollback": "Keep hardcoded dispatch and ignore the optional override file."
+    },
+    {
+      "id": "WP3",
+      "name": "Integration, reload, and visibility",
+      "goal": "Apply one validated map across dispatchers, reload atomically, and display effective bindings.",
+      "rollback": "Disable reload and override application while retaining defaults."
     }
   ],
   "steps": [
@@ -124,15 +165,17 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Define the keymap schema in `crates/raul/src/tui/keybinds.rs`. Each lane has a section; action names are bound to keyboard codes (ratatui's KeyCode display set). Defaults live in code.",
+      "action": "Define global and per-lane action registry, hardcoded defaults, TOML override schema, reserved recovery actions, and duplicate-conflict policy.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/tests/keybind_action_registry.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
-      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 222 AC-01 --evidence`.",
+      "tests": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
+      "done_when": "AC-01 and AC-06 pass with dedicated registry/default tests.",
       "status": "pending",
       "covers_ac": [
-        "AC-01"
+        "AC-01",
+        "AC-06"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
@@ -142,19 +185,24 @@
     },
     {
       "id": "S2",
-      "work_package": "WP1",
+      "work_package": "WP3",
       "order": 2,
-      "action": "Wire each lane's app.rs to load its section at construction time. The TOML is optional; absence keeps defaults. Bad entries (unknown action / unparseable key string) fall back to defaults with a stderr warning.",
+      "action": "Wire every dispatcher to the shared effective Keybinds service; load once at construction and preserve canonical action paths.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/tests/keybind_override_dispatch.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test keybind_override_dispatch --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 222 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
-        "AC-01"
+        "AC-01",
+        "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -162,19 +210,24 @@
     },
     {
       "id": "S3",
-      "work_package": "WP1",
+      "work_package": "WP3",
       "order": 3,
-      "action": "SIGHUP reload: register a signal handler that re-reads the TOML atomically. The new keymap applies on the next input cycle.",
+      "action": "Implement candidate parse/validate plus atomic swap, Unix SIGHUP flag handling, platform-neutral explicit reload, and previous-map retention on failure.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/tests/keybind_reload.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test keybind_reload --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 222 AC-04 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -182,19 +235,23 @@
     },
     {
       "id": "S4",
-      "work_package": "WP1",
+      "work_package": "WP3",
       "order": 4,
-      "action": "Settings lane exposes the active keymap as a read-only view (per the M198 precedent).",
+      "action": "Render effective keymap read-only in Settings with default/override markers and external file path.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/tests/settings_keybind_view.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test settings_keybind_view --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 222 AC-05 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -202,17 +259,18 @@
     },
     {
       "id": "S5",
-      "work_package": "WP1",
+      "work_package": "WP2",
       "order": 5,
-      "action": "Manual verification: defaults survive absent TOML; custom TOML maps `<F1>` to autopilot pause; bad entries ignored; SIGHUP triggers reload within 100ms.",
+      "action": "Implement invalid-entry and section-fallback fixtures for unknown actions, malformed keys, conflicts, and reserved recovery actions.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/tests/keybind_invalid_entries.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
-      "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 222 AC-02 --evidence`.",
+      "tests": "cargo nextest run -p raul --test keybind_invalid_entries --no-fail-fast",
+      "done_when": "AC-03 passes for unknown, malformed, conflicting, and reserved-action fixtures.",
       "status": "pending",
       "covers_ac": [
-        "AC-02"
+        "AC-03"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
@@ -222,17 +280,40 @@
     },
     {
       "id": "S6",
-      "work_package": "WP1",
+      "work_package": "WP2",
       "order": 6,
-      "action": "Manual verification of bad-entry fixtures and the SIGHUP scenario.",
+      "action": "Lock the complete documented key parser alias and modifier surface, including prior double-quote, page-up, and back-tab regressions.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/tests/keybind_parser_aliases.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
-      "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 222 AC-03 --evidence`.",
+      "tests": "cargo nextest run -p raul --test keybind_parser_aliases --no-fail-fast",
+      "done_when": "AC-07 passes across every documented alias and modifier combination.",
       "status": "pending",
       "covers_ac": [
-        "AC-03"
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Implement legacy mp-config keybind fallback and migration diagnostics beneath keybinds.toml precedence; do not delete the legacy source in this milestone.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/tests/keybinds_v2.rs",
+        "docs/raul/keybinds.md"
+      ],
+      "tests": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "done_when": "AC-08 proves precedence, no-write reads, and one migration hint.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

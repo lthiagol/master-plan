@@ -11,9 +11,14 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207",
+      "209",
+      "211",
+      "227"
+    ],
+    "effort": "L",
+    "risk": "high",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
@@ -66,36 +71,57 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "The verifier reads the three sources (milestone JSON, reviews.json, activity.json) and cross-checks them against the lane notification. Mismatches (e.g., lane claims `lifecycle=executed` but milestone JSON says `lifecycle=approved`) are detected as typed mismatches.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "The verifier cross-checks milestone state, latest review verdict, and session event-log entries after a durable event cursor; mismatches and missing revisions are typed errors. It does not rely on an arbitrary last-three activity tail.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Each of the seven violation detectors fires on a hand-crafted fixture reproducing the original lesson (e.g., M203's runner calling `mp reviews pass` is detected by detector #1).",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Each role-boundary detector is exercised with attributable session fixtures. Detection uses M207 actor tokens and dispatch-bounded repository snapshots; conditions that cannot be attributed are reported as UnknownActor and block automatic acceptance rather than being guessed.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "`recommend_remediation` returns `Resend` for any violation under 3-pane, `EscalateToUser` under 2-pane or 1-pane.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Regression test for M201 cycle 1: a fabricated `lifecycle=executed` notification with no matching activity.json event and a milestone at `lifecycle=approved` is rejected by the verifier as a typed mismatch.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "Documentation: `docs/mp/autopilot-verifier.md` describes (a) the `mp reviews pass` writing pattern (writes to milestone JSON + reviews.json; does NOT add an activity.json event by default), so future agents don't look for a `review-pass` event in activity.json as proof of completion; (b) the M200 recovery lesson (review-pass lost to activity.json truncation; verifier cross-checks three sources to catch it); (c) the multi-source verification convention (milestone JSON + reviews.json + activity.json).",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Every autopilot mutation carries session id, role, actor token, dispatch id, and sequence number. Review pass attribution is read from the session event log plus reviews.json; missing or mismatched actor identity blocks automatic completion.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Before accepting runner completion, the verifier requires every step done and every AC evidence value to contain the exact command, exit code, and observed pass count. Generic summaries and evidence overwritten after completion are rejected; the canonical criterion state is re-read after completion.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Verification commands use a structured command-list representation. Parentheses in nextest filters are preserved as argv; shell control operators such as `&&`, `;`, and newlines are either represented as separate commands or rejected with an actionable typed error, never silently skipped.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -115,6 +141,11 @@
       "area": "topology_decision_in_verifier",
       "choice": "`recommend_remediation` lives in C2 (verifier), but the policy enum (`Resend` / `EscalateToUser`) is shared with C3 (cycle flow).",
       "rationale": "C2 owns the surface; C3 owns the cycle-flow consumption."
+    },
+    {
+      "area": "attribution",
+      "choice": "Role violations are accepted only with session-scoped actor provenance or dispatch-bounded repository evidence; uncertain attribution becomes a blocking UnknownActor result.",
+      "rationale": "Activity and git history do not inherently identify a herdr pane. Guessing would create false accusations and still miss the M203 violation."
     }
   ],
   "work_packages": [
@@ -214,11 +245,74 @@
       "files": [
         "docs/mp/autopilot-verifier.md"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test autopilot_verifier_docs --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 212 AC-05 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP1",
+      "order": 6,
+      "action": "Implement actor-token and dispatch-snapshot attribution; return UnknownActor when provenance is insufficient and block automatic acceptance.",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs",
+        "crates/mp/tests/verifier_actor_attribution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_actor_attribution --no-fail-fast",
+      "done_when": "AC-06 passes for valid, mismatched, and missing actor provenance.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Enforce per-step completion and per-AC evidence format, then re-read canonical criterion evidence after completion to detect overwrite.",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs",
+        "crates/mp/tests/verifier_evidence_contract.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_evidence_contract --no-fail-fast",
+      "done_when": "AC-07 reproduces and rejects generic and overwritten evidence from the herdr runs.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP1",
+      "order": 8,
+      "action": "Introduce structured verification command lists with argv-safe nextest filters and explicit multi-command semantics.",
+      "files": [
+        "crates/mp/src/autopilot/verifier.rs",
+        "crates/mp/tests/verifier_command_list.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test verifier_command_list --no-fail-fast",
+      "done_when": "AC-08 covers parentheses, zero-match filters, command lists, and control-operator rejection.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

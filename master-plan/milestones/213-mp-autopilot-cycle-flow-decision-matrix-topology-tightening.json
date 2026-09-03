@@ -11,9 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207",
+      "209",
+      "211",
+      "212",
+      "210"
+    ],
+    "effort": "M",
+    "risk": "high",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
@@ -44,72 +50,69 @@
     }
   },
   "intent": {
-    "outcome": "The orchestrator drives a milestone through orchestrator→runner→orchestrator→reviewer→orchestrator cycle flow, applies the documented decision matrix (per-cycle governance: 2 default, soft cap 3, hard limit 4; cycle-next / ship-with-backlog / escalate), and respects the topology-mode tightening (3-pane = full matrix; 2-pane = no ship-with-backlog; 1-pane = no external review)."
+    "outcome": "A headless mp-owned cycle engine dispatches runner/reviewer assignments, observes durable session events, applies topology-aware decisions, and escalates safely without depending on raul."
   },
   "problem": {
-    "description": "The project log's R2/R3/R11 captured hard requirements (cycle caps, decision matrix, reviewer activation by orchestrator prompt) that drove M200/M201/M202/M203 to completion in 3-4 cycles each, with a documented soft cap hit twice (M200, M201). The new autopilot system needs the cycle machinery as code, not as a procedure the agent follows: a state machine that runs the cycle, applies the matrix after each reviewer verdict, and tightens itself based on topology. Without this, the orchestrator has no formal cycle governance and either never progresses or ships-with-too-many-bugs."
+    "description": "The herdr runs proved the cycle policy but also exposed fabricated state, overwritten evidence, unclear cycle limits, and role violations. The orchestration engine must own polling, dispatch, verification, lifecycle commands, recovery, and audit events inside mp; depending on a focused TUI would make background drives stall."
   },
   "scope": {
     "in_scope": [
-      "Cycle-flow state machine in `crates/mp/src/autopilot/cycle.rs`: states `Dispatching`, `WaitingRunner`, `Reviewing`, `Deciding`, `AwaitingUser`; transitions driven by lane notifications (C1) and verifier verdicts (C2). One full cycle is `Dispatching → WaitingRunner → Reviewing → Deciding → (cycle-next → Dispatching | ship | escalate).`",
-      "Decision matrix as a pure function in `crates/mp/src/autopilot/decision.rs`: `decide_after_review(verdict: ReviewReport, cycle: u8) -> CycleDecision { CycleNext, ShipWithBacklog, Escalate }`. Inputs: severity counts, drift ratio, current cycle number. Documented thresholds per the log's R3.",
-      "Cycle-cap enforcement: default 2 cycles, soft cap 3 (tightened reviewer prompt — `blockers only` — kicks in at cycle 2), hard limit 4 (forces `Escalate` regardless of verdict).",
-      "Topology-mode tightening consumes B1's `topology_tightening(topology) -> MatrixMode` (`FullMatrix` / `NoShipWithBacklog` / `NoExternalReview`) and applies it: 2-pane removes the `ShipWithBacklog` arm; 1-pane skips `Reviewing` entirely and ships via a typed `SingleAgentShip` arm.",
-      "Reviewer activation by orchestrator prompt (per R11): the cycle-flow state machine includes a `DispatchReviewer` transition that sends a fixed-shape `review_request` shell command to the reviewer pane carrying the milestone id, cycle number, and evidence refs."
+      "Headless event loop and typed cycle state machine.",
+      "Complete, CycleNext, ShipWithBacklog, and Escalate decision matrix.",
+      "Topology cycle budgets, heartbeat liveness, reviewer activation, and next-action prediction."
     ],
     "out_of_scope": [
-      "The lane-notify wire format — that's C1.",
-      "Role-boundary violations — that's C2.",
-      "The role config and topology declaration — that's B1."
+      "Lifecycle and commit transaction closure, moved to the follow-up lifecycle milestone.",
+      "Review environment isolation, restart reconciliation, and final end-to-end certification, each moved to dedicated follow-up milestones."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "The cycle-flow state machine runs through one full cycle (Dispatching → WaitingRunner → Reviewing → Deciding → cycle-next → Dispatching) for an in-test milestone with stubbed TUI-relay events (lane state changes surfaced via session.json writes, then relayed to the orchestrator by the TUI per E's mediator role).",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "The mp-owned headless event loop runs a full Dispatching → WaitingRunner → Reviewing → Deciding → CycleNext cycle from M207 events without raul running; starting or changing raul lanes has no effect on progress.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "The decision matrix returns the documented outcome for representative inputs: `high_severity + cycle=1 → CycleNext`; `low_count<=2 + cycle=2 → ShipWithBacklog` (verified by an end-state fixture that asserts the milestone ends as `ship-with-backlog` in reviews.json, not just that the matrix returns the enum); `cycle=4 → Escalate`. Each arm is locked by an explicit test fixture.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "The decision matrix has explicit Complete, CycleNext, ShipWithBacklog, and Escalate outcomes. A clean reviewer pass returns Complete; low findings may return ShipWithBacklog only in 3-pane policy; high/correctness findings return CycleNext; non-pass at the hard limit returns Escalate.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Topology-mode tightening: 2-pane returns `NoShipWithBacklog` (low-severity findings force `CycleNext` instead of `ShipWithBacklog`); 1-pane returns `NoExternalReview` (the `Reviewing` state is skipped and the matrix has no `Reviewer` input).",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Topology tightening consumes M209 policy: 3-pane uses the full matrix and four-cycle maximum, 2-pane forbids ship-with-backlog and uses three cycles, and 1-pane is accepted only for track/trivial sessions with two cycles.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "Cycle-cap enforcement: synthetic 4-cycle milestone reaches `Escalate` even if all prior verdicts were `Pass`. Soft-cap kicks in at cycle 2 (tightened-reviewer-prompt flag). When cycle 4's verifier reports `cycle-next` (continuation-impossible), the cycle-flow escalates immediately to user with the typed `CycleCapExhausted` event — not `cycle-next`. This sub-case was untested in M200 (which hit cycle 4 but the review passed); lock it as an explicit test fixture.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Cycle-cap enforcement treats a clean pass on cycle 4 as Complete and any non-pass requiring continuation on cycle 4 as CycleCapExhausted/Escalate. Blockers-only reviewer mode begins at cycle 2.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Reviewer activation: `DispatchReviewer` transition sends a `herdr agent prompt <reviewer-pane-id> \"...\"` shell command with the documented `review_request` payload (milestone id, cycle number, evidence refs); the rendered command is auditable.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Reviewer activation uses M211 typed dispatch, appends an auditable dispatch event, and carries milestone, cycle, evidence revision, and reviewer actor token.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "Stale-state timeout: if the lane's state in session.json.roles.<role>.state has not changed within `autopilot.stale_state_secs` seconds while the cycle-flow expects it to (e.g., runner should transition to `Done` after Working), the cycle-flow raises a typed `StaleStateTimeout` event and the topology-aware escalation in C2 routes it (3-pane: resend + log; 2-pane: escalate to user; 1-pane: always escalate).",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "The headless engine uses explicit heartbeat acknowledgements and state timestamps. A responsive lane may remain in the same workflow state without timing out; only missed heartbeat plus stale state produces StaleStateTimeout.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
       "description": "predict_next_action(cycle_state, recent_events) -> NextAction is a pure function with at least 6 named outcomes (DispatchRunner, DispatchReviewer, AwaitRunner, AwaitReviewer, ApplyMatrix, EscalateUser). Returns one of these based on the cycle state machine's current position and last TUI-relay event. The TUI's per-milestone detail view consumes this directly so users can see 'what's next' for each queued milestone.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -127,8 +130,13 @@
     },
     {
       "area": "single_agent_1pane",
-      "choice": "1-pane topology's `Deciding` state consumes the orchestrator's self-review verdict (no separate reviewer); the matrix degenerates to `Ship (no verification)` since the agent has already done both the work and the review.",
-      "rationale": "This is the topology tightening's terminal case; restricts 1-pane to tracks and trivial fixes (B1 already documents this)."
+      "choice": "One-pane mode is restricted to tracks/trivial sessions and records a non-independent self-review outcome; full milestones fail preflight unless an explicit recorded bypass policy is supplied.",
+      "rationale": "A self-review cannot be described as independent verification or as ship without verification."
+    },
+    {
+      "area": "control_plane_owner",
+      "choice": "mp owns orchestration, polling, liveness, recovery, and lifecycle transitions; raul reads session APIs and submits controls but is never in the progress path.",
+      "rationale": "A TUI-mediated relay stops when the lane is unfocused or the TUI exits, contradicting unattended autopilot behavior."
     }
   ],
   "work_packages": [
@@ -244,11 +252,11 @@
       "id": "S6",
       "work_package": "WP1",
       "order": 6,
-      "action": "Stale-state timeout: integrate a per-lane watcher into the cycle-flow state machine. When a state-watch deadline elapses without a state change, emit a typed `StaleStateTimeout` event. The topology-aware remediation hook from C2 routes it.",
+      "action": "Implement mp-owned heartbeat acknowledgements and stale-state timeout; same-state heartbeat responses remain healthy.",
       "files": [
         "crates/mp/src/autopilot/cycle.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test cycle_stale_state_timeout --no-fail-fast",
       "done_when": "AC-06 evidence is stamped via `mp milestone criterion pass 213 AC-06 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -264,11 +272,11 @@
       "id": "S7",
       "work_package": "WP1",
       "order": 7,
-      "action": "Implement predict_next_action in crates/mp/src/autopilot/cycle.rs as a pure function. Inputs: the cycle-flow state's current position (e.g., Dispatching, WaitingRunner, Reviewing, Deciding, AwaitingUser) and the last N TUI-relay events (lane state changes surfaced via session.json). Output: a typed NextAction enum with at least 6 variants (DispatchRunner, DispatchReviewer, AwaitRunner, AwaitReviewer, ApplyMatrix, EscalateUser). Tested against hand-built (state, events) -> expected_outcome fixtures covering each variant plus topology-aware escalation.",
+      "action": "Implement predict_next_action as a pure function over cycle state plus recent session events from the mp-owned headless loop; return typed dispatch, await, matrix, complete, or escalation actions.",
       "files": [
         "crates/mp/src/autopilot/cycle.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test cycle_predict_next_action --no-fail-fast",
       "done_when": "AC-07 evidence is stamped via `mp milestone criterion pass 213 AC-07 --evidence`.",
       "status": "pending",
       "covers_ac": [

@@ -11,13 +11,27 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "212",
+      "213",
+      "208",
+      "214",
+      "215",
+      "216",
+      "217",
+      "218",
+      "219",
+      "223",
+      "225",
+      "226",
+      "224"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -65,22 +79,29 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "All user-facing files in `templates/skills/**`, `templates/harness/**`, and `docs/**` describe the autopilot flow with no `watch`-prefixed user-facing terminology (lane label, skill description, command example).",
-      "verification": "manual: searched `rg -l '\\b[Mm]p watch\\b|\\b[Wt]atch (lane|tab|skill|process|automation)\\b'` in the consumer surface; expected empty result.",
+      "description": "Consumer files use Autopilot terminology for canonical commands, lane names, skills, and examples. Intentional compatibility references to `mp watch` are allowed only in the dedicated migration/deprecation documentation and must include the replacement command.",
+      "verification": "make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "`make consumer-surface-lint` passes — no internal milestone IDs (MXXX), no lesson codes (LXX), no stale `Watch` references in the consumer surface.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "`make install` copies refreshed templates to installed skills / harness directories under `~/.config/...` so consumer end-users see the new skill descriptions on next session.",
-      "verification": "manual: ran `make install`, opened `~/.config/opencode/agents/mp-orchestrator/SKILL.md` (or equivalent) and confirmed the description references autopilot, not watch.",
+      "description": "An isolated-HOME install fixture copies refreshed skills and harness templates and asserts canonical Autopilot terminology without mutating the developer global configuration.",
+      "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Installed consumer skills include distinct mp-orchestrator and mp-reviewer roles plus updated mp-runner/mp-flow bindings; role permissions and hand-off commands match the M209/M211/M212/M213 contracts and no stale coordinator-as-orchestrator contract remains.",
+      "verification": "cargo nextest run -p mp --test suite_init --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -93,8 +114,8 @@
     },
     {
       "area": "lint_target",
-      "choice": "Extend `make consumer-surface-lint` with a stale-Watch check (regex against user-facing prose patterns).",
-      "rationale": "Matches M195's existing lint pattern (leak guard); prevents regressions."
+      "choice": "The stale-Watch lint rejects canonical user-facing Watch terminology but permits an allowlisted migration/deprecation document to mention the legacy `mp watch` spelling alongside its replacement.",
+      "rationale": "A zero-match rule would make the required compatibility documentation impossible and conflict with the retained alias."
     }
   ],
   "work_packages": [
@@ -110,11 +131,15 @@
       "id": "S01",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement and verify: All user-facing files in `templates/skills/**`, `templates/harness/**`, and `docs/**` describe the autopilot flow with no `watch`-prefixed user-facing terminology (lane label, skill description, comma",
+      "action": "Update canonical terminology across templates/skills, templates/harness, docs/autopilot, command reference, and agent guide while preserving annotated compatibility references in migration docs.",
       "files": [
-        "templates/skills/**"
+        "templates/skills/**",
+        "templates/harness/**",
+        "docs/autopilot/**",
+        "docs/mp/commands.md",
+        "docs/agent-guide/README.md"
       ],
-      "tests": "manual: searched `rg -l '\\b[Mm]p watch\\b|\\b[Wt]atch (lane|tab|skill|process|automation)\\b'` in the consumer surface; expected empty result.",
+      "tests": "make consumer-surface-lint",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 220 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -132,9 +157,13 @@
       "order": 2,
       "action": "Implement and verify: `make consumer-surface-lint` passes — no internal milestone IDs (MXXX), no lesson codes (LXX), no stale `Watch` references in the consumer surface.",
       "files": [
-        "templates/skills/**"
+        "Makefile",
+        "scripts/consumer-surface-lint.sh",
+        "templates/skills/**",
+        "templates/harness/**",
+        "docs/**"
       ],
-      "tests": "make consumer-surface-lint → exit 0",
+      "tests": "make consumer-surface-lint",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 220 AC-02 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -150,15 +179,42 @@
       "id": "S03",
       "work_package": "WP1",
       "order": 3,
-      "action": "Implement and verify: `make install` copies refreshed templates to installed skills / harness directories under `~/.config/...` so consumer end-users see the new skill descriptions on next session.",
+      "action": "Test template installation under an isolated HOME/destination and assert installed files use canonical Autopilot terminology.",
       "files": [
-        "templates/skills/**"
+        "Makefile",
+        "crates/mp/tests/install_autopilot_templates.rs",
+        "templates/skills/**",
+        "templates/harness/**"
       ],
-      "tests": "manual: ran `make install`, opened `~/.config/opencode/agents/mp-orchestrator/SKILL.md` (or equivalent) and confirmed the description references autopilot, not watch.",
+      "tests": "cargo nextest run -p mp --test install_autopilot_templates --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 220 AC-03 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Create/update consumer role skills and mp-flow bindings for orchestrator, runner, and reviewer, with installer parity coverage.",
+      "files": [
+        "templates/skills/mp-orchestrator/**",
+        "templates/skills/mp-reviewer/**",
+        "templates/skills/mp-runner/**",
+        "templates/skills/mp-flow/**",
+        "crates/mp/tests/suite_init.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test suite_init --no-fail-fast",
+      "done_when": "AC-04 proves installed skill topology and commands match runtime roles.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

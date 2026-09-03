@@ -11,9 +11,12 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "214",
+      "216"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-03",
@@ -29,6 +32,14 @@
         "status": "done",
         "at": "2026-09-03T13:17:54.524699+00:00"
       },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:00:52.086620+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:00:52.184490+00:00"
+      },
       "specify": {
         "status": "done",
         "at": "2026-09-03T13:17:54.524699+00:00"
@@ -36,61 +47,63 @@
     }
   },
   "intent": {
-    "outcome": "Every raul lane supports mouse interaction consistent with keyboard: click on a row selects it; double-click on a row opens its detail; scroll-wheel scrolls the list (Milestones queue, Backlog list, Ideas list, Path swimlanes, Overview cards, Autopilot queue). On touch-screen devices (e.g. running raul over a phone SSH session) the ergonomics are usable: long-press maps to double-click; vertical swipe maps to scroll-wheel."
+    "outcome": "raul provides consistent terminal mouse behavior: click selects, double-click opens supported detail views, and wheel scroll matches keyboard navigation. Touch gestures are documented as terminal-emulator capabilities, not guaranteed application events."
   },
   "problem": {
     "description": "Today most raul lanes are keyboard-only. Mouse clicks fall through to the underlying terminal; wheel events do nothing. Specifically: (a) Milestones tab: click selects a row, but double-click does not open the milestone detail; (b) Backlog and Ideas tabs: clicking an item does not even select it; (c) Path swimlanes, Overview cards, Settings rows have partial coverage from earlier milestones; (d) Autopilot lane (M216) is fully keyboard-only. On a phone or a tablet connected via SSH/Screen, keyboard input is painful — taps are the natural mode. The fix is a TUI-wide mouse-handler surface wired into each lane's render dispatcher; the harness-level event loop already delivers mouse events via ratatui, so this is a layer-up exercise, not new infrastructure."
   },
   "scope": {
     "in_scope": [
-      "Click-to-select on rows in Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot. Currently partial; extend to all lanes with consistent semantics (clicking a row sets the active index; Esc clears it).",
-      "Double-click on a row to open detail view: Milestones → milestone detail; Backlog → entry detail; Ideas → idea detail; Path → milestone detail; Autopilot → per-milestone detail panel (M216 AC-05).",
-      "Scroll-wheel support on lists: Milestones backlog, Backlog list, Ideas list, Path swimlanes, Overview cards, Settings rows, Autopilot pane rows + queue.",
-      "Touch-screen compatibility: long-press (200–400ms hold) maps to double-click; vertical swipe maps to wheel events. Tested on Termux/iSH SSH sessions if available, otherwise documented.",
-      "Backwards compatibility: keyboard input remains the canonical path; mouse support is additive and never overrides keyboard shortcuts.",
-      "Per-lane wiring tests + a TUI-wide integration test that drives a click + double-click sequence against `crates/raul/tests/suite_mouse_lanes.rs`."
+      "Central coordinate-to-row mapping and double-click timing for crossterm mouse events.",
+      "Click selection across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot.",
+      "Detail activation where a keyboard detail action exists; wheel scrolling across every list-bearing lane including Settings.",
+      "RAUL_NO_MOUSE escape hatch and a tested terminal capability matrix."
     ],
     "out_of_scope": [
-      "Drag-to-reorder (Milestones / Backlog priority reordering via drag is a separate interaction; current keyboard-based reorder is unchanged).",
-      "Right-click context menus (a future affordance; not needed now).",
-      "Hover tooltips in the autopilot lane's per-pane status rows (M216 currently has no hover; mouse hover would need a different time-tracking mechanism).",
-      "Configuring mouse sensitivity or long-press duration (sensible defaults; configurability can land later via the keybinds config system).",
-      "Drag-and-drop for the per-milestone queue (key-based reordering stays)."
+      "Synthesizing long-press or swipe when the terminal does not emit distinguishable mouse down/up/wheel events.",
+      "Drag reorder, right-click menus, hover tooltips, and configurable mouse thresholds."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Click-to-select on a row sets the active index in every list-bearing lane (Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot). Verified by a single TUI integration test that sends a Click event to each lane's test harness and asserts the active index updates.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices.",
+      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Double-click on a row in Milestones / Backlog / Ideas / Path / Autopilot opens the corresponding detail view. A second click elsewhere (or Esc) returns to the list. Verified per lane.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Double-click on Milestones, Backlog, Ideas, Path, and Autopilot invokes the same detail action as keyboard Enter. Overview and Settings explicitly remain selection-only because they have no corresponding row-detail action.",
+      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Scroll-wheel scrolls the list-viewport in Milestones, Backlog, Ideas, Path, Overview, Autopilot. Scrolling honors the lane's existing scroll-position state; mouse wheel and keyboard navigation reach the same position.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Wheel scrolling covers Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot and reaches the same viewport/index as equivalent keyboard input.",
+      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "Touch-screen compatibility: long-press (configurable default 250ms) maps to double-click; vertical swipe maps to wheel events. Documented in `docs/tui/usage.md` with a Termux screenshot or equivalent; not gated on a CI capability since touch input is platform-conditional.",
-      "verification": "manual: a Termux (or equivalent) SSH session running raul responds to long-press with a detail-open and to vertical swipe with list scroll. Recorded in `docs/tui/usage.md`.",
+      "description": "Touch/SSH documentation provides a terminal capability matrix: when the emulator emits click/wheel events raul handles them; long-press/swipe translation performed by Termux/iSH is best effort and not claimed when those events are unavailable.",
+      "verification": "manual: verify docs/tui/usage.md records tested terminal, protocol events observed, supported behavior, and limitations; no application-level long-press guarantee.",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Keyboard remains canonical. All existing keyboard shortcuts continue to work; mouse input is never required. Verified by `cargo nextest run -p raul --no-fail-fast` (the full 700+ test regression stays green) plus a manual smoke through every lane with `--no-mouse` env var suppressing mouse handlers.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Keyboard behavior remains canonical and RAUL_NO_MOUSE=1 disables mouse capture/handling while all keyboard-path integration tests remain green.",
+      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Coordinate mapping remains correct after resize, header/footer changes, viewport scrolling, filters/search, empty lists, and out-of-bounds clicks. Filtered Backlog and Ideas selections resolve to the intended visible item without changing selection on invalid coordinates.",
+      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -118,6 +131,18 @@
       "name": "TUI-wide mouse dispatch",
       "goal": "A single `crates/raul/src/tui/mouse.rs` module owns click/double-click/scroll mapping; each lane wires to it once per render cycle.",
       "rollback": "Revert mouse.rs to a no-op stub; lane-specific dispatch becomes a no-op; full regression stays green."
+    },
+    {
+      "id": "WP2",
+      "name": "Per-lane integration",
+      "goal": "Wire central mouse actions through each lane canonical keyboard action and viewport state.",
+      "rollback": "Remove per-lane mouse dispatch while preserving the isolated central module."
+    },
+    {
+      "id": "WP3",
+      "name": "Compatibility and documentation",
+      "goal": "Preserve keyboard-only behavior and document terminal/touch capability boundaries.",
+      "rollback": "Disable mouse capture through RAUL_NO_MOUSE and retain keyboard paths."
     }
   ],
   "steps": [
@@ -125,15 +150,16 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Add `crates/raul/src/tui/mouse.rs`: a small module that exposes `try_handle_mouse(app, mouse_event) -> Consumed` and helpers `try_click`, `try_double_click`, `try_scroll`. Each lane's app.rs calls these once per render cycle.",
+      "action": "Implement pure coordinate mapping, click classification, double-click timing, and wheel actions over terminal mouse events.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/mouse_coordinate_mapping.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
-      "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 221 AC-01 --evidence`.",
+      "tests": "cargo nextest run -p raul --test mouse_coordinate_mapping --no-fail-fast",
+      "done_when": "AC-06 passes for resize, viewport offset, empty, and out-of-bounds coordinate fixtures.",
       "status": "pending",
       "covers_ac": [
-        "AC-01"
+        "AC-06"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
@@ -143,19 +169,23 @@
     },
     {
       "id": "S2",
-      "work_package": "WP1",
+      "work_package": "WP2",
       "order": 2,
       "action": "Wire click-to-select on Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot. Each lane's test harness sends a click event at the row's coordinates and asserts the active index updates.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/suite_mouse_lanes.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 221 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -163,19 +193,24 @@
     },
     {
       "id": "S3",
-      "work_package": "WP1",
+      "work_package": "WP2",
       "order": 3,
       "action": "Wire double-click to open detail in Milestones / Backlog / Ideas / Path / Autopilot. The detail-open transition is the same code path as the keyboard's Enter handler.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/suite_mouse_details.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test suite_mouse_details --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 221 AC-02 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -183,19 +218,24 @@
     },
     {
       "id": "S4",
-      "work_package": "WP1",
+      "work_package": "WP2",
       "order": 4,
       "action": "Wire scroll-wheel support to each list-bearing lane. Scrolling advances/retreats the list-viewport by one row per wheel tick; matches the keyboard scroll step.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "crates/raul/src/tui/app.rs",
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/suite_mouse_scroll.rs"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test suite_mouse_scroll --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 221 AC-03 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -203,13 +243,13 @@
     },
     {
       "id": "S5",
-      "work_package": "WP1",
+      "work_package": "WP3",
       "order": 5,
-      "action": "Touch-screen detection + long-press-to-double-click + swipe-to-wheel. Long-press threshold 250ms. Documented in `docs/tui/usage.md`.",
+      "action": "Document terminal mouse and touch capability matrix; test only events raul can observe and record Termux/iSH limitations.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "docs/tui/usage.md"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "manual: verify terminal capability matrix includes emitted events, supported behavior, and limitations.",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 221 AC-04 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -223,13 +263,15 @@
     },
     {
       "id": "S6",
-      "work_package": "WP1",
+      "work_package": "WP3",
       "order": 6,
-      "action": "Full regression test for the keyboard-canonical invariant; `RAUL_NO_MOUSE=1` env var escape hatch; document in `docs/tui/usage.md`.",
+      "action": "Implement and verify RAUL_NO_MOUSE behavior and keyboard-canonical fallback.",
       "files": [
-        "crates/raul/src/tui/mouse.rs"
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/tests/suite_mouse_disabled.rs",
+        "docs/tui/usage.md"
       ],
-      "tests": "manual: end-to-end verification runs across all raul lanes via `cargo nextest run -p raul --no-fail-fast`; the same test pass count is preserved; cargo clippy -p raul --tests --no-deps -- -D warnings; cargo fmt --all -- --check.",
+      "tests": "cargo nextest run -p raul --test suite_mouse_disabled --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 221 AC-05 --evidence`.",
       "status": "pending",
       "covers_ac": [

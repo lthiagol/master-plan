@@ -1,7 +1,7 @@
 {
   "milestone": {
     "id": "211",
-    "title": "mp autopilot lane-notification wire format — shell-command, never printed text",
+    "title": "mp autopilot typed task assignment — orchestrator dispatch through herdr argv",
     "slug": "mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text",
     "lifecycle": "approved",
     "spec_status": "ready",
@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -44,43 +46,42 @@
     }
   },
   "intent": {
-    "outcome": "Every lane (orchestrator, runner, reviewer) sends its lifecycle report to the orchestrator pane via a hardcoded shell command invocation of `herdr agent prompt <orchestrator-pane-id>`; a missing shell command in the notification is rejected as a protocol violation by the orchestrator's parser before any state mutation happens."
+    "outcome": "The orchestrator dispatches every runner or reviewer assignment through one typed renderer that produces and executes a herdr argv invocation, while roles report progress through typed session transitions."
   },
   "problem": {
-    "description": "Lesson 1 from the project log (recurring across M200 cycle 1, M201 cycle 1, M202 cycle 1): opencode agents interpret 'notify the orchestrator' as 'print the message' by default. M201's runner fabricated a 'lifecycle=executed' notification; M200's runner printed instead of executing. The fix is structural: the lane-notify prompt template renders the literal `herdr agent prompt ...` command, not the prose, and the orchestrator's parser refuses any notification that lacks a parseable shell-command envelope. This is independent of C2's verifier (which catches state-level lies); C1 catches the *form* of the message — that it was actually sent as a shell command, not printed."
+    "description": "The herdr tests showed that prose such as notify the orchestrator is interpreted inconsistently. The enforceable boundary is at dispatch: mp constructs and executes herdr argv itself, records the assignment event, and agents report progress through typed mp session transitions. The receiver cannot prove how arbitrary text was produced, so this milestone does not attempt receiver-side shell-envelope detection."
   },
   "scope": {
     "in_scope": [
-      "Define the lane-notify wire format in `crates/mp/src/autopilot/prompts/lane_notify.rs`: each role template emits a `herdr agent prompt <orchestrator-pane-id> \"<role>: cycle N done. ACs: <passed>/<total>. Findings: <list|none>. State: lifecycle=<lifecycle>,execution=<execution_status>.\"` shell command. The template is per-role (O, R, V).",
-      "Parser in `crates/mp/src/autopilot/lane_notify.rs`: parses incoming notifications into a typed `LaneReport` (role, cycle, acs_passed, acs_total, findings, state_snapshot). Rejects messages lacking the `<role>: cycle N done.` prefix or the `State: lifecycle=...,execution=...` line as a protocol violation.",
-      "Render-side contract: the role's spawn-prompt (from B2) includes a `Boundaries` block stating 'send your notification by EXECUTING this command, not by printing it'; the lane-notify template is the only path to send.",
-      "Regression tests: reproductions of M200 cycle 1 (notification printed but not sent) and M201 cycle 1 (lifecycle claim with no executor-state evidence) — both fail without the fix."
+      "Typed TaskAssignment renderer for orchestrator-to-runner and orchestrator-to-reviewer dispatches, with structured payload fields for session, milestone, cycle, role, task, evidence references, and boundary reminders.",
+      "Execution uses argv directly rather than shell interpolation; before invoking herdr, command shape, non-empty payload, target pane membership, and role direction are validated.",
+      "Each successful or failed dispatch appends a sequence-numbered event to the M207 session log; agents report state through mp autopilot session transition."
     ],
     "out_of_scope": [
-      "The orchestrator's state-verification cross-check (mp show milestone + reviews.json + activity.json) — that's C2.",
-      "The actual cycle-flow sequencing — that's C3.",
-      "Per-AC evidence restoration — that's a separate small track item, not part of C1."
+      "Lane-to-orchestrator notification parsing; typed session transitions and the orchestrator event loop replace it.",
+      "State cross-checking and role-boundary verification, owned by M212.",
+      "Cycle sequencing and retry policy, owned by M213."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "The task-assignment wire format (orchestrator → lane) renders correctly per role-direction pair (orchestrator→runner; orchestrator→reviewer). Golden-file tests pin each rendered shell command. The lane→orchestrator notification protocol from prior drafts is removed: lanes now communicate state via session.json writes (B2 + E), not via outgoing prompts.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Task-assignment rendering is deterministic for orchestrator-to-runner and orchestrator-to-reviewer, includes session/milestone/cycle/role/evidence fields, and produces an argv vector rather than a shell string.",
+      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Lesson-1 enforcement: a task rendered as text (no `herdr agent prompt <lane> \"...\"` shell form) is rejected as a TaskAssignmentShapeViolation by the orchestrator's command-shape check. Catches both the M200 cycle 1 lesson (printed instead of executed) and any drift where the task template accidentally produces prose instead of a command.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Before dispatch, validation rejects empty payloads, unknown target panes, invalid role directions, missing session identity, and shell metacharacter interpolation; no herdr call or session mutation occurs on rejection.",
+      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Regression — the M200 cycle 1 lesson in task-assignment form: a fake orchestrator that renders a task as text and forwards it via `herdr agent prompt <lane> \"\"` (empty quoted text, no actual shell command) is detected by the verifier and produces a typed TaskAssignmentShapeViolation error. Reproduces the original failure with the new IPC focus.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "A regression fixture reproduces the M200 text-only assignment mistake: only the typed dispatcher can append AssignmentDispatched, and a prose-only or empty assignment is rejected before execution with TaskAssignmentShapeViolation.",
+      "verification": "cargo nextest run -p mp --test watch_prompts --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -88,8 +89,8 @@
   "design_decisions": [
     {
       "area": "wire_format_shape",
-      "choice": "Single-line shell command with key=value pairs in the message body, parsed by a hand-rolled parser.",
-      "rationale": "Avoids JSON-in-shell-command parsing pitfalls (escaping, quoting); agents can compose the message with simple string interpolation, parser stays trivial."
+      "choice": "Use a typed payload and direct argv execution (`Command` arguments), not a shell command string or hand-rolled key=value parser.",
+      "rationale": "The sender can enforce argv shape and record dispatch. The receiver cannot prove whether arbitrary text was printed or sent, and shell strings add avoidable quoting risk."
     },
     {
       "area": "protocol_violation_handling",
@@ -110,11 +111,12 @@
       "id": "S01",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement the task-assignment wire-format renderer in `crates/mp/src/autopilot/task_assign.rs`. Renders a shell command per role-direction: orchestrator→runner ('implement M<id> cycle N AC-XX ...'); orchestrator→reviewer ('review M<id> cycle N ...'). Includes shell-command-not-printed discipline (lesson-1) — see also B2 (M210) Boundaries block.",
+      "action": "Implement deterministic typed task-assignment renderer and argv builder for orchestrator-to-runner and orchestrator-to-reviewer dispatch.",
       "files": [
-        "crates/mp/src/autopilot/lane_notify.rs"
+        "crates/mp/src/autopilot/task_assign.rs",
+        "crates/mp/tests/autopilot_task_assignment_golden.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test autopilot_task_assignment_golden --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 211 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -130,11 +132,12 @@
       "id": "S02",
       "work_package": "WP1",
       "order": 2,
-      "action": "Implement the TaskAssignmentShapeViolation check: when a parsed task-assignment payload lacks the `herdr agent prompt <pane-id> \"<text>\"` shell-command shape, raise the typed error. Rejects text-shaped task messages before any lane notification occurs.",
+      "action": "Validate target pane, role direction, non-empty structured payload, identity fields, and shell-safe argv before dispatch; append an event only after execution outcome is known.",
       "files": [
-        "crates/mp/src/autopilot/lane_notify.rs"
+        "crates/mp/src/autopilot/task_assign.rs",
+        "crates/mp/tests/autopilot_task_assignment_validation.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test autopilot_task_assignment_validation --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 211 AC-02 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -150,11 +153,12 @@
       "id": "S03",
       "work_package": "WP1",
       "order": 3,
-      "action": "Regression test (M200 cycle 1 task-form): a fake orchestrator forwards a task as text-only (no shell command). The verifier catches the shape violation and emits a typed error. The test fixture reproduces the original M200 cycle 1 pattern in the new IPC.",
+      "action": "Add M200 regression proving prose-only and empty assignments cannot produce a dispatched event or reach herdr.",
       "files": [
-        "crates/mp/src/autopilot/lane_notify.rs"
+        "crates/mp/src/autopilot/task_assign.rs",
+        "crates/mp/tests/autopilot_task_assignment_m200_regression.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p mp --test autopilot_task_assignment_m200_regression --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 211 AC-03 --evidence`.",
       "status": "pending",
       "covers_ac": [

@@ -11,9 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207",
+      "209",
+      "208",
+      "214",
+      "218"
+    ],
+    "effort": "L",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
@@ -66,28 +72,28 @@
     {
       "id": "AC-01",
       "description": "Picker renders drivable milestones from `mp list milestones`, filtered to the autopilot-eligible lifecycles; toggle selection preserves insertion order; cursor moves correctly across the list.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Override panel captures topology, per-role model/harness/skill/extras, and refresh interval; invalid values (numeric refresh_secs, empty role names, unknown harness) are rejected with an inline error before persistence.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Override panel captures topology, refresh interval, and per-role model/harness/skill/extras. Empty model/skill values mean inherit; unknown harness, invalid topology, malformed extras, and non-positive refresh values are rejected before persistence.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "On Start, the override values are written to session.json's `config_overrides` and `roles.<role>` blocks; `mp autopilot session show <id>` returns the values; the next `mp autopilot --dry-run` honors them as session-scoped overrides (winning over config.json).",
-      "verification": "manual: opened the Autopilot lane, picked two milestones, set per-role overrides (e.g., runner model to a different id), clicked Start, ran `mp autopilot session show`, and confirmed the persisted overrides; ran `mp autopilot --dry-run` with a fresh selection and confirmed it used the config.json defaults.",
+      "description": "On Start, overrides persist to the new session and win over project defaults for that session; a second session without overrides uses project defaults. Both effective configurations are asserted through dry-run/session show.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "Picker's `Mode:` toggles between (a) drivable milestones (current behavior) and (b) past sessions — listing each `master-plan/autopilot/<id>/session.json` folder with id, status, last_updated, and a hover-preview of the queued milestones. <Enter> on a past session opens a read-only replay: per-cycle panels like the live detail view, but no Start/Override/control affordances. Read-only is enforced: the lane refuses to invoke `mp autopilot` verbs against a past session (they would create a new session, which is the wrong affordance for replay).",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Past-session mode consumes `mp autopilot session list/show`, never reads plan files directly, and opens a read-only replay shell backed by session events. M216 may enrich the shared detail renderer without being required for this milestone.",
+      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -159,9 +165,10 @@
       "order": 3,
       "action": "Implement and verify: On Start, the override values are written to session.json's `config_overrides` and `roles.<role>` blocks; `mp autopilot session show <id>` returns the values; the next `mp autopilot --dry-run` honors ",
       "files": [
-        "crates/raul/src/tui/autopilot.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_override_precedence.rs"
       ],
-      "tests": "manual: opened the Autopilot lane, picked two milestones, set per-role overrides (e.g., runner model to a different id), clicked Start, ran `mp autopilot session show`, and confirmed the persisted overrides; ran `mp autopilot --dry-run` with a fresh selection and confirmed it used the config.json defaults.",
+      "tests": "cargo nextest run -p raul --test autopilot_override_precedence --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 215 AC-03 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -177,11 +184,12 @@
       "id": "S4",
       "work_package": "WP1",
       "order": 4,
-      "action": "Implement picker's mode toggle (drivable / past). The past-sessions mode reads `master-plan/autopilot/` directory entries; each entry's session.json is parsed minimally (id, status, last_updated) for the row. <Enter> opens a read-only replay buffer that renders the same per-cycle panels as M216 but with all control affordances (Start/Override/Steer/Cancel) disabled. Golden-file tests pin the picker row layout and the replay panel.",
+      "action": "Implement drivable/past mode using mp autopilot session list/show adapters and a read-only replay shell backed by session events; no direct master-plan file reads.",
       "files": [
-        "crates/raul/src/tui/autopilot.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_session_replay.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p raul --test autopilot_session_replay --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 215 AC-04 --evidence`.",
       "status": "pending",
       "covers_ac": [

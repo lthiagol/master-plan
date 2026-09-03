@@ -11,13 +11,19 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207",
+      "209",
+      "212",
+      "213",
+      "216"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -44,70 +50,77 @@
     }
   },
   "intent": {
-    "outcome": "The Autopilot lane polls `mp autopilot session show <id>` and `mp autopilot-control status` every `autopilot.refresh_secs` seconds (default 2) when the lane is focused and the raul TUI is not in input mode; manual `p` toggles the poll on/off; `r` forces an immediate refresh. The poll behavior respects per-session override of `refresh_secs` set by the D2 override panel."
+    "outcome": "The focused Autopilot lane periodically refreshes its display from mp autopilot session/status APIs. Display polling may pause when unfocused without affecting the headless orchestration engine."
   },
   "problem": {
-    "description": "D3 ships with manual refresh only. For long drives (multi-hour milestones), users need at-a-glance freshness without spamming `r`. The poll must not interfere with input mode, must not poll when the lane isn't visible, and must respect per-session overrides. F3's hygiene sweep is downstream; this milestone is the last piece of the lane UX."
+    "description": "Users need fresh status during long drives, but raul is not the control plane. This milestone schedules coalesced UI refreshes only; liveness, heartbeats, dispatch, and escalation remain owned by M213."
   },
   "scope": {
     "in_scope": [
-      "Idle poller in `crates/raul/src/tui/poll.rs` (or extend the existing D3 module): a per-app poller with a configurable interval (default 2s, configurable via `session.json.config_overrides.refresh_secs`).",
-      "Polling pauses when: (a) the Autopilot lane is not the active lane, (b) raul is in any input mode, (c) explicit pause (`p` toggles a `poll_paused` flag).",
-      "Manual refresh hook (`r`): the existing D3 `r` handler now also resets the poll timer so a forced refresh doesn't fire again immediately.",
-      "Lifecycle: poll starts when a session becomes active; stops when the session enters a terminal state (lifecycle=shipped or escalated)."
+      "Single-flight UI refresh scheduler with manual refresh and per-session interval.",
+      "Polling pauses while unfocused or in input mode and resumes without catch-up bursts.",
+      "Render state-change and health information returned by mp APIs."
     ],
     "out_of_scope": [
-      "Steering or pause/cancel controls — separate track.",
-      "Auto-refresh of any other raul lane — Autopilot only."
+      "Orchestrator liveness pulses, state transition relay, and stale-state escalation, owned by M213.",
+      "Any requirement that raul remain open or focused for autopilot progress.",
+      "Auto-refresh of other lanes."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "The poller fires `mp autopilot session show` + `mp autopilot-control status` once per `refresh_secs`; verified by a fake clock test that advances fake time and counts calls.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "A single-flight poller invokes session show plus autopilot status once per interval; slow calls are coalesced and never overlap. Fake-clock tests cover normal and overrun intervals.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Polling pauses when the Autopilot lane is not the active lane and resumes when it becomes active.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Display polling pauses when Autopilot is unfocused and resumes when focused; a headless drive continues and accumulates session events while display polling is paused.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "Manual `r` triggers an immediate refresh; the poll timer is reset so it does not fire again immediately. Manual `p` toggles the poll on/off; the toggle state is visible in the lane footer.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Per-session `refresh_secs` override (set via D2's override panel) is honored; the polish default (2s) applies when no override.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "State-change detection: the poller maintains a snapshot of session.json.roles.<role>.state keyed by (session_id, role). On each tick it reads the latest session.json and emits a `StateChanged(role, old_state, new_state, evidence_refs)` event for each role whose state changed.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "The poller diffs API snapshots for rendering only and emits local UI StateChanged events with sequence/revision information; it never writes session state or relays progress to the orchestrator.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "TUI relay: when a state-change event fires, the poller dispatches a fixed-format `TUI relay: <role> state <old> → <new>; evidence: <refs>` message to the orchestrator pane via `herdr agent prompt <orch-pane-id> \"...\"`. The orchestrator's verifier (C2) re-reads session.json and applies the standard cross-check before acting.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "All UI refresh data comes from mp autopilot APIs. A fixture proves no `herdr agent prompt` is issued by raul and orchestration outcomes are unchanged when raul is absent.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
-      "description": "Liveness pulse probes: on a separate cadence (`autopilot.pulse_secs`, default 60s), the poller sends `herdr agent prompt <lane-pane-id> \"pulse\"` to any lane whose state is Working/Reviewing. If no state change is observed within the pulse window, escalate per C2.",
-      "verification": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "description": "Health and heartbeat timestamps returned by `mp autopilot status` are rendered without raul generating pulses. Responsive same-state agents remain healthy; stale status is displayed but escalation remains in mp.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "The M217 cutover deletes the fixed-interval Watch Poller and dead `fire_watch_tick` stub after the coalescing poller is wired; no second scheduler or legacy log-tail polling path remains.",
+      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -115,8 +128,8 @@
   "design_decisions": [
     {
       "area": "polling_primitive",
-      "choice": "Use a single idle-poller task with a tick counter, gated by lane-active + input-mode + paused flags. Polling is fire-and-forget (no back-pressure).",
-      "rationale": "Matches raul's existing redraw pipeline (M190 frame gate); no new event loop."
+      "choice": "Use one coalescing single-flight UI refresh task gated by lane-active, input-mode, and display-pause flags; at most one CLI request is in flight.",
+      "rationale": "A two-second fire-and-forget loop can accumulate overlapping subprocesses. Coalescing keeps the UI bounded without placing it in the control path."
     },
     {
       "area": "session_override_resolution",
@@ -137,7 +150,7 @@
       "id": "S01",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement and verify: The poller fires `mp autopilot session show` + `mp autopilot-control status` once per `refresh_secs`; verified by a fake clock test that advances fake time and counts calls.",
+      "action": "Implement a coalescing single-flight UI poller for session show and autopilot status using a fake clock.",
       "files": [
         "crates/raul/src/tui/poll.rs"
       ],
@@ -217,11 +230,12 @@
       "id": "S5",
       "work_package": "WP1",
       "order": 5,
-      "action": "State-change detection: implement a typed session.json diff against the last-seen snapshot per (session_id, role). Emit StateChanged events when the lane state differs from the cached value.",
+      "action": "Diff API snapshots into local rendering events only; preserve session sequence and revision for stale-display detection.",
       "files": [
-        "crates/raul/src/tui/poll.rs"
+        "crates/raul/src/tui/poll.rs",
+        "crates/raul/tests/autopilot_poll_state_diff.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p raul --test autopilot_poll_state_diff --no-fail-fast",
       "done_when": "AC-05 evidence stamped via `mp milestone criterion pass 217 AC-05 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -237,11 +251,12 @@
       "id": "S6",
       "work_package": "WP1",
       "order": 6,
-      "action": "TUI relay: when a StateChanged event fires, dispatch a fixed-format `TUI relay: <role> state <old> → <new>; evidence: <refs>` shell command to the orchestrator pane. The orchestrator's verifier (C2) is the source of truth, not the relay message body.",
+      "action": "Remove TUI-to-orchestrator relay behavior and prove raul is observer-only with no herdr prompt dispatch.",
       "files": [
-        "crates/raul/src/tui/poll.rs"
+        "crates/raul/src/tui/poll.rs",
+        "crates/raul/tests/autopilot_poller_observer_only.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p raul --test autopilot_poller_observer_only --no-fail-fast",
       "done_when": "AC-06 evidence stamped via `mp milestone criterion pass 217 AC-06 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -257,15 +272,38 @@
       "id": "S7",
       "work_package": "WP1",
       "order": 7,
-      "action": "Liveness pulse probes: send `herdr agent prompt <lane-pane-id> \"pulse\"` to lanes in Working/Reviewing state on the pulse cadence. Track pulse-response deadlines; on timeout, emit a StaleStateTimeout event that C2 routes per topology.",
+      "action": "Render liveness and heartbeat timestamps from mp status; do not generate pulses or own escalation.",
       "files": [
-        "crates/raul/src/tui/poll.rs"
+        "crates/raul/src/tui/poll.rs",
+        "crates/raul/tests/autopilot_health_rendering.rs"
       ],
-      "tests": "manual: accepted — implementation produces the documented behavior; when the matching test fixture exists, this verification is replaced with a per-AC `cargo nextest run -p <crate> --test <name> --no-fail-fast` command.",
+      "tests": "cargo nextest run -p raul --test autopilot_health_rendering --no-fail-fast",
       "done_when": "AC-07 evidence stamped via `mp milestone criterion pass 217 AC-07 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S8",
+      "work_package": "WP1",
+      "order": 8,
+      "action": "Remove legacy Watch Poller, fire_watch_tick, and direct log-tail scheduling after the new observer poller passes parity tests.",
+      "files": [
+        "crates/raul/src/tui/watch.rs",
+        "crates/raul/src/tui/runner.rs",
+        "crates/raul/tests/tui_smoothness.rs"
+      ],
+      "tests": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "done_when": "AC-08 proves only one UI scheduler remains.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

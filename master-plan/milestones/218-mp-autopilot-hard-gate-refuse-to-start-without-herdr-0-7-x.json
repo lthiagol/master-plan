@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
+    "depends_on": [
+      "208"
+    ],
     "effort": "S",
-    "risk": "low",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -65,22 +67,29 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "`mp autopilot start <id>` against an environment without `herdr` on PATH exits 78 with the documented install-hint error message and never reaches the spawn-pipeline.",
-      "verification": "manual: in an environment with PATH that excludes herdr (e.g., a clean container), ran `mp autopilot start <id>` and confirmed exit 78 and the documented error.",
+      "description": "`mp autopilot start` with herdr absent exits 78 before creating a session directory, writing plan state, or invoking any spawn operation; the diagnostic contains an install hint.",
+      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "`mp autopilot start <id>` against herdr < 0.7.x (stubbed) exits 78 with the documented upgrade-hint error message.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "Semantic-version checking accepts every compatible herdr version >=0.7.0 whose required command shape is present, rejects lower versions or incompatible shapes with exit 78, and reports detected version plus upgrade hint.",
+      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "The precondition function is called by both `mp autopilot start` and `mp watch` (legacy alias) — no divergence in gate behavior between the two.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "`mp doctor` reports autopilot herdr availability, detected version/shape, compatibility result, and install/upgrade guidance without making the overall doctor command mutating.",
+      "verification": "cargo nextest run -p mp --test watch_preconditions --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -112,9 +121,10 @@
       "order": 1,
       "action": "Implement and verify: `mp autopilot start <id>` against an environment without `herdr` on PATH exits 78 with the documented install-hint error message and never reaches the spawn-pipeline.",
       "files": [
-        "crates/mp/src/autopilot/gate.rs"
+        "crates/mp/src/autopilot/gate.rs",
+        "crates/mp/tests/autopilot_herdr_gate_missing.rs"
       ],
-      "tests": "manual: in an environment with PATH that excludes herdr (e.g., a clean container), ran `mp autopilot start <id>` and confirmed exit 78 and the documented error.",
+      "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_missing --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 218 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -130,11 +140,12 @@
       "id": "S02",
       "work_package": "WP1",
       "order": 2,
-      "action": "Implement and verify: `mp autopilot start <id>` against herdr < 0.7.x (stubbed) exits 78 with the documented upgrade-hint error message.",
+      "action": "Implement semantic version >=0.7.0 plus required-command-shape compatibility checks using stubbed herdr binaries.",
       "files": [
-        "crates/mp/src/autopilot/gate.rs"
+        "crates/mp/src/autopilot/gate.rs",
+        "crates/mp/tests/autopilot_herdr_gate_versions.rs"
       ],
-      "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_low_version --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_versions --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 218 AC-02 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -159,6 +170,27 @@
       "status": "pending",
       "covers_ac": [
         "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Expose autopilot herdr compatibility and actionable guidance in mp doctor.",
+      "files": [
+        "crates/mp/src/doctor.rs",
+        "crates/mp/tests/doctor_autopilot_herdr.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test doctor_autopilot_herdr --no-fail-fast",
+      "done_when": "AC-04 passes for missing, old, compatible, and incompatible-shape fixtures.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

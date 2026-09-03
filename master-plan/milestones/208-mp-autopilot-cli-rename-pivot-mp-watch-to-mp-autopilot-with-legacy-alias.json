@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "207"
+    ],
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -67,21 +69,35 @@
     {
       "id": "AC-01",
       "description": "`mp autopilot --help` lists the autopilot verb tree (start, status, stop, output, result, config, session) with descriptions matching today's `mp watch` and `mp watch-control` sub-commands.",
-      "verification": "manual: ran `mp autopilot --help`; output contained all seven verb subcommands with one-line descriptions.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "`mp watch --help` still works and continues to match `mp autopilot --help` argument-by-argument; running `mp watch` with the same args as today's `mp watch` produces the same exit code and JSON output as `mp autopilot`.",
-      "verification": "manual: accepted — implementation produces the documented behavior; verifier allows manual ACs in draft state. Implementation-phase replacement of this verification with a per-AC cargo nextest command happens when the corresponding test lands.",
+      "description": "`mp watch` and `mp autopilot` accept the same arguments and return identical exit codes and stdout bytes; the only permitted difference is the single legacy deprecation line on `mp watch` stderr.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "`mp autopilot status`, `mp autopilot session list`, and `mp autopilot session show` all work against an in-flight legacy `mp watch` session (the alias wires the same backend).",
-      "verification": "manual: started a session via `mp watch` (legacy alias), then queried via `mp autopilot session list` and saw the same session; queried `mp autopilot status` and saw non-empty output.",
+      "description": "A versioned legacy watch-state fixture migrates once into the M207 session schema; status/list/show preserve session identity, queue order, pane IDs, and lifecycle state. Re-running migration is idempotent.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Unknown, corrupt, or partially migrated legacy state fails with a typed diagnostic and leaves both the legacy source and any existing autopilot session unchanged.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "`mp session` planning workflows and `mp autopilot session` drive workflows have unambiguous CLI nesting, help text, storage paths, and diagnostics; neither command can read or mutate the other session domain.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -96,6 +112,11 @@
       "area": "alias_implementation",
       "choice": "`mp watch` is implemented as a clap-level alias (clap supports `alias = \"watch\"` on the autopilot command) so both names walk the same code path.",
       "rationale": "Avoids divergent behavior; the alias lives or dies with the clap definition, and F2's removal is a one-line change."
+    },
+    {
+      "area": "legacy_migration",
+      "choice": "Migration is explicit, versioned, idempotent, and rollback-safe; the legacy file is retained until the new session validates and is atomically committed.",
+      "rationale": "The herdr test exposed truncation and stale-binary regressions. A best-effort shared backend is insufficient for durable compatibility."
     }
   ],
   "work_packages": [
@@ -115,7 +136,7 @@
       "files": [
         "crates/mp/src/commands/autopilot.rs"
       ],
-      "tests": "manual: ran `mp autopilot --help`; output contained all seven verb subcommands with one-line descriptions.",
+      "tests": "cargo nextest run -p mp --test autopilot_cli_tree --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 208 AC-01 --evidence`.",
       "status": "pending",
       "covers_ac": [
@@ -155,11 +176,55 @@
       "files": [
         "crates/mp/src/commands/autopilot.rs"
       ],
-      "tests": "manual: started a session via `mp watch` (legacy alias), then queried via `mp autopilot session list` and saw the same session; queried `mp autopilot status` and saw non-empty output.",
+      "tests": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 208 AC-03 --evidence`.",
       "status": "pending",
       "covers_ac": [
         "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement versioned, idempotent watch-state to autopilot-session migration with rollback-safe failure handling.",
+      "files": [
+        "crates/mp/src/commands/autopilot.rs",
+        "crates/mp/tests/autopilot_legacy_state_migration.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
+      "done_when": "AC-03 and AC-04 pass with exact fixture assertions.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP1",
+      "order": 5,
+      "action": "Add CLI/storage namespace guards and help tests distinguishing planning sessions from autopilot drive sessions.",
+      "files": [
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/src/session.rs",
+        "crates/mp/tests/watch_cli.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "done_when": "AC-05 proves cross-domain IDs and paths cannot be confused.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
