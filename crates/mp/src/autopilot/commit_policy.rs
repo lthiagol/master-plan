@@ -254,6 +254,7 @@ fn collect_finding_ids(tail: &str) -> Vec<String> {
 
 /// Pull `S<n>` out of `S<n> — …` or `S<n>: …`. Returns the
 /// canonical step id (`S<n>`) on success.
+#[allow(dead_code)]
 fn parse_step_id(s: &str) -> Option<String> {
     let s = s.trim();
     let mut chars = s.chars();
@@ -269,6 +270,7 @@ fn parse_step_id(s: &str) -> Option<String> {
 
 /// Pull `F-<n>` out of `F-<n> — …`. Conservative: only matches
 /// the canonical `F-NN` form.
+#[allow(dead_code)]
 fn parse_finding_id(s: &str) -> Option<String> {
     let s = s.trim();
     let mut chars = s.chars();
