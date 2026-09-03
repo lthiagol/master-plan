@@ -3,8 +3,8 @@
     "id": "213",
     "title": "mp autopilot cycle flow + decision matrix + topology tightening",
     "slug": "mp-autopilot-cycle-flow-decision-matrix-topology-tightening",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -21,7 +21,7 @@
     "effort": "M",
     "risk": "high",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -29,11 +29,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T17:15:00.196904+00:00",
+    "lifecycle_at": "2026-09-03T17:23:46.837746+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-03T12:03:34.695402+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T17:23:54.971017+00:00"
       },
       "draft": {
         "status": "done",
@@ -41,15 +45,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T17:15:00.196905+00:00"
+        "at": "2026-09-03T17:23:54.971017+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T17:23:55.036328+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.099431+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T17:23:55.036330+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T17:23:46.837748+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T17:15:00.196905+00:00"
+        "at": "2026-09-03T17:23:54.971017+00:00"
       },
       "specify": {
         "status": "done",
@@ -301,5 +317,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "spec_text_drift",
+      "description": "AC-04 description ('Cycle-cap enforcement treats a clean pass on cycle 4 as Complete') contradicts both the implementation and the step S04 description ('synthetic 4-cycle milestone reaches Escalate even if all prior verdicts were Pass'). The implementation correctly enforces the anti-thrash guarantee: at cycle=4 with budget=4, the matrix returns CycleDecision::Escalate{CycleCapExhausted} for any verdict (see apply_decision_matrix in crates/mp/src/autopilot/cycle.rs:476-484 and test synthetic_four_cycle_milestone_with_all_passes_reaches_escalate in crates/mp/tests/cycle_cap_enforcement.rs:79-127). The AC's own second clause ('any non-pass requiring continuation on cycle 4 as CycleCapExhausted/Escalate') matches the implementation; the first clause is internally inconsistent. No code change needed; recommend rewording AC-04's first clause (e.g. 'a clean pass before the hard limit returns Complete; cycle=4 always escalates' or similar).",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "code_duplication",
+      "description": "cycle_stale_state_timeout.rs (lines 173-194) duplicates parse_rfc3339_ms/days_from_civil from cycle.rs (lines 755-794). The doc-comment says 'intentional' so the integration suite is self-contained, but a future bug fix to parse_rfc3339_ms (e.g. timezone-offset handling) won't propagate. Other integration tests in the same crate already use mod common for shared helpers (e.g. cycle_reviewer_activation.rs:23, plus ~80 other test files). Recommend moving parse_rfc3339_ms to tests/common/ (or exposing it as a pub(crate) test helper) so the integration test reuses the source-of-truth parser.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    }
+  ]
 }
