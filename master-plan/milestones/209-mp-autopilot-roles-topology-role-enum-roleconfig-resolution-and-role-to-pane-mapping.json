@@ -3,9 +3,9 @@
     "id": "209",
     "title": "mp autopilot roles + topology — Role enum, RoleConfig resolution, and role-to-pane mapping",
     "slug": "mp-autopilot-roles-topology-role-enum-roleconfig-resolution-and-role-to-pane-mapping",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,7 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.585435+00:00",
+    "lifecycle_at": "2026-09-03T16:06:28.564596+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -35,9 +35,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:28.946093+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T16:06:28.564598+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.946093+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T16:06:28.564598+00:00"
       },
       "specify": {
         "status": "done",
@@ -72,36 +80,36 @@
       "id": "AC-01",
       "description": "The `Role` enum has three variants; the `Topology` enum has three variants; the role-to-pane mapping function returns the documented slot pattern for each topology.",
       "verification": "cargo nextest run -p mp --test autopilot_role_topology --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
     },
     {
       "id": "AC-02",
       "description": "RoleConfig resolution applies the three-tier priority correctly: a session.json override beats a config.json default beats a built-in. Empty string overrides are treated as 'not set' (the next tier resolves).",
       "verification": "cargo nextest run -p mp --test autopilot_role_config_resolve --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
     },
     {
       "id": "AC-03",
       "description": "`mp autopilot config get autopilot.topology` returns the current value (or a default); `mp autopilot config set autopilot.topology three-agent` writes it; `mp autopilot config get autopilot.roles.runner.harness` returns the configured harness.",
       "verification": "cargo nextest run -p mp --test autopilot_config_cli --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
     },
     {
       "id": "AC-04",
       "description": "Topology policy returns FullMatrix with four-cycle budget for 3-pane, NoShipWithBacklog with a reduced three-cycle budget for 2-pane, and SingleAgentTrackOnly with a two-cycle budget for 1-pane. Starting a full milestone in 1-pane is rejected unless an explicit recorded review-bypass policy exists.",
       "verification": "cargo nextest run -p mp --test autopilot_topology_tightening --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
     },
     {
       "id": "AC-05",
       "description": "Legacy `agent.runner` and `agent.coordinator` configuration participates in one documented resolution function: explicit autopilot role override wins, then compatible legacy role fallback, then harness default. Conflicts and unsupported reviewer fallback are typed diagnostics.",
       "verification": "cargo nextest run -p mp --test watch_config --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
     }
   ],
   "design_decisions": [
@@ -234,8 +242,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
-    "evidence": ""
+    "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
   }
 }
