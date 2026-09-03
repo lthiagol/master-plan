@@ -412,10 +412,7 @@ pub enum AssignmentOutcome {
     /// `herdr` ran and exited with status 0. `argv` is the
     /// captured argv for log/audit (matches
     /// [`build_assignment_argv`]).
-    Success {
-        argv: Vec<String>,
-        status: i32,
-    },
+    Success { argv: Vec<String>, status: i32 },
     /// `herdr` ran but exited non-zero. The argv + status + any
     /// stderr text are recorded.
     NonZeroExit {
@@ -425,10 +422,7 @@ pub enum AssignmentOutcome {
     },
     /// `herdr` could not be spawned (binary missing, permission
     /// error, etc.). The argv is still recorded for forensics.
-    SpawnError {
-        argv: Vec<String>,
-        error: String,
-    },
+    SpawnError { argv: Vec<String>, error: String },
 }
 
 impl AssignmentOutcome {
@@ -514,12 +508,11 @@ pub fn dispatch_assignment(
     validate_assignment_structure(payload)?;
     // Step 2: load the session so we can validate pane membership
     // and compute the next event seq.
-    let session = load_session(ctx, &payload.session_id)
-        .map_err(|e| {
-            TaskAssignmentValidationError::TaskAssignmentShapeViolation(format!(
-                "session load failed: {e}"
-            ))
-        })?;
+    let session = load_session(ctx, &payload.session_id).map_err(|e| {
+        TaskAssignmentValidationError::TaskAssignmentShapeViolation(format!(
+            "session load failed: {e}"
+        ))
+    })?;
     // Step 3: validate pane membership against the loaded layout.
     validate_pane_membership(payload, &session.topology)?;
     // Step 4: render the argv.
@@ -547,8 +540,8 @@ pub fn dispatch_assignment(
     // failed dispatch is recorded so the verifier sees the
     // attempt — what must NOT happen is a success event without
     // a real spawn.
-    let path = append_assignment_event(ctx, &payload.session_id, payload, &outcome)
-        .map_err(|e| {
+    let path =
+        append_assignment_event(ctx, &payload.session_id, payload, &outcome).map_err(|e| {
             TaskAssignmentValidationError::TaskAssignmentShapeViolation(format!(
                 "event append failed: {e}"
             ))
@@ -672,7 +665,9 @@ mod tests {
 
     #[test]
     fn direction_rejects_unknown() {
-        let err = "coordinator-to-runner".parse::<RoleDirection>().unwrap_err();
+        let err = "coordinator-to-runner"
+            .parse::<RoleDirection>()
+            .unwrap_err();
         assert!(matches!(
             err,
             TaskAssignmentValidationError::UnknownDirection(_)
@@ -797,7 +792,7 @@ mod tests {
         // the payload fields. This is what makes
         // `validate_assignment_structure` usable as a pre-I/O gate
         // before session.json is loaded.
-        let empty = PaneLayout::default();
+        let _empty = PaneLayout::default();
         let p = ok_payload();
         assert!(validate_assignment_structure(&p).is_ok());
         // Empty structural fields still rejected.
@@ -825,10 +820,7 @@ mod tests {
         let err = validate_assignment(&p, &layout()).unwrap_err();
         assert!(matches!(
             err,
-            TaskAssignmentValidationError::ShellMetacharacter {
-                field: "task",
-                ..
-            }
+            TaskAssignmentValidationError::ShellMetacharacter { field: "task", .. }
         ));
     }
 
@@ -1003,7 +995,9 @@ mod tests {
 
     #[test]
     fn shell_metachar_set_includes_quotes_and_backtick() {
-        for c in [';', '&', '|', '`', '$', '>', '<', '"', '\'', '\\', '\n', '\r', '(', ')'] {
+        for c in [
+            ';', '&', '|', '`', '$', '>', '<', '"', '\'', '\\', '\n', '\r', '(', ')',
+        ] {
             let mut p = ok_payload();
             p.task = format!("x{c}y");
             let err = validate_assignment(&p, &layout()).unwrap_err();

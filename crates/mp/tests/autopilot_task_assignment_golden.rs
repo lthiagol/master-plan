@@ -51,7 +51,10 @@ fn golden_argv_shape_for_runner_dispatch() {
     // never reorder these positions; downstream consumers (and
     // logs) rely on argv[2] being the target pane.
     assert_eq!(argv.len(), 4, "argv must be exactly 4 elements");
-    assert_eq!(argv[0], "agent", "argv[0] must be the herdr subcommand root");
+    assert_eq!(
+        argv[0], "agent",
+        "argv[0] must be the herdr subcommand root"
+    );
     assert_eq!(argv[1], "prompt", "argv[1] must select prompt subcommand");
     assert_eq!(
         argv[2], "%2",
@@ -90,10 +93,7 @@ fn golden_argv_shape_for_reviewer_dispatch() {
     assert_eq!(argv.len(), 4);
     assert_eq!(argv[0], "agent");
     assert_eq!(argv[1], "prompt");
-    assert_eq!(
-        argv[2], "%3",
-        "argv[2] must be the reviewer pane id"
-    );
+    assert_eq!(argv[2], "%3", "argv[2] must be the reviewer pane id");
     let text = &argv[3];
     assert!(text.contains("session=sess-alpha"));
     assert!(text.contains("direction=orchestrator-to-reviewer"));

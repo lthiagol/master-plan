@@ -22,8 +22,8 @@ use mp::autopilot::session::{
     load_session, sample_session_for_tests, save_session, PaneLayout, PaneRef,
 };
 use mp::autopilot::task_assign::{
-    build_assignment_argv, execute_assignment, parse_assignment, validate_assignment, RoleDirection,
-    TaskAssignment, TaskAssignmentValidationError,
+    build_assignment_argv, execute_assignment, parse_assignment, validate_assignment,
+    RoleDirection, TaskAssignment, TaskAssignmentValidationError,
 };
 use mp::paths::PlanContext;
 use serde_json::json;
@@ -157,10 +157,7 @@ fn validation_rejects_shell_metachar_in_task() {
     let err = validate_assignment(&p, &test_layout()).unwrap_err();
     assert!(matches!(
         err,
-        TaskAssignmentValidationError::ShellMetacharacter {
-            field: "task",
-            ..
-        }
+        TaskAssignmentValidationError::ShellMetacharacter { field: "task", .. }
     ));
 }
 
@@ -239,7 +236,9 @@ fn argv_passes_through_command_args_without_shell_interpolation() {
     // element is its own literal argument.
     let argv = build_assignment_argv(&well_formed_runner_payload());
     assert!(
-        !argv.iter().any(|a| a == "/bin/sh" || a == "sh" || a == "-c"),
+        !argv
+            .iter()
+            .any(|a| a == "/bin/sh" || a == "sh" || a == "-c"),
         "argv must not include a shell; got {argv:?}"
     );
     // Argv length must be the golden 4: [agent, prompt, <pane>, <text>].
@@ -281,7 +280,7 @@ fn execute_assignment_propagates_spawn_failure() {
 fn dispatch_validation_failure_leaves_session_events_untouched() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let mut session = sample_session_for_tests("alpha");
+    let session = sample_session_for_tests("alpha");
     save_session(&ctx, "alpha", &session).unwrap();
 
     // Build a payload whose target pane is not in the layout. The
@@ -332,7 +331,7 @@ fn dispatch_validation_failure_leaves_session_events_untouched() {
 fn dispatch_validation_failure_for_shell_metachar_does_not_run_herdr() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let mut session = sample_session_for_tests("alpha");
+    let session = sample_session_for_tests("alpha");
     save_session(&ctx, "alpha", &session).unwrap();
 
     let mut bad_payload = well_formed_runner_payload();
@@ -360,7 +359,7 @@ fn dispatch_validation_failure_for_shell_metachar_does_not_run_herdr() {
 fn dispatch_validation_failure_for_empty_session_id_does_not_run_herdr() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let mut session = sample_session_for_tests("alpha");
+    let session = sample_session_for_tests("alpha");
     save_session(&ctx, "alpha", &session).unwrap();
 
     let mut bad_payload = well_formed_runner_payload();
@@ -384,7 +383,7 @@ fn dispatch_validation_failure_for_empty_session_id_does_not_run_herdr() {
 fn dispatch_validation_failure_for_zero_cycle_does_not_run_herdr() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let mut session = sample_session_for_tests("alpha");
+    let session = sample_session_for_tests("alpha");
     save_session(&ctx, "alpha", &session).unwrap();
 
     let mut bad_payload = well_formed_runner_payload();
@@ -408,7 +407,7 @@ fn dispatch_validation_failure_for_zero_cycle_does_not_run_herdr() {
 fn dispatch_validation_failure_for_invalid_direction_does_not_run_herdr() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let mut session = sample_session_for_tests("alpha");
+    let session = sample_session_for_tests("alpha");
     save_session(&ctx, "alpha", &session).unwrap();
 
     // Build a payload that parses but carries an unsupported
@@ -440,8 +439,9 @@ fn dispatch_validation_failure_for_invalid_direction_does_not_run_herdr() {
 #[test]
 fn validation_error_mapping_matrix() {
     use TaskAssignmentValidationError as E;
+    type Mutator = Box<dyn Fn(&mut TaskAssignment)>;
     let layout = test_layout();
-    let cases: Vec<(&str, Box<dyn Fn(&mut TaskAssignment)>, E)> = vec![
+    let cases: Vec<(&str, Mutator, E)> = vec![
         (
             "empty_session",
             Box::new(|p| p.session_id = "".into()),
@@ -452,21 +452,13 @@ fn validation_error_mapping_matrix() {
             Box::new(|p| p.milestone_id = "".into()),
             E::EmptyMilestoneId,
         ),
-        (
-            "empty_task",
-            Box::new(|p| p.task = "".into()),
-            E::EmptyTask,
-        ),
+        ("empty_task", Box::new(|p| p.task = "".into()), E::EmptyTask),
         (
             "empty_target_pane",
             Box::new(|p| p.target_pane = "".into()),
             E::EmptyTargetPane,
         ),
-        (
-            "zero_cycle",
-            Box::new(|p| p.cycle = 0),
-            E::ZeroCycle,
-        ),
+        ("zero_cycle", Box::new(|p| p.cycle = 0), E::ZeroCycle),
         (
             "shell_in_task",
             Box::new(|p| p.task = "x;y".into()),
