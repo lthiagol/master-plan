@@ -36,6 +36,46 @@ this file actually uses (entries 23+).
 
 <!-- Add newest entries at the top. -->
 
+## Entry 48 — 2026-09-03 — `mp milestone step done` / `mp milestone complete` / `mp milestone criterion pass` do not write activity.json events  <!-- points-at: M225 -->
+
+- When:           2026-09-03, autopilot orchestration session driving M207, M209, M211, M212, M213 (the autopilot foundation set). mp-herdr-log2.txt documents the full session.
+- Command:        `mp milestone step done <id> <step>`, `mp milestone criterion pass <id> <ac> --evidence "<text>"`, `mp milestone complete <id>` — called by the runner lane (opencode) under orchestrator supervision.
+- Observed:       For all 5 milestones driven in this session, `master-plan/activity.json` was completely empty for the milestone's subject field. Verified via `grep '"subject": "<id>"' master-plan/activity.json` after each milestone's `mp milestone complete` call. The milestone JSON itself was correct (lifecycle, execution_status, spec_status, steps, ACs, evidence all populated), but the activity event stream had no entries. This is the same gap that caused the M200 review-pass event loss in the original test session (`mp-herdr-log.txt` R-late section): the milestone JSON is canonical, but `mp reviews pass --verdict ok` does NOT add an activity event by default; this entry shows that `mp milestone *` commands have the same gap.
+- Suspected:      The installed `mp 1.0.0-rc2` either doesn't write activity events for these commands, or writes them to a different file. Same root cause as the M200 review-pass loss: `mp` is missing a write-to-activity hook for the milestone/review lifecycle transitions that the orchestrator depends on for the audit trail. The R5 verification protocol (orchestrator reads milestone JSON + reviews.json independently) works around this for the canonical-state check, but the activity stream is broken for every milestone in this session.
+- Verdict:        **bug** — silent audit-trail gap across 5 consecutive milestones. Should be fixed in M225 (restart + reconciliation), which is the natural milestone for "durable event recovery"; or by adding an `--events` flag to the relevant `mp` commands; or by a new tooling milestone that adds an `mp autopilot activity reconcile` command. Not a blocker for the autopilot work, but a real `mp` defect.
+- One-line:       `mp milestone *` lifecycle commands do not write to `master-plan/activity.json`; 5 milestones driven in this session have no activity events.
+- Status:         **bug** — 5 occurrences in this session (M207, M209, M211, M212, M213); worked around by R5 orchestrator verification reading milestone JSON + reviews.json. No immediate fix; the next session that does durable-state recovery (M225) should include the activity-rebuild path.
+
+## Entry 47 — 2026-09-03 — Pre-existing `doc_overindented_list_items` clippy lint blocks `make lint`  <!-- points-at: M228 -->
+
+- When:           2026-09-03, autopilot session — every milestone's reviewer cold build hit this lint in `crates/mp-model/src/milestone.rs:155-158` (file is in `mp-model`, not in the milestone's touched files).
+- Command:        `cargo clippy --all-targets -- -D warnings` (the `make lint` command).
+- Observed:       `make lint` is red with `doc_overindented_list_items` on `crates/mp-model/src/milestone.rs:155-158`, introduced by commit `6204555` (M202 cycle 3, 2026-08-31). clippy 1.98 added this lint. The runner's per-milestone `-p mp --tests --no-deps -- -D warnings` is clean (the lint is in `mp-model`, not `mp`), so each milestone's work itself is fine. The reviewer correctly filed as a low-severity backlog-class finding in M209, M211, and M212 (three times). The reviewer's scope discipline was exemplary, but the underlying `mp-model` regression is now a 3-milestone known issue.
+- Suspected:      M202 cycle 3 added doc comments with over-indented list items. The clippy 1.98 lint caught them. The fix is a 5-line `cargo clippy --fix` change to the doc comment, but no milestone in flight is scoped to touch `mp-model`.
+- Verdict:        **bug** — pre-existing `mp` repo issue, recurring blocker for `make lint` on autopilot milestones that touch `mp`. Should be a quick standalone fix or absorbed into M228 (post-cutover autopilot internal cleanup).
+- One-line:       `doc_overindented_list_items` clippy lint in `crates/mp-model/src/milestone.rs:155-158` (M202 era, commit 6204555) blocks `make lint`; reviewer filed as backlog 3 times.
+- Status:         **bug** — 3 occurrences in this session (M209 F-01, M211 (not filed as out of scope), M212 F-01). Workaround: per-milestone reviewer uses `-p mp --tests --no-deps` instead of `make lint`. No immediate fix; should be picked up by M228 or a one-line `mp-model` PR.
+
+## Entry 46 — 2026-09-03 — M211 file name is stale (slug mismatch)  <!-- points-at: M228 -->
+
+- When:           2026-09-03, M211 review cycle 1 — reviewer's F-02 noticed the mismatch.
+- Command:        `ls master-plan/milestones/ | grep 211`
+- Observed:       File is named `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` but the spec title is `mp autopilot typed task assignment — orchestrator dispatch through herdr argv`. The slug was set when the milestone was first created (under an earlier title) and was not updated when commit `09412e2` ("plan: tighten autopilot milestone specs (M207-M222) — typed verifications + state model") renamed the title. The mp CLI loads by ID, not by file name, so this is cosmetic — but it's a real hygiene issue that misleads any agent reading the file name. The reviewer correctly filed as a low-severity backlog-class finding.
+- Suspected:      `mp milestone create` and `mp milestone update --json` do not rename the file when the title is updated. The file name is set at creation and is sticky. The 09412e2 commit updated titles but not file names. A future fix could either (a) auto-rename the file on title change, or (b) `git mv` the affected files post-rename. For M211, the work was scoped to autopilot code, not plan-hygiene, so the rename was deferred.
+- Verdict:        **wontfix** for this session — cosmetic, agent-discoverable via ID. Should be picked up by M228 (post-cutover cleanup) as a one-line `git mv`.
+- One-line:       M211 file name `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` is stale (spec title renamed in 09412e2 to "typed task assignment"); `mp` loads by ID so functional, but misleading.
+- Status:         **wontfix** — cosmetic; deferred to M228 cleanup.
+
+## Entry 45 — 2026-09-03 — M213 `cycle_stale_state_timeout.rs` duplicates `parse_rfc3339_ms` from `cycle.rs`  <!-- points-at: M228 -->
+
+- When:           2026-09-03, M213 review cycle 1 — reviewer's F-02 noticed the duplication.
+- Command:        `diff` between `crates/mp/src/autopilot/cycle.rs` lines 755-794 and `crates/mp/tests/cycle_stale_state_timeout.rs` lines 173-194.
+- Observed:       `parse_rfc3339_ms` and `days_from_civil` are duplicated in two files: once in the cycle engine (`cycle.rs`) and once in the integration test (`cycle_stale_state_timeout.rs`). The duplication is intentional per the doc comment ("integration suite is self-contained"), but real — if the cycle engine's parser changes, the test's copy will silently drift. The reviewer correctly filed as a low-severity backlog-class finding (no commit, deferred).
+- Suspected:      The test was written to be self-contained (no shared test helper module) so the integration suite can be run in isolation. The trade-off is real: self-contained tests catch regressions in the parser at the cost of duplication. A `crates/mp/tests/common/` helper module would solve it but is a refactor outside M213's scope.
+- Verdict:        **spec-gap** — M213 should be extended (or a follow-up added) to either (a) move the duplicated helpers to a shared test module, or (b) document the intentional duplication as a known constraint.
+- One-line:       M213 duplicates `parse_rfc3339_ms` / `days_from_civil` between `cycle.rs` and `cycle_stale_state_timeout.rs`; intentional per doc comment, but a real drift risk.
+- Status:         **spec-gap** — flagged for M228 or a follow-up cleanup; M213 itself ships as-is.
+
 ## Entry 47 — 2026-08-28 — `mp milestone create --json` / `update --json` reject all non-allowlisted top-level fields, blocking structured artifacts  <!-- points-at: M201 -->
 
 - When:           2026-08-28, drafting the M201 (Settings 2.0) spec with a 46-entry key description table.
