@@ -111,19 +111,19 @@ reads it (the TUI surface is the only consumer). One key per lane.
 mp config set sort.milestones lifecycle
 ```
 
-### `[agent]` — `mp watch` and automation
+### `[agent]` — `mp autopilot` and automation
 
 | Key | Default | Effect |
 |-----|---------|--------|
-| `agent.runner.{…}` | — | Per-role agent config consumed by `mp watch` |
-| `agent.coordinator.{…}` | — | Per-role agent config consumed by `mp watch` |
+| `agent.runner.{…}` | — | Per-role agent config consumed by `mp autopilot` |
+| `agent.coordinator.{…}` | — | Per-role agent config consumed by `mp autopilot` |
 | `agent.automation.commit_after_execute` | `false` | Runner commits after `milestone complete` |
 | `agent.automation.push_after_review` | `false` | Coordinator pushes the runner's branch at review |
 | `agent.automation.branch_strategy` | `current` | `per-milestone` \| `current` \| `none` |
 | `agent.automation.auto_remediate` | `none` | Remediation policy at review boundaries |
 
 The `[agent]` section is optional end-to-end — `mp` and `raul` build and run
-without it. Only `mp watch` requires it.
+without it. Only `mp autopilot` requires it.
 
 ### `[review]` — hunk export
 

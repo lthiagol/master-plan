@@ -59,7 +59,7 @@ mp init   →   plan files (JSON)   →   mp <read|write>   →   raul (humans l
 - **Discovery & reads:** `status`, `next`, `path`, `list …`, `show …`, `search`, `inbox`, `graph`
 - **Lifecycle & review:** `execution …`, `reviews …`
 - **Spec authoring aids:** `interview …`, `plan …`, `specs …`, `brief …`
-- **Cross-cutting:** `config …`, `note …`, `decision …`, `annotation …`, `changelog …`, `release …`, `git …`, `scratch …`, `digest`, `watch`
+- **Cross-cutting:** `config …`, `note …`, `decision …`, `annotation …`, `changelog …`, `release …`, `git …`, `scratch …`, `digest`, `autopilot`
 
 ## Plan zone vs. code zone
 
