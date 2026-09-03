@@ -1715,7 +1715,10 @@ mod m226_ac01 {
         // The cycle-1 finding is added, but PassReviews / Complete
         // refused because the finding is still open. R5 lesson:
         // never fabricate completion.
-        assert!(!outcome.reached_complete(), "open finding must block complete");
+        assert!(
+            !outcome.reached_complete(),
+            "open finding must block complete"
+        );
         let journal = closure.journal.clone();
         let finding_entries: Vec<_> = journal
             .entries()
@@ -1789,7 +1792,10 @@ mod m226_ac01 {
             },
         ];
         let cycle1 = closure.execute(&cycle1_plan, &Clock::fixed("2026-09-03T00:00:00Z"));
-        assert!(!cycle1.reached_complete(), "open finding blocks cycle-1 complete");
+        assert!(
+            !cycle1.reached_complete(),
+            "open finding blocks cycle-1 complete"
+        );
 
         // Cycle-2 plan: replay the cycle-1 prefix (same keys →
         // Idempotent no-ops in the journal) and add the fresh
@@ -1867,10 +1873,7 @@ mod m226_ac01 {
         // carries the original "reviewer-pane-w12:p2B" attribution;
         // both surfaces honor the M223 contract that reviewer
         // attribution is recorded.
-        assert_eq!(
-            review.actor, "reviewer",
-            "resume-path review attribution"
-        );
+        assert_eq!(review.actor, "reviewer", "resume-path review attribution");
         // Per-AC evidence was set on the cycle-1 closure
         // (`closure`); the resumed closure uses a fresh snapshot
         // and the journal does not carry evidence, so the
@@ -2009,7 +2012,10 @@ mod m226_ac01 {
             },
         ];
         let outcome_a = resumed_a.execute(&cycle2_plan_a, &Clock::fixed("2026-09-03T00:01:00Z"));
-        assert!(outcome_a.reached_complete(), "M226-A cycle 2 must reach complete");
+        assert!(
+            outcome_a.reached_complete(),
+            "M226-A cycle 2 must reach complete"
+        );
 
         // M226-B: clean completion (no findings).
         let snapshot_b =
@@ -2046,7 +2052,10 @@ mod m226_ac01 {
             },
         ];
         let outcome_b = closure_b.execute(&plan_b, &Clock::fixed("2026-09-03T00:02:00Z"));
-        assert!(outcome_b.reached_complete(), "M226-B clean path must reach complete");
+        assert!(
+            outcome_b.reached_complete(),
+            "M226-B clean path must reach complete"
+        );
 
         // Independent reviewer attribution is preserved on both
         // milestones (different actor strings — the contract that
@@ -2129,16 +2138,8 @@ mod m226_ac01 {
     /// reads it.
     fn snapshot_helper(milestone_id: &str) -> MilestoneSnapshot {
         match milestone_id {
-            "226-A" => MilestoneSnapshot::ready_for_closure(
-                "226-A",
-                &["S1"],
-                &["AC-01", "AC-02"],
-            ),
-            "226-B" => MilestoneSnapshot::ready_for_closure(
-                "226-B",
-                &["S1"],
-                &["AC-01", "AC-02"],
-            ),
+            "226-A" => MilestoneSnapshot::ready_for_closure("226-A", &["S1"], &["AC-01", "AC-02"]),
+            "226-B" => MilestoneSnapshot::ready_for_closure("226-B", &["S1"], &["AC-01", "AC-02"]),
             other => panic!("unexpected milestone id {other}"),
         }
     }
@@ -2354,9 +2355,9 @@ mod m226_ac02 {
                 assert_eq!(last_seq, 3);
                 assert_eq!(prior, prior_event_count);
             }
-            other => panic!(
-                "M226 AC-02 / reviewer restart: stale cursor must Recover, got {other:?}"
-            ),
+            other => {
+                panic!("M226 AC-02 / reviewer restart: stale cursor must Recover, got {other:?}")
+            }
         }
         assert_eq!(
             session_lib.events.len(),
@@ -2457,8 +2458,8 @@ mod m226_ac03 {
     use super::m226_fixtures::*;
     use mp::autopilot::lifecycle::{Clock, LifecycleClosure, MilestoneSnapshot};
     use mp::autopilot::role::{
-        MilestoneKind, ReviewBypassPolicy, Topology, TopologyMode, TopologyPolicy,
-        TopologyPreflightError, topology_policy, topology_preflight,
+        topology_policy, topology_preflight, MilestoneKind, ReviewBypassPolicy, Topology,
+        TopologyMode, TopologyPolicy, TopologyPreflightError,
     };
 
     /// Two-pane topology: the policy is NoShipWithBacklog with a
@@ -2520,9 +2521,12 @@ mod m226_ac03 {
             TopologyPreflightError::FullMilestoneRequiresReviewer { .. }
         ));
         // Track milestone is accepted under every topology.
-        let policy_track =
-            topology_preflight(Topology::OneAgent, MilestoneKind::Track, ReviewBypassPolicy::None)
-                .unwrap();
+        let policy_track = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Track,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap();
         assert_eq!(policy_track.mode, TopologyMode::SingleAgentTrackOnly);
         // Recorded bypass is honored.
         let policy_recorded = topology_preflight(
