@@ -184,6 +184,18 @@ fn cmd_autopilot_session(
     format: crate::cli::OutputFormat,
     fields: &[String],
 ) -> Result<()> {
+    // M208 / S3: before answering, attempt the legacy watch-state
+    // migration if it has not already happened. The migration is
+    // idempotent and best-effort — a failure here surfaces as an
+    // empty session list, not a hard error, so a user who has no
+    // legacy state (the common case) sees a clean response. Once
+    // an autopilot session exists, the migration is a no-op.
+    //
+    // The migration error type intentionally does not propagate so a
+    // corrupt legacy file does not block the session list view; the
+    // operator can run `mp autopilot migrate` to see the typed
+    // diagnostic. S4 makes that command visible.
+    drop(autopilot::migrate_legacy_watch_state(ctx));
     match cmd {
         AutopilotSessionCmd::List => {
             let list = autopilot::list_sessions(ctx)?;
