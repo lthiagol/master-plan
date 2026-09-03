@@ -21,9 +21,7 @@ use mp::autopilot::prompts::spawn::{
     RoleReexport as Role, SpawnPromptInputs, TopologyReexport as Topology,
 };
 use mp::autopilot::role::{resolve_role_config, ResolvedRoleConfig};
-use mp::autopilot::spawn::{
-    spawn_session, MockHerdrSpawnOps, SpawnError, SpawnInputs,
-};
+use mp::autopilot::spawn::{spawn_session, MockHerdrSpawnOps, SpawnError, SpawnInputs};
 use mp::paths::PlanContext;
 use std::path::PathBuf;
 use tempfile::TempDir;
