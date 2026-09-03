@@ -922,7 +922,10 @@ mod m223_ac03 {
 
 #[allow(dead_code, unused_imports)]
 mod m224_fixtures {
-    use mp::autopilot::review_env::{build_provenance, ActorIdentity, ReviewerProvenance};
+    use mp::autopilot::review_env::{
+        build_provenance, gate, provenance_issues, ActorIdentity, GateInputs, ReviewEnvConfig,
+        ReviewEnvDecision, ReviewEnvError, ReviewerProvenance,
+    };
     use std::path::PathBuf;
 
     pub const RUNNER_PID: u32 = 9999;
@@ -1094,5 +1097,241 @@ mod m224_ac02 {
         );
         assert_eq!(cmds.len(), 1);
         assert!(cmds[0].contains("cargo clean"));
+    }
+}
+
+mod m224_ac03 {
+    //! AC-03 — gate refuses unsafe environments with typed,
+    //! actionable errors and escalates to clean-room for shared
+    //! target-dir rather than blocking.
+    use super::m224_fixtures::*;
+    use mp::autopilot::review_env::{
+        gate, provenance_issues, GateInputs, ReviewEnvConfig, ReviewEnvDecision, ReviewEnvError,
+    };
+
+    #[test]
+    fn gate_passes_when_env_is_clean_and_isolated() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("clean env must pass");
+        assert!(decision.is_pass(), "expected Pass, got {decision:?}");
+    }
+
+    #[test]
+    fn gate_blocks_dirty_worktree_with_actionable_hint() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: false,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("dirty worktree must block");
+        match err {
+            ReviewEnvError::DirtyWorktree { hint, .. } => {
+                assert!(
+                    !hint.is_empty(),
+                    "AC-03 requires an actionable typed result"
+                );
+            }
+            other => panic!("expected DirtyWorktree, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gate_allows_dirty_worktree_only_when_explicitly_configured() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig {
+            clean_room: false,
+            allow_dirty_worktree: true,
+        };
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: false,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("explicit allow bypasses dirty-tree refusal");
+        assert!(decision.is_pass());
+    }
+
+    #[test]
+    fn gate_blocks_same_actor_identity() {
+        let env = fresh_provenance();
+        let cfg = ReviewEnvConfig::default();
+        let target = runner_target();
+        // The reviewer becomes the runner — sharing the actor.
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &env.actor,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("shared actor must block");
+        match err {
+            ReviewEnvError::SameActor { actor, hint } => {
+                assert_eq!(actor, "reviewer-pane-w12:p27");
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected SameActor, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gate_blocks_stale_binary() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-stale"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("sha mismatch must block");
+        match err {
+            ReviewEnvError::StaleBinary {
+                expected,
+                actual,
+                hint,
+            } => {
+                assert_eq!(expected, "sha-stale");
+                assert_eq!(actual, "sha-fresh");
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected StaleBinary, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gate_blocks_unverifiable_env_when_reviewers_sha_missing() {
+        let mut env = fresh_provenance();
+        env.binary_sha = None;
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("missing sha must block");
+        match err {
+            ReviewEnvError::UnverifiableEnv { missing, hint } => {
+                assert!(missing.iter().any(|m| m == "reviewer.binary_sha"));
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected UnverifiableEnv, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gate_blocks_unverifiable_env_when_expected_sha_missing() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let target = runner_target();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &target,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: None,
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("missing expected sha must block");
+        match err {
+            ReviewEnvError::UnverifiableEnv { missing, hint } => {
+                assert!(missing.iter().any(|m| m == "expected_binary_sha"));
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected UnverifiableEnv, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gate_escalates_to_clean_room_on_shared_target_dir() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &env.target_dir,
+            runner_pid: RUNNER_PID,
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-fresh"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("shared target dir escalates, does not block");
+        assert!(decision.is_clean_room(), "expected PassWithCleanRoom");
+        match decision {
+            ReviewEnvDecision::PassWithCleanRoom {
+                commands,
+                reason,
+            } => {
+                assert!(!commands.is_empty());
+                assert!(commands[0].contains("cargo clean"));
+                assert!(
+                    reason.contains("target_dir") || reason.contains("runner.target_dir"),
+                    "reason must explain the trigger: {reason}"
+                );
+            }
+            other => panic!("expected PassWithCleanRoom, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn provenance_issues_lists_isolation_failures_for_select_mode() {
+        let env = fresh_provenance();
+        // Shared target dir + shared pid (matching the reviewer's).
+        let issues = provenance_issues(&env, &env.target_dir, env.pid);
+        assert!(issues.contains(&"shared-target-dir".to_string()));
+        assert!(issues.contains(&"shared-pid".to_string()));
+    }
+
+    #[test]
+    fn provenance_issues_empty_when_reviewer_is_isolated() {
+        let env = fresh_provenance();
+        let target = runner_target();
+        let issues = provenance_issues(&env, &target, RUNNER_PID);
+        assert!(
+            issues.is_empty(),
+            "isolated reviewer must produce no issues: {issues:?}"
+        );
     }
 }

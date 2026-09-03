@@ -469,3 +469,444 @@ mod s2_tests {
         );
     }
 }
+
+// ─── Gate (S3 / AC-03) ─────────────────────────────────────────────────
+
+/// Decision recorded by [`gate`].
+///
+/// - `Pass` — the environment is clean-room `Normal` and the gate
+///   has no findings. The cycle proceeds.
+/// - `PassWithCleanRoom` — the gate found provenance issues but
+///   clean-room escalation makes the review safe. The cycle
+///   proceeds with the recorded trigger + commands.
+/// - The absence of a `Block` variant is intentional: blocking
+///   environments return `Err(ReviewEnvError)` instead.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "verdict", rename_all = "kebab-case")]
+pub enum ReviewEnvDecision {
+    Pass,
+    PassWithCleanRoom {
+        reason: String,
+        commands: Vec<String>,
+    },
+}
+
+impl ReviewEnvDecision {
+    pub const fn is_pass(&self) -> bool {
+        matches!(self, ReviewEnvDecision::Pass)
+    }
+    pub const fn is_clean_room(&self) -> bool {
+        matches!(self, ReviewEnvDecision::PassWithCleanRoom { .. })
+    }
+}
+
+/// Typed refusal for an unsafe environment. Each variant carries a
+/// `hint` string with the action a human (or the cycle engine) needs
+/// to take. AC-03 verbatim: the gate must block automatic review
+/// pass with an actionable typed result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ReviewEnvError {
+    DirtyWorktree {
+        status_output: String,
+        hint: String,
+    },
+    SameActor {
+        actor: String,
+        hint: String,
+    },
+    StaleBinary {
+        expected: String,
+        actual: String,
+        hint: String,
+    },
+    UnverifiableEnv {
+        missing: Vec<String>,
+        hint: String,
+    },
+}
+
+impl ReviewEnvError {
+    pub fn hint(&self) -> &str {
+        match self {
+            ReviewEnvError::DirtyWorktree { hint, .. }
+            | ReviewEnvError::SameActor { hint, .. }
+            | ReviewEnvError::StaleBinary { hint, .. }
+            | ReviewEnvError::UnverifiableEnv { hint, .. } => hint,
+        }
+    }
+
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ReviewEnvError::DirtyWorktree { .. } => "dirty-worktree",
+            ReviewEnvError::SameActor { .. } => "same-actor",
+            ReviewEnvError::StaleBinary { .. } => "stale-binary",
+            ReviewEnvError::UnverifiableEnv { .. } => "unverifiable-env",
+        }
+    }
+}
+
+/// Inputs to [`gate`]. Bundled so the test suite can build fixtures
+/// without an enormous positional argument list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GateInputs<'a> {
+    pub env: &'a ReviewerProvenance,
+    pub runner_actor: &'a ActorIdentity,
+    pub runner_target_dir: &'a std::path::Path,
+    pub runner_pid: u32,
+    pub worktree_clean: bool,
+    pub expected_binary_sha: Option<&'a str>,
+    pub config: &'a ReviewEnvConfig,
+}
+
+/// Run the pre-review gate. Returns `Ok(decision)` when the
+/// environment is safe (with or without clean-room escalation);
+/// returns `Err(ReviewEnvError)` when the environment is unsafe and
+/// the automatic review pass must be blocked.
+///
+/// **Refusal order** (so a test can predict which variant surfaced):
+///
+/// 1. `UnverifiableEnv` — `binary_sha` missing OR `expected_binary_sha`
+///    missing. Without provenance we cannot reason about isolation.
+/// 2. `SameActor` — `actor.distinct_from(runner_actor)` is false.
+/// 3. `StaleBinary` — provenances differ from the expected sha.
+/// 4. `DirtyWorktree` — last because it is observable post-build
+///    (the build can succeed on a dirty tree; the gate fails before
+///    the cycle records a false-positive pass).
+///
+/// `allow_dirty_worktree` lifts the dirty-worktree check but leaves
+/// the others untouched — a reviewer that knowingly accepts dirty
+/// still needs process + binary isolation.
+pub fn gate(inputs: &GateInputs<'_>) -> Result<ReviewEnvDecision, ReviewEnvError> {
+    let GateInputs {
+        env,
+        runner_actor,
+        runner_target_dir,
+        runner_pid,
+        worktree_clean,
+        expected_binary_sha,
+        config,
+    } = inputs;
+
+    // 1. Unverifiable environment.
+    let mut missing = Vec::new();
+    if env.binary_sha.is_none() {
+        missing.push("reviewer.binary_sha".to_string());
+    }
+    if expected_binary_sha.is_none() {
+        missing.push("expected_binary_sha".to_string());
+    }
+    if !missing.is_empty() {
+        return Err(ReviewEnvError::UnverifiableEnv {
+            missing,
+            hint: "Record both reviewer.binary_sha and the runner's expected binary sha before launching the reviewer; rerun with `--no-isolation-overrides`.".to_string(),
+        });
+    }
+
+    // 2. Same actor identity as the runner.
+    if !env.actor.distinct_from(runner_actor) {
+        return Err(ReviewEnvError::SameActor {
+            actor: env.actor.actor_token.clone(),
+            hint: format!(
+                "Reviewer shares actor identity with runner ({}); spawn a fresh reviewer process on a distinct pane.",
+                env.actor.actor_token
+            ),
+        });
+    }
+
+    // 3. Stale binary.
+    if let (Some(actual), Some(expected)) = (env.binary_sha.as_ref(), expected_binary_sha) {
+        if actual != expected {
+            return Err(ReviewEnvError::StaleBinary {
+                expected: expected.to_string(),
+                actual: actual.clone(),
+                hint: "Rebuild the reviewer binary (`cargo build --release -p mp`) before launching the reviewer; ensure the runner and reviewer see the same artifact hash.".to_string(),
+            });
+        }
+    }
+
+    // 4. Dirty worktree (unless explicitly allowed).
+    if !worktree_clean && !config.allow_dirty_worktree {
+        return Err(ReviewEnvError::DirtyWorktree {
+            status_output: "git status --porcelain returned non-empty output".to_string(),
+            hint: "Commit or stash working-tree changes before requesting an automated review pass; the gate refuses to record a `Pass` over a dirty tree.".to_string(),
+        });
+    }
+
+    // Safety check passed. Decide whether clean-room escalation
+    // applies — only when the worktree/actor/binary checks all
+    // pass AND something on the provenance side was suspicious but
+    // not blocking. Today that boils down to "shared target dir":
+    // the gate refuses a structural failure here but allows
+    // clean-room escalation for non-structural dirt.
+    if !env.target_dir_is_isolated(runner_target_dir) {
+        return Ok(ReviewEnvDecision::PassWithCleanRoom {
+            reason: "reviewer.target_dir matches runner.target_dir; forcing clean-room to break the build-cache inheritance".to_string(),
+            commands: clean_room_commands(
+                Some(&CleanRoomTrigger::ProvenanceFailure {
+                    reasons: vec!["shared-target-dir".to_string()],
+                }),
+                &env.target_dir,
+            ),
+        });
+    }
+    if !env.pid_is_fresh(*runner_pid) {
+        return Ok(ReviewEnvDecision::PassWithCleanRoom {
+            reason: format!(
+                "reviewer.pid {} equals runner.pid; clean-room + process reset required",
+                env.pid
+            ),
+            commands: clean_room_commands(
+                Some(&CleanRoomTrigger::ProvenanceFailure {
+                    reasons: vec!["shared-pid".to_string()],
+                }),
+                &env.target_dir,
+            ),
+        });
+    }
+
+    Ok(ReviewEnvDecision::Pass)
+}
+
+/// Collect provenance *issues* (non-blocking) into a flat list. Used
+/// by the cycle engine after the first run to decide whether to
+/// escalate on subsequent reviews; the gate itself only reads
+/// `Ok`/`Err` outcomes.
+pub fn provenance_issues(
+    env: &ReviewerProvenance,
+    runner_target_dir: &std::path::Path,
+    runner_pid: u32,
+) -> Vec<String> {
+    let mut issues = Vec::new();
+    if !env.target_dir_is_isolated(runner_target_dir) {
+        issues.push("shared-target-dir".to_string());
+    }
+    if !env.pid_is_fresh(runner_pid) {
+        issues.push("shared-pid".to_string());
+    }
+    issues
+}
+
+#[cfg(test)]
+mod s3_tests {
+    use super::*;
+
+    fn fixture_runner() -> ActorIdentity {
+        ActorIdentity::runner("s-1", "runner-pane-w12:p17", "2026-09-03T00:00:00Z")
+    }
+
+    fn fixture_env() -> ReviewerProvenance {
+        build_provenance(
+            "s-1",
+            "reviewer-pane-w12:p27",
+            "2026-09-03T00:00:00Z",
+            std::path::PathBuf::from("/tmp/mp"),
+            Some("sha-abc"),
+            std::path::PathBuf::from("/tmp/wt"),
+            std::path::PathBuf::from("/tmp/reviewer-target"),
+            4242,
+        )
+    }
+
+    fn clean_runner_target() -> std::path::PathBuf {
+        std::path::PathBuf::from("/tmp/runner-target")
+    }
+
+    fn clean_runner_pid() -> u32 {
+        9999
+    }
+
+    #[test]
+    fn s3_gate_passes_when_provenance_is_clean() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("clean env passes");
+        assert!(decision.is_pass());
+    }
+
+    #[test]
+    fn s3_gate_blocks_dirty_worktree_by_default() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: false,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("dirty worktree must block");
+        assert!(matches!(err, ReviewEnvError::DirtyWorktree { .. }));
+        assert_eq!(err.kind(), "dirty-worktree");
+    }
+
+    #[test]
+    fn s3_gate_allows_dirty_worktree_when_configured() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig {
+            clean_room: false,
+            allow_dirty_worktree: true,
+        };
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: false,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("explicit allow bypasses dirty-tree refusal");
+        assert!(decision.is_pass());
+    }
+
+    #[test]
+    fn s3_gate_blocks_same_actor_identity() {
+        let env = fixture_env();
+        let same_actor = env.actor.clone();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &same_actor,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("shared actor must block");
+        assert!(matches!(err, ReviewEnvError::SameActor { .. }));
+        assert!(!err.hint().is_empty());
+    }
+
+    #[test]
+    fn s3_gate_blocks_stale_binary() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-different"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("sha mismatch must block");
+        match err {
+            ReviewEnvError::StaleBinary {
+                expected,
+                actual,
+                hint,
+            } => {
+                assert_eq!(expected, "sha-different");
+                assert_eq!(actual, "sha-abc");
+                assert!(!hint.is_empty());
+            }
+            other => panic!("expected StaleBinary, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn s3_gate_blocks_unverifiable_environment_when_binary_sha_missing() {
+        let mut env = fixture_env();
+        env.binary_sha = None;
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("missing binary_sha must block");
+        match err {
+            ReviewEnvError::UnverifiableEnv { missing, .. } => {
+                assert!(missing.iter().any(|m| m == "reviewer.binary_sha"));
+            }
+            other => panic!("expected UnverifiableEnv, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn s3_gate_blocks_when_expected_sha_missing() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &clean_runner_target(),
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: None,
+            config: &cfg,
+        };
+        let err = gate(&inputs).expect_err("missing expected_sha must block");
+        match err {
+            ReviewEnvError::UnverifiableEnv { missing, .. } => {
+                assert!(missing.iter().any(|m| m == "expected_binary_sha"));
+            }
+            other => panic!("expected UnverifiableEnv, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn s3_gate_escalates_to_clean_room_on_shared_target_dir() {
+        let env = fixture_env();
+        let runner = fixture_runner();
+        let cfg = ReviewEnvConfig::default();
+        let inputs = GateInputs {
+            env: &env,
+            runner_actor: &runner,
+            runner_target_dir: &env.target_dir,
+            runner_pid: clean_runner_pid(),
+            worktree_clean: true,
+            expected_binary_sha: Some("sha-abc"),
+            config: &cfg,
+        };
+        let decision = gate(&inputs).expect("shared target dir escalates, does not block");
+        assert!(decision.is_clean_room());
+        match decision {
+            ReviewEnvDecision::PassWithCleanRoom { commands, .. } => {
+                assert!(!commands.is_empty());
+                assert!(commands[0].contains("cargo clean"));
+                assert!(commands[0].contains(env.target_dir.to_str().unwrap()));
+            }
+            other => panic!("expected PassWithCleanRoom, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn s3_provenance_issues_lists_isolation_failures() {
+        let env = fixture_env();
+        let issues = provenance_issues(&env, &env.target_dir, env.pid);
+        assert!(issues.contains(&"shared-target-dir".to_string()));
+        assert!(issues.contains(&"shared-pid".to_string()));
+    }
+
+    #[test]
+    fn s3_provenance_issues_empty_when_isolated() {
+        let env = fixture_env();
+        let issues = provenance_issues(&env, &clean_runner_target(), clean_runner_pid());
+        assert!(issues.is_empty());
+    }
+}
