@@ -68,6 +68,7 @@ fn documented_fields_are_all_present() {
             harness: Some("opencode".into()),
             skill: Some("mp-coordinator".into()),
             config_hash: Some("v1".into()),
+            spawn_prompt_rendered: None,
         }),
         runner: Some(RoleConfig {
             role: RoleName::Runner,
@@ -76,6 +77,7 @@ fn documented_fields_are_all_present() {
             harness: Some("opencode".into()),
             skill: Some("mp-runner".into()),
             config_hash: Some("v1".into()),
+            spawn_prompt_rendered: None,
         }),
         reviewer: Some(RoleConfig {
             role: RoleName::Reviewer,
@@ -84,6 +86,7 @@ fn documented_fields_are_all_present() {
             harness: Some("opencode".into()),
             skill: Some("mp-runner".into()),
             config_hash: Some("v1".into()),
+            spawn_prompt_rendered: None,
         }),
     };
 

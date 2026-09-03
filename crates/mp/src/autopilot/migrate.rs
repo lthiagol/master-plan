@@ -297,6 +297,7 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
             harness: None,
             skill: Some("mp-coordinator".into()),
             config_hash: None,
+            spawn_prompt_rendered: None,
         }),
         runner: Some(RoleConfig {
             role: RoleName::Runner,
@@ -305,6 +306,7 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
             harness: None,
             skill: Some("mp-runner".into()),
             config_hash: None,
+            spawn_prompt_rendered: None,
         }),
         reviewer: Some(RoleConfig {
             role: RoleName::Reviewer,
@@ -313,6 +315,7 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
             harness: None,
             skill: Some("mp-runner".into()),
             config_hash: None,
+            spawn_prompt_rendered: None,
         }),
     };
 

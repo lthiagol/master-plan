@@ -140,6 +140,13 @@ pub struct RoleConfig {
     pub skill: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_hash: Option<String>,
+    /// M210 / AC-04: the rendered per-role spawn prompt the
+    /// pipeline delivered to this role's pane on the most recent
+    /// spawn. Captured for audit; the bundle delivered to a
+    /// physical pane is the *concatenated* prompt (for collapsed
+    /// topologies) and lives in `session.prompt_bundles[<label>]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_prompt_rendered: Option<String>,
 }
 
 /// Per-role topology pane_ids. Mirrors `topology.*` in the schema.
@@ -349,6 +356,12 @@ pub struct AutopilotSession {
     pub queue_cycle_history: Vec<CycleHistoryEntry>,
     #[serde(default)]
     pub schema_migrations: Vec<SchemaMigration>,
+    /// M210 / AC-07: provenance record for the mp binary that
+    /// last mutated this session. The spawn pipeline's
+    /// provenance gate reads this field and rejects a binary
+    /// that cannot preserve the recorded schema version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binary_provenance: Option<crate::autopilot::spawn::MpBinaryProvenance>,
 }
 
 /// One entry in `queue_cycle_history`.
@@ -604,6 +617,7 @@ pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
             harness: Some("opencode".into()),
             skill: Some("mp-coordinator".into()),
             config_hash: Some("orch-coord-v1".into()),
+            spawn_prompt_rendered: None,
         }),
         runner: Some(RoleConfig {
             role: RoleName::Runner,
@@ -612,6 +626,7 @@ pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
             harness: Some("opencode".into()),
             skill: Some("mp-runner".into()),
             config_hash: Some("runner-v1".into()),
+            spawn_prompt_rendered: None,
         }),
         reviewer: Some(RoleConfig {
             role: RoleName::Reviewer,
@@ -620,6 +635,7 @@ pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
             harness: Some("opencode".into()),
             skill: Some("mp-runner".into()),
             config_hash: Some("reviewer-v1".into()),
+            spawn_prompt_rendered: None,
         }),
     };
 
@@ -690,6 +706,7 @@ pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
         ac_projections,
         queue_cycle_history: Vec::new(),
         schema_migrations: Vec::new(),
+        binary_provenance: None,
     }
 }
 
@@ -732,6 +749,7 @@ impl AutopilotSession {
             ac_projections: BTreeMap::new(),
             queue_cycle_history: Vec::new(),
             schema_migrations: Vec::new(),
+            binary_provenance: None,
         }
     }
 }

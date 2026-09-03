@@ -135,17 +135,6 @@
           "at": { "type": "string" }
         }
       }
-    },
-    "binary_provenance": {
-      "type": "object",
-      "description": "M210 / AC-07: provenance record for the mp binary that last mutated this session. Stamped at spawn time; rejected by the spawn pipeline if a newer binary cannot preserve the recorded schema.",
-      "properties": {
-        "binary_path": { "type": "string" },
-        "version": { "type": "string" },
-        "schema_version": { "type": "integer" },
-        "build_kind": { "type": "string" },
-        "recorded_at": { "type": "string" }
-      }
     }
   },
   "$defs": {
