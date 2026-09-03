@@ -1999,6 +1999,14 @@
       "reviewed_at": "2026-09-03",
       "notes": "Cycle 2 re-review (tightened blockers-only). F-01 regression test PASS (s3_gate_blocks_worktree_mismatch_when_reviewer_on_different_worktree). F-02 AC-03 promoted 10/10 -> 11/11 (gate_escalates_to_clean_room_on_shared_pid present in both s3_tests and m224_ac03). F-01 wiring verified: GateInputs.runner_worktree_path + gate() calls env.worktree_matches + WorktreeMismatch ReviewEnvError variant + all 8 existing gate tests updated to pass runner_worktree_path. F-02 tests verified to be real assertions (commands non-empty, contains cargo clean, contains target dir, reason contains pid). Total m224-prefixed tests 20/20 PASS. fmt + clippy -D warnings clean. Both findings now status=fixed.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "225",
+      "verdict": "ok",
+      "reviewer": "reviewer-225",
+      "reviewed_at": "2026-09-03",
+      "notes": "F-01 wired: dispatch_assignment returns AlreadyApplied (typed enum, prevents herdr spawn); cmd_watch_drive calls run_startup_recovery_all on startup; complete_milestone refuses on canonical_wins_anywhere. F-02 subprocess: 4 AC tests use FakeHerdrBuilder (M227); 1 regression test ties them. F-03 timestamp: compare_revisions uses canonical_at vs session_at RFC3339; lex is tiebreaker only. 30/30 watch_resume pass; 26/26 M225 tests across autopilot+watch_resume surfaces pass. Pre-existing migrate test failure (idempotent_re_run_is_a_no_op) confirmed pre-M225 — fails on ccabd03 too, not a regression.",
+      "milestone_completed_at": "2026-09-03"
     }
   ],
   "comments": [
