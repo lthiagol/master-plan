@@ -1,0 +1,186 @@
+{
+  "milestone": {
+    "id": "229",
+    "title": "breaking-release cleanup — remove mp watch and legacy autopilot migration shims",
+    "slug": "breaking-release-cleanup-remove-mp-watch-and-legacy-autopilot-migration-shims",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "deferred",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": true,
+    "deferred_reason": "Execute only for the explicitly recorded next major release after at least one full minor release ships the M219 warning and migration shims.",
+    "depends_on": [
+      "228",
+      "219",
+      "222"
+    ],
+    "effort": "L",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "low",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:16:13.983423+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:16:13.983424+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:16:28.308789+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:16:28.403134+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:16:13.983424+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "A scheduled breaking release exposes only canonical autopilot commands, keys, state, roles, and JSON vocabulary after the documented compatibility window."
+  },
+  "problem": {
+    "description": "Deprecation without a removal owner becomes permanent maintenance. The alias, v1/v2 state reader, old settings and role fallback, legacy keybind source, and watch_readiness JSON field need one release-gated removal plan."
+  },
+  "scope": {
+    "in_scope": [
+      "Remove mp watch and watch-control aliases and their warning hook.",
+      "Remove legacy watch.state migration/read support after migration-window evidence.",
+      "Remove ui.show_watch_tab, agent.coordinator role fallback, project keybinds fallback, and watch_readiness compatibility fields.",
+      "Publish breaking migration notes and update goldens/install fixtures."
+    ],
+    "out_of_scope": [
+      "Removing historical changelog entries or archived milestone files.",
+      "Executing before one full minor compatibility window and an explicit next-major target version are recorded."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Execution is gated on a recorded next-major target version and evidence that at least one full minor release carried the warning/migration shims; without both, preflight refuses removal work.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Canonical mp/raul surfaces contain no executable watch alias, watch-control command, legacy state/config/keybind reader, or watch_readiness field; unknown legacy inputs return migration guidance.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Breaking-release migration docs, schema goldens, installer fixtures, and full tests pass while historical changelog/archive text remains untouched.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "release_gate",
+      "choice": "Compatibility removal is a next-major operation gated by one full minor release of warning/migration support and explicit target-version evidence.",
+      "rationale": "A calendar-free but evidence-backed gate prevents accidental breaking removal while ensuring deprecation has an owner."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Release gate and removals",
+      "goal": "Remove compatibility surfaces only in the recorded breaking release after the full warning window.",
+      "rollback": "Restore compatibility adapters for another release without changing canonical autopilot behavior."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement preflight that requires explicit next-major target and one full minor release of migration evidence before removal begins.",
+      "files": [
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/tests/watch_cli.rs",
+        "CHANGELOG.md"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "done_when": "AC-01 refuses early execution and accepts a valid release fixture.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Remove executable aliases and legacy state/config/keybind/readiness shims while preserving actionable unknown-input diagnostics.",
+      "files": [
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/src/autopilot/**",
+        "crates/mp/src/config.rs",
+        "crates/raul/src/config.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "done_when": "AC-02 leaves no legacy executable reader or alias.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Publish breaking migration guide, regenerate schemas/goldens, and run full regression without altering historical archives.",
+      "files": [
+        "docs/**",
+        "tests/fixtures/**",
+        "tests/scenarios/**",
+        "templates/**"
+      ],
+      "tests": "make test",
+      "done_when": "AC-03 passes with reviewed breaking-release notes.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

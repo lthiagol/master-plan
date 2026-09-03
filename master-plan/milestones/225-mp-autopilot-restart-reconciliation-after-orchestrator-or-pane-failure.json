@@ -1,0 +1,211 @@
+{
+  "milestone": {
+    "id": "225",
+    "title": "mp autopilot restart + reconciliation after orchestrator or pane failure",
+    "slug": "mp-autopilot-restart-reconciliation-after-orchestrator-or-pane-failure",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "207",
+      "210",
+      "213",
+      "223"
+    ],
+    "effort": "M",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:12:35.205735+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:12:35.205737+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:13:30.925071+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:13:31.018751+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:12:35.205737+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Interrupted autopilot sessions resume from durable events without duplicate dispatch, fabricated completion, or loss of evidence."
+  },
+  "problem": {
+    "description": "Durable session writes are insufficient unless the orchestrator can reconcile them with live herdr panes and canonical milestone/review state after SIGINT, process death, pane loss, or partial command completion."
+  },
+  "scope": {
+    "in_scope": [
+      "Resume from last valid event sequence and schema revision.",
+      "Reconcile herdr workspace/panes, session roles, milestone criteria, reviews, and lifecycle state.",
+      "No duplicate dispatch; explicit outcomes for missing pane, corrupt tail, incompatible binary, and terminal session."
+    ],
+    "out_of_scope": [
+      "Normal cycle decision policy.",
+      "UI replay rendering and full multi-milestone certification."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Resume after orchestrator SIGINT continues from the last durable event without duplicate assignment or lifecycle command.",
+      "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Missing/dead panes are classified by role and topology; safe respawn uses the stored prompt and actor rotation, while unsafe ambiguity escalates AwaitingUser.",
+      "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "A corrupt or partial event tail recovers the last valid sequence without truncating prior events; incompatible schema/binary fails before mutation.",
+      "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Reconciliation cross-checks canonical criterion/review/lifecycle state and never restores stale session projections over newer plan evidence.",
+      "verification": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "recovery_authority",
+      "choice": "Canonical milestone criteria, reviews, and lifecycle revisions override stale session projections; append-only events and idempotency keys determine whether an effect may be replayed.",
+      "rationale": "Recovery must not replace newer plan evidence or duplicate irreversible dispatch and closure commands."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Restart reconciliation",
+      "goal": "Recover durable sessions against live panes and canonical plan state without duplicate effects.",
+      "rollback": "Leave interrupted sessions AwaitingUser and preserve all durable evidence."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement resume from event cursor with idempotency keys for dispatch and lifecycle operations.",
+      "files": [
+        "crates/mp/src/autopilot/reconcile.rs",
+        "crates/mp/tests/watch_resume.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "AC-01 resumes without duplicate effects.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Reconcile stored role/pane identity with herdr liveness and implement safe respawn versus AwaitingUser classification.",
+      "files": [
+        "crates/mp/src/autopilot/reconcile.rs",
+        "crates/mp/tests/watch_resume.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "AC-02 covers each topology and pane-loss role.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Recover last valid event sequence and reject incompatible schema/binary before writes.",
+      "files": [
+        "crates/mp/src/autopilot/reconcile.rs",
+        "crates/mp/tests/watch_resume.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "AC-03 preserves prior events and makes no mutation on incompatibility.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Cross-check canonical criterion, review, and lifecycle revisions during recovery; never restore stale projections.",
+      "files": [
+        "crates/mp/src/autopilot/reconcile.rs",
+        "crates/mp/tests/watch_resume.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_resume --no-fail-fast",
+      "done_when": "AC-04 proves canonical newer evidence wins.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [
+        "S2",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "milestone": {
+    "id": "223",
+    "title": "mp autopilot lifecycle transaction + commit/finding attribution",
+    "slug": "mp-autopilot-lifecycle-transaction-commit-finding-attribution",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "212",
+      "213"
+    ],
+    "effort": "M",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:11:35.243522+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:11:35.243524+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:13:30.546516+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:13:30.646178+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:11:35.243524+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Autopilot closes implementation and remediation through an explicit transactional lifecycle protocol with auditable commit and finding attribution."
+  },
+  "problem": {
+    "description": "The herdr runs exposed completion commands that overwrote evidence, generic review evidence, and unclear `fixed_in` ownership. The cycle engine needs a separate closure module so state transitions and git/review attribution are testable without expanding the scheduler."
+  },
+  "scope": {
+    "in_scope": [
+      "Exact runner-complete, review-claim, finding, remediation, reviews-pass, and lifecycle-complete command sequence.",
+      "Implementation commits map to steps or documented groups; remediation uses one actual fix commit per finding and stores it in fixed_in.",
+      "Precondition failure and partial-command failure leave lifecycle, reviews, and evidence in a reconcilable state."
+    ],
+    "out_of_scope": [
+      "Cycle scheduling and decision policy, owned by M213.",
+      "Reviewer process isolation and crash recovery, owned by follow-up milestones."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A fixture executes runner completion, independent review claim, finding add, remediation, finding resolution with actual fixed_in commit, reviews pass, and lifecycle complete; each state and evidence revision is asserted.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Commit policy rejects missing or fabricated fixed_in hashes, ambiguous grouped remediation commits, and lifecycle metadata commits that overwrite per-AC evidence.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "A failure injected at every lifecycle command boundary is restart-safe: completed writes remain auditable, incomplete transitions do not fabricate success, and rerun is idempotent.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "transaction_boundary",
+      "choice": "Compose existing milestone/review commands behind revision-checked idempotency keys; never mutate milestone or reviews files directly from autopilot.",
+      "rationale": "This preserves canonical validation/audit behavior and makes partial closure recoverable."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Lifecycle closure transaction",
+      "goal": "Implement exact lifecycle/review command sequencing with idempotent failure recovery.",
+      "rollback": "Disable automatic closure and leave sessions AwaitingUser with evidence intact."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement typed lifecycle closure protocol over existing milestone and reviews commands, including revision checks and idempotency.",
+      "files": [
+        "crates/mp/src/autopilot/lifecycle.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-01 passes through lifecycle complete with independent reviewer attribution.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement commit and fixed_in attribution policy, preserving AC evidence across lifecycle metadata commits.",
+      "files": [
+        "crates/mp/src/autopilot/commit_policy.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-02 rejects fabricated, missing, and ambiguous commit attribution.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Add command-boundary failure injection and idempotent rerun/reconciliation fixtures.",
+      "files": [
+        "crates/mp/src/autopilot/lifecycle.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-03 passes for every injected boundary.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

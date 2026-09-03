@@ -1,0 +1,182 @@
+{
+  "milestone": {
+    "id": "226",
+    "title": "mp autopilot end-to-end certification — remediation, restart, topology, completion",
+    "slug": "mp-autopilot-end-to-end-certification-remediation-restart-topology-completion",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "210",
+      "212",
+      "213",
+      "223",
+      "224",
+      "225",
+      "208",
+      "218"
+    ],
+    "effort": "M",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:12:50.463076+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:12:50.463078+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:13:31.113974+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:13:31.213229+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:12:50.463078+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "A production-shaped integration suite certifies that the complete autopilot stack drives queued work through remediation and terminal completion without raul."
+  },
+  "problem": {
+    "description": "The component milestones can pass independently while their command, event, actor, and lifecycle contracts still disagree. A final certification milestone must integrate them without becoming the place where missing component behavior is first implemented."
+  },
+  "scope": {
+    "in_scope": [
+      "Three-pane full milestone with one remediation cycle and independent review pass.",
+      "Restart during runner and reviewer phases without duplicate dispatch.",
+      "Two-pane restricted policy and one-pane full-milestone rejection.",
+      "Multi-milestone queue ordering, terminal summary, and raul-absent operation."
+    ],
+    "out_of_scope": [
+      "New component behavior not already owned by prerequisite milestones.",
+      "Legacy watch removal and raul presentation details."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "A three-pane fixture drives two queued milestones through step/AC evidence, independent review, one remediation cycle, finding fixed_in resolution, reviews pass, and lifecycle complete without raul.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Restart injection during runner and reviewer phases preserves queue order and produces no duplicate dispatch, finding, or lifecycle transition.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Topology certification proves two-pane no-ship-with-backlog behavior and rejects one-pane full milestones before plan mutation.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "certification_scope",
+      "choice": "The certification milestone may add fixtures and adapters only; any missing production behavior is routed back to its owning prerequisite milestone.",
+      "rationale": "Keeping integration certification free of feature implementation prevents ownership drift and oversized remediation."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Full-stack certification",
+      "goal": "Exercise only prerequisite-owned behavior in production-shaped queued drives.",
+      "rollback": "Keep component milestones shippable but do not advertise unattended autopilot as certified."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Build a three-pane two-milestone integration fixture covering evidence, independent review, remediation, fixed_in, reviews pass, and complete.",
+      "files": [
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-01 completes both milestones without raul.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Inject orchestrator restart in runner and reviewer phases and assert queue/idempotency invariants.",
+      "files": [
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-02 produces no duplicate durable effects.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Add two-pane restriction and one-pane full-milestone rejection certification cases.",
+      "files": [
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-03 matches M209/M213 topology policy.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

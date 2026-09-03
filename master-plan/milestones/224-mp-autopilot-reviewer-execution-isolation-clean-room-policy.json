@@ -1,0 +1,179 @@
+{
+  "milestone": {
+    "id": "224",
+    "title": "mp autopilot reviewer execution isolation + clean-room policy",
+    "slug": "mp-autopilot-reviewer-execution-isolation-clean-room-policy",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "210",
+      "212",
+      "213"
+    ],
+    "effort": "M",
+    "risk": "medium",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:12:20.732332+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:12:20.732333+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:13:30.738623+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:13:30.830541+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:12:20.732333+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Each automated review runs in a recorded, reproducible environment that prevents runner process state or build-cache ambiguity from masquerading as independent evidence."
+  },
+  "problem": {
+    "description": "Herdr review cycles may inherit process state, workspace dirt, or stale build products. Unconditionally cleaning every cycle is expensive, so review isolation and clean-room escalation need a dedicated policy and evidence contract."
+  },
+  "scope": {
+    "in_scope": [
+      "Fresh reviewer process with recorded binary/worktree/target-dir provenance.",
+      "Normal isolated-target mode and configurable clean-room mode using cargo clean only when requested or provenance checks fail.",
+      "Pre-review dirty-worktree and runner/reviewer independence checks."
+    ],
+    "out_of_scope": [
+      "Cycle scheduling and findings policy.",
+      "Crash/restart reconciliation and final full-drive certification."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Normal review mode launches a fresh reviewer process with independent actor identity, records binary/worktree/target-dir provenance, and does not reuse runner-local process state.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Clean-room mode runs only when configured or provenance/cache checks fail, records the reason and commands, and never makes unconditional cargo clean the default.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Dirty worktree, shared actor identity, stale binary, or unverifiable environment blocks automatic review pass with an actionable typed result.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "isolation_default",
+      "choice": "Default to a fresh reviewer process and isolated target directory; run cargo clean only under explicit clean-room policy or failed provenance checks.",
+      "rationale": "Independent evidence requires process isolation, while unconditional cold builds add cost without guaranteeing correctness."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Reviewer environment policy",
+      "goal": "Launch and verify independent review environments with recorded provenance and bounded clean-room escalation.",
+      "rollback": "Disable automated review pass and require explicit human review."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement reviewer environment builder with fresh process, actor identity, worktree, target directory, and binary provenance.",
+      "files": [
+        "crates/mp/src/autopilot/review_env.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-01 records independent provenance.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Implement normal and clean-room policy selection with recorded trigger and no unconditional cargo clean.",
+      "files": [
+        "crates/mp/src/autopilot/review_env.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-02 proves both modes and trigger evidence.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Gate automatic review pass on clean worktree, distinct actor, and compatible binary/environment provenance.",
+      "files": [
+        "crates/mp/src/autopilot/review_env.rs",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-03 rejects each unsafe environment.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

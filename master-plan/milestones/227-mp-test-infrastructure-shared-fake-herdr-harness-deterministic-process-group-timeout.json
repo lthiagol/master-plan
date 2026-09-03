@@ -1,0 +1,182 @@
+{
+  "milestone": {
+    "id": "227",
+    "title": "mp test infrastructure — shared fake-herdr harness + deterministic process-group timeout",
+    "slug": "mp-test-infrastructure-shared-fake-herdr-harness-deterministic-process-group-timeout",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "M",
+    "risk": "medium",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:15:01.388291+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:15:01.388293+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:15:02.062094+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:15:02.156182+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:15:01.388293+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Autopilot integration tests share one configurable fake-herdr harness and run subprocess timeout/process-group cases reliably under parallel nextest."
+  },
+  "problem": {
+    "description": "Fake-herdr scripts are duplicated across watch tests and the process-group timeout regression is already flaky under parallel CI. Adding spawn, verifier, restart, and E2E coverage on top of those copies would multiply double work and nondeterminism."
+  },
+  "scope": {
+    "in_scope": [
+      "Shared test helper for herdr version, pane, agent-start, prompt, list, delay, failure, and signal behavior.",
+      "Deterministic process-group timeout/kill synchronization without wall-clock races.",
+      "Migrate representative existing watch tests before autopilot suites extend the harness."
+    ],
+    "out_of_scope": [
+      "Production herdr invocation behavior changes.",
+      "Autopilot feature implementation or renaming watch test files."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Spawn, prompt, list, version, delayed response, nonzero exit, and signal-ignore behaviors are configured through one shared fake-herdr helper used by representative watch tests.",
+      "verification": "cargo nextest run -p mp --test watch_herdr_wait --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "The process-group timeout test passes repeatedly under parallel nextest without fixed sleeps and proves descendant processes are terminated.",
+      "verification": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Migrated watch tests preserve their prior assertions and no additional ad-hoc fake-herdr script builder is introduced by M210-M226 steps.",
+      "verification": "cargo nextest run -p mp --test watch_herdr_start --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "test_fixture_boundary",
+      "choice": "Provide fake herdr as test-only process fixtures under shared test support; production subprocess behavior remains unchanged except deterministic timeout synchronization needed by the test.",
+      "rationale": "The goal is reuse and reliability, not a second in-process herdr abstraction."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Shared fake-herdr harness",
+      "goal": "Replace duplicated fake CLI builders with one configurable test primitive.",
+      "rollback": "Revert migrated tests to their prior local fixtures."
+    },
+    {
+      "id": "WP2",
+      "name": "Timeout determinism",
+      "goal": "Make process-group timeout evidence reliable under parallel execution.",
+      "rollback": "Retain retry annotation while restoring previous timeout implementation."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extract configurable fake-herdr helper covering version, pane, agent, prompt, list, delay, failure, and signal modes.",
+      "files": [
+        "crates/mp/tests/common/fake_herdr.rs",
+        "crates/mp/tests/watch_herdr_wait.rs",
+        "crates/mp/tests/watch_herdr_start.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_herdr_wait --test watch_herdr_start --no-fail-fast",
+      "done_when": "AC-01 uses one helper across both test targets.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Replace sleep-sensitive process-group timeout fixture with readiness synchronization and deterministic descendant assertions.",
+      "files": [
+        "crates/mp/src/watch/bridge.rs",
+        "crates/mp/tests/watch_bridge_report.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_bridge_report --no-fail-fast",
+      "done_when": "AC-02 passes repeated parallel runs without retry dependence.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Migrate representative spawn/bridge suites and document reuse requirement for future autopilot tests.",
+      "files": [
+        "crates/mp/tests/common/fake_herdr.rs",
+        "crates/mp/tests/watch_herdr_start.rs",
+        "crates/mp/tests/watch_bridge_report.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_herdr_start --test watch_bridge_report --no-fail-fast",
+      "done_when": "AC-03 preserves assertions and removes local duplicate builders.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

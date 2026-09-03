@@ -1,0 +1,188 @@
+{
+  "milestone": {
+    "id": "228",
+    "title": "post-cutover autopilot internal cleanup — rename watch modules/tests and remove dead orchestration paths",
+    "slug": "post-cutover-autopilot-internal-cleanup-rename-watch-modules-tests-and-remove-dead-orchestration-paths",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "220",
+      "226",
+      "217"
+    ],
+    "effort": "M",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-03",
+    "updated": "2026-09-03",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-03T14:15:50.137188+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-03T14:15:50.137189+00:00"
+      },
+      "draft": {
+        "status": "done",
+        "at": "2026-09-03T14:15:50.825628+00:00"
+      },
+      "groom": {
+        "status": "done",
+        "at": "2026-09-03T14:15:50.919999+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-03T14:15:50.137189+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "After canonical autopilot certification, the implementation has one internally named autopilot stack while the legacy CLI alias remains a thin compatibility adapter."
+  },
+  "problem": {
+    "description": "M208 intentionally retains watch module names during migration. Leaving the old names and unreachable two-role prompt/state paths indefinitely would obscure ownership and invite fixes to dead code."
+  },
+  "scope": {
+    "in_scope": [
+      "Rename crates/mp/src/watch to autopilot and update internal imports after M226 certification.",
+      "Rename canonical integration tests and fixtures to autopilot names while retaining focused watch-alias compatibility tests.",
+      "Remove unreachable legacy lifecycle prompt stages, orphan coordinator drive state, obsolete bridge wake-up paths, and superseded template/runtime code proven unused."
+    ],
+    "out_of_scope": [
+      "Removing the mp watch CLI alias, legacy persisted-state reader, legacy config fallback, or public compatibility JSON fields.",
+      "Changing certified behavior or adding new autopilot features."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Canonical production implementation and non-compatibility tests use autopilot module/type names; remaining watch-named code is isolated under documented compatibility adapters.",
+      "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Unreachable legacy prompt stages, orphan coordinator-only state, superseded bridge wake-up code, and dead template runtime paths are removed only after coverage proves the M207-M226 replacements.",
+      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Full mp and raul test suites plus consumer-surface lint pass with no behavior or JSON-shape regression.",
+      "verification": "make test",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "compatibility_boundary",
+      "choice": "Rename canonical internals and remove proven-dead paths while retaining all executable/public compatibility shims in isolated adapters until M229.",
+      "rationale": "This removes maintenance ambiguity without shortening the promised migration window."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Canonical internal rename",
+      "goal": "Move certified production modules and tests to autopilot names while isolating compatibility adapters.",
+      "rollback": "Restore module/test paths without changing compatibility behavior."
+    },
+    {
+      "id": "WP2",
+      "name": "Dead path removal",
+      "goal": "Delete only legacy paths proven superseded by certified event/lifecycle behavior.",
+      "rollback": "Restore removed adapters behind private compatibility modules."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Rename the mp watch implementation tree and canonical tests/imports to autopilot; retain thin watch CLI compatibility tests/adapters.",
+      "files": [
+        "crates/mp/src/watch/**",
+        "crates/mp/src/lib.rs",
+        "crates/mp/tests/watch_*.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
+      "done_when": "AC-01 leaves watch naming only in compatibility adapters.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Remove unreachable legacy prompt stages, orphan coordinator state, superseded bridge wake-up paths, and dead template runtime code after replacement coverage.",
+      "files": [
+        "crates/mp/src/autopilot/**",
+        "templates/watch/**",
+        "crates/mp/tests/watch_execution.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "done_when": "AC-02 proves replacements before each deletion.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Run full regression and consumer lint after path cleanup; review JSON shape and compatibility alias parity.",
+      "files": [
+        "Cargo.toml",
+        "Makefile",
+        "docs/**",
+        "templates/**"
+      ],
+      "tests": "make test",
+      "done_when": "AC-03 passes with zero behavior regression.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
