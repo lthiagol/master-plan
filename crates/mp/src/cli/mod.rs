@@ -39,7 +39,9 @@ mod track;
 pub use activity::ActivityCmd;
 pub use agent::{AgentCmd, HarnessCmd, SkillCmd};
 pub use annotation::AnnotationCmd;
-pub use autopilot::{AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs};
+pub use autopilot::{
+    AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs,
+};
 pub use backlog::BacklogCmd;
 pub use brief::BriefCmd;
 pub use changelog::ChangelogCmd;

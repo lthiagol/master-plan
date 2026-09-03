@@ -90,12 +90,7 @@ pub struct OrchestrationEvent {
 impl OrchestrationEvent {
     /// Build a fresh event with `seq = cursor + 1` and the supplied
     /// kind / actor / payload. `at` is set to `now` (RFC3339).
-    pub fn new(
-        seq: u64,
-        kind: EventKind,
-        actor: impl Into<String>,
-        payload: Value,
-    ) -> Self {
+    pub fn new(seq: u64, kind: EventKind, actor: impl Into<String>, payload: Value) -> Self {
         Self {
             seq,
             kind,
@@ -110,11 +105,7 @@ impl OrchestrationEvent {
     }
 
     /// Builder-style attach of milestone id + cycle.
-    pub fn with_context(
-        mut self,
-        milestone_id: impl Into<String>,
-        cycle: u32,
-    ) -> Self {
+    pub fn with_context(mut self, milestone_id: impl Into<String>, cycle: u32) -> Self {
         self.milestone_id = Some(milestone_id.into());
         self.cycle = Some(cycle);
         self

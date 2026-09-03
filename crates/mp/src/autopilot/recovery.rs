@@ -28,7 +28,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::autopilot::events::{EventCursor, OrchestrationEvent};
-use crate::autopilot::session::{load_session, load_session_from, save_session, AutopilotSession};
+use crate::autopilot::session::{load_session_from, AutopilotSession};
 use crate::paths::PlanContext;
 
 /// Reconcile the cursor against the surviving event tail. Returns
@@ -40,10 +40,7 @@ pub fn reconcile_event_cursor(cursor: &mut EventCursor, events: &[OrchestrationE
 /// Load a session, reconcile its cursor against the surviving event
 /// log, and write it back. Returns the number of events the cursor
 /// was bumped by (0 on a clean read, >0 if a stale cursor was found).
-pub fn recover_session(
-    ctx: &PlanContext,
-    session_id: &str,
-) -> Result<RecoveredSession> {
+pub fn recover_session(ctx: &PlanContext, session_id: &str) -> Result<RecoveredSession> {
     let path = crate::autopilot::session::SessionPath::new(ctx, session_id)?;
     recover_session_at(&path.file, &ctx.project_root)
 }
@@ -67,10 +64,7 @@ pub fn recover_session_at(file: &Path, project_root: &Path) -> Result<RecoveredS
 /// Helper that mirrors `save_session_at` but skips the
 /// `last_updated` re-stamp, so recovery doesn't perturb the
 /// timestamp. Used internally by `recover_session_at`.
-fn save_session_at_and_touch_last_updated(
-    file: &Path,
-    session: &AutopilotSession,
-) -> Result<()> {
+fn save_session_at_and_touch_last_updated(file: &Path, session: &AutopilotSession) -> Result<()> {
     crate::autopilot::save_session_at(file, session)?;
     Ok(())
 }
@@ -106,7 +100,7 @@ pub fn append_event_unchecked(
 mod tests {
     use super::*;
     use crate::autopilot::events::EventKind;
-    use crate::autopilot::session::sample_session_for_tests;
+    use crate::autopilot::session::{load_session, sample_session_for_tests, save_session};
     use crate::paths::PlanContext;
     use serde_json::Value;
     use std::fs;
@@ -220,10 +214,7 @@ mod tests {
         fs::write(&path, b"not json {{{").unwrap();
         let err = load_session(&ctx, "alpha").unwrap_err();
         let msg = format!("{err}");
-        assert!(
-            msg.contains("parse") || msg.contains("decode"),
-            "got {msg}"
-        );
+        assert!(msg.contains("parse") || msg.contains("decode"), "got {msg}");
     }
 
     #[test]

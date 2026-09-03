@@ -158,7 +158,11 @@ pub fn project_ac_status(
 /// sourced from. The hash is intentionally simple (xxhash is not in
 /// the dependency tree; `DefaultHasher` is std-only) — the point is
 /// stable equality, not cryptographic strength.
-pub fn canonical_revision(seed: &str, milestone_id: &str, ac_states: &[(&str, AcStatus)]) -> String {
+pub fn canonical_revision(
+    seed: &str,
+    milestone_id: &str,
+    ac_states: &[(&str, AcStatus)],
+) -> String {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let mut h = DefaultHasher::new();
@@ -193,9 +197,7 @@ mod tests {
         let outcome = project_ac_status(&mut s, key, next.clone());
         assert_eq!(outcome, ProjectionWriteOutcome::Written);
         assert_eq!(
-            s.ac_projections
-                .get("207")
-                .and_then(|m| m.get("AC-01")),
+            s.ac_projections.get("207").and_then(|m| m.get("AC-01")),
             Some(&next)
         );
     }

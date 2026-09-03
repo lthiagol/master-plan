@@ -18,11 +18,11 @@ use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use serde_json::json;
 
+use crate::autopilot::notes::build_note;
 use crate::autopilot::{
     self, AcStatus, AutopilotSession, NoteKind, OrchestrationEvent, ProjectionKey, RoleName,
     RoleState, TransitionError,
 };
-use crate::autopilot::notes::build_note;
 use crate::cli::{AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs};
 use crate::commands::common::{emit, emit_fields};
 use crate::paths::PlanContext;
@@ -54,8 +54,7 @@ fn cmd_autopilot_session(
             emit_fields(format, &json!({ "ok": true, "sessions": list }), fields)
         }
         AutopilotSessionCmd::Show { id } => {
-            let session = autopilot::load_session(ctx, &id)
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            let session = autopilot::load_session(ctx, &id).map_err(|e| anyhow::anyhow!("{e}"))?;
             emit_fields(format, &SessionShowReport::new(&id, &session), fields)
         }
         AutopilotSessionCmd::Transition(args) => {
@@ -78,8 +77,7 @@ fn cmd_autopilot_note_add(
         milestone,
     } = args;
     let kind = parse_note_kind(&kind)?;
-    let mut loaded = autopilot::load_session(ctx, &session)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut loaded = autopilot::load_session(ctx, &session).map_err(|e| anyhow::anyhow!("{e}"))?;
     let note = build_note(&loaded, kind, &body, cycle, milestone.as_deref())?;
     let next_seq = loaded.event_cursor.next_seq();
     let event = OrchestrationEvent::new(
@@ -92,8 +90,7 @@ fn cmd_autopilot_note_add(
     loaded.event_cursor.advance_to(next_seq)?;
     loaded.events.push(event);
     loaded.runner_notes.push(note.clone());
-    autopilot::save_session(ctx, &session, &loaded)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    autopilot::save_session(ctx, &session, &loaded).map_err(|e| anyhow::anyhow!("{e}"))?;
     emit_fields(
         format,
         &json!({
@@ -128,8 +125,7 @@ fn cmd_autopilot_transition(
         Some(spec) => Some(parse_working_on(spec)?),
         None => None,
     };
-    let mut loaded = autopilot::load_session(ctx, &session)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut loaded = autopilot::load_session(ctx, &session).map_err(|e| anyhow::anyhow!("{e}"))?;
     let outcome = autopilot::apply_transition(&mut loaded, role, next, &actor, wo)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     let next_seq = loaded.event_cursor.next_seq();
@@ -138,17 +134,11 @@ fn cmd_autopilot_transition(
         "state": next.as_str(),
         "applied": outcome.was_applied(),
     });
-    let event = OrchestrationEvent::new(
-        next_seq,
-        autopilot::EventKind::Transition,
-        actor,
-        payload,
-    )
-    .with_role(role);
+    let event = OrchestrationEvent::new(next_seq, autopilot::EventKind::Transition, actor, payload)
+        .with_role(role);
     loaded.event_cursor.advance_to(next_seq)?;
     loaded.events.push(event);
-    autopilot::save_session(ctx, &session, &loaded)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    autopilot::save_session(ctx, &session, &loaded).map_err(|e| anyhow::anyhow!("{e}"))?;
     emit_fields(
         format,
         &json!({
@@ -221,10 +211,7 @@ impl SessionShowReport {
 // will route through the projection helpers below. The re-export
 // keeps the surface intentional rather than dead-code.
 #[allow(dead_code)]
-fn _ac_surface(
-    _: ProjectionKey,
-    _: AcStatus,
-) -> autopilot::ProjectionWriteOutcome {
+fn _ac_surface(_: ProjectionKey, _: AcStatus) -> autopilot::ProjectionWriteOutcome {
     autopilot::ProjectionWriteOutcome::NoChange
 }
 

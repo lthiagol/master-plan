@@ -11,7 +11,7 @@
 mod common;
 
 use common::TestEnv;
-use mp::autopilot::notes::{NoteError, NoteKind, build_note, derive_cycle};
+use mp::autopilot::notes::{build_note, derive_cycle, NoteError, NoteKind};
 use mp::autopilot::session::{load_session, save_session, QueueItem, Stage};
 use mp::paths::PlanContext;
 use std::path::Path;
@@ -57,10 +57,7 @@ fn note_add_with_explicit_cycle_persists() {
     assert_eq!(note.kind, NoteKind::Info);
     assert_eq!(note.body, "explicit-cycle note");
     assert_eq!(loaded.events.len(), 1);
-    assert_eq!(
-        loaded.events[0].kind,
-        mp::autopilot::EventKind::Note
-    );
+    assert_eq!(loaded.events[0].kind, mp::autopilot::EventKind::Note);
 }
 
 #[test]
@@ -145,10 +142,7 @@ fn note_add_rejected_when_cycle_is_zero() {
         "--cycle",
         "0",
     ]);
-    assert!(
-        !out.status.success(),
-        "expected rejection for cycle=0"
-    );
+    assert!(!out.status.success(), "expected rejection for cycle=0");
 }
 
 #[test]
@@ -172,10 +166,7 @@ fn note_add_rejected_when_body_is_empty() {
         "--cycle",
         "1",
     ]);
-    assert!(
-        !out.status.success(),
-        "expected rejection for empty body"
-    );
+    assert!(!out.status.success(), "expected rejection for empty body");
 }
 
 #[test]
@@ -194,10 +185,7 @@ fn note_add_rejected_when_kind_unknown() {
         "--cycle",
         "1",
     ]);
-    assert!(
-        !out.status.success(),
-        "expected rejection for unknown kind"
-    );
+    assert!(!out.status.success(), "expected rejection for unknown kind");
 }
 
 #[test]

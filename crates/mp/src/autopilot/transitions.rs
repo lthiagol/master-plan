@@ -171,14 +171,11 @@ pub fn transition(
 
     if next == current && working_on.is_none() {
         // No-op: same state, no new working_on.
-        let existing_since = session
-            .role_state
-            .as_ref()
-            .and_then(|m| match role {
-                RoleName::Orchestrator => m.orchestrator.as_ref().and_then(|r| r.since.clone()),
-                RoleName::Runner => m.runner.as_ref().and_then(|r| r.since.clone()),
-                RoleName::Reviewer => m.reviewer.as_ref().and_then(|r| r.since.clone()),
-            });
+        let existing_since = session.role_state.as_ref().and_then(|m| match role {
+            RoleName::Orchestrator => m.orchestrator.as_ref().and_then(|r| r.since.clone()),
+            RoleName::Runner => m.runner.as_ref().and_then(|r| r.since.clone()),
+            RoleName::Reviewer => m.reviewer.as_ref().and_then(|r| r.since.clone()),
+        });
         let record = RoleStateRecord {
             role,
             state: next,
@@ -190,7 +187,10 @@ pub fn transition(
     }
 
     if !is_valid(current, next) {
-        return Err(TransitionError::InvalidTransition { from: current, to: next });
+        return Err(TransitionError::InvalidTransition {
+            from: current,
+            to: next,
+        });
     }
 
     let now = now_rfc3339();
@@ -252,8 +252,7 @@ mod tests {
     #[test]
     fn transition_stamps_since_and_actor() {
         let mut s = empty();
-        let out = transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None)
-            .unwrap();
+        let out = transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None).unwrap();
         assert!(out.was_applied());
         let record = out.record();
         assert_eq!(record.role, RoleName::Runner);
@@ -266,10 +265,8 @@ mod tests {
     #[test]
     fn noop_transition_returns_no_change() {
         let mut s = empty();
-        transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None)
-            .unwrap();
-        let out = transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None)
-            .unwrap();
+        transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None).unwrap();
+        let out = transition(&mut s, RoleName::Runner, RoleState::Starting, "test", None).unwrap();
         assert!(!out.was_applied());
     }
 
@@ -277,8 +274,7 @@ mod tests {
     fn invalid_transition_returns_error() {
         let mut s = empty();
         // Idle -> Done is not in the table.
-        let err = transition(&mut s, RoleName::Runner, RoleState::Done, "test", None)
-            .unwrap_err();
+        let err = transition(&mut s, RoleName::Runner, RoleState::Done, "test", None).unwrap_err();
         match err {
             TransitionError::InvalidTransition { from, to } => {
                 assert_eq!(from, RoleState::Idle);
@@ -296,8 +292,14 @@ mod tests {
             cycle: 1,
             role: Some(RoleName::Runner),
         };
-        transition(&mut s, RoleName::Runner, RoleState::Working, "test", Some(wo.clone()))
-            .unwrap();
+        transition(
+            &mut s,
+            RoleName::Runner,
+            RoleState::Working,
+            "test",
+            Some(wo.clone()),
+        )
+        .unwrap();
         assert_eq!(s.working_on, Some(wo));
     }
 
@@ -309,10 +311,15 @@ mod tests {
             cycle: 1,
             role: Some(RoleName::Runner),
         };
-        transition(&mut s, RoleName::Runner, RoleState::Working, "test", Some(wo))
-            .unwrap();
-        transition(&mut s, RoleName::Runner, RoleState::Idle, "test", None)
-            .unwrap();
+        transition(
+            &mut s,
+            RoleName::Runner,
+            RoleState::Working,
+            "test",
+            Some(wo),
+        )
+        .unwrap();
+        transition(&mut s, RoleName::Runner, RoleState::Idle, "test", None).unwrap();
         assert!(s.working_on.is_none());
     }
 

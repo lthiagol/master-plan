@@ -69,11 +69,12 @@ mod tests {
     use super::*;
     use crate::autopilot::session::{save_session, sample_session_for_tests};
     use crate::paths::PlanContext;
+    use std::path::Path;
     use tempfile::TempDir;
 
-    fn ctx_in(dir: &PathBuf) -> PlanContext {
+    fn ctx_in(dir: &Path) -> PlanContext {
         PlanContext {
-            project_root: dir.clone(),
+            project_root: dir.to_path_buf(),
             plan_dir: dir.join("master-plan"),
         }
     }
@@ -81,7 +82,7 @@ mod tests {
     #[test]
     fn list_returns_empty_when_no_autopilot_dir() {
         let tmp = TempDir::new().unwrap();
-        let ctx = ctx_in(&tmp.path().to_path_buf());
+        let ctx = ctx_in(tmp.path());
         let list = list_sessions(&ctx).unwrap();
         assert!(list.is_empty());
     }
@@ -89,7 +90,7 @@ mod tests {
     #[test]
     fn list_sorts_by_id() {
         let tmp = TempDir::new().unwrap();
-        let ctx = ctx_in(&tmp.path().to_path_buf());
+        let ctx = ctx_in(tmp.path());
         // Insertion order is deliberately non-alphabetical.
         for id in ["zeta", "alpha", "mike"] {
             let s = sample_session_for_tests(id);
@@ -105,7 +106,7 @@ mod tests {
     #[test]
     fn list_skips_malformed_subdirs_nonfatally() {
         let tmp = TempDir::new().unwrap();
-        let ctx = ctx_in(&tmp.path().to_path_buf());
+        let ctx = ctx_in(tmp.path());
         let s = sample_session_for_tests("good");
         save_session(&ctx, "good", &s).unwrap();
         // Drop a directory with no session.json — must be skipped.

@@ -18,7 +18,9 @@ use mp::autopilot::ac_projection::{
     canonical_revision, project_ac_status, AcProjection, AcStatus, ProjectionKey,
     ProjectionWriteOutcome,
 };
-use mp::autopilot::session::{load_session, sample_session_for_tests, save_session, AutopilotSession};
+use mp::autopilot::session::{
+    load_session, sample_session_for_tests, save_session, AutopilotSession,
+};
 use mp::paths::PlanContext;
 use std::path::Path;
 
@@ -174,11 +176,7 @@ fn project_ac_status_writes_through_session_io() {
         source_revision: "rev-A".into(),
         projected_at: Some("2026-01-01T00:00:00Z".into()),
     };
-    project_ac_status(
-        &mut loaded,
-        ProjectionKey::new("207", "AC-01"),
-        next,
-    );
+    project_ac_status(&mut loaded, ProjectionKey::new("207", "AC-01"), next);
     save_session(&ctx, "alpha", &loaded).unwrap();
 
     let reloaded = load_session(&ctx, "alpha").unwrap();

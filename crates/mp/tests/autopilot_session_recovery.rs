@@ -86,7 +86,10 @@ fn events_are_appended_in_strictly_monotonic_order() {
             window
         );
     }
-    assert_eq!(loaded.event_cursor.last_seq, loaded.events.last().unwrap().seq);
+    assert_eq!(
+        loaded.event_cursor.last_seq,
+        loaded.events.last().unwrap().seq
+    );
 }
 
 #[test]
@@ -132,24 +135,14 @@ fn recover_session_bumps_stale_cursor() {
     session.queue.clear();
     // Three events, then stale the cursor.
     let events = vec![
-        mp::autopilot::OrchestrationEvent::new(
-            1,
-            EventKind::Dispatch,
-            "t",
-            serde_json::json!({}),
-        ),
+        mp::autopilot::OrchestrationEvent::new(1, EventKind::Dispatch, "t", serde_json::json!({})),
         mp::autopilot::OrchestrationEvent::new(
             2,
             EventKind::Transition,
             "t",
             serde_json::json!({}),
         ),
-        mp::autopilot::OrchestrationEvent::new(
-            3,
-            EventKind::Note,
-            "t",
-            serde_json::json!({}),
-        ),
+        mp::autopilot::OrchestrationEvent::new(3, EventKind::Note, "t", serde_json::json!({})),
     ];
     for e in events {
         session.event_cursor.advance_to(e.seq).unwrap();
@@ -173,10 +166,7 @@ fn recover_session_is_noop_when_cursor_is_consistent() {
     session.role_state = None;
     session.working_on = None;
     session.queue.clear();
-session
-        .event_cursor
-        .advance_to(1)
-        .unwrap();
+    session.event_cursor.advance_to(1).unwrap();
     session.events.push(mp::autopilot::OrchestrationEvent::new(
         1,
         EventKind::Dispatch,

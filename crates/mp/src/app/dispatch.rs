@@ -129,7 +129,7 @@ pub(super) fn run(cli: Cli) -> Result<()> {
         }
         Commands::Autopilot { cmd } => {
             ctx.ensure_plan_exists()?;
-            cmd_autopilot_mod::cmd_autopilot(&ctx, cmd, format, &fields)
+            cmd_autopilot_mod::cmd_autopilot(&ctx, cmd, format, fields)
         }
         Commands::Agent { cmd } => super::agent::run(&ctx, cmd, format),
         Commands::Skill { cmd } => {

@@ -462,22 +462,13 @@ pub fn load_session_from(
 
     // Bounded read (32 MiB cap, O_NOFOLLOW open via json_input).
     let raw = json_input::read_file_bounded(&candidate, SESSION_MAX_BYTES).map_err(|e| {
-        SessionLoadError::Parse(format!(
-            "read session.json {}: {e}",
-            candidate.display()
-        ))
+        SessionLoadError::Parse(format!("read session.json {}: {e}", candidate.display()))
     })?;
     let value: Value = serde_json::from_str(&raw).map_err(|e| {
-        SessionLoadError::Parse(format!(
-            "parse session.json {}: {e}",
-            candidate.display()
-        ))
+        SessionLoadError::Parse(format!("parse session.json {}: {e}", candidate.display()))
     })?;
     let session: AutopilotSession = serde_json::from_value(value.clone()).map_err(|e| {
-        SessionLoadError::Parse(format!(
-            "decode session.json {}: {e}",
-            candidate.display()
-        ))
+        SessionLoadError::Parse(format!("decode session.json {}: {e}", candidate.display()))
     })?;
     if session.schema_version > SESSION_SCHEMA_VERSION {
         return Err(SessionLoadError::UnknownSchemaVersion {
@@ -556,33 +547,34 @@ pub fn save_session_at(file: &Path, session: &AutopilotSession) -> Result<PathBu
 /// the embedded schema, so callers can immediately save+load without
 /// further setup.
 pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
-    let mut queue = Vec::new();
-    queue.push(QueueItem {
-        milestone_id: "207".to_string(),
-        stage: Stage::InProgress,
-        cycle: 1,
-        last_notify: None,
-        verifier_verdict: None,
-        evidence_refs: Some(EvidenceRefs {
-            lifecycle: Some("in-progress".into()),
-            execution_status: Some("in-progress".into()),
-            spec_status: Some("ready".into()),
-            reviews_verdict: None,
-        }),
-    });
-    queue.push(QueueItem {
-        milestone_id: "209".to_string(),
-        stage: Stage::Pending,
-        cycle: 1,
-        last_notify: None,
-        verifier_verdict: None,
-        evidence_refs: Some(EvidenceRefs {
-            lifecycle: Some("approved".into()),
-            execution_status: Some("planned".into()),
-            spec_status: Some("ready".into()),
-            reviews_verdict: None,
-        }),
-    });
+    let queue = vec![
+        QueueItem {
+            milestone_id: "207".to_string(),
+            stage: Stage::InProgress,
+            cycle: 1,
+            last_notify: None,
+            verifier_verdict: None,
+            evidence_refs: Some(EvidenceRefs {
+                lifecycle: Some("in-progress".into()),
+                execution_status: Some("in-progress".into()),
+                spec_status: Some("ready".into()),
+                reviews_verdict: None,
+            }),
+        },
+        QueueItem {
+            milestone_id: "209".to_string(),
+            stage: Stage::Pending,
+            cycle: 1,
+            last_notify: None,
+            verifier_verdict: None,
+            evidence_refs: Some(EvidenceRefs {
+                lifecycle: Some("approved".into()),
+                execution_status: Some("planned".into()),
+                spec_status: Some("ready".into()),
+                reviews_verdict: None,
+            }),
+        },
+    ];
 
     let topology = Topology {
         orchestrator: Some(PaneRef {
@@ -747,8 +739,8 @@ pub fn append_event(
     event: OrchestrationEvent,
 ) -> Result<PathBuf> {
     let path = SessionPath::new(ctx, session_id)?;
-    let mut session = load_session_from(&path.file, &ctx.project_root)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut session =
+        load_session_from(&path.file, &ctx.project_root).map_err(|e| anyhow::anyhow!("{e}"))?;
     session.event_cursor.advance_to(event.seq)?;
     session.events.push(event);
     save_session_at(&path.file, &session)
@@ -840,7 +832,6 @@ mod tests {
         // project_root must surface OutsideProjectRoot.
         let project = TempDir::new().unwrap();
         let foreign = TempDir::new().unwrap();
-        let ctx = ctx_in(project.path());
         let foreign_dir = foreign.path().join("autopilot/foreign/session.json");
         std::fs::create_dir_all(foreign_dir.parent().unwrap()).unwrap();
         std::fs::write(&foreign_dir, r#"{"id":"x","schema_version":1,"topology":{},"roles":{},"queue":[],"status":"draft","last_updated":"t"}"#).unwrap();
@@ -859,10 +850,7 @@ mod tests {
         let mut bad = sample_session_for_tests("alpha");
         bad.id = "Alpha-Capital".to_string();
         let err = save_session(&ctx, "alpha", &bad).unwrap_err();
-        assert!(
-            err.to_string().contains("schema validation"),
-            "got {err}"
-        );
+        assert!(err.to_string().contains("schema validation"), "got {err}");
         // Nothing was written.
         let p = SessionPath::new(&ctx, "alpha").unwrap();
         assert!(!p.file.exists());

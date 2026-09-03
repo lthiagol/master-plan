@@ -1,4 +1,4 @@
-# M207 — Autopilot session.json schema
+# Autopilot session.json schema
 
 Durable per-session state for `mp autopilot` drives. Every autopilot
 session lives at `<plan_dir>/autopilot/<id>/session.json` —
@@ -6,7 +6,9 @@ self-contained so it can be archived, diffed, and recovered in
 isolation.
 
 This document is the canonical surface for downstream autopilot
-milestones (M210–M217). The JSON-schema source of truth lives at
+features (config-and-spawn, cycle governance, verifier reads,
+reviewer reviews, archive tooling). The JSON-schema source of truth
+lives at
 [`schemas/autopilot-session.schema.json`](../../schemas/autopilot-session.schema.json);
 the Rust typed view lives in
 [`crates/mp/src/autopilot/session.rs`](../../crates/mp/src/autopilot/session.rs).

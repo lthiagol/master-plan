@@ -133,14 +133,16 @@ fn transition_cli_rejects_invalid_transition() {
 
     // The session must not have been mutated.
     let loaded = load_session(&ctx, "alpha").unwrap();
-    assert!(loaded.role_state.is_none() || {
-        loaded
-            .role_state
-            .as_ref()
-            .and_then(|m| m.runner.as_ref())
-            .map(|r| r.state != RoleState::Done)
-            .unwrap_or(true)
-    });
+    assert!(
+        loaded.role_state.is_none() || {
+            loaded
+                .role_state
+                .as_ref()
+                .and_then(|m| m.runner.as_ref())
+                .map(|r| r.state != RoleState::Done)
+                .unwrap_or(true)
+        }
+    );
 }
 
 #[test]

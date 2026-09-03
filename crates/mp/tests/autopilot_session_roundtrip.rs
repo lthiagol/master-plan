@@ -6,11 +6,7 @@
 //! execution_status / spec_status / reviews.json verdict) — survives
 //! serialize -> bounded read -> deserialize without data loss.
 
-use mp::autopilot::{
-    load_session, sample_session_for_tests, save_session, EvidenceRefs, QueueItem, RoleConfig,
-    RoleName, RoleState, SessionConfigOverrides, SessionStatus, Stage, Topology, PaneRef,
-    RolesConfig, WorkingOn, RoleStateEnvelope, RoleStateRecord, AutopilotSession,
-};
+use mp::autopilot::{load_session, sample_session_for_tests, save_session, RoleName, SessionStatus};
 use mp::paths::PlanContext;
 use tempfile::TempDir;
 
@@ -59,12 +55,24 @@ fn sample_session_has_required_schema_shape() {
     // every queue item.
     for item in &s.queue {
         let refs = item
-        .evidence_refs
-        .as_ref()
-        .expect("every queue item must have evidence_refs");
-        assert!(refs.lifecycle.is_some(), "milestone {} missing lifecycle ref", item.milestone_id);
-        assert!(refs.execution_status.is_some(), "milestone {} missing execution_status ref", item.milestone_id);
-        assert!(refs.spec_status.is_some(), "milestone {} missing spec_status ref", item.milestone_id);
+            .evidence_refs
+            .as_ref()
+            .expect("every queue item must have evidence_refs");
+        assert!(
+            refs.lifecycle.is_some(),
+            "milestone {} missing lifecycle ref",
+            item.milestone_id
+        );
+        assert!(
+            refs.execution_status.is_some(),
+            "milestone {} missing execution_status ref",
+            item.milestone_id
+        );
+        assert!(
+            refs.spec_status.is_some(),
+            "milestone {} missing spec_status ref",
+            item.milestone_id
+        );
     }
 }
 
@@ -107,7 +115,10 @@ fn loaded_session_validates_against_embedded_schema() {
     let loaded = load_session(&ctx, "alpha").unwrap();
     let value = serde_json::to_value(&loaded).unwrap();
     let errs = mp::autopilot::validate_session_value(&value).unwrap();
-    assert!(errs.is_empty(), "loaded session failed validation: {errs:?}");
+    assert!(
+        errs.is_empty(),
+        "loaded session failed validation: {errs:?}"
+    );
 }
 
 #[test]
@@ -146,24 +157,4 @@ fn round_trip_preserves_role_config_snapshots() {
     assert_eq!(runner.skill.as_deref(), Some("mp-runner"));
     assert!(runner.harness.is_some());
     assert!(runner.model.is_some());
-}
-
-// Silence unused warnings on types re-exported for integration
-// tests that import them.
-#[allow(dead_code)]
-fn _types(
-    _: Topology,
-    _: PaneRef,
-    _: RolesConfig,
-    _: RoleConfig,
-    _: SessionConfigOverrides,
-    _: Stage,
-    _: QueueItem,
-    _: EvidenceRefs,
-    _: RoleState,
-    _: RoleStateRecord,
-    _: RoleStateEnvelope,
-    _: WorkingOn,
-    _: AutopilotSession,
-) {
 }

@@ -10,20 +10,20 @@ mod common;
 
 use common::TestEnv;
 use mp::autopilot::ac_projection::{
-    canonical_revision, project_ac_status, AcProjection, AcStatus, ProjectionKey,
+    canonical_revision, project_ac_status, AcProjection, ProjectionKey,
 };
+use mp::autopilot::apply_transition;
 use mp::autopilot::events::EventKind;
 use mp::autopilot::notes::{build_note, NoteKind};
 use mp::autopilot::session::{
-    load_session, sample_session_for_tests, save_session, Controls, EvidenceRefs, PaneRef,
-    QueueItem, RoleConfig, RoleName, RolesConfig, SessionConfigOverrides, SessionStatus, Stage,
-    Topology, WorkingOn, AutopilotSession,
+    load_session, sample_session_for_tests, save_session, AutopilotSession, Controls, EvidenceRefs,
+    PaneRef, QueueItem, RoleConfig, RoleName, RolesConfig, SessionConfigOverrides, SessionStatus,
+    Stage, Topology, WorkingOn,
 };
 use mp::autopilot::transitions::{is_valid as is_valid_transition, RoleState};
-use mp::autopilot::apply_transition;
 use mp::autopilot::{
-    AcStatus as PubAcStatus, EventCursor, EventKind as PubEventKind, OrchestrationEvent,
-    RecoveredSession, recover_session,
+    recover_session, AcStatus as PubAcStatus, EventCursor, EventKind as PubEventKind,
+    OrchestrationEvent, RecoveredSession,
 };
 use mp::paths::PlanContext;
 use std::path::Path;
@@ -136,14 +136,7 @@ fn documented_fields_are_all_present() {
     };
 
     // Runner notes via build_note.
-    let note = build_note(
-        &session,
-        NoteKind::Info,
-        "starting cycle 1",
-        Some(1),
-        None,
-    )
-    .unwrap();
+    let note = build_note(&session, NoteKind::Info, "starting cycle 1", Some(1), None).unwrap();
     session.runner_notes.push(note);
 
     // Events via append_event_unchecked.
@@ -186,7 +179,7 @@ fn documented_fields_are_all_present() {
     assert_eq!(loaded.queue.len(), 1);
     assert!(loaded.queue[0].evidence_refs.is_some());
     assert_eq!(loaded.status, SessionStatus::Active);
-    assert_eq!(loaded.controls.paused, false);
+    assert!(!loaded.controls.paused);
     assert_eq!(loaded.runner_notes.len(), 1);
     assert_eq!(loaded.runner_notes[0].kind, NoteKind::Info);
     assert_eq!(loaded.events.len(), 1);
@@ -197,7 +190,11 @@ fn documented_fields_are_all_present() {
         .and_then(|m| m.get("AC-01"))
         .is_some());
     assert_eq!(loaded.working_on.as_ref().map(|w| w.cycle), Some(1));
-    assert!(loaded.role_state.as_ref().and_then(|m| m.runner.as_ref()).is_some());
+    assert!(loaded
+        .role_state
+        .as_ref()
+        .and_then(|m| m.runner.as_ref())
+        .is_some());
     assert_eq!(loaded.config_overrides.stall_timeout_ms, Some(1_800_000));
 }
 
@@ -221,15 +218,15 @@ fn queue_cycle_history_round_trips() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
     let mut session = sample_session_for_tests("alpha");
-    session.queue_cycle_history.push(
-        mp::autopilot::session::CycleHistoryEntry {
+    session
+        .queue_cycle_history
+        .push(mp::autopilot::session::CycleHistoryEntry {
             milestone_id: "207".into(),
             cycle: 1,
             started_at: "2026-01-01T00:00:00Z".into(),
             completed_at: Some("2026-01-02T00:00:00Z".into()),
             outcome: Some("executed".into()),
-        },
-    );
+        });
     save_session(&ctx, "alpha", &session).unwrap();
     let loaded = load_session(&ctx, "alpha").unwrap();
     assert_eq!(loaded.queue_cycle_history.len(), 1);
@@ -246,11 +243,13 @@ fn schema_migrations_round_trips() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
     let mut session = sample_session_for_tests("alpha");
-    session.schema_migrations.push(mp::autopilot::session::SchemaMigration {
-        from_version: 0,
-        to_version: 1,
-        at: "2026-01-01T00:00:00Z".into(),
-    });
+    session
+        .schema_migrations
+        .push(mp::autopilot::session::SchemaMigration {
+            from_version: 0,
+            to_version: 1,
+            at: "2026-01-01T00:00:00Z".into(),
+        });
     save_session(&ctx, "alpha", &session).unwrap();
     let loaded = load_session(&ctx, "alpha").unwrap();
     assert_eq!(loaded.schema_migrations.len(), 1);
@@ -355,10 +354,7 @@ fn event_cursor_is_a_typed_object_with_last_seq() {
     session.events.push(e);
     save_session(&ctx, "alpha", &session).unwrap();
 
-    let raw = std::fs::read_to_string(
-        ctx.plan_dir.join("autopilot/alpha/session.json"),
-    )
-    .unwrap();
+    let raw = std::fs::read_to_string(ctx.plan_dir.join("autopilot/alpha/session.json")).unwrap();
     let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
     let cursor = value
         .get("event_cursor")
@@ -389,9 +385,10 @@ fn prompt_bundles_round_trips_as_open_object() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
     let mut session = sample_session_for_tests("alpha");
-    session
-        .prompt_bundles
-        .insert("execute".to_string(), serde_json::json!("sha256:execute-v3"));
+    session.prompt_bundles.insert(
+        "execute".to_string(),
+        serde_json::json!("sha256:execute-v3"),
+    );
     session
         .prompt_bundles
         .insert("review".to_string(), serde_json::json!("sha256:review-v2"));

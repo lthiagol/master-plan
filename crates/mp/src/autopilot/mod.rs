@@ -42,29 +42,27 @@ pub mod session;
 pub mod transitions;
 
 pub use ac_projection::{
-    AcProjection, AcStatus, PerMilestoneProjections, ProjectionKey, ProjectionRevision,
-    ProjectionWriteOutcome, canonical_revision, project_ac_status,
+    canonical_revision, project_ac_status, AcProjection, AcStatus, PerMilestoneProjections,
+    ProjectionKey, ProjectionRevision, ProjectionWriteOutcome,
 };
-pub use events::{EventCursor, EventKind, OrchestrationEvent, events_by_kind};
+pub use events::{events_by_kind, EventCursor, EventKind, OrchestrationEvent};
+pub use list::{list_sessions, SessionListEntry};
+pub use notes::{build_note, derive_cycle, NoteError, NoteKind, RunnerNote};
 pub use recovery::{
-    RecoveredSession, append_event_unchecked, reconcile_event_cursor, recover_session,
-    recover_session_at,
+    append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
+    RecoveredSession,
 };
-pub use list::{SessionListEntry, list_sessions};
-pub use notes::{
-    NoteError, NoteKind, RunnerNote, build_note, derive_cycle,
-};
-pub use schema::{SESSION_MAX_BYTES, validate_session_value};
 #[allow(unused_imports)]
 use schema::validate_value as _;
+pub use schema::{validate_session_value, SESSION_MAX_BYTES};
 pub use session::{
-    AutopilotSession, Controls, CycleHistoryEntry, EvidenceRefs, PaneRef, QueueItem, RoleConfig,
-    RoleName, RoleStateEnvelope, RolesConfig, SchemaMigration, SessionConfigOverrides,
-    SessionLoadError, SessionPath, SessionStatus, Stage, Topology, WorkingOn, append_event,
-    autopilot_dir, load_session, load_session_from, sample_session_for_tests, save_session,
-    save_session_at, SESSION_SCHEMA_VERSION,
+    append_event, autopilot_dir, load_session, load_session_from, sample_session_for_tests,
+    save_session, save_session_at, AutopilotSession, Controls, CycleHistoryEntry, EvidenceRefs,
+    PaneRef, QueueItem, RoleConfig, RoleName, RoleStateEnvelope, RolesConfig, SchemaMigration,
+    SessionConfigOverrides, SessionLoadError, SessionPath, SessionStatus, Stage, Topology,
+    WorkingOn, SESSION_SCHEMA_VERSION,
 };
 pub use transitions::{
-    RoleState, RoleStateRecord, TransitionError, TransitionOutcome, is_valid as is_valid_transition,
-    transition as apply_transition,
+    is_valid as is_valid_transition, transition as apply_transition, RoleState, RoleStateRecord,
+    TransitionError, TransitionOutcome,
 };

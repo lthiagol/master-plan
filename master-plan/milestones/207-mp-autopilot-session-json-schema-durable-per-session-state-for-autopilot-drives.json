@@ -162,7 +162,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_schema --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 207 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -182,7 +182,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_roundtrip --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 207 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -202,7 +202,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_cli --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 207 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -222,7 +222,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_runner_notes --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 207 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -242,7 +242,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_ac_projection --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 207 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -263,7 +263,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_transitions --no-fail-fast",
       "done_when": "AC-06 passes with command output and test count evidence.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -284,7 +284,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_recovery --no-fail-fast",
       "done_when": "AC-07 passes with command output and test count evidence.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -306,7 +306,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_session_full_contract --no-fail-fast",
       "done_when": "AC-05 and AC-08 pass with command output and test count evidence.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05",
         "AC-08"
