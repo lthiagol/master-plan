@@ -80,6 +80,18 @@ pub fn check_preconditions(cfg: &ProjectConfig, log_path: &Path) -> Precondition
     // the harness auto-set state in `mp watch`'s JSON output.
     checks.push(check_harness_auto_set(cfg));
 
+    // M209 AC-05: run the legacy-to-autopilot role resolution for
+    // the two roles that have legacy analogs. Surfaces conflicts
+    // between the new `autopilot.roles.<role>.*` surface and the
+    // legacy `agent.<role>.*` surface as typed precondition
+    // failures so the operator sees them at startup, not mid-run.
+    checks.push(check_role_config_resolution(cfg, "runner", crate::autopilot::role::Role::Runner));
+    checks.push(check_role_config_resolution(
+        cfg,
+        "orchestrator",
+        crate::autopilot::role::Role::Orchestrator,
+    ));
+
     let ok = checks.iter().all(|c| c.ok);
     PreconditionReport { ok, checks }
 }
@@ -228,6 +240,53 @@ fn check_role_config(name: &str, label: &str, rc: &crate::config::RoleConfig) ->
                 ),
             }
         }
+    }
+}
+
+/// M209 AC-05: run the unified legacy-to-autopilot role resolution
+/// at precondition time. Surfaces a typed diagnostic when the new
+/// `autopilot.roles.<role>.*` surface and the legacy
+/// `agent.<role>.*` surface disagree on `harness` or `model`, and
+/// reports the resolved harness so `mp watch --dry-run` (and JSON
+/// output) reflects what the spawn will actually use.
+fn check_role_config_resolution(
+    cfg: &ProjectConfig,
+    label: &str,
+    role: crate::autopilot::role::Role,
+) -> PreconditionCheck {
+    let check_name = format!("{label}_role_resolved");
+    let autopilot_key = role.as_str();
+    let ovr = cfg.autopilot.roles.get(autopilot_key);
+    let legacy_runner = if matches!(role, crate::autopilot::role::Role::Runner) {
+        Some(cfg.runner_config())
+    } else {
+        None
+    };
+    let legacy_coordinator = if matches!(role, crate::autopilot::role::Role::Orchestrator) {
+        Some(cfg.coordinator_config())
+    } else {
+        None
+    };
+    match crate::autopilot::resolve_with_legacy_fallback(
+        role,
+        ovr,
+        legacy_runner,
+        legacy_coordinator,
+    ) {
+        Ok(resolved) => PreconditionCheck {
+            name: check_name,
+            ok: true,
+            message: format!(
+                "{label}.role resolved: harness={} skill={}",
+                resolved.harness,
+                resolved.skill
+            ),
+        },
+        Err(err) => PreconditionCheck {
+            name: check_name,
+            ok: false,
+            message: format!("{label}.role resolution failed: {err}"),
+        },
     }
 }
 
