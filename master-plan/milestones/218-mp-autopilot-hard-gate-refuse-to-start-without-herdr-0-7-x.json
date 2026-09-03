@@ -3,9 +3,9 @@
     "id": "218",
     "title": "mp autopilot hard gate — refuse to start without herdr ≥ 0.7.x",
     "slug": "mp-autopilot-hard-gate-refuse-to-start-without-herdr-0-7-x",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,7 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.931674+00:00",
+    "lifecycle_at": "2026-09-03T20:09:09.836067+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -35,9 +35,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.272547+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T20:09:09.836069+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.272547+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T20:09:09.836069+00:00"
       },
       "specify": {
         "status": "done",
@@ -69,29 +77,29 @@
       "id": "AC-01",
       "description": "`mp autopilot start` with herdr absent exits 78 before creating a session directory, writing plan state, or invoking any spawn operation; the diagnostic contains an install hint.",
       "verification": "cargo nextest run -p mp --test autopilot_herdr_gate_missing --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_herdr_gate_missing --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-02",
       "description": "Semantic-version checking accepts every compatible herdr version >=0.7.0 whose required command shape is present, rejects lower versions or incompatible shapes with exit 78, and reports detected version plus upgrade hint.",
       "verification": "cargo nextest run -p mp --test autopilot_herdr_gate_versions --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_herdr_gate_versions --no-fail-fast exit 0 (12/12 pass)"
     },
     {
       "id": "AC-03",
       "description": "The precondition function is called by both `mp autopilot start` and `mp watch` (legacy alias) — no divergence in gate behavior between the two.",
       "verification": "cargo nextest run -p mp --test autopilot_gate_shared_with_watch --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_gate_shared_with_watch --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-04",
       "description": "`mp doctor` reports autopilot herdr availability, detected version/shape, compatibility result, and install/upgrade guidance without making the overall doctor command mutating.",
       "verification": "cargo nextest run -p mp --test doctor_autopilot_herdr --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test doctor_autopilot_herdr --no-fail-fast exit 0 (10/10 pass)"
     }
   ],
   "design_decisions": [
@@ -126,7 +134,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_missing --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 218 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -147,7 +155,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_herdr_gate_versions --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 218 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -167,7 +175,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_gate_shared_with_watch --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 218 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -188,7 +196,7 @@
       ],
       "tests": "cargo nextest run -p mp --test doctor_autopilot_herdr --no-fail-fast",
       "done_when": "AC-04 passes for missing, old, compatible, and incompatible-shape fixtures.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -200,7 +208,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
