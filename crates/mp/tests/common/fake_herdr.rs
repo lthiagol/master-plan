@@ -218,11 +218,7 @@ impl FakeHerdrBuilder {
         self
     }
 
-    pub fn pane_split_failure(
-        &mut self,
-        code: i32,
-        stderr: impl Into<String>,
-    ) -> &mut Self {
+    pub fn pane_split_failure(&mut self, code: i32, stderr: impl Into<String>) -> &mut Self {
         self.pane_split_failure = Some((code, stderr.into()));
         self
     }
@@ -308,11 +304,7 @@ impl FakeHerdrBuilder {
     /// test, this drives the killpg path: the parent sh + the
     /// grandchild sleep must both be reaped when the helper times
     /// out.
-    pub fn pane_get_grandchild_sleep(
-        &mut self,
-        secs: u64,
-        pid_file: &Path,
-    ) -> &mut Self {
+    pub fn pane_get_grandchild_sleep(&mut self, secs: u64, pid_file: &Path) -> &mut Self {
         self.pane_get_sleep_ms = (secs * 1000).max(2000);
         self.pane_get_response = format!(
             "sleep {secs} &\necho $! > {}\nwait\n",
@@ -579,7 +571,9 @@ fn shell_quote(s: &str) -> String {
 #[cfg(unix)]
 fn set_executable(path: &Path) {
     use std::os::unix::fs::PermissionsExt;
-    let mut perms = fs::metadata(path).expect("fake-herdr metadata").permissions();
+    let mut perms = fs::metadata(path)
+        .expect("fake-herdr metadata")
+        .permissions();
     perms.set_mode(0o755);
     fs::set_permissions(path, perms).expect("chmod 0o755 fake-herdr");
 }
@@ -708,7 +702,9 @@ mod tests {
         // checking that a graceful kill (no signal) still works
         // end-to-end.
         let dir = tempfile::tempdir().unwrap();
-        let fake = FakeHerdrBuilder::new().signal_ignore(true).install(dir.path());
+        let fake = FakeHerdrBuilder::new()
+            .signal_ignore(true)
+            .install(dir.path());
         let out = std::process::Command::new(fake.path())
             .args(["pane", "split"])
             .output()
