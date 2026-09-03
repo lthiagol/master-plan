@@ -3,9 +3,9 @@
     "id": "213",
     "title": "mp autopilot cycle flow + decision matrix + topology tightening",
     "slug": "mp-autopilot-cycle-flow-decision-matrix-topology-tightening",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -29,7 +29,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.750339+00:00",
+    "lifecycle_at": "2026-09-03T17:15:00.196904+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -39,9 +39,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.099431+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T17:15:00.196905+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.099431+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T17:15:00.196905+00:00"
       },
       "specify": {
         "status": "done",
@@ -71,50 +79,50 @@
       "id": "AC-01",
       "description": "The mp-owned headless event loop runs a full Dispatching → WaitingRunner → Reviewing → Deciding → CycleNext cycle from M207 events without raul running; starting or changing raul lanes has no effect on progress.",
       "verification": "cargo nextest run -p mp --test cycle_flow_one_cycle --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_flow_one_cycle --no-fail-fast exit 0 (4/4 pass)"
     },
     {
       "id": "AC-02",
       "description": "The decision matrix has explicit Complete, CycleNext, ShipWithBacklog, and Escalate outcomes. A clean reviewer pass returns Complete; low findings may return ShipWithBacklog only in 3-pane policy; high/correctness findings return CycleNext; non-pass at the hard limit returns Escalate.",
       "verification": "cargo nextest run -p mp --test decision_matrix_thresholds --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test decision_matrix_thresholds --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-03",
       "description": "Topology tightening consumes M209 policy: 3-pane uses the full matrix and four-cycle maximum, 2-pane forbids ship-with-backlog and uses three cycles, and 1-pane is accepted only for track/trivial sessions with two cycles.",
       "verification": "cargo nextest run -p mp --test cycle_topology_tightening --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_topology_tightening --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-04",
       "description": "Cycle-cap enforcement treats a clean pass on cycle 4 as Complete and any non-pass requiring continuation on cycle 4 as CycleCapExhausted/Escalate. Blockers-only reviewer mode begins at cycle 2.",
       "verification": "cargo nextest run -p mp --test cycle_cap_enforcement --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_cap_enforcement --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-05",
       "description": "Reviewer activation uses M211 typed dispatch, appends an auditable dispatch event, and carries milestone, cycle, evidence revision, and reviewer actor token.",
       "verification": "cargo nextest run -p mp --test cycle_reviewer_activation --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_reviewer_activation --no-fail-fast exit 0 (12/12 pass)"
     },
     {
       "id": "AC-06",
       "description": "The headless engine uses explicit heartbeat acknowledgements and state timestamps. A responsive lane may remain in the same workflow state without timing out; only missed heartbeat plus stale state produces StaleStateTimeout.",
       "verification": "cargo nextest run -p mp --test cycle_stale_state_timeout --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_stale_state_timeout --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-07",
       "description": "predict_next_action(cycle_state, recent_events) -> NextAction is a pure function with at least 6 named outcomes (DispatchRunner, DispatchReviewer, AwaitRunner, AwaitReviewer, ApplyMatrix, EscalateUser). Returns one of these based on the cycle state machine's current position and last TUI-relay event. The TUI's per-milestone detail view consumes this directly so users can see 'what's next' for each queued milestone.",
       "verification": "cargo nextest run -p mp --test cycle_predict_next_action --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test cycle_predict_next_action --no-fail-fast exit 0 (12/12 pass)"
     }
   ],
   "design_decisions": [
@@ -158,7 +166,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_flow_one_cycle --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 213 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -178,7 +186,7 @@
       ],
       "tests": "cargo nextest run -p mp --test decision_matrix_thresholds --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 213 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -198,7 +206,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_topology_tightening --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 213 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -218,7 +226,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_cap_enforcement --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 213 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -238,7 +246,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_reviewer_activation --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 213 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -258,7 +266,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_stale_state_timeout --no-fail-fast",
       "done_when": "AC-06 evidence is stamped via `mp milestone criterion pass 213 AC-06 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -278,7 +286,7 @@
       ],
       "tests": "cargo nextest run -p mp --test cycle_predict_next_action --no-fail-fast",
       "done_when": "AC-07 evidence is stamped via `mp milestone criterion pass 213 AC-07 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -290,7 +298,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
