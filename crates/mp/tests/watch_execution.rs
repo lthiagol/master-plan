@@ -907,3 +907,119 @@ mod m223_ac03 {
         assert_eq!(finding.status, "resolved");
     }
 }
+
+// ─── M224: reviewer execution isolation + clean-room policy ───────────
+//
+// AC-01 — review environment records independent provenance
+//         (binary / worktree / target-dir / pid / actor identity).
+// AC-02 — mode selection (Normal default, CleanRoom only when
+//         explicitly configured or provenance checks fail) and
+//         no unconditional cargo clean.
+// AC-03 — pre-review gate refuses unsafe environments (dirty
+//         worktree / shared actor / stale binary / unverifiable
+//         env) with a typed, actionable error; shared target-dir
+//         escalates to clean-room rather than blocking.
+
+#[allow(dead_code, unused_imports)]
+mod m224_fixtures {
+    use mp::autopilot::review_env::{build_provenance, ActorIdentity, ReviewerProvenance};
+    use std::path::PathBuf;
+
+    pub const RUNNER_PID: u32 = 9999;
+    pub const RUNNER_TARGET: &str = "/tmp/m224-runner-target";
+    pub const REVIEW_TARGET: &str = "/tmp/m224-reviewer-target";
+
+    pub fn review_target() -> PathBuf {
+        PathBuf::from(REVIEW_TARGET)
+    }
+    pub fn runner_target() -> PathBuf {
+        PathBuf::from(RUNNER_TARGET)
+    }
+    pub fn worktree() -> PathBuf {
+        PathBuf::from("/tmp/m224-wt")
+    }
+
+    pub fn reviewer_actor() -> ActorIdentity {
+        ActorIdentity::reviewer("s-m224", "reviewer-pane-w12:p27", "2026-09-03T00:00:00Z")
+    }
+    pub fn runner_actor() -> ActorIdentity {
+        ActorIdentity::runner("s-m224", "runner-pane-w12:p17", "2026-09-03T00:00:00Z")
+    }
+
+    pub fn fresh_provenance() -> ReviewerProvenance {
+        build_provenance(
+            "s-m224",
+            "reviewer-pane-w12:p27",
+            "2026-09-03T00:00:00Z",
+            PathBuf::from("/usr/local/bin/mp"),
+            Some("sha-fresh"),
+            worktree(),
+            review_target(),
+            4242,
+        )
+    }
+}
+
+mod m224_ac01 {
+    //! AC-01 — review environment records independent provenance:
+    //! binary path, worktree, target directory, pid, and actor
+    //! identity are distinct from the runner.
+    use super::m224_fixtures::*;
+
+    #[test]
+    fn provenance_carries_distinct_actor_identity_from_runner() {
+        let env = fresh_provenance();
+        let runner = runner_actor();
+        assert!(
+            env.actor.distinct_from(&runner),
+            "reviewer must be distinct from runner"
+        );
+        assert_eq!(env.actor.lane, "reviewer");
+        assert_eq!(runner.lane, "runner");
+        assert_ne!(env.actor.actor_token, runner.actor_token);
+        // Session is intentionally shared — both lanes work the
+        // same session.
+        assert_eq!(env.actor.session_id, runner.session_id);
+    }
+
+    #[test]
+    fn provenance_target_dir_is_isolated_from_runner() {
+        let env = fresh_provenance();
+        assert!(
+            env.target_dir_is_isolated(&runner_target()),
+            "target dir must not equal runner's"
+        );
+    }
+
+    #[test]
+    fn provenance_pid_is_fresh_from_runner() {
+        let env = fresh_provenance();
+        assert!(
+            env.pid_is_fresh(9999),
+            "reviewer pid {} should differ from runner pid",
+            env.pid
+        );
+        assert!(
+            !env.pid_is_fresh(env.pid),
+            "an actor is never distinct from itself by pid"
+        );
+    }
+
+    #[test]
+    fn provenance_serializes_to_expected_kebab_shape() {
+        let env = fresh_provenance();
+        let json = serde_json::to_value(&env).expect("serialize");
+        // rename_all = "kebab-case" applies to all fields including paths.
+        assert!(json.get("binary-path").is_some());
+        assert!(json.get("binary-sha").is_some());
+        assert!(json.get("worktree-path").is_some());
+        assert!(json.get("target-dir").is_some());
+        assert!(json.get("pid").is_some());
+        let actor = json.get("actor").expect("actor");
+        assert_eq!(actor.get("lane").and_then(|v| v.as_str()), Some("reviewer"));
+        assert_eq!(
+            actor.get("session-id").and_then(|v| v.as_str()),
+            Some("s-m224")
+        );
+    }
+}

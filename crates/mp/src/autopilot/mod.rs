@@ -36,6 +36,13 @@
 //!   lifecycle-claim unbacked, unknown actor, evidence contract,
 //!   command-list). Topology-aware remediation lives in
 //!   [`recommend_remediation`].
+//! - [`review_env`] — M224's reviewer execution isolation and
+//!   clean-room policy. Records reviewer provenance (binary /
+//!   worktree / target dir / pid / actor identity), selects the
+//!   mode ([`ReviewEnvMode::Normal`] default vs [`ReviewEnvMode::
+//!   CleanRoom`] explicit-or-provenance-forced), and gates the
+//!   pre-review pass on a typed refusal for dirty worktree / shared
+//!   actor / stale binary / unverifiable environment.
 //!
 //! The on-disk shape is validated against
 //! `schemas/autopilot-session.schema.json`; that file is the source of
@@ -61,6 +68,7 @@ pub mod migrate;
 pub mod notes;
 pub mod prompts;
 pub mod recovery;
+pub mod review_env;
 pub mod role;
 pub mod schema;
 pub mod session;
@@ -117,6 +125,7 @@ pub use role::{
 };
 #[allow(unused_imports)]
 use schema::validate_value as _;
+pub use review_env::{build_provenance, ActorIdentity, ReviewerProvenance};
 pub use schema::{validate_session_value, SESSION_MAX_BYTES};
 pub use session::{
     append_event, autopilot_dir, load_session, load_session_from, sample_session_for_tests,
