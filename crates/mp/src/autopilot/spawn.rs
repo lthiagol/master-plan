@@ -953,7 +953,7 @@ fn persist_session(
             harness: Some(inputs.role_o.harness.clone()),
             skill: Some(inputs.role_o.skill.clone()),
             config_hash: None,
-            spawn_prompt_rendered: Some(rendered_for(inputs_o)),
+            spawn_prompt_rendered: Some(rendered_for(Role::Orchestrator, inputs_o)),
         }),
         runner: Some(RoleConfig {
             role: RoleName::Runner,
@@ -962,7 +962,7 @@ fn persist_session(
             harness: Some(inputs.role_r.harness.clone()),
             skill: Some(inputs.role_r.skill.clone()),
             config_hash: None,
-            spawn_prompt_rendered: Some(rendered_for(inputs_r)),
+            spawn_prompt_rendered: Some(rendered_for(Role::Runner, inputs_r)),
         }),
         reviewer: Some(RoleConfig {
             role: RoleName::Reviewer,
@@ -975,7 +975,7 @@ fn persist_session(
             harness: Some(inputs.role_v.harness.clone()),
             skill: Some(inputs.role_v.skill.clone()),
             config_hash: None,
-            spawn_prompt_rendered: Some(rendered_for(inputs_v)),
+            spawn_prompt_rendered: Some(rendered_for(Role::Reviewer, inputs_v)),
         }),
     };
 
@@ -1005,15 +1005,19 @@ fn persist_session(
     Ok(path.file)
 }
 
-fn rendered_for(i: &SpawnPromptInputs) -> String {
+fn rendered_for(role: Role, i: &SpawnPromptInputs) -> String {
     // The per-role source prompt (one role's contract) — what
     // a 3-pane topology delivers to a single pane. Collapsed
     // topologies concatenate these; the concatenated bundle
     // lives in `prompt_bundles`.
-    let role = match i.role_config.skill.as_str() {
-        "mp-coordinator" => Role::Orchestrator,
-        _ => Role::Runner, // mp-runner is used by both Runner + Reviewer.
-    };
+    //
+    // The role is taken from the caller's Role enum, NOT
+    // inferred from `i.role_config.skill`. Skill name is a
+    // harness-dispatch concern (mp-runner is the skill for
+    // both Runner and Reviewer); role classification is a
+    // template-selection concern. Inferred classification
+    // would silently mis-render the Reviewer as a Runner
+    // (reviewer F-01).
     crate::autopilot::prompts::spawn::render_role_prompt(role, i)
 }
 
