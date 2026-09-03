@@ -135,6 +135,17 @@
           "at": { "type": "string" }
         }
       }
+    },
+    "binary_provenance": {
+      "type": "object",
+      "description": "M210 / AC-07: provenance record for the mp binary that last mutated this session. Stamped at spawn time; rejected by the spawn pipeline if a newer binary cannot preserve the recorded schema.",
+      "properties": {
+        "binary_path": { "type": "string" },
+        "version": { "type": "string" },
+        "schema_version": { "type": "integer" },
+        "build_kind": { "type": "string" },
+        "recorded_at": { "type": "string" }
+      }
     }
   },
   "$defs": {
@@ -158,7 +169,11 @@
         "model": { "type": "string" },
         "harness": { "type": "string" },
         "skill": { "type": "string" },
-        "config_hash": { "type": "string" }
+        "config_hash": { "type": "string" },
+        "spawn_prompt_rendered": {
+          "type": "string",
+          "description": "M210 / AC-04: the rendered per-role spawn prompt. Captured at spawn time for audit; the bundle delivered to a physical pane lives in prompt_bundles (concatenated across roles for collapsed topologies)."
+        }
       }
     },
     "queue_item": {
