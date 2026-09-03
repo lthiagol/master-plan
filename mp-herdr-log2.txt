@@ -819,3 +819,59 @@ Total time (rough estimate): ~75 min from M207 cycle 1 to M213 complete. That's 
 The 5 foundation milestones are done. The autopilot system is feature-complete for one cycle. The natural next step is **M223 (mp autopilot lifecycle transaction + commit/finding attribution)** — high priority, 3 ACs, 3 steps. M223 is the closure protocol that the original log's R5/R7/R10 lessons were about. After M223, the system has the full foundation + closure, ready for the next batch (M224, M225, M226, M227, M228, M229).
 
 But the user said "let's do those 5 milestones" — implying 5 was the target. Awaiting user direction.
+
+---
+
+## 2026-09-03 ~17:00 — SESSION 2 START: 10-milestone batch begins
+
+User approved a 10-milestone batch (the autopilot follow-on). Sequence:
+
+| # | M | Title | ACs/Steps | Priority |
+|---|---|---|---|---|
+| 1 | M208 | CLI rename `mp watch` → `mp autopilot` | 5/5 | normal |
+| 2 | M210 | spawn-prompt template + harness-extra-flags | 7/7 | normal |
+| 3 | M218 | herdr hard gate | 4/4 | normal |
+| 4 | M220 | consumer-surface hygiene | 4/4 | normal |
+| 5 | M227 | test infrastructure (fake-herdr harness) | 3/3 | high |
+| 6 | M223 | lifecycle transaction + commit/finding attribution | 3/3 | high |
+| 7 | M224 | reviewer execution isolation + clean-room | 3/3 | high |
+| 8 | M225 | restart + reconciliation | 4/4 | high |
+| 9 | M226 | end-to-end certification | 3/3 | high |
+| 10 | M214 | raul Autopilot lane rename | 4/4 | normal |
+
+**Total: 40 ACs, 40 steps. Mix of 4 high-priority + 6 normal.**
+
+### What carries over from session 1
+
+- Same contracts (with the discipline gate at the top — proven in M211-M213)
+- F-02 pre-empt pattern (5 of 5 milestones needed it in session 1; will check each in this batch)
+- `make clean` before each reviewer cycle
+- Backlog class for out-of-scope findings
+- Pre-notify gate + orchestrator R5 verification
+- 4 dogfood entries already filed (activity.json gap, M202 doc lint, M211 stale slug, M213 code duplication)
+- 60 commits ahead of origin/wip
+
+### New in session 2
+
+- The lane contracts will be re-sent at the start of each milestone's tab (fresh context per the user's pattern). Same content as session 1's M211-M213 contracts.
+- Any new `mp` CLI issues found will be filed in `mp-dogfood-log.md` as they're discovered.
+- Tab strategy: fresh tab per milestone. After 10 milestones, 10 closed tabs.
+
+### What this batch achieves
+
+By M226 (milestone #9), the autopilot system has:
+- Renamed CLI surface (M208)
+- Spawn-prompt rendering (M210)
+- Hard gate (M218)
+- Clean consumer surface (M220)
+- Shared test infra (M227)
+- Lifecycle transaction (M223)
+- Reviewer isolation (M224)
+- Restart + reconciliation (M225)
+- End-to-end certification (M226)
+
+Plus M214 (milestone #10) for the first user-visible UI surface milestone (raul lane rename).
+
+### Starting now
+
+First milestone: M208 (CLI rename). Pre-empting F-02 (5 ACs all have `watch_cli` placeholder), then dispatch.
