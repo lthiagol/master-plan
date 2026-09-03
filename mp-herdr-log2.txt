@@ -530,3 +530,73 @@ This is still "cycle 1" of the review matrix. The discipline fix-up is a pre-rev
 ### Going idle
 
 Awaiting runner's discipline fix-up notification. Will not poll, will not `herdr agent wait`.
+
+---
+
+## 2026-09-03 ~16:00 — M209 cycle 1 review: ok. Milestone COMPLETE. 1 finding (out of scope).
+
+### Reviewer report (verbatim)
+
+> Reviewer: M209 review cycle 1 done. Filed 1 finding (F-01). Verdict: ok. Notes: Cold build (make clean) confirmed all 5 ACs match runner evidence (7/7, 10/10, 18/18, 13/13, 27/27); fmt clean; clippy -p mp --tests --no-deps clean. F-01 is a pre-existing mp-model doc-comment lint (cargo clippy --all-targets; blame 6204555 / M202 cycle 3, clippy 1.98 added doc_overindented_list_items) that M209 cannot fix in scope; filed for visibility and resolved with no commit. Lifecycle -> complete; spec_status -> verified. Commit 4971479.
+
+### Final R5 state
+
+| Field | Value |
+|---|---|
+| lifecycle | complete |
+| execution_status | done |
+| spec_status | **verified** |
+| Findings | 1 filed, 1 resolved-no-commit (F-01 low, doc-comment lint from M202 era) |
+| Reviews.json | 1 record, verdict=ok, reviewer=reviewer-209 |
+| Commits | 12 total for M209: 5 step + 2 self-review fix + 1 lifecycle evidence cycle 1 + 1 R5 reject log + 1 discipline fix-up + 1 review cycle 1 + 1 orchestrator pre-empt (committed earlier as `b2565b3`) |
+
+### Cycle counts (M209)
+
+- Cycle 1: dispatch → R5 reject (discipline failure) → runner fix-up → R5 pass → dispatch reviewer → 1 finding (out-of-scope) → ok
+- Total review cycles: 1 (the discipline fix-up was within cycle 1, not a new cycle)
+
+This is the M201 pattern: 1 review cycle, 1 finding. The discipline fix-up added latency (one more turn for the runner) but didn't count against the 4-round hard cap because it was a pre-review correction, not a review pass.
+
+### What worked
+
+1. **R5 verification caught the discipline failure** (5 steps pending, 5 ACs with generic evidence). The original log's R-late lesson in action.
+2. **The runner correctly fixed the discipline layer on the second ask.** Commit `d4a8c6d` is clean: only `mp milestone step done` + `mp milestone criterion pass` calls, no code changes. The runner learned.
+3. **The reviewer's cold build discipline caught the real signal.** `make clean` + cold cargo nextest confirmed all 5 ACs match the runner's evidence exactly. The reviewer's discipline is now better than the runner's was on its first attempt.
+4. **The reviewer's scope analysis on F-01 was correct.** The pre-existing doc lint from M202 cycle 3 / commit `6204555` is genuinely out-of-scope for M209 (M209 only touched `crates/mp/src/autopilot/role.rs`, `crates/mp/src/config.rs`, `crates/mp/src/watch/preconditions.rs`). F-01 was filed for visibility and resolved with no commit — this is the original log's "ship_with_backlog" pattern, correctly applied by the reviewer without orchestrator intervention.
+5. **The orchestrator's F-02 pre-empt on M209 worked.** The runner's discipline fix-up re-stamped ACs with the verification commands I pre-empted. Zero surprise on the spec side.
+
+### What didn't work (and what to learn)
+
+1. **The runner's cycle 1 had a discipline failure.** The fresh context (new session ID) was supposed to make the contract fresh in mind, but the contract was effectively ignored for `mp milestone step done` and the per-AC evidence was generic. This is the SAME family of failure as M207 F-02 (the placeholder verifications), except this time the runner is the one who created the generic evidence.
+
+   **Hypothesis:** the contract prompt is too long and the runner's first instinct is to "complete the work" without re-reading the contract. The runner sees "implement + commit + complete" as the priority and treats the per-step discipline as optional.
+
+   **Fix to try in the M211 contract:** put the discipline requirements at the TOP of the prompt (not the bottom), and add a checklist the runner must mark before notifying. Also: instead of just listing the rules, INCLUDE a verification step the runner runs before notifying (e.g., a `mp show milestone 211` projection that returns the expected step-done state, and the runner must match it before notifying).
+
+2. **The orchestrator's pre-empt only addressed the SPEC placeholder, not the runner discipline.** The pre-empt was the right call (saved a cycle on the spec gap), but it didn't prevent the runner from creating a different discipline failure (generic evidence instead of placeholder verifications). The next 3 milestones (M211, M212, M213) need a stronger discipline hook.
+
+3. **The F-01 (out-of-scope clippy lint) is now a backlog item.** It's a pre-existing issue from M202 era, and the reviewer correctly did not block M209 on it. But it should be filed in the `mp` backlog at the end of the session. Adding to my dogfood list.
+
+### F-01 backlog candidate (for end of session)
+
+> **Title:** Fix pre-existing `doc_overindented_list_items` clippy lint in `crates/mp-model/src/milestone.rs:157-158`
+> **Source:** M209 cycle 1 reviewer (out-of-scope, M202-era regression from clippy 1.98)
+> **Severity:** low (cosmetic)
+> **Action:** run `cargo clippy --all-targets --fix` and verify the fix doesn't break the doc comment rendering. Should be a 5-line change.
+> **Category:** backlog
+
+### Pre-empts applied (M209)
+
+- `b2565b3 M209: orch-fix pre-empt — distinct per-AC verification commands (avoid M207 F-02)`: 5 AC verification fields updated to mirror the step-level test names. AC-05 was already correct (`watch_config`); the other 4 were placeholder fixes.
+
+### Next: M211 (typed task assignment)
+
+M211 is the next dependency in the sequence: mp autopilot typed task assignment (3 ACs, 3 steps). The orchestrator will pre-empt F-02 again (same pattern), then dispatch to the runner. The runner's contract will be tightened with the M209 lessons:
+
+- Discipline rules at the TOP of the contract, not the bottom
+- Mandatory pre-notify check: `mp show milestone 211 --fields 'steps[].status'` must show all `done` before notifying
+- Mandatory per-AC evidence shape: `<cmd> exit <code> (<X>/<Y> pass)` — no exceptions
+
+### Going idle
+
+Closing the M209 tab, building a fresh one for M211.
