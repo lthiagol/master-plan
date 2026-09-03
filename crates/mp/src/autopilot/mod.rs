@@ -53,6 +53,7 @@
 pub mod ac_projection;
 pub mod cycle;
 pub mod events;
+pub mod gate;
 pub mod list;
 pub mod migrate;
 pub mod notes;
@@ -79,6 +80,10 @@ pub use cycle::{
     ReviewerMode, ReviewerVerdict, REVIEWER_SOFT_CAP_CYCLE,
 };
 pub use events::{events_by_kind, EventCursor, EventKind, OrchestrationEvent};
+pub use gate::{
+    check_autopilot_herdr_gate, check_autopilot_herdr_gate_default, AutopilotGateError, GateReason,
+    EX_AUTOPILOT_GATE, HERDR_INSTALL_HINT,
+};
 pub use list::{list_sessions, SessionListEntry};
 pub use migrate::{
     migrate_legacy_watch_state, write_legacy_for_tests, MigrationError, MigrationOutcome,

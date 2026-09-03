@@ -32,6 +32,7 @@ use crate::milestone::load_milestone_by_id;
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::store;
+use crate::autopilot::{AutopilotGateError, EX_AUTOPILOT_GATE};
 use crate::watch::{
     build_pane_split_args, build_start_args, check_preconditions, default_log_path,
     harness_extra_flags, next_stage, pane_label_for, resolve_harness_kind, run_milestones,
@@ -74,6 +75,18 @@ pub(crate) fn cmd_watch(
     detach: bool,
     format: Fmt,
 ) -> Result<()> {
+    // M218 / AC-01 + AC-03: autopilot hard gate — refuse to start
+    // when herdr is missing or below the required version. Fires
+    // BEFORE any plan-state write (lazy auto-set), BEFORE any spawn
+    // operation, and BEFORE the dry-run split so the legacy `mp
+    // watch` and `mp autopilot start` paths share the same gate
+    // behavior. `--force` does NOT bypass (herdr is required by
+    // design; `--force` keeps its M178 double-spawn-guard role).
+    if let Err(err) = crate::autopilot::check_autopilot_herdr_gate_default() {
+        emit(format, &GateReport::from_error(&err))?;
+        return Err(crate::ExitCode(err.exit_code).into());
+    }
+
     let mut cfg = store::load_config(ctx);
     let log_path = log_file
         .clone()
@@ -1054,3 +1067,30 @@ mod tests {
         assert!(v["milestones"].is_array());
     }
 }
+
+/// M218 / AC-01 + AC-03: structured JSON envelope for the autopilot
+/// hard-gate refusal. The `ok: false` flag is the contract every
+/// downstream tool checks; the nested `autopilot_herdr_gate` payload
+/// carries the typed reason + actionable hints. Both `mp autopilot
+/// start` and the legacy `mp watch` alias emit this same shape.
+#[derive(Debug, Serialize)]
+struct GateReport {
+    ok: bool,
+    autopilot_herdr_gate: AutopilotGateError,
+}
+
+impl GateReport {
+    fn from_error(err: &AutopilotGateError) -> Self {
+        Self {
+            ok: false,
+            autopilot_herdr_gate: err.clone(),
+        }
+    }
+}
+
+// Suppress an "unused import" lint for `EX_AUTOPILOT_GATE` — the
+// constant is referenced by name in the docstring above and is part
+// of the agent contract (78 = EX_CONFIG). Importing it here keeps the
+// doc + the import list in one place for future readers.
+#[allow(dead_code)]
+const _AUTOPILOT_GATE_EXIT: i32 = EX_AUTOPILOT_GATE;
