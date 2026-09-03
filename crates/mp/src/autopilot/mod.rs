@@ -115,6 +115,11 @@ pub use recovery::{
     append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
     RecoveredSession,
 };
+pub use review_env::{
+    build_provenance, clean_room_commands, gate, provenance_issues, select_mode, ActorIdentity,
+    CleanRoomTrigger, GateInputs, ModeSelection, ReviewEnvConfig, ReviewEnvDecision,
+    ReviewEnvError, ReviewEnvMode, ReviewerProvenance,
+};
 pub use role::{
     builtin_role_default, pane_index_for, resolve_role_config, resolve_role_config_full,
     resolve_role_config_with_provenance, resolve_with_legacy_fallback, role_pane_slots, tighten,
@@ -125,11 +130,6 @@ pub use role::{
 };
 #[allow(unused_imports)]
 use schema::validate_value as _;
-pub use review_env::{
-    build_provenance, clean_room_commands, gate, provenance_issues, select_mode, ActorIdentity,
-    CleanRoomTrigger, GateInputs, ModeSelection, ReviewEnvConfig, ReviewEnvDecision,
-    ReviewEnvError, ReviewEnvMode, ReviewerProvenance,
-};
 pub use schema::{validate_session_value, SESSION_MAX_BYTES};
 pub use session::{
     append_event, autopilot_dir, load_session, load_session_from, sample_session_for_tests,

@@ -1057,7 +1057,10 @@ mod m224_ac02 {
         };
         let sel = select_mode(&cfg, &[]);
         assert_eq!(sel.mode, ReviewEnvMode::CleanRoom);
-        assert!(matches!(sel.trigger, Some(CleanRoomTrigger::ExplicitConfig)));
+        assert!(matches!(
+            sel.trigger,
+            Some(CleanRoomTrigger::ExplicitConfig)
+        ));
     }
 
     #[test]
@@ -1091,10 +1094,7 @@ mod m224_ac02 {
 
     #[test]
     fn explicit_config_trigger_records_commands() {
-        let cmds = clean_room_commands(
-            Some(&CleanRoomTrigger::ExplicitConfig),
-            &review_target(),
-        );
+        let cmds = clean_room_commands(Some(&CleanRoomTrigger::ExplicitConfig), &review_target());
         assert_eq!(cmds.len(), 1);
         assert!(cmds[0].contains("cargo clean"));
     }
@@ -1300,10 +1300,7 @@ mod m224_ac03 {
         let decision = gate(&inputs).expect("shared target dir escalates, does not block");
         assert!(decision.is_clean_room(), "expected PassWithCleanRoom");
         match decision {
-            ReviewEnvDecision::PassWithCleanRoom {
-                commands,
-                reason,
-            } => {
+            ReviewEnvDecision::PassWithCleanRoom { commands, reason } => {
                 assert!(!commands.is_empty());
                 assert!(commands[0].contains("cargo clean"));
                 assert!(
