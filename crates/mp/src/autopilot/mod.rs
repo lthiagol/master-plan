@@ -85,8 +85,8 @@ pub use session::{
 };
 pub use task_assign::{
     build_assignment_argv, dispatch_assignment, execute_assignment, parse_assignment,
-    render_task_text, validate_assignment, AssignmentOutcome, RoleDirection, TaskAssignment,
-    TaskAssignmentValidationError,
+    render_task_text, validate_assignment, validate_assignment_structure, validate_pane_membership,
+    AssignmentOutcome, RoleDirection, TaskAssignment, TaskAssignmentValidationError,
 };
 pub use transitions::{
     is_valid as is_valid_transition, transition as apply_transition, RoleState, RoleStateRecord,

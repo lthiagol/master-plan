@@ -279,6 +279,19 @@ pub fn validate_assignment(
     payload: &TaskAssignment,
     layout: &PaneLayout,
 ) -> Result<(), TaskAssignmentValidationError> {
+    validate_assignment_structure(payload)?;
+    validate_pane_membership(payload, layout)?;
+    Ok(())
+}
+
+/// Structural checks: empty fields, zero cycle, shell
+/// metacharacters. Does NOT need the session layout — runs before
+/// the dispatcher attempts to load `session.json`, so a payload
+/// missing identity (empty session_id, etc.) is rejected without
+/// ever touching the file system.
+pub fn validate_assignment_structure(
+    payload: &TaskAssignment,
+) -> Result<(), TaskAssignmentValidationError> {
     if payload.session_id.trim().is_empty() {
         return Err(TaskAssignmentValidationError::EmptySessionId);
     }
@@ -294,12 +307,6 @@ pub fn validate_assignment(
     if payload.cycle == 0 {
         return Err(TaskAssignmentValidationError::ZeroCycle);
     }
-    // Shell-metacharacter gate BEFORE pane-membership check — a
-    // payload smuggling a metacharacter in any field is rejected
-    // up front regardless of whether the pane id happens to match.
-    // Defense in depth — Command::args does not invoke a shell, but
-    // the validator refuses the input either way so a future
-    // shell-string fallback cannot smuggle metacharacters in.
     let field_pairs: [(&'static str, &str); 4] = [
         ("session_id", &payload.session_id),
         ("milestone_id", &payload.milestone_id),
@@ -314,19 +321,23 @@ pub fn validate_assignment(
             });
         }
     }
-    // Pane membership: the target pane must match the pane id the
-    // session records for the requested direction.
+    Ok(())
+}
+
+/// Layout-dependent check: the target pane must match the pane
+/// id the session records for the requested direction.
+pub fn validate_pane_membership(
+    payload: &TaskAssignment,
+    layout: &PaneLayout,
+) -> Result<(), TaskAssignmentValidationError> {
     let expected = payload.direction.pane_slot(layout);
     match expected {
-        Some(id) if id == payload.target_pane => {}
-        _ => {
-            return Err(TaskAssignmentValidationError::TargetPaneNotInLayout {
-                direction: payload.direction,
-                pane: payload.target_pane.clone(),
-            });
-        }
+        Some(id) if id == payload.target_pane => Ok(()),
+        _ => Err(TaskAssignmentValidationError::TargetPaneNotInLayout {
+            direction: payload.direction,
+            pane: payload.target_pane.clone(),
+        }),
     }
-    Ok(())
 }
 
 /// First shell metacharacter in `s`, if any. The set is the
@@ -473,13 +484,17 @@ pub fn execute_assignment(herdr_bin: &Path, argv: &[String]) -> std::io::Result<
 /// task assignment.
 ///
 /// Steps:
-/// 1. Load the session (so we know the pane layout + next seq).
-/// 2. Validate the payload against the loaded layout.
-/// 3. Render the argv.
-/// 4. Execute via [`execute_assignment`].
-/// 5. Append an `AssignmentDispatched` event with the outcome.
+/// 1. **Structural validation** (no I/O) — reject empty fields,
+///    zero cycle, shell metacharacters. A payload missing
+///    identity (empty session_id, etc.) is rejected without
+///    ever touching the file system.
+/// 2. Load the session (so we know the pane layout + next seq).
+/// 3. Validate pane membership against the loaded layout.
+/// 4. Render the argv.
+/// 5. Execute via [`execute_assignment`].
+/// 6. Append an `AssignmentDispatched` event with the outcome.
 ///
-/// On validation failure (step 2), the function returns the
+/// On validation failure (steps 1 or 3), the function returns the
 /// error immediately — **no `herdr` call, no session mutation.**
 /// That is the AC-03 / M200 regression gate: prose-only or empty
 /// assignments cannot produce an event or reach herdr.
@@ -492,19 +507,24 @@ pub fn dispatch_assignment(
     herdr_bin: &Path,
     payload: &TaskAssignment,
 ) -> Result<(AssignmentOutcome, PathBuf), TaskAssignmentValidationError> {
-    // Step 1: load the session so we can validate against the
-    // current pane layout and compute the next event seq.
+    // Step 1: structural validation BEFORE any I/O. This catches
+    // empty session_id / milestone_id / task / target_pane,
+    // zero cycle, and shell metacharacters without ever opening
+    // session.json or spawning herdr.
+    validate_assignment_structure(payload)?;
+    // Step 2: load the session so we can validate pane membership
+    // and compute the next event seq.
     let session = load_session(ctx, &payload.session_id)
         .map_err(|e| {
             TaskAssignmentValidationError::TaskAssignmentShapeViolation(format!(
                 "session load failed: {e}"
             ))
         })?;
-    // Step 2: validate against the loaded layout.
-    validate_assignment(payload, &session.topology)?;
-    // Step 3: render the argv.
+    // Step 3: validate pane membership against the loaded layout.
+    validate_pane_membership(payload, &session.topology)?;
+    // Step 4: render the argv.
     let argv = build_assignment_argv(payload);
-    // Step 4: execute.
+    // Step 5: execute.
     let outcome = match execute_assignment(herdr_bin, &argv) {
         Ok(status) if status.success() => AssignmentOutcome::Success {
             argv: argv.clone(),
@@ -523,7 +543,7 @@ pub fn dispatch_assignment(
             error: e.to_string(),
         },
     };
-    // Step 5: append an event AFTER the outcome is known. Even a
+    // Step 6: append an event AFTER the outcome is known. Even a
     // failed dispatch is recorded so the verifier sees the
     // attempt — what must NOT happen is a success event without
     // a real spawn.
@@ -768,6 +788,34 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn validate_structure_rejects_empty_fields_without_layout() {
+        // Structural validation must succeed for an empty
+        // PaneLayout — it does not check pane membership, only
+        // the payload fields. This is what makes
+        // `validate_assignment_structure` usable as a pre-I/O gate
+        // before session.json is loaded.
+        let empty = PaneLayout::default();
+        let p = ok_payload();
+        assert!(validate_assignment_structure(&p).is_ok());
+        // Empty structural fields still rejected.
+        let mut p = ok_payload();
+        p.session_id = "".into();
+        assert!(validate_assignment_structure(&p).is_err());
+    }
+
+    #[test]
+    fn validate_pane_membership_only_checks_layout() {
+        // pane-membership check is layout-only — payload structure
+        // is not re-validated. An empty session_id with a valid
+        // pane id passes (callers must run structural check first).
+        let l = layout();
+        let mut p = ok_payload();
+        p.session_id = "".into();
+        p.target_pane = "%2".into();
+        assert!(validate_pane_membership(&p, &l).is_ok());
     }
 
     #[test]
