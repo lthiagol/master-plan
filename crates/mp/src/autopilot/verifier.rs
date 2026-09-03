@@ -449,6 +449,9 @@ pub fn validate_evidence_shape(evidence: &str) -> Result<(), EvidenceShapeError>
         "cycle done",
         "all acs",
         "ready for review",
+        "cycle 1 done",
+        "cycle 2 done",
+        "step done",
     ];
     for marker in summary_markers {
         if lower.contains(marker) {
@@ -1503,8 +1506,17 @@ mod tests {
 
     #[test]
     fn cross_check_accepts_matching_state() {
-        let state = sample_state("207", "executed");
-        let notification = sample_notification("207", "executed");
+        let mut state = sample_state("207", "executed");
+        // Set legacy fields explicitly so the cross-check has
+        // a stable target — without this, effective_spec_status
+        // / effective_execution_status derive from the
+        // lifecycle and the test becomes coupled to the
+        // legacy-vs-canonical derivation rules.
+        state.milestone.milestone.execution_status = "done".into();
+        state.milestone.milestone.spec_status = "implemented".into();
+        let mut notification = sample_notification("207", "executed");
+        notification.claimed_execution_status = "done".into();
+        notification.claimed_spec_status = "implemented".into();
         assert!(cross_check_state(&notification, &state).is_ok());
     }
 
