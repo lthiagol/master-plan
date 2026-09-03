@@ -50,6 +50,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::autopilot::role::{ResolvedRoleConfig, Role, Topology};
 
+// Re-export so integration tests can name the type via the
+// prompts::spawn path without depending on the role module's
+// privacy surface.
+pub use crate::autopilot::role::{Role as RoleReexport, Topology as TopologyReexport};
+
 // ─── Inputs ──────────────────────────────────────────────────────────
 
 /// All the read-only inputs the renderer needs. Built once per
@@ -159,7 +164,7 @@ Boundaries you MUST respect:
 
 Lane-notify wire format (what your reply MUST start with):
 
-  session=<id> milestone=<id> cycle=<n> role=<you> next=<decision>
+  session=<id> milestone=<id> cycle=<n> role=orchestrator next=<decision>
   <one-line decision summary>";
 
 /// Runner `Boundaries you must respect` block. The verifier
