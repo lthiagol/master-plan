@@ -935,3 +935,85 @@ First milestone: M208 (CLI rename). Pre-empting F-02 (5 ACs all have `watch_cli`
 ### Going idle
 
 Closing the M208 tab, building a fresh one for M210.
+
+---
+
+## 2026-09-03 ~17:45 — M210 cycle 1+2 review: ok. Milestone COMPLETE. F-01 HIGH (spec-gap) caught + fixed.
+
+### Cycle 1 reviewer report (verbatim)
+
+> Reviewer: M210 review cycle 1 done. Filed 2 findings: F-01 HIGH (spec-gap, rendered_for skill-name fallback corrupts roles.reviewer.spawn_prompt_rendered), F-02 LOW (doc-drift on render_topology_prompts return type). Verdict: changes-needed. Note: mp reviews pass was blocked by execution_status=in-progress gate (filing F-01 auto-transitioned lifecycle to remediation); verdict call deferred to cycle 2 after runner fixes F-01. AC verification on cold build (make clean + cargo nextest): 56/56 pass.
+
+### Cycle 1 finding analysis
+
+| ID | Severity | Category | Description |
+|---|---|---|---|
+| F-01 | HIGH | spec-gap | `rendered_for` in `crates/mp/src/autopilot/spawn.rs:1008-1018` uses skill-name fallback: `'mp-coordinator'` → Orchestrator, `_` → Runner. Since the Reviewer's built-in skill is `'mp-runner'`, the Reviewer's spawn prompt gets the Runner role assigned by the fallback. Real correctness bug — Reviewer renders Runner's template, not Reviewer's. |
+| F-02 | LOW | doc-drift | Module-level doc comment says `render_topology_prompts` returns `Vec<(PaneLabel, BundledPrompt)>` but the actual signature is `pub fn render_topology_prompts(...) -> Vec<BundledPrompt>`. |
+
+The reviewer's cold build was exemplary: 56/56 tests pass on the cycle 1 cold build, but F-01 is a real bug that the test surface didn't catch (the test used a different code path that bypassed the `rendered_for` function). This is the M207 F-01 pattern: a real bug that the runner's incremental build missed. The reviewer's cold build caught it.
+
+### Cycle 2 runner + reviewer
+
+The runner's cycle 2 (tightened prompt: "fix F-01, fix F-02, nothing else") was disciplined:
+- F-01 fix in `829b348`: `rendered_for` now uses the EXPLICIT role from `SpawnPromptInputs`, not the skill-name fallback.
+- F-02 fix in `d938f93`: doc comment aligned with actual signature.
+- Regression test added in `4d5117a`: catches the original bug (runner verified by temporary revert — the M207 F-01 lesson applied correctly).
+- Self-review clippy cleanup in `c7849ac`.
+- Lifecycle evidence: `06ab4b4`.
+- 58/58 tests pass (was 56/56 in cycle 1; +2 is the new regression test).
+
+The reviewer's cycle 2 (tightened "blockers only" prompt) returned:
+- 0 findings, verdict=ok.
+- F-01 regression test: pass.
+- cargo fmt: clean.
+- 58/58 tests pass.
+
+### Final R5 state (M210)
+
+| Field | Value |
+|---|---|
+| lifecycle | complete |
+| execution_status | done |
+| spec_status | **verified** |
+| Findings | 2 filed (F-01 HIGH, F-02 LOW), 2 fixed (F-01 in 829b348, F-02 in d938f93) |
+| Reviews.json | 1 record, verdict=ok, reviewer=reviewer-210 |
+| Commits | 18 total for M210: 7 step/AC + 1 S6+S7 batched + 1 S4+S7 schema + 1 lifecycle cycle 1 + 1 review cycle 1 + 1 F-01 fix + 1 regression test + 1 F-02 fix + 1 self-review clippy + 1 lifecycle cycle 2 + 1 review cycle 2 + 1 self-review fmt round 1 + 1 self-review fmt round 2 |
+
+### Cycle counts (M210)
+
+- Cycle 1: dispatch → R5 PASS → dispatch reviewer → F-01 HIGH, F-02 LOW → changes-needed
+- Cycle 2: dispatch runner (tightened) → fix F-01 + F-02 + regression test → R5 PASS → dispatch reviewer (tightened "blockers only") → 0 findings → ok
+- Total: 2 cycles (within the soft cap of 3, well under the hard limit of 4)
+
+### What worked
+
+1. **The cold build caught F-01 (HIGH).** 56/56 tests passed on the reviewer's cold build, but F-01 is a real spec-gap bug. The bug was in the role-classification function (`rendered_for`), not in the prompt content. The test surface didn't exercise this path correctly — the test used a different code path.
+2. **The runner's cycle 2 added a regression test (M207 F-01 lesson).** Per the original log's M207 F-01 lesson ("test the FULL documented surface, not just the bug-reported case"), the runner added a regression test that catches the original bug. The runner verified by temporary revert.
+3. **Tightened prompt at cycle 2 worked.** The runner's cycle 2 was scoped to "fix F-01, fix F-02, nothing else." No scope creep. The reviewer's cycle 2 was "blockers only" — F-02 (already a known LOW) wasn't re-filed.
+4. **Decision matrix (R3) applied correctly.** F-01 HIGH → cycle_next. After cycle 2 fix verified → ok. No `ship_with_backlog` after cycle 4 (we're at cycle 2).
+
+### What didn't work
+
+1. **The test surface didn't cover the `rendered_for` function correctly.** This is the M207 F-01 lesson: when fixing a parser, expand the test surface to cover ALL aliases. M210's spawn prompt surface had a similar gap — the test used a code path that bypassed the role-classification bug.
+2. **The runner's F-01 fix needed a self-review clippy pass (c7849ac).** The first attempt at the regression test had a redundant reference. Small, but real.
+
+### Dogfood candidate from M210
+
+> **F-01 root cause:** `rendered_for` used skill-name fallback instead of explicit role. This is a pattern that should be caught at design time — the function signature should make the role explicit. Filed as a **spec-gap** (or design-pattern-gap) for future mp autopilot work.
+
+This isn't a dogfood entry for `mp` itself — it's for the autopilot design pattern. The lesson: role classification should be from the explicit role enum, not from skill-name heuristics. The next autopilot milestone that touches spawn prompts (M227 fake-herdr harness, M214 lane rename) should be aware of this.
+
+### Session 2 milestone progress (so far)
+
+| M | Status | Cycles | Findings | Commits |
+|---|---|---|---|---|
+| M208 | complete/verified | 1 (clean) | 2 fixed (both low backlog) | 11 |
+| M210 | complete/verified | 2 (1 reject + 1 clean) | 2 fixed (F-01 HIGH, F-02 LOW) | 18 |
+| **Total** | **2/10** | **3 cycles** | **4 fixed** | **29** |
+
+**2 of 10 milestones done.** M218 is next (herdr hard gate, 4 ACs, 4 steps, effort=S — small).
+
+### Going idle
+
+Closing the M210 tab, building a fresh one for M218.
