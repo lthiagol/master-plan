@@ -2144,3 +2144,302 @@ mod m226_ac01 {
     }
 }
 
+mod m226_ac02 {
+    //! AC-02 — restart injection in runner and reviewer phases.
+    //!
+    //! The certification pins the M225 contract end-to-end:
+    //!
+    //! - Runner phase: a FakeHerdrBuilder (M227) backs the
+    //!   `dispatch_assignment` path. The session already records an
+    //!   `AssignmentDispatched` event for the runner pane; a second
+    //!   dispatch through the wired task_assign path returns
+    //!   `AlreadyApplied` and the fake log does NOT contain a fresh
+    //!   `agent start`. A dead runner pane without a stored prompt
+    //!   escalates to `AwaitingUser::NoStoredPrompt` via M225's
+    //!   `classify_pane_loss`.
+    //! - Reviewer phase: stage a session with a stale event
+    //!   cursor (3 events, cursor=1). `recover_event_tail`
+    //!   recovers the cursor to 3 without truncating events
+    //!   (M225 AC-03). A canonical-cross-check with a newer
+    //!   canonical state refuses a fabricated lifecycle flip
+    //!   (M225 AC-04).
+    use super::m226_fixtures::RUNNER_PANE_LABEL;
+    use crate::common::fake_herdr::FakeHerdrBuilder;
+    use crate::common::TestEnv;
+    use mp::autopilot::events::{EventKind, OrchestrationEvent};
+    use mp::autopilot::reconcile::{
+        classify_pane_loss, recover_event_tail, was_already_applied, CanonicalAcKey,
+        CanonicalAcState, CanonicalSnapshot, CrossCheckReport, IdempotencyKey, PaneLossInput,
+        PaneLossOutcome, PaneLossReason, TailRecovery,
+    };
+    use mp::autopilot::session::{load_session, save_session, AutopilotSession};
+    use mp::autopilot::spawn::MpBinaryProvenance;
+    use mp::autopilot::task_assign::{dispatch_assignment, AssignmentOutcome, TaskAssignment};
+    use mp::autopilot::RoleName;
+    use mp::paths::PlanContext;
+    use serde_json::json;
+    use std::path::Path;
+
+    fn ctx_in(dir: &Path) -> PlanContext {
+        PlanContext {
+            project_root: dir.to_path_buf(),
+            plan_dir: dir.join("master-plan"),
+        }
+    }
+
+    fn sample_session() -> AutopilotSession {
+        let mut s = AutopilotSession::sample("m226-fixture");
+        s.binary_provenance = Some(MpBinaryProvenance::current());
+        s
+    }
+
+    /// Runner restart: a second dispatch with the same pane label
+    /// returns AlreadyApplied. The fake herdr log does NOT contain
+    /// a fresh `agent start`. This is the production hot path the
+    /// M225 F-01 wiring installed.
+    #[test]
+    fn m226_ac02_runner_restart_dedup_via_fake_herdr() {
+        let env = TestEnv::new();
+        let bin_dir = env.tmp.path().join("fake-bin");
+        let fake = FakeHerdrBuilder::new()
+            .agent_start_response(r#"{"pane_id":"%spawned-1","status":"started"}"#)
+            .install(&bin_dir);
+        fake.clear_log();
+
+        let ctx = ctx_in(env.tmp.path());
+        let mut session = sample_session();
+        session.events.push(OrchestrationEvent::new(
+            1,
+            EventKind::AssignmentDispatched,
+            "runner:M226",
+            json!({
+                "pane_label": RUNNER_PANE_LABEL,
+                "milestone_id": "226",
+                "cycle": 1,
+            }),
+        ));
+        session.event_cursor.last_seq = 1;
+        save_session(&ctx, "m226-fixture", &session).unwrap();
+
+        // The pure-function check pins that the session records
+        // the prior dispatch (M225 AC-01 dedup).
+        assert!(was_already_applied(
+            &session,
+            &IdempotencyKey::Dispatch {
+                pane_label: RUNNER_PANE_LABEL.into()
+            }
+        ));
+
+        // The wired dispatch_assignment path returns
+        // AlreadyApplied and never spawns the fake herdr.
+        let payload = TaskAssignment::new(
+            "m226-fixture",
+            "226",
+            1,
+            mp::autopilot::task_assign::RoleDirection::OrchestratorToRunner,
+            "%2",
+            "You are the runner for M226",
+        );
+        let (outcome, _) = dispatch_assignment(&ctx, fake.path(), &payload).unwrap();
+        match outcome {
+            AssignmentOutcome::AlreadyApplied { pane_label, .. } => {
+                assert_eq!(pane_label, RUNNER_PANE_LABEL);
+            }
+            other => panic!(
+                "M226 AC-02 / runner restart: dispatch with prior event must be AlreadyApplied, got {other:?}"
+            ),
+        }
+        let log_text = fake.read_log();
+        assert!(
+            !log_text.contains("agent start"),
+            "M226 AC-02 / runner restart: FakeHerdrBuilder must NOT log a fresh `agent start`; got: {log_text}"
+        );
+    }
+
+    /// A dead runner pane without a stored prompt escalates to
+    /// AwaitingUser via M225's classify_pane_loss. This is the
+    /// production restart classification that the wired F-01 code
+    /// path consults.
+    #[test]
+    fn m226_ac02_runner_restart_no_stored_prompt_escalates_to_awaiting_user() {
+        // The wired F-01 cmd_watch_drive calls classify_pane_loss
+        // for every Dead pane and surfaces the verdict to the
+        // operator via a structured log row. A missing stored
+        // prompt must escalate, not auto-respawn — that would be a
+        // context-less agent.
+        let outcome = classify_pane_loss(&PaneLossInput {
+            role: RoleName::Runner,
+            pane_live: false,
+            topology_role_present: true,
+            stored_prompt: None,
+            stored_actor: Some("runner:M226"),
+        });
+        match outcome {
+            PaneLossOutcome::AwaitingUser {
+                reason: PaneLossReason::NoStoredPrompt { role },
+            } => assert_eq!(role, "runner"),
+            other => panic!(
+                "M226 AC-02 / runner restart: dead pane without stored prompt must escalate, got {other:?}"
+            ),
+        }
+
+        // Counter-test: a stored prompt + actor is SafeRespawn
+        // with actor rotation. This is the happy restart path.
+        let outcome_safe = classify_pane_loss(&PaneLossInput {
+            role: RoleName::Runner,
+            pane_live: false,
+            topology_role_present: true,
+            stored_prompt: Some("You are the runner for M226"),
+            stored_actor: Some("runner:M226"),
+        });
+        let PaneLossOutcome::SafeRespawn {
+            prompt,
+            actor_rotation,
+        } = outcome_safe
+        else {
+            panic!("M226 AC-02 / runner restart: stored prompt+actor must be SafeRespawn")
+        };
+        assert_eq!(prompt, "You are the runner for M226");
+        let rot = actor_rotation.expect("prior actor triggers rotation");
+        assert!(rot.contains("respawn"), "got {rot}");
+    }
+
+    /// Reviewer restart: a session with a stale event cursor (3
+    /// events, cursor=1) is recovered by `recover_event_tail`
+    /// without truncating events. The cursor is bumped to the
+    /// max surviving event seq (M225 AC-03). The subprocess path
+    /// is exercised through `mp autopilot session recover` so
+    /// the FakeHerdrBuilder is part of the M227 reuse contract.
+    #[test]
+    fn m226_ac02_reviewer_restart_recover_event_tail_subprocess() {
+        let env = TestEnv::new();
+        let bin_dir = env.tmp.path().join("fake-bin");
+        let fake = FakeHerdrBuilder::new().install(&bin_dir);
+        fake.clear_log();
+
+        let ctx = ctx_in(env.tmp.path());
+        let mut session = sample_session();
+        // 3 events; cursor lags at 1 (torn-write simulation).
+        for seq in 1..=3 {
+            session.events.push(OrchestrationEvent::new(
+                seq,
+                EventKind::Transition,
+                "reviewer:M226",
+                json!({"milestone_id": "226", "target": "executed"}),
+            ));
+        }
+        session.event_cursor.last_seq = 1;
+        let prior_event_count = session.events.len();
+        save_session(&ctx, "m226-fixture", &session).unwrap();
+
+        // Library-side check: recover_event_tail is pure and
+        // produces the expected TailRecovery variant.
+        let mut session_lib = sample_session();
+        for seq in 1..=3 {
+            session_lib.events.push(OrchestrationEvent::new(
+                seq,
+                EventKind::Transition,
+                "reviewer:M226",
+                json!({"milestone_id": "226", "target": "executed"}),
+            ));
+        }
+        session_lib.event_cursor.last_seq = 1;
+        let current = MpBinaryProvenance::current();
+        let result = recover_event_tail(&mut session_lib, &current);
+        match result {
+            TailRecovery::Recovered {
+                last_seq,
+                prior_event_count: prior,
+            } => {
+                assert_eq!(last_seq, 3);
+                assert_eq!(prior, prior_event_count);
+            }
+            other => panic!(
+                "M226 AC-02 / reviewer restart: stale cursor must Recover, got {other:?}"
+            ),
+        }
+        assert_eq!(
+            session_lib.events.len(),
+            prior_event_count,
+            "M226 AC-02 / reviewer restart: events must not be truncated"
+        );
+        assert_eq!(session_lib.event_cursor.last_seq, 3);
+
+        // Subprocess-side check: `mp autopilot session recover
+        // m226-fixture` exercises the F-01 wired
+        // run_startup_recovery. The FakeHerdrBuilder is installed
+        // for the M227 reuse contract even though recover does
+        // not consult herdr.
+        let out = env.run(&[
+            "autopilot",
+            "session",
+            "recover",
+            "m226-fixture",
+            "--format",
+            "json",
+        ]);
+        assert!(
+            out.status.success(),
+            "M226 AC-02 / reviewer restart: `mp autopilot session recover` failed: stderr={}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(parsed["ok"], serde_json::Value::Bool(true));
+        assert_eq!(parsed["outcome"], "recovered");
+        assert_eq!(parsed["prev_cursor"], 1);
+        assert_eq!(parsed["next_cursor"], 3);
+        assert_eq!(parsed["event_count"], 3);
+
+        let reloaded = load_session(&ctx, "m226-fixture").unwrap();
+        assert_eq!(
+            reloaded.event_cursor.last_seq, 3,
+            "M226 AC-02 / reviewer restart: cursor must be 3 on disk after subprocess recover"
+        );
+    }
+
+    /// Reviewer restart: a canonical-cross-check with a newer
+    /// canonical state refuses a fabricated lifecycle flip
+    /// (M225 AC-04). The cross-check report's `canonical_wins_anywhere`
+    /// flag must be true so the resume path refuses to restore
+    /// the session's stale value.
+    #[test]
+    fn m226_ac02_reviewer_restart_canonical_newer_refuses_restoration() {
+        use mp::autopilot::reconcile::cross_check_canonical;
+        let mut session = sample_session();
+        // Force the session's projection to an old timestamp so
+        // the canonical "newer" snapshot wins by the F-03
+        // timestamp comparison.
+        if let Some(map) = session.ac_projections.get_mut("207") {
+            if let Some(p) = map.get_mut("AC-01") {
+                p.source_revision = "a-old-rev".into();
+                p.projected_at = Some("2020-01-01T00:00:00Z".into());
+            }
+        }
+        let mut snapshot = CanonicalSnapshot::empty();
+        snapshot.ac_revisions.insert(
+            CanonicalAcKey::new("207", "AC-01"),
+            CanonicalAcState {
+                status: "passed".into(),
+                source_revision: "z-new-rev".into(),
+                canonical_at: "2026-09-03T00:00:00Z".into(),
+            },
+        );
+        let report = cross_check_canonical(&session, &snapshot);
+        assert!(
+            report.canonical_wins_anywhere,
+            "M226 AC-02 / reviewer restart: canonical must win where newer; got {report:?}"
+        );
+        assert!(
+            !report.session_is_safe(),
+            "M226 AC-02 / reviewer restart: report.session_is_safe() must be false when canonical wins"
+        );
+        // The verdict on AC-01 must be CanonicalNewer.
+        let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
+        assert!(matches!(
+            ac_verdict,
+            mp::autopilot::reconcile::DimensionVerdict::CanonicalNewer { .. }
+        ));
+        let _ = CrossCheckReport::default();
+    }
+}
+
