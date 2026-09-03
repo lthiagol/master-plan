@@ -143,8 +143,13 @@ pub struct RoleConfig {
 }
 
 /// Per-role topology pane_ids. Mirrors `topology.*` in the schema.
+///
+/// Renamed from `Topology` to `PaneLayout` in M209 so the
+/// [`crate::autopilot::role::Topology`] enum can own the canonical
+/// name; the on-disk shape (`topology.orchestrator.pane_id`, etc.)
+/// and serde representation are unchanged.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-pub struct Topology {
+pub struct PaneLayout {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orchestrator: Option<PaneRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -311,7 +316,7 @@ pub struct AutopilotSession {
     pub schema_version: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub herdr_workspace: Option<String>,
-    pub topology: Topology,
+    pub topology: PaneLayout,
     pub roles: RolesConfig,
     #[serde(default)]
     pub config_overrides: SessionConfigOverrides,
@@ -576,7 +581,7 @@ pub fn sample_session_for_tests(id: &str) -> AutopilotSession {
         },
     ];
 
-    let topology = Topology {
+    let topology = PaneLayout {
         orchestrator: Some(PaneRef {
             pane_id: "%1".into(),
             label: Some("role-orchestrator-1".into()),
@@ -708,7 +713,7 @@ impl AutopilotSession {
             id: id.to_string(),
             schema_version: SESSION_SCHEMA_VERSION,
             herdr_workspace: None,
-            topology: Topology::default(),
+            topology: PaneLayout::default(),
             roles: RolesConfig::default(),
             config_overrides: SessionConfigOverrides::default(),
             queue: Vec::new(),

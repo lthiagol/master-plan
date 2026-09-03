@@ -17,8 +17,8 @@ use mp::autopilot::events::EventKind;
 use mp::autopilot::notes::{build_note, NoteKind};
 use mp::autopilot::session::{
     load_session, sample_session_for_tests, save_session, AutopilotSession, Controls, EvidenceRefs,
-    PaneRef, QueueItem, RoleConfig, RoleName, RolesConfig, SessionConfigOverrides, SessionStatus,
-    Stage, Topology, WorkingOn,
+    PaneLayout, PaneRef, QueueItem, RoleConfig, RoleName, RolesConfig, SessionConfigOverrides,
+    SessionStatus, Stage, WorkingOn,
 };
 use mp::autopilot::transitions::{is_valid as is_valid_transition, RoleState};
 use mp::autopilot::{
@@ -46,7 +46,7 @@ fn documented_fields_are_all_present() {
     let mut session = AutopilotSession::blank("alpha");
 
     // Topology + roles.
-    session.topology = Topology {
+    session.topology = PaneLayout {
         orchestrator: Some(PaneRef {
             pane_id: "%1".into(),
             label: Some("role-orchestrator-1".into()),

@@ -1,4 +1,5 @@
-//! M207: durable per-session state for `mp autopilot` drives.
+//! M207 / M209: durable per-session state for `mp autopilot` drives
+//! and the canonical role/topology model.
 //!
 //! This module owns the schema and on-disk I/O for `session.json`, the
 //! single canonical record of an autopilot drive. Each session lives
@@ -18,6 +19,10 @@
 //!   canonical milestone criterion state; rejects stale writes.
 //! - [`events`] — append-only event types and the sequence-numbered
 //!   cursor that survives a crash mid-write.
+//! - [`role`] — M209's canonical three-role model and the topology
+//!   enum + pane-slot mapping function. The session struct holds a
+//!   [`session::PaneLayout`] (the per-role pane assignments) which
+//!   is a derived view over [`Topology`] + a pane-id map.
 //!
 //! The on-disk shape is validated against
 //! `schemas/autopilot-session.schema.json`; that file is the source of
@@ -37,6 +42,7 @@ pub mod events;
 pub mod list;
 pub mod notes;
 pub mod recovery;
+pub mod role;
 pub mod schema;
 pub mod session;
 pub mod transitions;
@@ -52,14 +58,17 @@ pub use recovery::{
     append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
     RecoveredSession,
 };
+pub use role::{
+    pane_index_for, role_pane_slots, PaneSlots, Role, RoleSlot, Topology,
+};
 #[allow(unused_imports)]
 use schema::validate_value as _;
 pub use schema::{validate_session_value, SESSION_MAX_BYTES};
 pub use session::{
     append_event, autopilot_dir, load_session, load_session_from, sample_session_for_tests,
     save_session, save_session_at, AutopilotSession, Controls, CycleHistoryEntry, EvidenceRefs,
-    PaneRef, QueueItem, RoleConfig, RoleName, RoleStateEnvelope, RolesConfig, SchemaMigration,
-    SessionConfigOverrides, SessionLoadError, SessionPath, SessionStatus, Stage, Topology,
+    PaneLayout, PaneRef, QueueItem, RoleConfig, RoleName, RoleStateEnvelope, RolesConfig,
+    SchemaMigration, SessionConfigOverrides, SessionLoadError, SessionPath, SessionStatus, Stage,
     WorkingOn, SESSION_SCHEMA_VERSION,
 };
 pub use transitions::{
