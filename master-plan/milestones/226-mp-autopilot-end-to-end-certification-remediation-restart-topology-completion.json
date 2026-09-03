@@ -3,9 +3,9 @@
     "id": "226",
     "title": "mp autopilot end-to-end certification — remediation, restart, topology, completion",
     "slug": "mp-autopilot-end-to-end-certification-remediation-restart-topology-completion",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -32,7 +32,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T14:12:50.463076+00:00",
+    "lifecycle_at": "2026-09-03T22:41:17.203874+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -42,9 +42,17 @@
         "status": "done",
         "at": "2026-09-03T14:13:31.113974+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T22:41:17.203878+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:13:31.213229+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T22:41:17.203878+00:00"
       },
       "specify": {
         "status": "done",
@@ -75,22 +83,22 @@
       "id": "AC-01",
       "description": "A three-pane fixture drives two queued milestones through step/AC evidence, independent review, one remediation cycle, finding fixed_in resolution, reviews pass, and lifecycle complete without raul.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution -E 'test(/m226_ac01/)' --no-fail-fast exit 0 (5/5 pass)"
     },
     {
       "id": "AC-02",
       "description": "Restart injection during runner and reviewer phases preserves queue order and produces no duplicate dispatch, finding, or lifecycle transition.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution -E 'test(/m226_ac02/)' --no-fail-fast exit 0 (4/4 pass)"
     },
     {
       "id": "AC-03",
       "description": "Topology certification proves two-pane no-ship-with-backlog behavior and rejects one-pane full milestones before plan mutation.",
       "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_execution -E 'test(/m226_ac03/)' --no-fail-fast exit 0 (4/4 pass)"
     }
   ],
   "design_decisions": [
@@ -119,7 +127,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-01 completes both milestones without raul.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -139,7 +147,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-02 produces no duplicate durable effects.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -161,7 +169,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
       "done_when": "AC-03 matches M209/M213 topology policy.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -175,7 +183,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
