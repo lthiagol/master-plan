@@ -54,7 +54,7 @@ this file actually uses (entries 23+).
 - Suspected:      M202 cycle 3 added doc comments with over-indented list items. The clippy 1.98 lint caught them. The fix is a 5-line `cargo clippy --fix` change to the doc comment, but no milestone in flight is scoped to touch `mp-model`.
 - Verdict:        **bug** — pre-existing `mp` repo issue, recurring blocker for `make lint` on autopilot milestones that touch `mp`. Should be a quick standalone fix or absorbed into M228 (post-cutover autopilot internal cleanup).
 - One-line:       `doc_overindented_list_items` clippy lint in `crates/mp-model/src/milestone.rs:155-158` (M202 era, commit 6204555) blocks `make lint`; reviewer filed as backlog 3 times.
-- Status:         **bug** — 3 occurrences in this session (M209 F-01, M211 (not filed as out of scope), M212 F-01). Workaround: per-milestone reviewer uses `-p mp --tests --no-deps` instead of `make lint`. No immediate fix; should be picked up by M228 or a one-line `mp-model` PR.
+- Status:         **bug** — 4 occurrences in this session (M209 F-01, M211 (not filed as out of scope, review used --tests no-deps), M212 F-01, M220 F-01). Workaround: per-milestone reviewer uses `-p mp --tests --no-deps` instead of `make lint`; runner evidence captures --tests no-deps clean. The full-workspace clippy still exits 101. No immediate fix; should be picked up by M228 or a one-line `mp-model` PR.
 
 ## Entry 46 — 2026-09-03 — M211 file name is stale (slug mismatch)  <!-- points-at: M228 -->
 
