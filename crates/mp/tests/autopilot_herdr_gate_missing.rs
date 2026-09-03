@@ -79,7 +79,10 @@ fn assert_missing_gate_report(parsed: &Value) {
 fn autopilot_start_refuses_when_herdr_absent_with_install_hint_and_exit_78() {
     let env = TestEnv::new();
     let path = path_without_herdr();
-    let out = env.run_with_env(&[("PATH", &path)], &["autopilot", "start", "--format", "json"]);
+    let out = env.run_with_env(
+        &[("PATH", &path)],
+        &["autopilot", "start", "--format", "json"],
+    );
 
     assert_eq!(
         out.status.code(),
@@ -88,8 +91,12 @@ fn autopilot_start_refuses_when_herdr_absent_with_install_hint_and_exit_78() {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr)
     );
-    let parsed: Value = serde_json::from_slice(&out.stdout)
-        .unwrap_or_else(|e| panic!("stdout was not JSON: {e}; raw: {}", String::from_utf8_lossy(&out.stdout)));
+    let parsed: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout was not JSON: {e}; raw: {}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    });
     assert_missing_gate_report(&parsed);
 }
 
@@ -110,8 +117,12 @@ fn watch_legacy_alias_refuses_when_herdr_absent() {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr)
     );
-    let parsed: Value = serde_json::from_slice(&out.stdout)
-        .unwrap_or_else(|e| panic!("stdout was not JSON: {e}; raw: {}", String::from_utf8_lossy(&out.stdout)));
+    let parsed: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout was not JSON: {e}; raw: {}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    });
     assert_missing_gate_report(&parsed);
 }
 

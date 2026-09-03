@@ -45,9 +45,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::watch::herdr_version::{
-    HerdrCliShape, VersionFloor, REQUIRED_HERDR_VERSION_FLOOR,
-};
+use crate::watch::herdr_version::{HerdrCliShape, VersionFloor, REQUIRED_HERDR_VERSION_FLOOR};
 
 /// Exit code reserved by the agent contract for configuration errors
 /// (sysexits.h `EX_CONFIG`). Distinct from 2 (bulk partial failure /
@@ -108,18 +106,20 @@ pub struct AutopilotGateError {
 /// Run the autopilot hard gate against the supplied herdr binary path.
 /// Returns `Ok(())` when herdr is on PATH AND reports a version
 /// string AND has the expected spawn shape. Returns
-/// [`AutopilotGateError`] otherwise.
+/// [`Box<AutopilotGateError>`] otherwise (boxed so the Result stays
+/// small — clippy `result_large_err` triggers at >128 bytes; the
+/// gate error carries multi-paragraph messages + a flag list).
 ///
 /// Pure over `herdr_bin` — the helper used by tests that want to
 /// inject a fake binary. The [`check_autopilot_herdr_gate_default`]
 /// wrapper resolves `which herdr` for the production call sites.
-pub fn check_autopilot_herdr_gate(herdr_bin: &Path) -> Result<(), AutopilotGateError> {
+pub fn check_autopilot_herdr_gate(herdr_bin: &Path) -> Result<(), Box<AutopilotGateError>> {
     let shape = crate::watch::detect_herdr_cli(herdr_bin);
     if !shape.on_path {
-        return Err(missing_gate_error());
+        return Err(Box::new(missing_gate_error()));
     }
     if !shape.compatible {
-        return Err(incompatible_gate_error(&shape));
+        return Err(Box::new(incompatible_gate_error(&shape)));
     }
     Ok(())
 }
@@ -129,10 +129,10 @@ pub fn check_autopilot_herdr_gate(herdr_bin: &Path) -> Result<(), AutopilotGateE
 /// is not on PATH, returns the [`GateReason::HerdrMissing`] error
 /// directly without probing a binary (saves one fork/exec pair on
 /// the failure path; keeps the missing-binary diagnostic clean).
-pub fn check_autopilot_herdr_gate_default() -> Result<(), AutopilotGateError> {
+pub fn check_autopilot_herdr_gate_default() -> Result<(), Box<AutopilotGateError>> {
     match crate::watch::herdr::which_herdr() {
         Some(bin) => check_autopilot_herdr_gate(&bin),
-        None => Err(missing_gate_error()),
+        None => Err(Box::new(missing_gate_error())),
     }
 }
 
@@ -262,7 +262,10 @@ mod tests {
         let err = incompatible_gate_error(&shape);
         assert_eq!(err.reason, GateReason::HerdrBelowFloor);
         assert_eq!(err.detected_version.as_deref(), Some("0.6.0"));
-        assert_eq!(err.missing_flags, vec!["--kind".to_string(), "--pane".to_string()]);
+        assert_eq!(
+            err.missing_flags,
+            vec!["--kind".to_string(), "--pane".to_string()]
+        );
         assert!(err.message.contains("0.6.0"));
         assert!(err.message.contains("0.7.0"));
         assert!(err.upgrade_hint.contains("0.6.0"));
@@ -290,10 +293,7 @@ mod tests {
 
     #[test]
     fn upgrade_hint_includes_missing_flags_when_shape_drifted() {
-        let hint = build_upgrade_hint(
-            Some("0.6.0"),
-            &["--kind".into(), "--pane".into()],
-        );
+        let hint = build_upgrade_hint(Some("0.6.0"), &["--kind".into(), "--pane".into()]);
         assert!(hint.contains("0.6.0"));
         assert!(hint.contains("0.7.0"));
         assert!(hint.contains("--kind"));

@@ -1,8 +1,8 @@
 //! M218 / S02 / AC-02: semantic-version + required-command-shape
 //! compatibility check for herdr. The gate accepts every version
-//! >= 0.7.0 whose required command shape is present, rejects lower
-//! versions or incompatible shapes with exit 78, and reports the
-//! detected version + upgrade hint.
+//! at or above 0.7.0 whose required command shape is present,
+//! rejects lower versions or incompatible shapes with exit 78, and
+//! reports the detected version + upgrade hint.
 //!
 //! Strategy: build stub `herdr` scripts in a temp bin dir, prepend
 //! the dir to PATH, and exercise `mp autopilot start` against each
@@ -124,12 +124,7 @@ fn refuses_herdr_below_floor_0_6_0() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-herdr-below-floor");
     fs::create_dir_all(&bin_dir).unwrap();
-    install_stub_herdr(
-        &bin_dir,
-        "herdr 0.6.0",
-        "Options:\n  --cwd <PATH>\n",
-        "",
-    );
+    install_stub_herdr(&bin_dir, "herdr 0.6.0", "Options:\n  --cwd <PATH>\n", "");
     let path = prepend_path(&bin_dir);
 
     let out = env.run_with_env(
@@ -154,12 +149,7 @@ fn refuses_herdr_0_6_5_with_upgrade_hint_naming_detected_version() {
     let env = TestEnv::new();
     let bin_dir = env.tmp.path().join("fake-herdr-0-6-5");
     fs::create_dir_all(&bin_dir).unwrap();
-    install_stub_herdr(
-        &bin_dir,
-        "herdr 0.6.5",
-        "Options:\n  --cwd <PATH>\n",
-        "",
-    );
+    install_stub_herdr(&bin_dir, "herdr 0.6.5", "Options:\n  --cwd <PATH>\n", "");
     let path = prepend_path(&bin_dir);
 
     let out = env.run_with_env(
@@ -243,8 +233,13 @@ fn refuses_incompatible_shape_when_version_is_at_or_above_floor() {
     );
     let parsed: Value = serde_json::from_slice(&out.stdout).unwrap();
     let gate = &parsed["autopilot_herdr_gate"];
-    assert_eq!(gate["reason"], Value::String("herdr-incompatible-shape".into()));
-    let missing = gate["missing_flags"].as_array().expect("missing_flags array");
+    assert_eq!(
+        gate["reason"],
+        Value::String("herdr-incompatible-shape".into())
+    );
+    let missing = gate["missing_flags"]
+        .as_array()
+        .expect("missing_flags array");
     let missing_strs: Vec<&str> = missing.iter().filter_map(|v| v.as_str()).collect();
     assert!(
         missing_strs.contains(&"--kind") && missing_strs.contains(&"--pane"),
@@ -301,7 +296,10 @@ fn refuses_when_pane_split_subcommand_missing() {
     assert_eq!(out.status.code(), Some(78));
     let parsed: Value = serde_json::from_slice(&out.stdout).unwrap();
     let gate = &parsed["autopilot_herdr_gate"];
-    assert_eq!(gate["reason"], Value::String("herdr-incompatible-shape".into()));
+    assert_eq!(
+        gate["reason"],
+        Value::String("herdr-incompatible-shape".into())
+    );
     assert!(
         gate["message"]
             .as_str()

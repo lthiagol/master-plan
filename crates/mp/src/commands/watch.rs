@@ -25,6 +25,7 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::json;
 
+use crate::autopilot::{AutopilotGateError, EX_AUTOPILOT_GATE};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
 use crate::config::ProjectConfig;
@@ -32,7 +33,6 @@ use crate::milestone::load_milestone_by_id;
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::store;
-use crate::autopilot::{AutopilotGateError, EX_AUTOPILOT_GATE};
 use crate::watch::{
     build_pane_split_args, build_start_args, check_preconditions, default_log_path,
     harness_extra_flags, next_stage, pane_label_for, resolve_harness_kind, run_milestones,

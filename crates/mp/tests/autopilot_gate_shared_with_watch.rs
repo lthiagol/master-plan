@@ -111,8 +111,7 @@ fn both_commands_refuse_identically_when_herdr_is_absent() {
     let a: Value = serde_json::from_slice(&autopilot.stdout).unwrap();
     let w: Value = serde_json::from_slice(&watch.stdout).unwrap();
     assert_eq!(
-        a["autopilot_herdr_gate"]["reason"],
-        w["autopilot_herdr_gate"]["reason"],
+        a["autopilot_herdr_gate"]["reason"], w["autopilot_herdr_gate"]["reason"],
         "reason must match between commands"
     );
     assert_eq!(
@@ -124,8 +123,7 @@ fn both_commands_refuse_identically_when_herdr_is_absent() {
         w["autopilot_herdr_gate"]["required_version"]
     );
     assert_eq!(
-        a["autopilot_herdr_gate"]["install_hint"],
-        w["autopilot_herdr_gate"]["install_hint"],
+        a["autopilot_herdr_gate"]["install_hint"], w["autopilot_herdr_gate"]["install_hint"],
         "install hint must be identical across commands"
     );
     assert_eq!(
@@ -146,10 +144,7 @@ fn both_commands_refuse_identically_when_herdr_below_floor() {
         &[("PATH", &path)],
         &["autopilot", "start", "--format", "json"],
     );
-    let watch = env.run_with_env(
-        &[("PATH", &path)],
-        &["watch", "--format", "json"],
-    );
+    let watch = env.run_with_env(&[("PATH", &path)], &["watch", "--format", "json"]);
 
     assert_eq!(autopilot.status.code(), Some(78));
     assert_eq!(watch.status.code(), Some(78));
@@ -205,8 +200,16 @@ fn both_commands_pass_gate_when_herdr_is_compatible() {
     );
 
     // Both should NOT be the gate exit code (78).
-    assert_ne!(autopilot.status.code(), Some(78), "autopilot must not gate on compatible herdr");
-    assert_ne!(watch.status.code(), Some(78), "watch must not gate on compatible herdr");
+    assert_ne!(
+        autopilot.status.code(),
+        Some(78),
+        "autopilot must not gate on compatible herdr"
+    );
+    assert_ne!(
+        watch.status.code(),
+        Some(78),
+        "watch must not gate on compatible herdr"
+    );
 
     // Neither stdout should carry the gate envelope.
     let a: Value = serde_json::from_slice(&autopilot.stdout).unwrap();
