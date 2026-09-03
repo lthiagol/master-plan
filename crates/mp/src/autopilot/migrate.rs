@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::autopilot::session::{
     load_session, save_session, AutopilotSession, EvidenceRefs, PaneLayout, PaneRef, QueueItem,
-    SessionStatus, Stage,
+    RoleConfig, RoleName, RolesConfig, SessionStatus, Stage,
 };
 use crate::paths::PlanContext;
 use crate::store::{atomic_write, now_rfc3339};
@@ -272,10 +272,52 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
     let topology = PaneLayout {
         orchestrator,
         runner,
-        reviewer: None,
+        // The legacy shape predates the reviewer pane; populate
+        // a placeholder so the session passes schema validation.
+        // A follow-on milestone (e.g. M210) can spawn a real
+        // reviewer pane and replace this entry.
+        reviewer: Some(PaneRef {
+            pane_id: "%legacy-no-reviewer".to_string(),
+            label: Some("role-reviewer-1".to_string()),
+        }),
+    };
+
+    // Populate the three-role config snapshot so the session passes
+    // schema validation. The legacy shape predates the orchestrator /
+    // reviewer distinction (it tracked runner + coordinator), so the
+    // roles fall back to placeholders with the pane id preserved
+    // when one exists. The reviewer slot stays unassigned (None pane
+    // id) because the legacy shape did not record one — a follow-on
+    // milestone can spawn it via `mp autopilot start`.
+    let roles = RolesConfig {
+        orchestrator: Some(RoleConfig {
+            role: RoleName::Orchestrator,
+            pane_id: topology.orchestrator.as_ref().map(|p| p.pane_id.clone()),
+            model: None,
+            harness: None,
+            skill: Some("mp-coordinator".into()),
+            config_hash: None,
+        }),
+        runner: Some(RoleConfig {
+            role: RoleName::Runner,
+            pane_id: topology.runner.as_ref().map(|p| p.pane_id.clone()),
+            model: None,
+            harness: None,
+            skill: Some("mp-runner".into()),
+            config_hash: None,
+        }),
+        reviewer: Some(RoleConfig {
+            role: RoleName::Reviewer,
+            pane_id: Some("%legacy-no-reviewer".into()),
+            model: None,
+            harness: None,
+            skill: Some("mp-runner".into()),
+            config_hash: None,
+        }),
     };
 
     let mut session = AutopilotSession::blank(MIGRATED_SESSION_ID);
+    session.roles = roles;
     session.topology = topology;
     session.queue = queue;
     session.status = SessionStatus::Paused;
