@@ -7,6 +7,12 @@
 #   - \bL\d{1,3}\b   internal lesson codes (provenance, not capability)
 #   - docs/code-review-lessons.md  archived; references are dead
 #   - docs/dogfood/…              archived; references are dead
+#   - \bWatch\b     (M220) canonical user-facing Watch terminology.
+#                   The `mp watch` CLI alias and the literal raul lane
+#                   label "Watch lane" are allowlisted; literal config
+#                   keys (`ui.show_watch_tab`, JSON field names like
+#                   `watch_readiness`) and imperative-verb English uses
+#                   are also allowlisted via line+anchor entries.
 #
 # Repository-internal skills (templates/skills/mp-code-review/) are excluded:
 # the spec marks them as master-plan-repo-only and exempts them from the
@@ -33,6 +39,7 @@ PATTERNS=(
     "lesson-code|\\bL\\d{1,3}\\b"
     "dead-code-review-lessons|docs/code-review-lessons\\.md"
     "dead-dogfood|docs/dogfood"
+    "stale-watch|\\bWatch\\b"
 )
 
 # Paths scanned. Repo-relative (the script cd's to the repo root above).
@@ -61,6 +68,20 @@ ALLOWLIST=(
     "dead-code-review-lessons:docs/skills/README.md:154:read \`docs/code-review-lessons.md\`:the 'Authoring rules' section uses the dead-link path inside a backticked negative example to teach the rule"
     "dead-code-review-lessons:docs/skills/README.md:191:paths \`docs/code-review-lessons.md\`:the 'Preventing recurrence' section names the dead-link patterns this guard detects"
     "dead-dogfood:docs/skills/README.md:191:docs/dogfood:the 'Preventing recurrence' section names the dead-link patterns this guard detects"
+    # M220: literal raul lane label "Watch lane" is still rendered in the UI
+    # (see `crates/raul/src/lanes.rs::LANE_WATCH = "Watch"`); allowlist the
+    # consumer-surface references so the lane label is consistent end-to-end.
+    'stale-watch:docs/raul/keybinds.md:42:**Watch lane**:literal raul lane label; the surrounding text contrasts it with `w`/`W` auto-refresh toggle on the Overview lane'
+    'stale-watch:docs/raul/keybinds.md:44:[Watch lane](#watch-lane):anchor link target — same literal lane label as line 42'
+    'stale-watch:docs/raul/keybinds.md:62:## Watch lane:section header for the literal raul lane — first occurrence in this file'
+    'stale-watch:docs/raul/keybinds.md:64:**Watch** lane (lane 6):the first bold **Watch** is the lane label; the (lane 6) qualifier pins the lane ordinal'
+    'stale-watch:docs/raul/README.md:44:| **Watch** |:lane label cell in the lane-overview table; the column header is the literal raul lane name'
+    'stale-watch:docs/raul/README.md:67:- **Watch lane.**:bulleted lane description; preserves the literal lane label end-to-end with keybinds.md'
+    # M220: imperative-verb English uses ("watch it go red") in
+    # diagnosing-bugs are method instructions, not system terminology.
+    'stale-watch:templates/skills/diagnosing-bugs/SKILL.md:69:Watch it go red:imperative-verb English describing what to observe during the bug-loop; not the autopilot/watch system'
+    'stale-watch:templates/skills/diagnosing-bugs/SKILL.md:124:Watch it fail:imperative-verb English in step 2 of the loop; not the autopilot/watch system'
+    'stale-watch:templates/skills/diagnosing-bugs/SKILL.md:126:Watch it pass:imperative-verb English in step 4 of the loop; not the autopilot/watch system'
 )
 
 # Portable: BSD `mktemp -d` requires a template; GNU accepts `-d` alone.
@@ -140,6 +161,11 @@ DEAD
     cat >"$fixture_dir/docs/example/dogfood.md" <<'DOG'
 See `docs/dogfood/M99-audit.md`.
 DOG
+    cat >"$fixture_dir/docs/example/stalewatch.md" <<'STALEWATCH'
+# Stale Watch terminology leak
+The Watch workflow is the right pattern here.
+Watch the live output.
+STALEWATCH
 
     # Inline the lint core against the fixture, with empty allowlist. We
     # avoid spawning another shell so the function-local variables stay in
@@ -171,7 +197,7 @@ DOG
         count="${v#*:}"
         total=$((total + count))
         case "$label" in
-            milestone-id|lesson-code|dead-code-review-lessons|dead-dogfood)
+            milestone-id|lesson-code|dead-code-review-lessons|dead-dogfood|stale-watch)
                 if [ "$count" -lt 1 ]; then
                     echo "self-test FAIL: pattern '$label' should catch >=1 violation, caught $count" >&2
                     return 3
@@ -184,8 +210,8 @@ DOG
         esac
     done
 
-    if [ "$total" -lt 4 ]; then
-        echo "self-test FAIL: expected >=4 violations across the fixture, got $total" >&2
+    if [ "$total" -lt 5 ]; then
+        echo "self-test FAIL: expected >=5 violations across the fixture, got $total" >&2
         return 3
     fi
 
