@@ -67,8 +67,8 @@ pub mod list;
 pub mod migrate;
 pub mod notes;
 pub mod prompts;
-pub mod recovery;
 pub mod reconcile;
+pub mod recovery;
 pub mod review_env;
 pub mod role;
 pub mod schema;
@@ -112,16 +112,16 @@ pub use migrate::{
     MIGRATED_SESSION_ID,
 };
 pub use notes::{build_note, derive_cycle, NoteError, NoteKind, RunnerNote};
-pub use recovery::{
-    append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
-    RecoveredSession,
-};
 pub use reconcile::{
     classify_pane_loss, cross_check_canonical, last_durable_seq, recover_event_tail,
     was_already_applied, CanonicalAcKey, CanonicalAcState, CanonicalLifecycleState,
     CanonicalReviewKey, CanonicalReviewState, CanonicalSnapshot, CrossCheckReport,
     DimensionVerdict, IdempotencyKey, PaneLossInput, PaneLossOutcome, PaneLossReason, TailRecovery,
     TailRejectReason,
+};
+pub use recovery::{
+    append_event_unchecked, reconcile_event_cursor, recover_session, recover_session_at,
+    RecoveredSession,
 };
 pub use review_env::{
     build_provenance, clean_room_commands, gate, provenance_issues, select_mode, ActorIdentity,

@@ -101,10 +101,14 @@ impl IdempotencyKey {
             IdempotencyKey::Lifecycle {
                 milestone_id,
                 target,
-            } => session.events.iter().filter(|e| e.kind == EventKind::Transition).any(|e| {
-                payload_string(e, "milestone_id").as_deref() == Some(milestone_id.as_str())
-                    && payload_string(e, "target").as_deref() == Some(target.as_str())
-            }),
+            } => session
+                .events
+                .iter()
+                .filter(|e| e.kind == EventKind::Transition)
+                .any(|e| {
+                    payload_string(e, "milestone_id").as_deref() == Some(milestone_id.as_str())
+                        && payload_string(e, "target").as_deref() == Some(target.as_str())
+                }),
         }
     }
 }
@@ -195,10 +199,7 @@ pub enum PaneLossOutcome {
 pub enum PaneLossReason {
     /// Role is no longer in the topology config. Re-spawning would
     /// silently undo the operator's topology change.
-    RoleRemovedFromTopology {
-        role: String,
-        topology_had: String,
-    },
+    RoleRemovedFromTopology { role: String, topology_had: String },
     /// A live pane is reported but the topology says the role is
     /// missing. The on-disk state and the live state disagree in a
     /// way the resume path cannot reconcile without a human.
@@ -656,8 +657,14 @@ impl CrossCheckReport {
     pub fn session_is_safe(&self) -> bool {
         !self.canonical_wins_anywhere
             && !self.working_on_stale
-            && self.ac.values().all(|v| matches!(v, DimensionVerdict::InSync { .. }))
-            && self.reviews.values().all(|v| matches!(v, DimensionVerdict::InSync { .. }))
+            && self
+                .ac
+                .values()
+                .all(|v| matches!(v, DimensionVerdict::InSync { .. }))
+            && self
+                .reviews
+                .values()
+                .all(|v| matches!(v, DimensionVerdict::InSync { .. }))
             && self
                 .lifecycles
                 .values()
@@ -689,13 +696,17 @@ pub fn cross_check_canonical(
             let key = CanonicalAcKey::new(milestone_id.clone(), ac_id.clone());
             let key_str = format!("{milestone_id}/{ac_id}");
             let verdict = match snapshot.ac_revisions.get(&key) {
-                Some(canonical) => compare_revisions(
-                    &projection.source_revision,
-                    &canonical.source_revision,
-                ),
+                Some(canonical) => {
+                    compare_revisions(&projection.source_revision, &canonical.source_revision)
+                }
                 None => DimensionVerdict::UnknownToCanonical,
             };
-            record_dimension(&mut report.canonical_wins_anywhere, &mut report.ac, key_str, verdict);
+            record_dimension(
+                &mut report.canonical_wins_anywhere,
+                &mut report.ac,
+                key_str,
+                verdict,
+            );
         }
     }
 
@@ -799,9 +810,7 @@ struct SessionLifecycleView {
     last_state_change_at: String,
 }
 
-fn walk_session_lifecycles(
-    session: &AutopilotSession,
-) -> BTreeMap<String, SessionLifecycleView> {
+fn walk_session_lifecycles(session: &AutopilotSession) -> BTreeMap<String, SessionLifecycleView> {
     let mut out = BTreeMap::new();
     if let Some(working) = &session.working_on {
         let last_state_change_at = session
@@ -910,10 +919,15 @@ mod tests {
             pane_label: "role-runner-1".into(),
         };
         assert!(!was_already_applied(&session, &key));
-        let event = OrchestrationEvent::new(1, EventKind::AssignmentDispatched, "test", json!({
-            "pane_label": "role-runner-1",
-            "milestone_id": "225",
-        }));
+        let event = OrchestrationEvent::new(
+            1,
+            EventKind::AssignmentDispatched,
+            "test",
+            json!({
+                "pane_label": "role-runner-1",
+                "milestone_id": "225",
+            }),
+        );
         session.events.push(event);
         session.event_cursor.last_seq = 1;
         assert!(was_already_applied(&session, &key));
@@ -927,10 +941,15 @@ mod tests {
             target: "executed".into(),
         };
         assert!(!was_already_applied(&session, &key));
-        let event = OrchestrationEvent::new(1, EventKind::Transition, "test", json!({
-            "milestone_id": "225",
-            "target": "executed",
-        }));
+        let event = OrchestrationEvent::new(
+            1,
+            EventKind::Transition,
+            "test",
+            json!({
+                "milestone_id": "225",
+                "target": "executed",
+            }),
+        );
         session.events.push(event);
         session.event_cursor.last_seq = 1;
         assert!(was_already_applied(&session, &key));
@@ -1048,7 +1067,11 @@ mod tests {
             }
             other => panic!("expected Recovered, got {other:?}"),
         }
-        assert_eq!(session.events.len(), prior_len, "events must not be truncated");
+        assert_eq!(
+            session.events.len(),
+            prior_len,
+            "events must not be truncated"
+        );
         assert_eq!(session.events.iter().map(|e| e.seq).max(), Some(3));
     }
 
@@ -1068,7 +1091,10 @@ mod tests {
             other => panic!("expected SchemaTooNew rejection, got {other:?}"),
         }
         // No mutation: cursor and events unchanged.
-        assert_eq!(session.event_cursor.last_seq, sample_session().event_cursor.last_seq);
+        assert_eq!(
+            session.event_cursor.last_seq,
+            sample_session().event_cursor.last_seq
+        );
     }
 
     #[test]
@@ -1111,11 +1137,14 @@ mod tests {
                 canonical_at: "2026-09-03T00:00:00Z".into(),
             },
         );
-        let report = cross_check_canonical(&mut session, &snapshot);
+        let report = cross_check_canonical(&session, &snapshot);
         assert!(report.canonical_wins_anywhere);
         assert!(!report.session_is_safe());
         let ac_verdict = report.ac.get("207/AC-01").expect("ac verdict present");
-        assert!(matches!(ac_verdict, DimensionVerdict::CanonicalNewer { .. }));
+        assert!(matches!(
+            ac_verdict,
+            DimensionVerdict::CanonicalNewer { .. }
+        ));
     }
 
     #[test]
@@ -1211,7 +1240,10 @@ mod tests {
         //    the no-mutation path.)
         let current = binary_with_schema(session.schema_version);
         let result = recover_event_tail(&mut session, &current);
-        assert!(matches!(result, TailRecovery::Recovered { last_seq: 1, .. }));
+        assert!(matches!(
+            result,
+            TailRecovery::Recovered { last_seq: 1, .. }
+        ));
 
         // 4. Cross-check the canonical snapshot. Empty snapshot
         //    means every AC is `UnknownToCanonical` — the resume

@@ -28,13 +28,12 @@
 mod common;
 
 use common::TestEnv;
+use mp::autopilot::events::{EventKind, OrchestrationEvent};
 use mp::autopilot::reconcile::{
     classify_pane_loss, cross_check_canonical, last_durable_seq, recover_event_tail,
-    was_already_applied, CanonicalAcKey, CanonicalAcState, CanonicalSnapshot,
-    CrossCheckReport, DimensionVerdict, IdempotencyKey, PaneLossInput, PaneLossOutcome,
-    PaneLossReason, TailRecovery,
+    was_already_applied, CanonicalAcKey, CanonicalAcState, CanonicalSnapshot, CrossCheckReport,
+    DimensionVerdict, IdempotencyKey, PaneLossInput, PaneLossOutcome, PaneLossReason, TailRecovery,
 };
-use mp::autopilot::events::{EventKind, OrchestrationEvent};
 use mp::autopilot::session::AutopilotSession;
 use mp::autopilot::spawn::MpBinaryProvenance;
 use mp::autopilot::RoleName;
@@ -480,7 +479,10 @@ fn m225_ac03_tail_recovery_preserves_events_and_rejects_incompatible_binary() {
             prior_event_count: n,
         } => {
             assert_eq!(last_seq, 3, "AC-03: cursor must bump to max surviving seq");
-            assert_eq!(n, prior_event_count, "AC-03: prior_event_count is reported, not truncated");
+            assert_eq!(
+                n, prior_event_count,
+                "AC-03: prior_event_count is reported, not truncated"
+            );
         }
         other => panic!("AC-03: clean tail must be Recovered, got {other:?}"),
     }
