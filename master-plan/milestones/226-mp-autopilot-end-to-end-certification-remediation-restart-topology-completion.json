@@ -3,9 +3,9 @@
     "id": "226",
     "title": "mp autopilot end-to-end certification — remediation, restart, topology, completion",
     "slug": "mp-autopilot-end-to-end-certification-remediation-restart-topology-completion",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -32,8 +32,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-03T22:50:47.375253+00:00",
+    "lifecycle_at": "2026-09-03T23:12:04.426676+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -45,7 +44,7 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T22:41:17.203878+00:00"
+        "at": "2026-09-03T23:12:09.710364+00:00"
       },
       "external-review": {
         "status": "done",
@@ -55,13 +54,17 @@
         "status": "done",
         "at": "2026-09-03T14:13:31.213229+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T23:12:04.426678+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-03T22:50:47.375254+00:00"
+        "status": "done",
+        "at": "2026-09-03T23:12:04.426678+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T22:41:17.203878+00:00"
+        "at": "2026-09-03T23:12:09.710364+00:00"
       },
       "specify": {
         "status": "done",
@@ -202,33 +205,33 @@
       "severity": "high",
       "category": "production-wiring",
       "description": "AC-02 runner restart dedup test (m226_ac02_runner_restart_dedup_via_fake_herdr at crates/mp/tests/watch_execution.rs:2244) calls dispatch_assignment() directly to certify the 'no duplicate dispatch' contract. dispatch_assignment has NO production caller — production spawn goes through cmd_watch_drive -> SystemDriveOps::ensure_pane / send_prompt_to -> RealHerdrSpawnOps::start_agent (crates/mp/src/autopilot/spawn.rs:418) and never consults was_already_applied. The M225 F-01 fix added was_already_applied INSIDE dispatch_assignment, but dispatch_assignment itself is dead code in production. The certification test passes because it exercises the library API surface, not the production hot path. The M225 reviewer's cycle-2 verdict accepted the wiring claim without verifying a production caller exists for dispatch_assignment. A 'runner restart with a stored AssignmentDispatched event' would NOT short-circuit in production — it would fall through to RealHerdrSpawnOps::start_agent. Fix path: wire dispatch_assignment (or an equivalent typed dispatch that calls was_already_applied) into SystemDriveOps::send_prompt_to so the production spawn path consults the session event log before spawning.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "8560545",
       "created": "2026-09-03",
-      "resolved": ""
+      "resolved": "2026-09-03"
     },
     {
       "id": "F-02",
       "severity": "high",
       "category": "production-wiring",
       "description": "AC-01 remediation flow tests (4 tests: m226_ac01_cycle1_finding_blocks_complete_and_is_remediable, m226_ac01_cycle2_fixed_in_resolution_reaches_complete, m226_ac01_second_milestone_completes_clean, m226_ac01_two_milestone_queue_both_complete_independently) and AC-03 completion test (m226_ac03_three_pane_drive_to_complete_preserves_evidence) all call LifecycleClosure::execute directly. LifecycleClosure has NO production caller — production milestone completion goes through complete_milestone (crates/mp/src/milestone/complete.rs:285) which mutates the milestone file via with_milestone_mut_unlocked and never invokes LifecycleClosure. Audit confirms LifecycleClosure::execute appears in src/ only inside crates/mp/src/autopilot/lifecycle.rs (its own unit tests); every other use is in crates/mp/tests/. The M226 AC-01 description claims 'A three-pane fixture drives two queued milestones through step/AC evidence, independent review, one remediation cycle, finding fixed_in resolution, reviews pass, and lifecycle complete without raul' — but the tested fixture exercises the in-process closure API, not the production milestone completion path. If the runner uses the production mp milestone complete command today, the closure ceremony (idempotency_key matching, journal replay on resume, refuse-out-of-order) is NOT enforced — it lives only in the untested library API. Fix path: wire LifecycleClosure::execute into complete_milestone (or replace complete_milestone with a driver that delegates to LifecycleClosure), THEN re-certify.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "723cdf5",
       "created": "2026-09-03",
-      "resolved": ""
+      "resolved": "2026-09-03"
     },
     {
       "id": "F-03",
       "severity": "high",
       "category": "production-wiring",
       "description": "AC-03 topology tests (m226_ac03_two_pane_policy_is_no_ship_with_backlog, m226_ac03_one_pane_full_milestone_rejected_without_recorded_bypass, m226_ac03_three_pane_full_milestone_accepted_under_full_matrix) call topology_policy() and topology_preflight() / start_cycle() directly. These have NO production caller — cmd_watch_drive (crates/mp/src/commands/watch.rs:231) does not consult the topology preflight; start_cycle is only called from cycle.rs unit tests. A 1-pane full milestone would NOT be rejected at plan-mutation time in production — the M209 topology gate is dead code in the production hot path. The M226 AC-03 description claims 'Topology certification proves ... rejects one-pane full milestones before plan mutation' but the tested function is library-only and not on the production startup path. Audit: topology_preflight / start_cycle appear in crates/mp/src/ only inside crates/mp/src/autopilot/role.rs and crates/mp/src/autopilot/cycle.rs; commands/watch.rs and commands/autopilot.rs do not import them. The 1-pane full-milestone rejection contract is unenforced in production. Fix path: call topology_preflight at the top of cmd_watch_drive (after preconditions and before startup_recovery) so a 1-pane full milestone returns the typed TopologyPreflightError before any plan mutation, THEN re-certify.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "440d935",
       "created": "2026-09-03",
-      "resolved": ""
+      "resolved": "2026-09-03"
     }
   ]
 }
