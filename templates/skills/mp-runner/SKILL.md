@@ -146,6 +146,37 @@ If `commit_after_execute` is `true` and the commit hook fails, file a
 self-finding and continue — the milestone can still complete, and the
 operator handles the commit manually.
 
+## What you CANNOT do
+
+Same-session self-review is unreliable, and the runner who wrote the code
+is never the reviewer of record. The runner may file **self-findings** via
+`mp reviews finding add --phase self`, but the four **review-verdict**
+commands below belong to the **reviewer** role (or an independent
+operator running `mp reviews pass`). The runner MUST NOT invoke them —
+same-session self-clear defeats the level-5 audit trail.
+
+- **`mp reviews claim`** — review claim belongs to the reviewer.
+- **`mp reviews finding add`** with `--phase external` — external findings
+  belong to the reviewer; the runner only files `--phase self`.
+- **`mp reviews pass`** — verdict-write belongs to the reviewer. The
+  runner may read the verdict (`mp reviews show <id>`) but never emit one.
+- **`mp reviews finding resolve`** — finding resolution is a reviewer-side
+  audit action. The runner may mark a self-finding closed via
+  `mp reviews finding resolve --phase self` (if the runner's project
+  policy allows self-resolution), but external findings stay open until
+  the reviewer closes them.
+
+The runner also MUST NOT:
+
+- Invoke `mp autopilot start` — start belongs to the orchestrator (the
+  runner is a role spawned by the orchestrator's session, not the one
+  that creates it).
+- Write autopilot config (`mp autopilot config set …`) — that is the
+  orchestrator's policy surface.
+- Invoke reviewer-only role bindings (`mp autopilot config
+  autopilot.roles.reviewer`) — reviewer config is project policy and
+  the runner only consults it.
+
 ## See also
 
 - `mp-flow` — canonical 12-stage timeline, stage-binding, and the four-point

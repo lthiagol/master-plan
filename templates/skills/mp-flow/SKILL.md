@@ -59,6 +59,30 @@ The coordinator owns stages 1, 2, 3, 4, 8, 10, 11, 12. The runner owns
 stages 5, 6, 7, 9. Stages 8 → 9 → 10 form a review loop (see
 `stages.toml`).
 
+### Autopilot role triad
+
+For autopilot sessions, the canonical role set is a triad —
+**orchestrator** (cycle decisions + state writes), **runner** (claim →
+execute → complete), and **reviewer** (independent verification + verdict
+writes). The orchestrator replaces the legacy `coordinator` role for the
+autopilot lane; the reviewer is a new role that did not exist in the
+original `mp watch` two-pane design. The stage-binding table above is the
+canonical view; the autopilot triad's stage ownership is:
+
+| Stage | Name | Autopilot owner |
+|-------|------|-----------------|
+| 5 | Claim & execute | runner (orchestrator decides *when*) |
+| 8 | External review | reviewer (orchestrator observes the verdict) |
+| 9 | Remediate | runner (orchestrator forwards reviewer findings) |
+| 10 | Re-review | reviewer |
+| 11 | Document | orchestrator |
+| 12 | Hand off | orchestrator |
+
+The autopilot consumer-facing skills `mp-orchestrator` and `mp-reviewer`
+(catalog skills; opt-in via `--skills=mp-orchestrator,mp-reviewer`) carry
+the role-specific allow/deny lists; `mp-runner` is shared between the
+autopilot and the legacy `mp watch` lanes.
+
 ### Coordinator → runner hand-offs
 
 Four session-boundary crossings follow the author-not-only-reviewer discipline (see Hand-off

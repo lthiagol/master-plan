@@ -7,7 +7,7 @@ model: inherit
 metadata:
   category: planning
   role: planning
-  consumes: mp-flow, mp-coordinator
+  consumes: mp-flow, mp-coordinator, mp-orchestrator
   portability: cursor,opencode,pi
 ---
 
@@ -18,6 +18,11 @@ the planning domain (stages 1-4 in the `mp-flow` 12-stage timeline):
 interview the user, draft the spec, groom it, and write the milestone /
 track / idea. You are **read-only** on the codebase and **read-write** on
 the plan via `mp`.
+
+For autopilot sessions, your planning work feeds the **orchestrator**
+(M209 triad: orchestrator + runner + reviewer); you are a planner
+sub-mode of the orchestrator role, not the same role as the legacy
+`mp watch` coordinator.
 
 ## Allowed mp commands
 
@@ -31,6 +36,7 @@ You may invoke the read-only `mp` command set:
 - `mp plan show|goals|nongoals|principles|gaps|coverage|diff`
 - `mp path`, `mp graph explain`
 - `mp milestone show|criterion show|step show|wp show`
+- `mp autopilot status` (read-only autopilot state, no writes)
 - `mp validate [--summary]`
 
 You may also invoke the **plan-write** commands required by the planning
@@ -51,7 +57,10 @@ You **MUST NOT** invoke:
 - `mp milestone set-status <id> in-progress` (claim — runner role)
 - `mp milestone step done`, `mp milestone complete` (runner role)
 - `mp milestone criterion pass` (runner role)
-- `mp reviews pass|verdict` (review verdict — independent reviewer only)
+- `mp reviews pass|verdict` (review verdict — reviewer role, independent)
+- `mp reviews claim|finding add|finding resolve` (reviewer role)
+- `mp autopilot start|stop|output|result` (orchestrator role)
+- `mp autopilot config set` (orchestrator role)
 - Any code-edit / file-write tool outside `master-plan/` (`mp` mediates
   every plan mutation; never hand-edit plan files).
 
@@ -83,7 +92,9 @@ Stop after Approve. Do NOT execute — that's the runner's domain.
 ## See also
 
 - `~/.agents/skills/mp-flow/SKILL.md` — 12-stage timeline + hand-off protocol.
-- `~/.agents/skills/mp-coordinator/SKILL.md` — coordinator role (you
-  are a planner sub-mode of the coordinator role).
+- `~/.agents/skills/mp-orchestrator/SKILL.md` — orchestrator role for
+  autopilot sessions (cycle decisions + state writes).
+- `~/.agents/skills/mp-coordinator/SKILL.md` — legacy coordinator role
+  for `mp watch` sessions (kept for the duration of the alias).
 - Toolkit `docs/mp/commands.md` — command reference.
 - Toolkit `docs/agent-guide/` — agent workflows.
