@@ -3,9 +3,9 @@
     "id": "207",
     "title": "mp autopilot session.json schema — durable per-session state for autopilot drives",
     "slug": "mp-autopilot-session-json-schema-durable-per-session-state-for-autopilot-drives",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,8 +23,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-03T15:33:22.656461+00:00",
+    "lifecycle_at": "2026-09-03T15:37:31.191206+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -36,7 +35,7 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T15:28:51.080720+00:00"
+        "at": "2026-09-03T15:37:38.525898+00:00"
       },
       "external-review": {
         "status": "done",
@@ -46,13 +45,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:28.873605+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T15:37:31.191207+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-03T15:33:22.656462+00:00"
+        "status": "done",
+        "at": "2026-09-03T15:37:31.191207+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T15:28:51.080720+00:00"
+        "at": "2026-09-03T15:37:38.525898+00:00"
       },
       "specify": {
         "status": "done",
@@ -346,11 +349,11 @@
       "severity": "medium",
       "category": "drift",
       "description": "After 'make clean' + cold rebuild, `cargo fmt --all -- --check` reports formatting drift in three files modified by M207 commits: `crates/mp/src/autopilot/list.rs` (import order at line 67), `crates/mp/tests/autopilot_session_roundtrip.rs` (multi-line use formatting at line 6), and `crates/mp/tests/autopilot_session_schema.rs` (lines 39, 92, 205, 228). The runner's self-review fix commit `652ffcf` claims `fmt, clippy clean, consumer-surface guard` but the current tree does not pass `make lint`'s `cargo fmt --check` step. All 100 tests across the 8 autopilot test targets pass, so this is a lint-hygiene drift, not a correctness blocker. Suggested fix: `cargo fmt --all` from repo root; verify with `cargo fmt --all -- --check`. Evidence (verbatim):```$ cargo fmt --all -- --check | grep '^Diff'`````Diff in /Users/thiago/Github/master-plan/crates/mp/src/autopilot/list.rs:67`````Diff in /Users/thiago/Github/master-plan/crates/mp/tests/autopilot_session_roundtrip.rs:6`````Diff in /Users/thiago/Github/master-plan/crates/mp/tests/autopilot_session_schema.rs:39`````Diff in /Users/thiago/Github/master-plan/crates/mp/tests/autopilot_session_schema.rs:92`````Diff in /Users/thiago/Github/master-plan/crates/mp/tests/autopilot_session_schema.rs:205`````Diff in /Users/thiago/Github/master-plan/crates/mp/tests/autopilot_session_schema.rs:228````Summary exit code: 1 (rustfmt reports diffs).",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-207",
-      "fixed_in": "",
+      "fixed_in": "5d5f5b0",
       "created": "2026-09-03",
-      "resolved": "",
+      "resolved": "2026-09-03",
       "summary": "cargo fmt --check fails on 3 M207 files"
     },
     {
@@ -358,11 +361,11 @@
       "severity": "low",
       "category": "spec-gap",
       "description": "Each of M207's 8 acceptance_criteria carries the identical placeholder `verification` value `cargo nextest run -p mp --test watch_state_file --no-fail-fast`. This is a stale field — the spec-tightening commit `09412e2` (which typed verifications) updated the per-step `tests` field to the correct autopilot-specific targets (`autopilot_session_schema`, `autopilot_session_roundtrip`, …) but the AC-level `verification` field was not propagated. The runner correctly used the step-level `tests` commands when stamping evidence (per-AC evidence is well-formed and matches what I re-ran on a cold build: 20/20, 7/7, 11/11, 13/13, 11/11, 12/12, 11/11, 15/15). The placeholder is misleading for future reviewers/agents who read the AC rather than the step. Suggested fix: per-AC `verification` should mirror the step-level `tests` command, or the AC `verification` field should be dropped if step-level `tests` is canonical. Evidence:```$ mp show milestone 207 --fields 'acceptance_criteria[].verification'```all 8 entries are identical and reference `--test watch_state_file`.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-207",
-      "fixed_in": "",
+      "fixed_in": "f6cab1a",
       "created": "2026-09-03",
-      "resolved": "",
+      "resolved": "2026-09-03",
       "summary": "All 8 ACs share a placeholder verification command"
     }
   ]
