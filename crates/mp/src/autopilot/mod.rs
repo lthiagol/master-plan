@@ -23,6 +23,12 @@
 //!   enum + pane-slot mapping function. The session struct holds a
 //!   [`session::PaneLayout`] (the per-role pane assignments) which
 //!   is a derived view over [`Topology`] + a pane-id map.
+//! - [`task_assign`] — M211's typed task-assignment renderer for
+//!   orchestrator-to-runner and orchestrator-to-reviewer dispatch.
+//!   Produces a deterministic herdr argv, validates the payload
+//!   against the session's pane layout before any spawn, and
+//!   appends an `AssignmentDispatched` event after the spawn
+//!   outcome is known.
 //!
 //! The on-disk shape is validated against
 //! `schemas/autopilot-session.schema.json`; that file is the source of
@@ -45,6 +51,7 @@ pub mod recovery;
 pub mod role;
 pub mod schema;
 pub mod session;
+pub mod task_assign;
 pub mod transitions;
 
 pub use ac_projection::{
@@ -75,6 +82,11 @@ pub use session::{
     PaneLayout, PaneRef, QueueItem, RoleConfig, RoleName, RoleStateEnvelope, RolesConfig,
     SchemaMigration, SessionConfigOverrides, SessionLoadError, SessionPath, SessionStatus, Stage,
     WorkingOn, SESSION_SCHEMA_VERSION,
+};
+pub use task_assign::{
+    build_assignment_argv, dispatch_assignment, execute_assignment, parse_assignment,
+    render_task_text, validate_assignment, AssignmentOutcome, RoleDirection, TaskAssignment,
+    TaskAssignmentValidationError,
 };
 pub use transitions::{
     is_valid as is_valid_transition, transition as apply_transition, RoleState, RoleStateRecord,

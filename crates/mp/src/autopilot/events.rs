@@ -29,6 +29,12 @@ pub enum EventKind {
     Control,
     Note,
     Recovery,
+    /// M211: a typed task assignment dispatched through herdr argv.
+    /// Appended only by [`crate::autopilot::task_assign`] after the
+    /// herdr spawn outcome is known — a prose-only or empty
+    /// assignment cannot reach this event (it is rejected upstream
+    /// with [`crate::autopilot::task_assign::TaskAssignmentShapeViolation`]).
+    AssignmentDispatched,
 }
 
 impl EventKind {
@@ -42,6 +48,7 @@ impl EventKind {
             EventKind::Control => "control",
             EventKind::Note => "note",
             EventKind::Recovery => "recovery",
+            EventKind::AssignmentDispatched => "assignment_dispatched",
         }
     }
 }
@@ -212,6 +219,7 @@ mod tests {
             EventKind::Control,
             EventKind::Note,
             EventKind::Recovery,
+            EventKind::AssignmentDispatched,
         ] {
             let s = serde_json::to_string(&kind).unwrap();
             let back: EventKind = serde_json::from_str(&s).unwrap();
