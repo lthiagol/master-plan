@@ -82,7 +82,8 @@ fn autopilot_hidden_when_show_autopilot_tab_is_false() {
 /// AC-01: `JumpLane` digit dispatch routes to the Autopilot lane when
 /// the lane is visible (digit = Autopilot's index in the visible list
 /// + 1). When Autopilot is hidden, the digit that previously routed
-/// to Autopilot now routes to the lane that took its slot (Settings).
+///   to Autopilot now routes to the lane that took its slot
+///   (Settings).
 #[test]
 fn jump_lane_digit_dispatch_routes_to_autopilot_when_visible() {
     // First: with Autopilot visible, the digit at Autopilot's slot
@@ -187,10 +188,7 @@ struct AutopilotDigit {
 
 impl AutopilotDigit {
     fn new(position: usize) -> Self {
-        assert!(
-            position >= 1 && position <= 9,
-            "digit position out of range"
-        );
+        assert!((1..=9).contains(&position), "digit position out of range");
         let ch = char::from_digit(position as u32, 10).expect("valid digit");
         Self { ch }
     }
