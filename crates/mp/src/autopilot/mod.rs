@@ -51,6 +51,7 @@
 //! [`ac_projection`].
 
 pub mod ac_projection;
+pub mod cycle;
 pub mod events;
 pub mod list;
 pub mod notes;
@@ -65,6 +66,14 @@ pub mod verifier;
 pub use ac_projection::{
     canonical_revision, project_ac_status, AcProjection, AcStatus, PerMilestoneProjections,
     ProjectionKey, ProjectionRevision, ProjectionWriteOutcome,
+};
+pub use cycle::{
+    apply_decision_matrix, build_reviewer_activation, classify_liveness,
+    cycle_state_machine_to_json, predict_next_action, reviewer_mode_for_cycle, start_cycle,
+    working_on_for, CycleDecision, CycleEscalateReason, CycleEvent, CycleStartError, CycleState,
+    CycleStateMachine, CycleStats, CycleVerdictRecord, DecisionInput, FindingSummary,
+    HeartbeatAckState, HeartbeatTracker, LivenessStatus, NextAction, ReviewRequestPayload,
+    ReviewerMode, ReviewerVerdict, REVIEWER_SOFT_CAP_CYCLE,
 };
 pub use events::{events_by_kind, EventCursor, EventKind, OrchestrationEvent};
 pub use list::{list_sessions, SessionListEntry};
