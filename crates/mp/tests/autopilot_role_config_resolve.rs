@@ -10,12 +10,16 @@
 //! the consumer's perspective.
 
 use mp::autopilot::role::{
-    builtin_role_default, resolve_role_config_full, resolve_role_config_with_provenance,
-    Role, RoleConfigOverride, RoleConfigSource,
+    builtin_role_default, resolve_role_config_full, resolve_role_config_with_provenance, Role,
+    RoleConfigOverride, RoleConfigSource,
 };
 use std::collections::BTreeMap;
 
-fn build_override(model: Option<&str>, harness: Option<&str>, skill: Option<&str>) -> RoleConfigOverride {
+fn build_override(
+    model: Option<&str>,
+    harness: Option<&str>,
+    skill: Option<&str>,
+) -> RoleConfigOverride {
     RoleConfigOverride {
         model: model.map(str::to_string),
         harness: harness.map(str::to_string),
@@ -31,11 +35,7 @@ fn three_tier_priority_order_is_session_then_global_then_builtin() {
     let global = build_override(Some("global-model"), Some("opencode"), Some("global-skill"));
     let session = build_override(Some("session-model"), Some("pi"), Some("session-skill"));
 
-    let resolved = resolve_role_config_full(
-        Role::Orchestrator,
-        Some(&session),
-        Some(&global),
-    );
+    let resolved = resolve_role_config_full(Role::Orchestrator, Some(&session), Some(&global));
     // Session wins on every field where both are set.
     assert_eq!(resolved.model.as_deref(), Some("session-model"));
     assert_eq!(resolved.harness, "pi");
@@ -58,7 +58,10 @@ fn builtin_supplies_fields_when_both_overrides_are_absent() {
     // Truly empty config — built-in is the only layer with values.
     let resolved = resolve_role_config_full(Role::Runner, None, None);
     let builtin = builtin_role_default(Role::Runner);
-    assert_eq!(resolved.harness, builtin.harness.expect("built-in has harness"));
+    assert_eq!(
+        resolved.harness,
+        builtin.harness.expect("built-in has harness")
+    );
     assert_eq!(resolved.skill, builtin.skill.expect("built-in has skill"));
     // Model has no built-in by design — the harness registry fills
     // it at spawn time. The resolver surfaces that absence as `None`
@@ -73,11 +76,7 @@ fn empty_string_session_override_falls_through_to_global() {
     // field and a session-driven empty clear.
     let session = build_override(Some(""), Some(""), Some(""));
     let global = build_override(Some("global-m"), Some("global-h"), Some("global-s"));
-    let resolved = resolve_role_config_full(
-        Role::Orchestrator,
-        Some(&session),
-        Some(&global),
-    );
+    let resolved = resolve_role_config_full(Role::Orchestrator, Some(&session), Some(&global));
     assert_eq!(resolved.model.as_deref(), Some("global-m"));
     assert_eq!(resolved.harness, "global-h");
     assert_eq!(resolved.skill, "global-s");
@@ -119,11 +118,8 @@ fn provenance_reports_each_layer_per_field() {
     // Diagnostically surface which layer provided each field.
     let session = build_override(Some("session-m"), Some("session-h"), Some("session-s"));
     let global = build_override(None, Some("global-h"), None);
-    let out = resolve_role_config_with_provenance(
-        Role::Orchestrator,
-        Some(&session),
-        Some(&global),
-    );
+    let out =
+        resolve_role_config_with_provenance(Role::Orchestrator, Some(&session), Some(&global));
     assert_eq!(out.model_source, Some(RoleConfigSource::Session));
     assert_eq!(out.harness_source, Some(RoleConfigSource::Session));
     assert_eq!(out.skill_source, Some(RoleConfigSource::Session));
@@ -145,9 +141,7 @@ fn extras_merge_per_key_with_session_winning_on_conflict() {
     // set only on a lower-priority layer survives. Empty-valued
     // session entries fall through (parity with the scalar rule).
     let mut builtin = builtin_role_default(Role::Runner);
-    builtin
-        .extras
-        .insert("cycle_budget".into(), "4".into());
+    builtin.extras.insert("cycle_budget".into(), "4".into());
 
     let mut global = RoleConfigOverride::empty();
     global.extras.insert("max_retries".into(), "3".into());
@@ -170,7 +164,10 @@ fn extras_merge_per_key_with_session_winning_on_conflict() {
         Some("3")
     );
     // Session's exclusive key makes it through.
-    assert_eq!(resolved.extras.get("trace").map(String::as_str), Some("yes"));
+    assert_eq!(
+        resolved.extras.get("trace").map(String::as_str),
+        Some("yes")
+    );
 }
 
 #[test]

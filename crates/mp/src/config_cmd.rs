@@ -939,7 +939,11 @@ fn validate_automation_field(field: &str) -> Result<()> {
 /// `model | harness | skill | extras`.
 fn config_get_autopilot(cfg: &ProjectConfig, rest: &str) -> Result<Value> {
     if rest == "topology" {
-        return Ok(json!(cfg.autopilot.topology.clone().unwrap_or_else(default_topology)));
+        return Ok(json!(cfg
+            .autopilot
+            .topology
+            .clone()
+            .unwrap_or_else(default_topology)));
     }
     if rest == "refresh_secs" {
         return Ok(json!(cfg.autopilot.refresh_secs));
@@ -1009,9 +1013,9 @@ fn set_autopilot_field(cfg: &mut ProjectConfig, rest: &str, value: &str) -> Resu
 }
 
 fn split_autopilot_role_field(rest: &str) -> Result<(&str, &str)> {
-    let (role, field) = rest
-        .split_once('.')
-        .ok_or_else(|| anyhow::anyhow!("expected autopilot.roles.<role>.<field>, got autopilot.roles.{rest}"))?;
+    let (role, field) = rest.split_once('.').ok_or_else(|| {
+        anyhow::anyhow!("expected autopilot.roles.<role>.<field>, got autopilot.roles.{rest}")
+    })?;
     Ok((role, field))
 }
 

@@ -56,8 +56,12 @@ fn cycle_budget_decreases_as_topology_contracts() {
 #[test]
 fn preflight_rejects_full_milestone_in_one_agent_without_recorded_bypass() {
     // The headline rule: 1-pane + full milestone is rejected.
-    let err = topology_preflight(Topology::OneAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
-        .unwrap_err();
+    let err = topology_preflight(
+        Topology::OneAgent,
+        MilestoneKind::Full,
+        ReviewBypassPolicy::None,
+    )
+    .unwrap_err();
     assert!(matches!(
         err,
         TopologyPreflightError::FullMilestoneRequiresReviewer { .. }
@@ -116,9 +120,12 @@ fn preflight_accepts_track_under_every_topology_without_bypass() {
 fn preflight_accepts_full_milestone_under_two_agent_with_no_bypass() {
     // 2-pane + full + no bypass is allowed — the matrix handles the
     // ship-with-backlog path restriction downstream.
-    let policy =
-        topology_preflight(Topology::TwoAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
-            .unwrap();
+    let policy = topology_preflight(
+        Topology::TwoAgent,
+        MilestoneKind::Full,
+        ReviewBypassPolicy::None,
+    )
+    .unwrap();
     assert_eq!(policy.mode, TopologyMode::NoShipWithBacklog);
 }
 
@@ -137,8 +144,12 @@ fn preflight_accepts_full_milestone_under_three_agent_with_no_bypass() {
 fn tighten_is_the_canonical_one_liner_for_callers() {
     // The convenience wrapper must return the same policy as the
     // explicit call.
-    let via_tighten = tighten(Topology::ThreeAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
-        .expect("three-agent + full + no bypass should never fail");
+    let via_tighten = tighten(
+        Topology::ThreeAgent,
+        MilestoneKind::Full,
+        ReviewBypassPolicy::None,
+    )
+    .expect("three-agent + full + no bypass should never fail");
     let via_explicit = topology_preflight(
         Topology::ThreeAgent,
         MilestoneKind::Full,
@@ -154,7 +165,10 @@ fn topology_mode_wire_strings_are_stable() {
     // Pin the on-disk / JSON form. Adding a new mode is a
     // deliberate test change so the rename is grep-able.
     assert_eq!(TopologyMode::FullMatrix.as_str(), "full_matrix");
-    assert_eq!(TopologyMode::NoShipWithBacklog.as_str(), "no_ship_with_backlog");
+    assert_eq!(
+        TopologyMode::NoShipWithBacklog.as_str(),
+        "no_ship_with_backlog"
+    );
     assert_eq!(
         TopologyMode::SingleAgentTrackOnly.as_str(),
         "single_agent_track_only"
@@ -185,7 +199,11 @@ fn topology_policies_apply_per_role_through_the_full_role_set() {
 /// name a private helper that the unit tests already exercise.
 fn role_pane_slot(topology: Topology, role: Role) -> usize {
     let slots = match topology {
-        Topology::ThreeAgent => vec![vec![Role::Orchestrator], vec![Role::Runner], vec![Role::Reviewer]],
+        Topology::ThreeAgent => vec![
+            vec![Role::Orchestrator],
+            vec![Role::Runner],
+            vec![Role::Reviewer],
+        ],
         Topology::TwoAgent => vec![vec![Role::Orchestrator, Role::Reviewer], vec![Role::Runner]],
         Topology::OneAgent => vec![vec![Role::Orchestrator, Role::Runner, Role::Reviewer]],
     };

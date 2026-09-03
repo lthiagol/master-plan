@@ -423,7 +423,10 @@ fn legacy_runner_falls_through_when_no_autopilot_override() {
     let out = env.run(&["watch", "151", "--format", "json"]);
     let report: Value =
         serde_json::from_slice(&out.stdout).expect("watch must emit JSON even on failure");
-    let report_checks = report["preconditions"]["checks"].as_array().cloned().unwrap_or_default();
+    let report_checks = report["preconditions"]["checks"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
     let names: Vec<String> = report_checks
         .iter()
         .map(|c| c["name"].as_str().unwrap_or("").to_string())
@@ -574,7 +577,9 @@ fn reviewer_resolution_function_is_the_canonical_path() {
     let out = env.run(&["watch", "151", "--format", "json"]);
     let report: Value =
         serde_json::from_slice(&out.stdout).expect("watch must emit JSON even on failure");
-    let checks = report["preconditions"]["checks"].as_array().expect("checks array");
+    let checks = report["preconditions"]["checks"]
+        .as_array()
+        .expect("checks array");
     let names: Vec<&str> = checks
         .iter()
         .map(|c| c["name"].as_str().unwrap_or(""))

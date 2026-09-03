@@ -234,9 +234,11 @@ fn cmd_autopilot_config(
 ) -> Result<()> {
     match cmd {
         AutopilotConfigCmd::Get { key } => cmd_autopilot_config_get(ctx, &key, format, fields),
-        AutopilotConfigCmd::Set { key, value, dry_run } => {
-            cmd_autopilot_config_set(ctx, &key, &value, dry_run, format, fields)
-        }
+        AutopilotConfigCmd::Set {
+            key,
+            value,
+            dry_run,
+        } => cmd_autopilot_config_set(ctx, &key, &value, dry_run, format, fields),
     }
 }
 

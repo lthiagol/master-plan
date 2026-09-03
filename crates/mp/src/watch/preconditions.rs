@@ -85,7 +85,11 @@ pub fn check_preconditions(cfg: &ProjectConfig, log_path: &Path) -> Precondition
     // between the new `autopilot.roles.<role>.*` surface and the
     // legacy `agent.<role>.*` surface as typed precondition
     // failures so the operator sees them at startup, not mid-run.
-    checks.push(check_role_config_resolution(cfg, "runner", crate::autopilot::role::Role::Runner));
+    checks.push(check_role_config_resolution(
+        cfg,
+        "runner",
+        crate::autopilot::role::Role::Runner,
+    ));
     checks.push(check_role_config_resolution(
         cfg,
         "orchestrator",
@@ -278,8 +282,7 @@ fn check_role_config_resolution(
             ok: true,
             message: format!(
                 "{label}.role resolved: harness={} skill={}",
-                resolved.harness,
-                resolved.skill
+                resolved.harness, resolved.skill
             ),
         },
         Err(err) => PreconditionCheck {

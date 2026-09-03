@@ -189,10 +189,7 @@ pub fn role_pane_slots(topology: Topology) -> PaneSlots {
             vec![Role::Runner],
             vec![Role::Reviewer],
         ],
-        Topology::TwoAgent => vec![
-            vec![Role::Orchestrator, Role::Reviewer],
-            vec![Role::Runner],
-        ],
+        Topology::TwoAgent => vec![vec![Role::Orchestrator, Role::Reviewer], vec![Role::Runner]],
         Topology::OneAgent => vec![vec![Role::Orchestrator, Role::Runner, Role::Reviewer]],
     }
 }
@@ -247,7 +244,10 @@ impl RoleConfigOverride {
     /// True when every field is unset (handy when the resolver needs
     /// to short-circuit through layers).
     pub fn is_empty(&self) -> bool {
-        self.model.is_none() && self.harness.is_none() && self.skill.is_none() && self.extras.is_empty()
+        self.model.is_none()
+            && self.harness.is_none()
+            && self.skill.is_none()
+            && self.extras.is_empty()
     }
 
     /// True when `value` is `Some` AND non-empty. Empty strings are
@@ -1026,7 +1026,10 @@ mod tests {
     fn topology_one_agent_collapses_every_role_into_one_slot() {
         let slots = role_pane_slots(Topology::OneAgent);
         assert_eq!(slots.len(), 1);
-        assert_eq!(slots[0], vec![Role::Orchestrator, Role::Runner, Role::Reviewer]);
+        assert_eq!(
+            slots[0],
+            vec![Role::Orchestrator, Role::Runner, Role::Reviewer]
+        );
     }
 
     #[test]
@@ -1140,9 +1143,18 @@ mod tests {
         // Orchestrator -> mp-coordinator; Runner / Reviewer -> mp-runner.
         // Pin so a rename in one place breaks the test rather than
         // silently shipping a misaligned default.
-        assert_eq!(builtin_role_default(Role::Orchestrator).skill.as_deref(), Some("mp-coordinator"));
-        assert_eq!(builtin_role_default(Role::Runner).skill.as_deref(), Some("mp-runner"));
-        assert_eq!(builtin_role_default(Role::Reviewer).skill.as_deref(), Some("mp-runner"));
+        assert_eq!(
+            builtin_role_default(Role::Orchestrator).skill.as_deref(),
+            Some("mp-coordinator")
+        );
+        assert_eq!(
+            builtin_role_default(Role::Runner).skill.as_deref(),
+            Some("mp-runner")
+        );
+        assert_eq!(
+            builtin_role_default(Role::Reviewer).skill.as_deref(),
+            Some("mp-runner")
+        );
     }
 
     #[test]
@@ -1160,11 +1172,7 @@ mod tests {
         // Per spec: session.json override wins.
         let global = ovr("anthropic/claude-sonnet-4-5", "opencode", "mp-coordinator");
         let session = ovr("anthropic/claude-opus-4-1", "pi", "mp-coordinator");
-        let resolved = resolve_role_config_full(
-            Role::Orchestrator,
-            Some(&session),
-            Some(&global),
-        );
+        let resolved = resolve_role_config_full(Role::Orchestrator, Some(&session), Some(&global));
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
         assert_eq!(resolved.harness, "pi");
     }
@@ -1188,11 +1196,7 @@ mod tests {
         // never-set field.
         let session = ovr_partial(Some(""), Some(""), Some(""));
         let global = ovr("anthropic/claude-opus-4-1", "opencode", "mp-coordinator");
-        let resolved = resolve_role_config_full(
-            Role::Orchestrator,
-            Some(&session),
-            Some(&global),
-        );
+        let resolved = resolve_role_config_full(Role::Orchestrator, Some(&session), Some(&global));
         // Every field was an empty string on session — fall through
         // to the global layer.
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
@@ -1205,11 +1209,7 @@ mod tests {
         // Session sets only `harness`; model and skill fall through.
         let session = ovr_partial(None, Some("cursor"), None);
         let global = ovr("anthropic/claude-opus-4-1", "opencode", "mp-runner");
-        let resolved = resolve_role_config_full(
-            Role::Runner,
-            Some(&session),
-            Some(&global),
-        );
+        let resolved = resolve_role_config_full(Role::Runner, Some(&session), Some(&global));
         assert_eq!(resolved.harness, "cursor");
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
         assert_eq!(resolved.skill, "mp-runner");
@@ -1221,18 +1221,31 @@ mod tests {
         // `cap` overrides global's `cap`; global's `flag` survives
         // because session didn't set it.
         let mut builtin = builtin_role_default(Role::Runner);
-        builtin.extras.insert("cap".to_string(), "builtin-cap".to_string());
-        builtin.extras.insert("flag".to_string(), "builtin-flag".to_string());
+        builtin
+            .extras
+            .insert("cap".to_string(), "builtin-cap".to_string());
+        builtin
+            .extras
+            .insert("flag".to_string(), "builtin-flag".to_string());
 
         let mut global = RoleConfigOverride::empty();
-        global.extras.insert("cap".to_string(), "global-cap".to_string());
-        global.extras.insert("flag".to_string(), "global-flag".to_string());
+        global
+            .extras
+            .insert("cap".to_string(), "global-cap".to_string());
+        global
+            .extras
+            .insert("flag".to_string(), "global-flag".to_string());
 
         let mut session = RoleConfigOverride::empty();
-        session.extras.insert("cap".to_string(), "session-cap".to_string());
+        session
+            .extras
+            .insert("cap".to_string(), "session-cap".to_string());
 
         let resolved = resolve_role_config(Some(&session), Some(&global), &builtin);
-        assert_eq!(resolved.extras.get("cap").map(String::as_str), Some("session-cap"));
+        assert_eq!(
+            resolved.extras.get("cap").map(String::as_str),
+            Some("session-cap")
+        );
         assert_eq!(
             resolved.extras.get("flag").map(String::as_str),
             Some("global-flag"),
@@ -1247,7 +1260,8 @@ mod tests {
         // to the next layer.
         let builtin = {
             let mut b = builtin_role_default(Role::Runner);
-            b.extras.insert("flag".to_string(), "builtin-flag".to_string());
+            b.extras
+                .insert("flag".to_string(), "builtin-flag".to_string());
             b
         };
         let global = RoleConfigOverride::empty();
@@ -1267,15 +1281,15 @@ mod tests {
         // Session sets model; global sets harness; built-in fills skill.
         let session = ovr_partial(Some("anthropic/claude-opus-4-1"), None, None);
         let global = ovr_partial(None, Some("pi"), None);
-        let out = resolve_role_config_with_provenance(
-            Role::Orchestrator,
-            Some(&session),
-            Some(&global),
-        );
+        let out =
+            resolve_role_config_with_provenance(Role::Orchestrator, Some(&session), Some(&global));
         assert_eq!(out.model_source, Some(RoleConfigSource::Session));
         assert_eq!(out.harness_source, Some(RoleConfigSource::Global));
         assert_eq!(out.skill_source, Some(RoleConfigSource::Builtin));
-        assert_eq!(out.resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
+        assert_eq!(
+            out.resolved.model.as_deref(),
+            Some("anthropic/claude-opus-4-1")
+        );
         assert_eq!(out.resolved.harness, "pi");
         assert_eq!(out.resolved.skill, "mp-coordinator");
     }
@@ -1339,7 +1353,12 @@ mod tests {
 
     #[test]
     fn preflight_accepts_full_milestone_in_three_agent_without_bypass() {
-        let policy = topology_preflight(Topology::ThreeAgent, MilestoneKind::Full, ReviewBypassPolicy::None).unwrap();
+        let policy = topology_preflight(
+            Topology::ThreeAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap();
         assert_eq!(policy.mode, TopologyMode::FullMatrix);
     }
 
@@ -1347,16 +1366,24 @@ mod tests {
     fn preflight_accepts_full_milestone_in_two_agent_without_bypass() {
         // 2-pane + full milestone is allowed (the matrix handles the
         // ship-with-backlog restriction downstream).
-        let policy = topology_preflight(Topology::TwoAgent, MilestoneKind::Full, ReviewBypassPolicy::None).unwrap();
+        let policy = topology_preflight(
+            Topology::TwoAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap();
         assert_eq!(policy.mode, TopologyMode::NoShipWithBacklog);
     }
 
     #[test]
     fn preflight_rejects_full_milestone_in_one_agent_without_recorded_bypass() {
         // The spec's headline rule.
-        let err =
-            topology_preflight(Topology::OneAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
-                .unwrap_err();
+        let err = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap_err();
         match err {
             TopologyPreflightError::FullMilestoneRequiresReviewer { policy } => {
                 assert_eq!(policy.mode, TopologyMode::SingleAgentTrackOnly);
@@ -1442,9 +1469,12 @@ mod tests {
 
     #[test]
     fn topology_preflight_error_displays_actionable_message() {
-        let err =
-            topology_preflight(Topology::OneAgent, MilestoneKind::Full, ReviewBypassPolicy::None)
-                .unwrap_err();
+        let err = topology_preflight(
+            Topology::OneAgent,
+            MilestoneKind::Full,
+            ReviewBypassPolicy::None,
+        )
+        .unwrap_err();
         let msg = err.to_string();
         assert!(
             msg.contains("record a review-bypass"),
@@ -1472,13 +1502,8 @@ mod tests {
     #[test]
     fn legacy_fallback_runner_picks_up_agent_runner() {
         let legacy_runner = legacy("opencode", "anthropic/claude-opus-4-1");
-        let resolved = resolve_with_legacy_fallback(
-            Role::Runner,
-            None,
-            Some(&legacy_runner),
-            None,
-        )
-        .expect("runner + legacy fallback should succeed");
+        let resolved = resolve_with_legacy_fallback(Role::Runner, None, Some(&legacy_runner), None)
+            .expect("runner + legacy fallback should succeed");
         assert_eq!(resolved.harness, "opencode");
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
         assert_eq!(resolved.skill, "mp-runner");
@@ -1487,13 +1512,9 @@ mod tests {
     #[test]
     fn legacy_fallback_orchestrator_picks_up_agent_coordinator() {
         let legacy_coord = legacy("pi", "anthropic/claude-opus-4-1");
-        let resolved = resolve_with_legacy_fallback(
-            Role::Orchestrator,
-            None,
-            None,
-            Some(&legacy_coord),
-        )
-        .expect("orchestrator + legacy fallback should succeed");
+        let resolved =
+            resolve_with_legacy_fallback(Role::Orchestrator, None, None, Some(&legacy_coord))
+                .expect("orchestrator + legacy fallback should succeed");
         assert_eq!(resolved.harness, "pi");
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
         assert_eq!(resolved.skill, "mp-coordinator");
@@ -1526,13 +1547,8 @@ mod tests {
         let mut ovr = RoleConfigOverride::empty();
         ovr.harness = Some("pi".to_string());
         ovr.model = Some("anthropic/claude-opus-4-1".to_string());
-        let resolved = resolve_with_legacy_fallback(
-            Role::Runner,
-            Some(&ovr),
-            None,
-            None,
-        )
-        .expect("override without legacy fallback should succeed");
+        let resolved = resolve_with_legacy_fallback(Role::Runner, Some(&ovr), None, None)
+            .expect("override without legacy fallback should succeed");
         assert_eq!(resolved.harness, "pi");
         assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"));
         // skill comes from the built-in (neither layer set it).
@@ -1547,13 +1563,9 @@ mod tests {
         let mut ovr = RoleConfigOverride::empty();
         ovr.harness = Some("opencode".to_string()); // matches legacy
         ovr.skill = Some("mp-runner".to_string());
-        let resolved = resolve_with_legacy_fallback(
-            Role::Runner,
-            Some(&ovr),
-            Some(&legacy_runner),
-            None,
-        )
-        .expect("equal values must not conflict");
+        let resolved =
+            resolve_with_legacy_fallback(Role::Runner, Some(&ovr), Some(&legacy_runner), None)
+                .expect("equal values must not conflict");
         assert_eq!(resolved.harness, "opencode");
     }
 
@@ -1563,14 +1575,14 @@ mod tests {
         let legacy_runner = legacy("opencode", "anthropic/claude-opus-4-1");
         let mut ovr = RoleConfigOverride::empty();
         ovr.harness = Some("pi".to_string());
-        let result = resolve_with_legacy_fallback(
-            Role::Runner,
-            Some(&ovr),
-            Some(&legacy_runner),
-            None,
-        );
+        let result =
+            resolve_with_legacy_fallback(Role::Runner, Some(&ovr), Some(&legacy_runner), None);
         match result {
-            Err(RoleResolutionError::ConflictingHarnessFallback { role, autopilot, legacy }) => {
+            Err(RoleResolutionError::ConflictingHarnessFallback {
+                role,
+                autopilot,
+                legacy,
+            }) => {
                 assert_eq!(role, Role::Runner);
                 assert_eq!(autopilot, "pi");
                 assert_eq!(legacy, "opencode");
@@ -1585,12 +1597,8 @@ mod tests {
         let mut ovr = RoleConfigOverride::empty();
         ovr.harness = Some("opencode".to_string()); // matches legacy
         ovr.model = Some("anthropic/claude-opus-4-1".to_string());
-        let result = resolve_with_legacy_fallback(
-            Role::Runner,
-            Some(&ovr),
-            Some(&legacy_runner),
-            None,
-        );
+        let result =
+            resolve_with_legacy_fallback(Role::Runner, Some(&ovr), Some(&legacy_runner), None);
         assert!(matches!(
             result,
             Err(RoleResolutionError::ConflictingModelFallback { .. })
@@ -1605,15 +1613,15 @@ mod tests {
         let legacy_runner = legacy("cursor", "anthropic/claude-opus-4-1");
         let mut ovr = RoleConfigOverride::empty();
         ovr.skill = Some("mp-runner".to_string());
-        let resolved = resolve_with_legacy_fallback(
-            Role::Runner,
-            Some(&ovr),
-            Some(&legacy_runner),
-            None,
-        )
-        .expect("partial override + legacy should succeed");
+        let resolved =
+            resolve_with_legacy_fallback(Role::Runner, Some(&ovr), Some(&legacy_runner), None)
+                .expect("partial override + legacy should succeed");
         assert_eq!(resolved.harness, "cursor", "harness from legacy");
-        assert_eq!(resolved.model.as_deref(), Some("anthropic/claude-opus-4-1"), "model from legacy");
+        assert_eq!(
+            resolved.model.as_deref(),
+            Some("anthropic/claude-opus-4-1"),
+            "model from legacy"
+        );
         assert_eq!(resolved.skill, "mp-runner", "skill from override");
     }
 
@@ -1621,10 +1629,7 @@ mod tests {
     fn legacy_fallback_unsupported_reviewer_message_guides_operator() {
         let err = resolve_with_legacy_fallback(Role::Reviewer, None, None, None).unwrap_err();
         let msg = err.to_string();
-        assert!(
-            msg.contains("reviewer"),
-            "error must name the role: {msg}"
-        );
+        assert!(msg.contains("reviewer"), "error must name the role: {msg}");
         assert!(
             msg.contains("autopilot.roles.reviewer"),
             "error must hint at the autopilot config path: {msg}"
@@ -1641,20 +1646,18 @@ mod tests {
         legacy_runner.harness = Some("opencode".to_string());
         legacy_runner.command = Some(vec!["opencode".to_string(), "--flag".to_string()]);
         legacy_runner.thinking_level = Some("high".to_string());
-        let resolved = resolve_with_legacy_fallback(
-            Role::Runner,
-            None,
-            Some(&legacy_runner),
-            None,
-        )
-        .expect("runner + legacy with command/thinking should succeed");
+        let resolved = resolve_with_legacy_fallback(Role::Runner, None, Some(&legacy_runner), None)
+            .expect("runner + legacy with command/thinking should succeed");
         assert_eq!(
             resolved.extras.get("legacy.command").map(String::as_str),
             Some(r#"["opencode","--flag"]"#),
             "command argv must be JSON-encoded under legacy.command"
         );
         assert_eq!(
-            resolved.extras.get("legacy.thinking_level").map(String::as_str),
+            resolved
+                .extras
+                .get("legacy.thinking_level")
+                .map(String::as_str),
             Some("high")
         );
     }

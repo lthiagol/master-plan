@@ -71,7 +71,10 @@ fn one_agent_topology_collapses_every_role_into_a_single_pane() {
     // 1-pane = [[O, R, V]] — every role in one pane.
     let slots = role_pane_slots(Topology::OneAgent);
     assert_eq!(slots.len(), 1);
-    assert_eq!(slots[0], vec![Role::Orchestrator, Role::Runner, Role::Reviewer]);
+    assert_eq!(
+        slots[0],
+        vec![Role::Orchestrator, Role::Runner, Role::Reviewer]
+    );
 }
 
 #[test]

@@ -45,7 +45,11 @@ fn topology_set_accepts_documented_values() {
     for value in ["one-agent", "two-agent", "three-agent"] {
         let env = TestEnv::new();
         set(&env, "autopilot.topology", value);
-        assert_eq!(get(&env, "autopilot.topology"), json!(value), "value={value}");
+        assert_eq!(
+            get(&env, "autopilot.topology"),
+            json!(value),
+            "value={value}"
+        );
     }
 }
 
@@ -160,13 +164,7 @@ fn refresh_secs_roundtrips() {
 #[test]
 fn refresh_secs_rejects_negative_value() {
     let env = TestEnv::new();
-    let out = env.run(&[
-        "autopilot",
-        "config",
-        "set",
-        "autopilot.refresh_secs",
-        "-1",
-    ]);
+    let out = env.run(&["autopilot", "config", "set", "autopilot.refresh_secs", "-1"]);
     assert!(
         !out.status.success(),
         "negative refresh_secs must be rejected"
@@ -181,13 +179,7 @@ fn mp_config_get_set_with_autopilot_prefix_also_round_trips() {
     let env = TestEnv::new();
     set(&env, "autopilot.topology", "two-agent");
 
-    let via_mp_config = env.run_json(&[
-        "config",
-        "get",
-        "autopilot.topology",
-        "--format",
-        "json",
-    ]);
+    let via_mp_config = env.run_json(&["config", "get", "autopilot.topology", "--format", "json"]);
     assert_eq!(via_mp_config["value"], json!("two-agent"));
 
     let out = env.run(&["config", "set", "autopilot.topology", "one-agent"]);
@@ -217,13 +209,7 @@ fn autopilot_config_set_with_unprefixed_key_writes_through() {
 #[test]
 fn autopilot_config_set_unknown_topology_key_returns_structured_error() {
     let env = TestEnv::new();
-    let out = env.run(&[
-        "autopilot",
-        "config",
-        "set",
-        "autopilot.bogus",
-        "x",
-    ]);
+    let out = env.run(&["autopilot", "config", "set", "autopilot.bogus", "x"]);
     assert!(
         !out.status.success(),
         "unknown autopilot key must be rejected"
