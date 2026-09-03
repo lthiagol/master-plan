@@ -3,8 +3,8 @@
     "id": "209",
     "title": "mp autopilot roles + topology — Role enum, RoleConfig resolution, and role-to-pane mapping",
     "slug": "mp-autopilot-roles-topology-role-enum-roleconfig-resolution-and-role-to-pane-mapping",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,7 +17,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-03",
     "blocked_at": "",
@@ -25,11 +25,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T16:06:28.564596+00:00",
+    "lifecycle_at": "2026-09-03T16:14:03.640860+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:02.585435+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T16:14:31.893463+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T16:06:28.564598+00:00"
+        "at": "2026-09-03T16:14:31.893463+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T16:14:31.932611+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.946093+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T16:14:31.932613+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T16:14:03.640861+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T16:06:28.564598+00:00"
+        "at": "2026-09-03T16:14:31.893463+00:00"
       },
       "specify": {
         "status": "done",
@@ -245,5 +261,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": "M209 complete: 5/5 steps done; 5/5 ACs evidence stamped (autopilot_role_topology 7/7, autopilot_role_config_resolve 10/10, autopilot_config_cli 18/18, autopilot_topology_tightening 13/13, watch_config 27/27); self-review clean (fmt check exit 0, clippy clean, 75/75 tests pass across 5 AC test targets). Lifecycle -> executed."
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "lint-pipeline",
+      "description": "make lint (cargo clippy --all-targets -- -D warnings) is red on a pre-existing doc comment in crates/mp-model/src/milestone.rs:157-158 introduced by 6204555 (M202 cycle 3). The doc_overindented_list_items lint (Rust 1.98) flags over-indented wrapped doc bullets. M209 does not touch mp-model and the -p mp --tests --no-deps clippy scope is clean. Tracking because it surfaces through make ci after make dev-env.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03",
+      "anchor": {
+        "path": "crates/mp-model/src/milestone.rs",
+        "new_range": {
+          "start_line": 157,
+          "end_line": 157
+        },
+        "side": "new"
+      },
+      "summary": "Pre-existing mp-model doc-comment lint breaks make lint (cargo clippy --all-targets)",
+      "rationale": "Repeated a cold-clean clippy run (-D warnings) on this checkout. The only failure is mp-model/src/milestone.rs lines 157-158 (over-indented doc list items, blame 6204555). M209's code passes clippy under -p mp --tests --no-deps. The repository-wide lint gate regressed without M209's involvement but the cycle-1 review uncovered it. Per M201 doc/spec ambiguity rule, implementation gets benefit of doubt — this is a backlog-class finding, not a M209 blocker.",
+      "confidence": "high"
+    }
+  ]
 }
