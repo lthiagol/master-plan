@@ -324,9 +324,9 @@ pub struct AutopilotSession {
     pub terminal_status: Option<SessionStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_state_change_at: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role_state: Option<RoleStateEnvelope>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_on: Option<WorkingOn>,
     #[serde(default)]
     pub prompt_bundles: BTreeMap<String, Value>,
