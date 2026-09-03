@@ -84,8 +84,8 @@
       "id": "AC-03",
       "description": "The Settings lane's `SETTINGS_KEYS` entry reads `ui.show_autopilot_tab` as the displayed key; the digit-jump dispatch routes to the Autopilot lane correctly.",
       "verification": "cargo nextest run -p raul --test settings_autopilot_key --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test settings_autopilot_key --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-04",
@@ -174,7 +174,7 @@
       ],
       "tests": "cargo nextest run -p raul --test settings_autopilot_key --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 214 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
