@@ -516,6 +516,11 @@ pub enum ReviewEnvError {
         missing: Vec<String>,
         hint: String,
     },
+    WorktreeMismatch {
+        expected: String,
+        actual: String,
+        hint: String,
+    },
 }
 
 impl ReviewEnvError {
@@ -524,7 +529,8 @@ impl ReviewEnvError {
             ReviewEnvError::DirtyWorktree { hint, .. }
             | ReviewEnvError::SameActor { hint, .. }
             | ReviewEnvError::StaleBinary { hint, .. }
-            | ReviewEnvError::UnverifiableEnv { hint, .. } => hint,
+            | ReviewEnvError::UnverifiableEnv { hint, .. }
+            | ReviewEnvError::WorktreeMismatch { hint, .. } => hint,
         }
     }
 
@@ -534,6 +540,7 @@ impl ReviewEnvError {
             ReviewEnvError::SameActor { .. } => "same-actor",
             ReviewEnvError::StaleBinary { .. } => "stale-binary",
             ReviewEnvError::UnverifiableEnv { .. } => "unverifiable-env",
+            ReviewEnvError::WorktreeMismatch { .. } => "worktree-mismatch",
         }
     }
 }
@@ -545,6 +552,7 @@ pub struct GateInputs<'a> {
     pub env: &'a ReviewerProvenance,
     pub runner_actor: &'a ActorIdentity,
     pub runner_target_dir: &'a std::path::Path,
+    pub runner_worktree_path: &'a std::path::Path,
     pub runner_pid: u32,
     pub worktree_clean: bool,
     pub expected_binary_sha: Option<&'a str>,
@@ -562,7 +570,9 @@ pub struct GateInputs<'a> {
 ///    missing. Without provenance we cannot reason about isolation.
 /// 2. `SameActor` — `actor.distinct_from(runner_actor)` is false.
 /// 3. `StaleBinary` — provenances differ from the expected sha.
-/// 4. `DirtyWorktree` — last because it is observable post-build
+/// 4. `WorktreeMismatch` — `env.worktree_path` differs from the
+///    runner's. The reviewer would be looking at different code.
+/// 5. `DirtyWorktree` — last because it is observable post-build
 ///    (the build can succeed on a dirty tree; the gate fails before
 ///    the cycle records a false-positive pass).
 ///
@@ -574,6 +584,7 @@ pub fn gate(inputs: &GateInputs<'_>) -> Result<ReviewEnvDecision, ReviewEnvError
         env,
         runner_actor,
         runner_target_dir,
+        runner_worktree_path,
         runner_pid,
         worktree_clean,
         expected_binary_sha,
@@ -617,7 +628,17 @@ pub fn gate(inputs: &GateInputs<'_>) -> Result<ReviewEnvDecision, ReviewEnvError
         }
     }
 
-    // 4. Dirty worktree (unless explicitly allowed).
+    // 4. Worktree mismatch — reviewer on a different worktree than
+    //    the runner would silently review different code.
+    if !env.worktree_matches(runner_worktree_path) {
+        return Err(ReviewEnvError::WorktreeMismatch {
+            expected: runner_worktree_path.display().to_string(),
+            actual: env.worktree_path.display().to_string(),
+            hint: "Reviewer worktree does not match runner worktree; re-spawn the reviewer on the runner's worktree (or pass an explicit `--reviewer-worktree-override`).".to_string(),
+        });
+    }
+
+    // 5. Dirty worktree (unless explicitly allowed).
     if !worktree_clean && !config.allow_dirty_worktree {
         return Err(ReviewEnvError::DirtyWorktree {
             status_output: "git status --porcelain returned non-empty output".to_string(),
@@ -717,6 +738,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: Some("sha-abc"),
@@ -735,6 +757,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: false,
             expected_binary_sha: Some("sha-abc"),
@@ -757,6 +780,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: false,
             expected_binary_sha: Some("sha-abc"),
@@ -775,6 +799,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &same_actor,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: Some("sha-abc"),
@@ -794,6 +819,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: Some("sha-different"),
@@ -824,6 +850,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: Some("sha-abc"),
@@ -847,6 +874,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &clean_runner_target(),
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: None,
@@ -870,6 +898,7 @@ mod s3_tests {
             env: &env,
             runner_actor: &runner,
             runner_target_dir: &env.target_dir,
+            runner_worktree_path: &env.worktree_path,
             runner_pid: clean_runner_pid(),
             worktree_clean: true,
             expected_binary_sha: Some("sha-abc"),
