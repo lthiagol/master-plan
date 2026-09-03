@@ -1975,6 +1975,14 @@
       "reviewed_at": "2026-09-03",
       "notes": "Cold build clean. AC-01/02 (consumer-surface-lint): exit 0; AC-03 (install_autopilot_templates): 9/9 pass; AC-04 (suite_init): 33/33 pass. Allowlist audit: 9 stale-Watch hits all legitimately anchor to literal raul lane labels (6) or imperative-verb English in diagnosing-bugs (3). install_autopilot_templates promoted cleanly to crates/mp/tests/ (no raul, no --dev). Role triad (orchestrator/runner/reviewer) consistent with M209 Role enum; legacy coordinator explicitly distinguished. Filed F-01 low-severity backlog (pre-existing M202 doc lint in mp-model/src/milestone.rs:157-158, OUT OF SCOPE per orchestrator brief); resolved without code change per same brief — tracked for next M202 pass.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "227",
+      "verdict": "ok",
+      "reviewer": "reviewer-227",
+      "reviewed_at": "2026-09-03",
+      "notes": "Cold-build AC verifications all PASS: AC-01 51/51 (watch_herdr_wait + watch_herdr_start), AC-02 20/20 (watch_bridge_report), AC-03 43/43 (watch_herdr_start + watch_bridge_report). Deterministic timeout test (mp_run_herdr_with_timeout_kills_grandchild_in_process_group) repeated 10x sequential + 5x parallel-binary load = all pass in ~800ms (no flake, no fixed sleeps). Harness is well-designed for M225/M226 reuse; the F-13 process-group proof is solid at both unit (bridge.rs) and integration (watch_bridge_report.rs) layers. Fmt + clippy -D warnings clean. Consumer-surface lint clean. Two LOW findings filed and reviewer-acknowledged as backlog for M225/M226: F-01 doc oversells knob coverage (5/11 subcommands only have failure knobs); F-02 pane_get_grandchild_sleep has misleading dead-store .max(2000) line. Both are design nits, not correctness blockers — AC-01 spec met.",
+      "milestone_completed_at": "2026-09-03"
     }
   ],
   "comments": [

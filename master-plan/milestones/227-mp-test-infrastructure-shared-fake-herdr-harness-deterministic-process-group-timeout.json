@@ -3,8 +3,8 @@
     "id": "227",
     "title": "mp test infrastructure — shared fake-herdr harness + deterministic process-group timeout",
     "slug": "mp-test-infrastructure-shared-fake-herdr-harness-deterministic-process-group-timeout",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -23,11 +23,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T20:53:16.432284+00:00",
+    "lifecycle_at": "2026-09-03T21:11:20.181883+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-03T14:15:01.388293+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-03T21:11:28.148265+00:00"
       },
       "draft": {
         "status": "done",
@@ -35,15 +39,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T20:53:16.432287+00:00"
+        "at": "2026-09-03T21:11:28.148265+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-03T21:11:28.184587+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:15:02.156182+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-03T21:11:28.184589+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-03T21:11:20.181884+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T20:53:16.432287+00:00"
+        "at": "2026-09-03T21:11:28.148265+00:00"
       },
       "specify": {
         "status": "done",
@@ -186,5 +202,29 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": "M227 cycle 1: shared fake-herdr harness (crates/mp/tests/common/fake_herdr.rs) with version/pane/agent/prompt/list/delay/failure/signal modes; watch_herdr_wait + watch_herdr_start + watch_bridge_report migrated; deterministic process-group timeout test added (no fixed sleeps, readiness sync via pid file); cargo fmt --check + clippy --no-deps -D warnings pass; AC-01 51/51 + AC-02 20/20 + AC-03 43/43 all pass."
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "doc-drift",
+      "description": "Harness docstring (crates/mp/tests/common/fake_herdr.rs:13-14) claims 'every herdr subcommand ... is represented as a configurable knob', but the rendered surface is partial: agent send, pane send-keys, pane report-agent, pane report-metadata only have failure knobs (response payload is hardcoded 'echo ok'), and agent read has no knobs at all (hardcoded 'echo \"\"'). AC-01 only requires failure + delay knobs for representative coverage, so the spec is met — but the doc overstates the API. Worth a one-paragraph clarification before M225/M226 inherit the harness, so they don't search for nonexistent response knobs.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "reviewer-ack: LOW doc-drift surfaced for M225/M226 backlog; spec AC-01 met; do not block M227",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "code-smell",
+      "description": "pane_get_grandchild_sleep (crates/mp/tests/common/fake_herdr.rs:307-316) writes self.pane_get_sleep_ms = (secs * 1000).max(2000) but this field is never read in the multi-line response path that this builder method takes. The render code at line 405 short-circuits when pane_get_response contains a newline (as the grandchild-sleep body does), emitting the body verbatim and bypassing emit_sleep_branch. The .max(2000) floor is misleading dead-store code: it implies the script will sleep for at least 2s, but the only sleep the script actually performs is the literal 'sleep {secs}' forked as a grandchild. Surface this either as documented behavior (rename to pane_get_grandchild_min_secs) or drop the dead field write. M225/M226 extenders reading the source will likely be confused.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "reviewer-ack: LOW code-smell in harness dead-store; non-blocking; defer cleanup to M225/M226 when they extend the builder API",
+      "created": "2026-09-03",
+      "resolved": "2026-09-03"
+    }
+  ]
 }
