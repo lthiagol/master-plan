@@ -339,14 +339,15 @@ fn skip_verdict_and_s2_next_action_agree_on_unready_milestone() {
 // produces on disk so a follow-up integration test can drive the
 // real CLI with the same data.
 
+#[allow(dead_code, unused_imports)]
 mod m223_fixtures {
     use mp::autopilot::commit_policy::{
         classify_subject, lifecycle_metadata_overwrites_evidence, validate_fixed_in, CommitIndex,
         CommitInspection, CommitKind, PolicyError,
     };
     use mp::autopilot::lifecycle::{
-        Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
-        TransitionOutcome, TransitionRejectReason,
+        Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot, TransitionOutcome,
+        TransitionRejectReason,
     };
     use std::cell::RefCell;
 
@@ -374,14 +375,8 @@ mod m223_fixtures {
 
     pub fn fixture_attestation() -> FakeCommitAttestation {
         let mut real = std::collections::BTreeMap::new();
-        real.insert(
-            "sha-fix-1".into(),
-            CommitRecord { single_fix: true },
-        );
-        real.insert(
-            "sha-fix-2".into(),
-            CommitRecord { single_fix: true },
-        );
+        real.insert("sha-fix-1".into(), CommitRecord { single_fix: true });
+        real.insert("sha-fix-2".into(), CommitRecord { single_fix: true });
         FakeCommitAttestation { real }
     }
 
@@ -440,10 +435,7 @@ mod m223_fixtures {
         plan
     }
 
-    pub fn assert_evidence_preserved(
-        snapshot: &MilestoneSnapshot,
-        ac_ids: &[&str],
-    ) {
+    pub fn assert_evidence_preserved(snapshot: &MilestoneSnapshot, ac_ids: &[&str]) {
         for ac in ac_ids {
             let ac_snap = snapshot.ac(ac).expect("AC in snapshot");
             assert_eq!(ac_snap.status, "passed", "AC {ac} should be passed");
@@ -501,7 +493,9 @@ mod m223_ac01 {
     //! asserted to be distinct and the final lifecycle is `complete`.
     use super::m223_fixtures::*;
     use mp::autopilot::commit_policy::CommitKind;
-    use mp::autopilot::lifecycle::{Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot};
+    use mp::autopilot::lifecycle::{
+        Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
+    };
 
     #[test]
     fn full_closure_preserves_per_ac_evidence_and_reaches_complete() {
@@ -512,7 +506,13 @@ mod m223_ac01 {
             &["AC-01", "AC-02", "AC-03"],
         );
         let mut closure = LifecycleClosure::new(snapshot, &commits);
-        let plan = plan_full("223", &["S1", "S2", "S3"], &["AC-01", "AC-02", "AC-03"], &["F-01"], "R-223");
+        let plan = plan_full(
+            "223",
+            &["S1", "S2", "S3"],
+            &["AC-01", "AC-02", "AC-03"],
+            &["F-01"],
+            "R-223",
+        );
         let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
         assert!(
             outcome.reached_complete(),
@@ -549,8 +549,7 @@ mod m223_ac01 {
     #[test]
     fn closure_records_each_step_done_with_revision() {
         let commits = fixture_attestation();
-        let snapshot =
-            MilestoneSnapshot::ready_for_closure("223", &["S1", "S2", "S3"], &["AC-01"]);
+        let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1", "S2", "S3"], &["AC-01"]);
         let mut closure = LifecycleClosure::new(snapshot, &commits);
         let plan = plan_full("223", &["S1", "S2", "S3"], &["AC-01"], &[], "R-223");
         let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
@@ -578,7 +577,10 @@ mod m223_ac02 {
     //! fixed_in and lifecycle metadata commits that would overwrite
     //! per-AC evidence.
     use super::m223_fixtures::*;
-    use mp::autopilot::commit_policy::{classify_subject, CommitIndex, CommitInspection, CommitKind, PolicyError, lifecycle_metadata_overwrites_evidence, validate_fixed_in};
+    use mp::autopilot::commit_policy::{
+        classify_subject, lifecycle_metadata_overwrites_evidence, validate_fixed_in, CommitIndex,
+        CommitInspection, CommitKind, PolicyError,
+    };
     use mp::autopilot::lifecycle::{
         Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot, TransitionOutcome,
         TransitionRejectReason,
@@ -619,7 +621,10 @@ mod m223_ac02 {
             other => panic!("expected GroupedRemediation, got {other:?}"),
         }
         assert!(
-            matches!(index.lookup("sha-grouped").unwrap().kind, CommitKind::Ambiguous { .. }),
+            matches!(
+                index.lookup("sha-grouped").unwrap().kind,
+                CommitKind::Ambiguous { .. }
+            ),
             "ambiguous commit must be classified as Ambiguous"
         );
     }
@@ -745,7 +750,7 @@ mod m223_ac03 {
     //! is restart-safe; rerun is idempotent.
     use super::m223_fixtures::*;
     use mp::autopilot::lifecycle::{
-        ClosureJournal, Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
+        Clock, ClosureJournal, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
         TransitionOutcome,
     };
 
@@ -780,14 +785,19 @@ mod m223_ac03 {
         let first = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
         assert_eq!(first.applied_count, 1);
         assert_eq!(first.rejected_count, 0);
-        assert!(!first.reached_complete(), "partial closure must not fabricate complete");
+        assert!(
+            !first.reached_complete(),
+            "partial closure must not fabricate complete"
+        );
 
         // Resume from the journal.
         let journal = closure.journal.clone();
-        let mut resumed =
-            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let mut resumed = LifecycleClosure::from_journal(snapshot(), journal, &commits);
         let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
-        assert!(second.reached_complete(), "resume should reach complete: {second:?}");
+        assert!(
+            second.reached_complete(),
+            "resume should reach complete: {second:?}"
+        );
         assert_eq!(second.applied_count, plan.len() - 1);
         assert_eq!(second.idempotent_count, 1);
     }
@@ -801,8 +811,7 @@ mod m223_ac03 {
         let partial: Vec<_> = plan.iter().take(2).cloned().collect();
         let _ = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
         let journal = closure.journal.clone();
-        let mut resumed =
-            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let mut resumed = LifecycleClosure::from_journal(snapshot(), journal, &commits);
         let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
         assert!(second.reached_complete());
     }
@@ -820,8 +829,7 @@ mod m223_ac03 {
         let partial: Vec<_> = plan.iter().take(4).cloned().collect();
         let _ = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
         let journal = closure.journal.clone();
-        let mut resumed =
-            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let mut resumed = LifecycleClosure::from_journal(snapshot(), journal, &commits);
         let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
         assert!(second.reached_complete());
     }
@@ -850,10 +858,7 @@ mod m223_ac03 {
         let _ = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
         // Fresh closure must NOT inherit the journal — each cycle
         // is its own transaction.
-        let mut fresh = LifecycleClosure::new(
-            snapshot(),
-            &commits,
-        );
+        let mut fresh = LifecycleClosure::new(snapshot(), &commits);
         let outcome = fresh.execute(
             &[LifecycleTransition::CompleteLifecycle {
                 idempotency_key: "lifecycle:223:complete:cycle-2".to_string(),
@@ -892,8 +897,7 @@ mod m223_ac03 {
         // Resume on a fresh snapshot (matches AC-03: a crash mid-
         // closure leaves the canonical milestone file untouched;
         // the next run re-reads it).
-        let mut resumed =
-            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let mut resumed = LifecycleClosure::from_journal(snapshot(), journal, &commits);
         let outcome = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
         assert!(outcome.reached_complete());
         // Final state has the resolved finding + passed review.

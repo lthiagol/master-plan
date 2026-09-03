@@ -67,14 +67,23 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum CommitKind {
     /// `M<id>: S<n> — <description>` — implements one step.
-    Implementation { milestone_id: String, step_id: String },
+    Implementation {
+        milestone_id: String,
+        step_id: String,
+    },
     /// `M<id>: fix self-review <area> — <description>` — fixes
     /// exactly one finding.
-    SelfReviewFix { milestone_id: String, finding_id: String },
+    SelfReviewFix {
+        milestone_id: String,
+        finding_id: String,
+    },
     /// `M<id>: lifecycle evidence …` — moves the milestone's
     /// lifecycle forward. Treated as evidence-overwriting by
     /// default unless the body carries the manifest.
-    LifecycleMetadata { milestone_id: String, transition: String },
+    LifecycleMetadata {
+        milestone_id: String,
+        transition: String,
+    },
     /// More than one intent marker in the subject — refused as
     /// `fixed_in` and as `Implementation` candidate.
     Ambiguous { reasons: Vec<String> },
@@ -111,7 +120,11 @@ pub struct CommitInspection {
 }
 
 impl CommitInspection {
-    pub fn new(sha: impl Into<String>, subject: impl Into<String>, body: impl Into<String>) -> Self {
+    pub fn new(
+        sha: impl Into<String>,
+        subject: impl Into<String>,
+        body: impl Into<String>,
+    ) -> Self {
         let subject = subject.into();
         let body = body.into();
         let kind = classify_subject(&subject);
@@ -662,11 +675,8 @@ mod tests {
 
     #[test]
     fn non_lifecycle_commit_short_circuits_overwrite_check() {
-        let inspection = CommitInspection::new(
-            "sha-fix",
-            "M223: fix self-review F-01 — clippy",
-            "",
-        );
+        let inspection =
+            CommitInspection::new("sha-fix", "M223: fix self-review F-01 — clippy", "");
         assert!(lifecycle_metadata_overwrites_evidence(&inspection, &[("AC-01", "rev-1")]).is_ok());
     }
 }

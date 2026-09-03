@@ -91,10 +91,11 @@ pub use gate::{
     EX_AUTOPILOT_GATE, HERDR_INSTALL_HINT,
 };
 pub use lifecycle::{
-    validate_evidence_shape as validate_lifecycle_evidence, ClosureJournal, ClosureOutcome,
-    CommitAttestation, JournalEntry, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
-    NullAttestation, TransitionKind, TransitionOutcome as LifecycleTransitionOutcome,
-    TransitionRejectReason, Clock, ClockT, LIFECYCLE_TRANSITION_ORDER,
+    validate_evidence_shape as validate_lifecycle_evidence, Clock, ClockT, ClosureJournal,
+    ClosureOutcome, CommitAttestation, JournalEntry, LifecycleClosure, LifecycleTransition,
+    MilestoneSnapshot, NullAttestation, TransitionKind,
+    TransitionOutcome as LifecycleTransitionOutcome, TransitionRejectReason,
+    LIFECYCLE_TRANSITION_ORDER,
 };
 pub use list::{list_sessions, SessionListEntry};
 pub use migrate::{

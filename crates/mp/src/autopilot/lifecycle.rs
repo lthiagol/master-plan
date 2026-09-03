@@ -207,6 +207,7 @@ impl TransitionKind {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         Some(match s {
             "mark-step-done" => TransitionKind::MarkStepDone,
@@ -278,12 +279,24 @@ impl LifecycleTransition {
 
     pub fn idempotency_key(&self) -> &str {
         match self {
-            LifecycleTransition::MarkStepDone { idempotency_key, .. }
-            | LifecycleTransition::StampCriterionPass { idempotency_key, .. }
-            | LifecycleTransition::ClaimReview { idempotency_key, .. }
-            | LifecycleTransition::AddFinding { idempotency_key, .. }
-            | LifecycleTransition::ResolveFinding { idempotency_key, .. }
-            | LifecycleTransition::PassReviews { idempotency_key, .. }
+            LifecycleTransition::MarkStepDone {
+                idempotency_key, ..
+            }
+            | LifecycleTransition::StampCriterionPass {
+                idempotency_key, ..
+            }
+            | LifecycleTransition::ClaimReview {
+                idempotency_key, ..
+            }
+            | LifecycleTransition::AddFinding {
+                idempotency_key, ..
+            }
+            | LifecycleTransition::ResolveFinding {
+                idempotency_key, ..
+            }
+            | LifecycleTransition::PassReviews {
+                idempotency_key, ..
+            }
             | LifecycleTransition::CompleteLifecycle { idempotency_key } => idempotency_key,
         }
     }
@@ -376,39 +389,47 @@ pub enum TransitionRejectReason {
     /// The journal's most-recent applied transition is not the
     /// transition the caller is now applying; the journal is the
     /// canonical record so the caller must align with it.
-    JournalMismatch { journal_kind: TransitionKind, attempted: TransitionKind },
+    JournalMismatch {
+        journal_kind: TransitionKind,
+        attempted: TransitionKind,
+    },
 }
 
 impl std::fmt::Display for TransitionRejectReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TransitionRejectReason::LifecycleDrift { observed, attempted } => write!(
+            TransitionRejectReason::LifecycleDrift {
+                observed,
+                attempted,
+            } => write!(
                 f,
                 "lifecycle drift: observed={observed} attempted={attempted}"
             ),
-            TransitionRejectReason::UnknownTarget { target, target_kind } => write!(
-                f,
-                "unknown {target_kind} target: {target}"
-            ),
+            TransitionRejectReason::UnknownTarget {
+                target,
+                target_kind,
+            } => write!(f, "unknown {target_kind} target: {target}"),
             TransitionRejectReason::IdempotencyKeyMismatch { stored, attempted } => write!(
                 f,
                 "idempotency-key mismatch: stored={stored} attempted={attempted}"
             ),
-            TransitionRejectReason::EvidenceOverwrite { ac_id, before, after } => write!(
+            TransitionRejectReason::EvidenceOverwrite {
+                ac_id,
+                before,
+                after,
+            } => write!(
                 f,
                 "evidence overwrite for {ac_id}: before={before:?} after={after:?}"
             ),
-            TransitionRejectReason::EvidenceShape { ac_id, detail } => write!(
-                f,
-                "evidence shape rejected for {ac_id}: {detail}"
-            ),
+            TransitionRejectReason::EvidenceShape { ac_id, detail } => {
+                write!(f, "evidence shape rejected for {ac_id}: {detail}")
+            }
             TransitionRejectReason::MissingFixedIn { finding_id } => {
                 write!(f, "missing fixed_in for finding {finding_id}")
             }
-            TransitionRejectReason::FabricatedFixedIn { finding_id, sha } => write!(
-                f,
-                "fabricated fixed_in for finding {finding_id}: sha={sha}"
-            ),
+            TransitionRejectReason::FabricatedFixedIn { finding_id, sha } => {
+                write!(f, "fabricated fixed_in for finding {finding_id}: sha={sha}")
+            }
             TransitionRejectReason::GroupedRemediation { finding_id, sha } => write!(
                 f,
                 "grouped remediation commit {sha} for finding {finding_id}"
@@ -418,7 +439,10 @@ impl std::fmt::Display for TransitionRejectReason {
                 "out-of-order: pending transition kind {} must apply first",
                 pending_kind.as_str()
             ),
-            TransitionRejectReason::JournalMismatch { journal_kind, attempted } => write!(
+            TransitionRejectReason::JournalMismatch {
+                journal_kind,
+                attempted,
+            } => write!(
                 f,
                 "journal mismatch: journal={} attempted={}",
                 journal_kind.as_str(),
@@ -481,12 +505,16 @@ pub fn validate_evidence_shape(evidence: &str) -> Result<(), String> {
         return Err(format!("evidence missing '(<n>/<m> pass)': {trimmed:?}"));
     }
     let first = trimmed.split_whitespace().next().unwrap_or("");
-    let runnable_prefixes = ["cargo", "make", "rustc", "bash", "sh", "nextest", "scripts/"];
+    let runnable_prefixes = [
+        "cargo", "make", "rustc", "bash", "sh", "nextest", "scripts/",
+    ];
     let starts_runnable = runnable_prefixes.iter().any(|p| first.starts_with(p))
         || first.starts_with("./")
         || first.starts_with('/');
     if !starts_runnable {
-        return Err(format!("evidence does not start with a runnable command: {trimmed:?}"));
+        return Err(format!(
+            "evidence does not start with a runnable command: {trimmed:?}"
+        ));
     }
     Ok(())
 }
@@ -673,11 +701,7 @@ impl<'a> LifecycleClosure<'a> {
         }
     }
 
-    fn apply_one(
-        &mut self,
-        transition: &LifecycleTransition,
-        clock: &Clock,
-    ) -> TransitionOutcome {
+    fn apply_one(&mut self, transition: &LifecycleTransition, clock: &Clock) -> TransitionOutcome {
         let kind = transition.kind();
         let target = transition.target_id().to_string();
         let key = transition.idempotency_key().to_string();
@@ -727,19 +751,28 @@ impl<'a> LifecycleClosure<'a> {
 
         // 3. Per-kind checks.
         match transition {
-            LifecycleTransition::MarkStepDone { step_id, .. } => self.apply_step_done(step_id, kind, target, key, clock),
-            LifecycleTransition::StampCriterionPass { ac_id, evidence, revision, .. } => {
-                self.apply_ac_pass(ac_id, evidence, revision, kind, target, key, clock)
+            LifecycleTransition::MarkStepDone { step_id, .. } => {
+                self.apply_step_done(step_id, kind, target, key, clock)
             }
-            LifecycleTransition::ClaimReview { review_id, actor, .. } => {
-                self.apply_claim_review(review_id, actor, kind, target, key, clock)
-            }
-            LifecycleTransition::AddFinding { finding_id, description, .. } => {
-                self.apply_add_finding(finding_id, description, kind, target, key, clock)
-            }
-            LifecycleTransition::ResolveFinding { finding_id, fixed_in, .. } => {
-                self.apply_resolve_finding(finding_id, fixed_in, kind, target, key, clock)
-            }
+            LifecycleTransition::StampCriterionPass {
+                ac_id,
+                evidence,
+                revision,
+                ..
+            } => self.apply_ac_pass(ac_id, evidence, revision, kind, target, key, clock),
+            LifecycleTransition::ClaimReview {
+                review_id, actor, ..
+            } => self.apply_claim_review(review_id, actor, kind, target, key, clock),
+            LifecycleTransition::AddFinding {
+                finding_id,
+                description,
+                ..
+            } => self.apply_add_finding(finding_id, description, kind, target, key, clock),
+            LifecycleTransition::ResolveFinding {
+                finding_id,
+                fixed_in,
+                ..
+            } => self.apply_resolve_finding(finding_id, fixed_in, kind, target, key, clock),
             LifecycleTransition::PassReviews { review_id, .. } => {
                 self.apply_pass_reviews(review_id, kind, target, key, clock)
             }
@@ -768,7 +801,9 @@ impl<'a> LifecycleClosure<'a> {
                 },
             };
         };
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         if let Some(s) = self.milestone.steps.iter_mut().find(|s| s.id == step.id) {
             s.status = "done".to_string();
         }
@@ -780,6 +815,7 @@ impl<'a> LifecycleClosure<'a> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_ac_pass(
         &mut self,
         ac_id: &str,
@@ -838,8 +874,15 @@ impl<'a> LifecycleClosure<'a> {
                 },
             };
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
-        if let Some(a) = self.milestone.acceptance_criteria.iter_mut().find(|a| a.id == ac.id) {
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
+        if let Some(a) = self
+            .milestone
+            .acceptance_criteria
+            .iter_mut()
+            .find(|a| a.id == ac.id)
+        {
             a.status = "passed".to_string();
             a.evidence = evidence.to_string();
             a.revision = revision.to_string();
@@ -868,7 +911,9 @@ impl<'a> LifecycleClosure<'a> {
                 actor: actor.to_string(),
             });
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         TransitionOutcome::Applied {
             kind,
             target_id: target,
@@ -895,7 +940,9 @@ impl<'a> LifecycleClosure<'a> {
             });
             let _ = description;
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         TransitionOutcome::Applied {
             kind,
             target_id: target,
@@ -945,7 +992,9 @@ impl<'a> LifecycleClosure<'a> {
                 },
             };
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         if self.milestone.finding(finding_id).is_none() {
             // Resume path: the finding was added in a prior run
             // that we are replaying. Re-create the snapshot row so
@@ -956,7 +1005,12 @@ impl<'a> LifecycleClosure<'a> {
                 fixed_in: fixed_in.to_string(),
                 resolved_at: clock.now(),
             });
-        } else if let Some(f) = self.milestone.findings.iter_mut().find(|f| f.id == finding_id) {
+        } else if let Some(f) = self
+            .milestone
+            .findings
+            .iter_mut()
+            .find(|f| f.id == finding_id)
+        {
             f.status = "resolved".to_string();
             f.fixed_in = fixed_in.to_string();
             f.resolved_at = clock.now();
@@ -1009,7 +1063,9 @@ impl<'a> LifecycleClosure<'a> {
                 },
             };
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         if !in_snapshot {
             // Resume path: rebuild the review snapshot row so the
             // milestone reflects the journal.
@@ -1018,7 +1074,12 @@ impl<'a> LifecycleClosure<'a> {
                 status: "passed".to_string(),
                 actor: "reviewer".to_string(),
             });
-        } else if let Some(r) = self.milestone.reviews.iter_mut().find(|r| r.id == review_id) {
+        } else if let Some(r) = self
+            .milestone
+            .reviews
+            .iter_mut()
+            .find(|r| r.id == review_id)
+        {
             r.status = "passed".to_string();
         }
         TransitionOutcome::Applied {
@@ -1070,7 +1131,9 @@ impl<'a> LifecycleClosure<'a> {
                 };
             }
         }
-        let entry = self.journal.append(kind, target.clone(), key.clone(), &clock.now());
+        let entry = self
+            .journal
+            .append(kind, target.clone(), key.clone(), &clock.now());
         self.milestone.lifecycle = "complete".to_string();
         self.journal.completed_lifecycle = Some("complete".to_string());
         TransitionOutcome::Applied {
@@ -1084,36 +1147,44 @@ impl<'a> LifecycleClosure<'a> {
     fn first_pending_kind(&self) -> Option<TransitionKind> {
         for kind in LIFECYCLE_TRANSITION_ORDER {
             let required = match kind {
-                TransitionKind::MarkStepDone => self
-                    .milestone
-                    .steps
-                    .iter()
-                    .any(|s| self.journal.lookup(TransitionKind::MarkStepDone, &s.id).is_none()),
-                TransitionKind::StampCriterionPass => self.milestone.acceptance_criteria.iter().any(|a| {
+                TransitionKind::MarkStepDone => self.milestone.steps.iter().any(|s| {
                     self.journal
-                        .lookup(TransitionKind::StampCriterionPass, &a.id)
+                        .lookup(TransitionKind::MarkStepDone, &s.id)
                         .is_none()
                 }),
-                TransitionKind::ClaimReview => self
-                    .milestone
-                    .reviews
-                    .iter()
-                    .any(|r| self.journal.lookup(TransitionKind::ClaimReview, &r.id).is_none()),
-                TransitionKind::AddFinding => self
-                    .milestone
-                    .findings
-                    .iter()
-                    .any(|f| f.status == "open" && self.journal.lookup(TransitionKind::AddFinding, &f.id).is_none()),
-                TransitionKind::ResolveFinding => self
-                    .milestone
-                    .findings
-                    .iter()
-                    .any(|f| f.status != "resolved" && self.journal.lookup(TransitionKind::ResolveFinding, &f.id).is_none()),
-                TransitionKind::PassReviews => self
-                    .milestone
-                    .reviews
-                    .iter()
-                    .any(|r| r.status != "passed" && self.journal.lookup(TransitionKind::PassReviews, &r.id).is_none()),
+                TransitionKind::StampCriterionPass => {
+                    self.milestone.acceptance_criteria.iter().any(|a| {
+                        self.journal
+                            .lookup(TransitionKind::StampCriterionPass, &a.id)
+                            .is_none()
+                    })
+                }
+                TransitionKind::ClaimReview => self.milestone.reviews.iter().any(|r| {
+                    self.journal
+                        .lookup(TransitionKind::ClaimReview, &r.id)
+                        .is_none()
+                }),
+                TransitionKind::AddFinding => self.milestone.findings.iter().any(|f| {
+                    f.status == "open"
+                        && self
+                            .journal
+                            .lookup(TransitionKind::AddFinding, &f.id)
+                            .is_none()
+                }),
+                TransitionKind::ResolveFinding => self.milestone.findings.iter().any(|f| {
+                    f.status != "resolved"
+                        && self
+                            .journal
+                            .lookup(TransitionKind::ResolveFinding, &f.id)
+                            .is_none()
+                }),
+                TransitionKind::PassReviews => self.milestone.reviews.iter().any(|r| {
+                    r.status != "passed"
+                        && self
+                            .journal
+                            .lookup(TransitionKind::PassReviews, &r.id)
+                            .is_none()
+                }),
                 TransitionKind::CompleteLifecycle => self.journal.completed_lifecycle.is_none(),
             };
             if required {
@@ -1168,7 +1239,10 @@ mod tests {
             self.real.get(sha).map(|r| r.single_fix).unwrap_or(false)
         }
         fn is_evidence_overwriting_metadata(&self, sha: &str) -> bool {
-            self.real.get(sha).map(|r| r.evidence_overwrite).unwrap_or(false)
+            self.real
+                .get(sha)
+                .map(|r| r.evidence_overwrite)
+                .unwrap_or(false)
         }
     }
 
@@ -1252,10 +1326,18 @@ mod tests {
     #[test]
     fn full_closure_reaches_complete() {
         let commits = fake_commits();
-        let snapshot =
-            MilestoneSnapshot::ready_for_closure("223", &["S1", "S2", "S3"], &["AC-01", "AC-02", "AC-03"]);
+        let snapshot = MilestoneSnapshot::ready_for_closure(
+            "223",
+            &["S1", "S2", "S3"],
+            &["AC-01", "AC-02", "AC-03"],
+        );
         let mut closure = LifecycleClosure::new(snapshot.clone(), &commits);
-        let plan = plan_full(&commits, "223", &["S1", "S2", "S3"], &["AC-01", "AC-02", "AC-03"]);
+        let plan = plan_full(
+            &commits,
+            "223",
+            &["S1", "S2", "S3"],
+            &["AC-01", "AC-02", "AC-03"],
+        );
         let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
         assert_eq!(outcome.applied_count, plan.len());
         assert_eq!(outcome.idempotent_count, 0);
@@ -1273,8 +1355,7 @@ mod tests {
     #[test]
     fn idempotent_rerun_does_not_re_apply() {
         let commits = fake_commits();
-        let snapshot =
-            MilestoneSnapshot::ready_for_closure("223", &["S1", "S2"], &["AC-01"]);
+        let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1", "S2"], &["AC-01"]);
         let mut closure = LifecycleClosure::new(snapshot, &commits);
         let plan = plan_full(&commits, "223", &["S1", "S2"], &["AC-01"]);
         let first = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
@@ -1289,8 +1370,7 @@ mod tests {
     #[test]
     fn failure_at_lifecycle_step_blocks_complete() {
         let commits = fake_commits();
-        let snapshot =
-            MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
+        let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
         let mut closure = LifecycleClosure::new(snapshot, &commits);
         let mut plan = plan_full(&commits, "223", &["S1"], &["AC-01"]);
         // Replace the resolve with a fabricated fixed_in.
@@ -1360,13 +1440,20 @@ mod tests {
         let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
         let mut closure = LifecycleClosure::new(snapshot, &commits);
         // Pre-populate the AC with real evidence.
-        if let Some(ac) = closure.milestone.acceptance_criteria.iter_mut().find(|a| a.id == "AC-01") {
+        if let Some(ac) = closure
+            .milestone
+            .acceptance_criteria
+            .iter_mut()
+            .find(|a| a.id == "AC-01")
+        {
             ac.evidence = evidence("AC-01");
             ac.revision = "rev-1".to_string();
         }
         let plan = vec![LifecycleTransition::StampCriterionPass {
             ac_id: "AC-01".to_string(),
-            evidence: "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (2/2 pass)".to_string(),
+            evidence:
+                "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (2/2 pass)"
+                    .to_string(),
             revision: "rev-2".to_string(),
             idempotency_key: "ac:AC-01:rev-2".to_string(),
         }];
@@ -1527,12 +1614,17 @@ mod tests {
         full_plan.push(LifecycleTransition::CompleteLifecycle {
             idempotency_key: "lifecycle:223:complete".to_string(),
         });
-        let snapshot =
-            MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
+        let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
         let mut closure2 = LifecycleClosure::from_journal(snapshot, journal, &commits);
         let outcome = closure2.execute(&full_plan, &Clock::fixed("2026-09-03T00:01:00Z"));
-        assert!(outcome.reached_complete(), "resume should complete: {outcome:?}");
+        assert!(
+            outcome.reached_complete(),
+            "resume should complete: {outcome:?}"
+        );
         assert_eq!(outcome.applied_count, 3, "only the new transitions apply");
-        assert_eq!(outcome.idempotent_count, 4, "the prefix is replayed as no-op");
+        assert_eq!(
+            outcome.idempotent_count, 4,
+            "the prefix is replayed as no-op"
+        );
     }
 }
