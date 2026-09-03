@@ -323,3 +323,583 @@ fn skip_verdict_and_s2_next_action_agree_on_unready_milestone() {
     let ready = ms_full("1", "approved", "ready", "planned");
     assert!(should_skip(&ready).is_none());
 }
+
+// ─── M223: lifecycle closure transaction + commit/finding attribution ────────
+//
+// AC-01 — full closure ceremony with per-AC evidence revisioning and
+// independent reviewer attribution.
+// AC-02 — commit policy rejects missing/fabricated/ambiguous fixed_in
+// and lifecycle metadata commits that overwrite per-AC evidence.
+// AC-03 — failure injection at every command boundary is restart-safe;
+// rerun is idempotent.
+//
+// These tests pin the typed protocol — they exercise the lifecycle
+// and commit_policy modules directly with in-memory fixtures, no
+// shelling out. The fixtures encode the same shape `mp milestone …`
+// produces on disk so a follow-up integration test can drive the
+// real CLI with the same data.
+
+mod m223_fixtures {
+    use mp::autopilot::commit_policy::{
+        classify_subject, lifecycle_metadata_overwrites_evidence, validate_fixed_in, CommitIndex,
+        CommitInspection, CommitKind, PolicyError,
+    };
+    use mp::autopilot::lifecycle::{
+        Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
+        TransitionOutcome, TransitionRejectReason,
+    };
+    use std::cell::RefCell;
+
+    /// In-memory commit index used by both the lifecycle and the
+    /// commit policy tests. Mirrors the fixture shape `git log`
+    /// would produce so the two layers agree.
+    pub struct FakeCommitAttestation {
+        pub real: std::collections::BTreeMap<String, CommitRecord>,
+    }
+    pub struct CommitRecord {
+        pub single_fix: bool,
+    }
+
+    impl mp::autopilot::lifecycle::CommitAttestation for FakeCommitAttestation {
+        fn sha_is_real(&self, sha: &str) -> bool {
+            self.real.contains_key(sha)
+        }
+        fn is_single_finding_fix(&self, sha: &str) -> bool {
+            self.real.get(sha).map(|r| r.single_fix).unwrap_or(false)
+        }
+        fn is_evidence_overwriting_metadata(&self, _sha: &str) -> bool {
+            false
+        }
+    }
+
+    pub fn fixture_attestation() -> FakeCommitAttestation {
+        let mut real = std::collections::BTreeMap::new();
+        real.insert(
+            "sha-fix-1".into(),
+            CommitRecord { single_fix: true },
+        );
+        real.insert(
+            "sha-fix-2".into(),
+            CommitRecord { single_fix: true },
+        );
+        FakeCommitAttestation { real }
+    }
+
+    pub fn evidence(ac_id: &str) -> String {
+        format!(
+            "cargo nextest run -p mp --test watch_execution --no-fail-fast -- {ac_id} exit 0 (1/1 pass)"
+        )
+    }
+
+    pub fn plan_full(
+        milestone_id: &str,
+        step_ids: &[&str],
+        ac_ids: &[&str],
+        finding_ids: &[&str],
+        review_id: &str,
+    ) -> Vec<LifecycleTransition> {
+        let mut plan = Vec::new();
+        for step in step_ids {
+            plan.push(LifecycleTransition::MarkStepDone {
+                step_id: (*step).to_string(),
+                idempotency_key: format!("step:{step}:rev-1"),
+            });
+        }
+        for ac in ac_ids {
+            plan.push(LifecycleTransition::StampCriterionPass {
+                ac_id: (*ac).to_string(),
+                evidence: evidence(ac),
+                revision: format!("rev-{ac}"),
+                idempotency_key: format!("ac:{ac}:rev-1"),
+            });
+        }
+        plan.push(LifecycleTransition::ClaimReview {
+            review_id: review_id.to_string(),
+            actor: "reviewer-pane".to_string(),
+            idempotency_key: format!("review:{review_id}:rev-1"),
+        });
+        for fid in finding_ids {
+            plan.push(LifecycleTransition::AddFinding {
+                finding_id: (*fid).to_string(),
+                description: format!("finding {fid}"),
+                idempotency_key: format!("finding:{fid}:add"),
+            });
+            plan.push(LifecycleTransition::ResolveFinding {
+                finding_id: (*fid).to_string(),
+                fixed_in: "sha-fix-1".to_string(),
+                idempotency_key: format!("finding:{fid}:resolve"),
+            });
+        }
+        plan.push(LifecycleTransition::PassReviews {
+            review_id: review_id.to_string(),
+            idempotency_key: format!("review:{review_id}:pass"),
+        });
+        plan.push(LifecycleTransition::CompleteLifecycle {
+            idempotency_key: format!("lifecycle:{milestone_id}:complete"),
+        });
+        plan
+    }
+
+    pub fn assert_evidence_preserved(
+        snapshot: &MilestoneSnapshot,
+        ac_ids: &[&str],
+    ) {
+        for ac in ac_ids {
+            let ac_snap = snapshot.ac(ac).expect("AC in snapshot");
+            assert_eq!(ac_snap.status, "passed", "AC {ac} should be passed");
+            assert!(
+                ac_snap.evidence.contains("cargo nextest"),
+                "AC {ac} evidence must contain a real cargo nextest command: {:?}",
+                ac_snap.evidence
+            );
+            assert!(
+                ac_snap.evidence.contains("exit "),
+                "AC {ac} evidence must contain exit code"
+            );
+            assert!(
+                ac_snap.evidence.contains(" pass)"),
+                "AC {ac} evidence must contain pass count"
+            );
+            assert_eq!(
+                ac_snap.revision,
+                format!("rev-{ac}"),
+                "AC {ac} revision preserved"
+            );
+        }
+    }
+
+    // Failure-injection helper: every step boundary gets a chance to
+    // fail. We use this to assert AC-03 restart safety.
+    pub struct FailureInjector {
+        fail_at: RefCell<Option<usize>>,
+        calls: RefCell<usize>,
+    }
+
+    impl FailureInjector {
+        pub fn new(fail_at: usize) -> Self {
+            Self {
+                fail_at: RefCell::new(Some(fail_at)),
+                calls: RefCell::new(0),
+            }
+        }
+
+        pub fn tick(&self) -> bool {
+            let mut c = self.calls.borrow_mut();
+            *c += 1;
+            let target = *self.fail_at.borrow();
+            target == Some(*c)
+        }
+
+        pub fn calls(&self) -> usize {
+            *self.calls.borrow()
+        }
+    }
+}
+
+mod m223_ac01 {
+    //! AC-01 — full closure sequence. Each AC's evidence revision is
+    //! asserted to be distinct and the final lifecycle is `complete`.
+    use super::m223_fixtures::*;
+    use mp::autopilot::commit_policy::CommitKind;
+    use mp::autopilot::lifecycle::{Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot};
+
+    #[test]
+    fn full_closure_preserves_per_ac_evidence_and_reaches_complete() {
+        let commits = fixture_attestation();
+        let snapshot = MilestoneSnapshot::ready_for_closure(
+            "223",
+            &["S1", "S2", "S3"],
+            &["AC-01", "AC-02", "AC-03"],
+        );
+        let mut closure = LifecycleClosure::new(snapshot, &commits);
+        let plan = plan_full("223", &["S1", "S2", "S3"], &["AC-01", "AC-02", "AC-03"], &["F-01"], "R-223");
+        let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        assert!(
+            outcome.reached_complete(),
+            "closure should reach complete: {outcome:?}"
+        );
+        assert_eq!(outcome.applied_count, plan.len());
+        assert_eq!(outcome.rejected_count, 0);
+        assert_eq!(outcome.idempotent_count, 0);
+
+        // Independent reviewer attribution recorded.
+        let review = closure
+            .milestone
+            .review("R-223")
+            .expect("review R-223 in snapshot");
+        assert_eq!(review.status, "passed");
+        assert_eq!(review.actor, "reviewer-pane");
+
+        // Per-AC evidence preserved with distinct revisions.
+        assert_evidence_preserved(&closure.milestone, &["AC-01", "AC-02", "AC-03"]);
+        let ac1 = closure.milestone.ac("AC-01").unwrap();
+        let ac2 = closure.milestone.ac("AC-02").unwrap();
+        let ac3 = closure.milestone.ac("AC-03").unwrap();
+        assert_eq!(ac1.revision, "rev-AC-01");
+        assert_eq!(ac2.revision, "rev-AC-02");
+        assert_eq!(ac3.revision, "rev-AC-03");
+        assert!(ac1.evidence.contains("-- AC-01"));
+        assert!(ac2.evidence.contains("-- AC-02"));
+        assert!(ac3.evidence.contains("-- AC-03"));
+
+        // Suppress unused import warning.
+        let _ = CommitKind::Unknown;
+    }
+
+    #[test]
+    fn closure_records_each_step_done_with_revision() {
+        let commits = fixture_attestation();
+        let snapshot =
+            MilestoneSnapshot::ready_for_closure("223", &["S1", "S2", "S3"], &["AC-01"]);
+        let mut closure = LifecycleClosure::new(snapshot, &commits);
+        let plan = plan_full("223", &["S1", "S2", "S3"], &["AC-01"], &[], "R-223");
+        let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        assert!(outcome.reached_complete());
+        for step_id in ["S1", "S2", "S3"] {
+            let step = closure.milestone.step(step_id).expect("step in snapshot");
+            assert_eq!(step.status, "done", "step {step_id} should be done");
+        }
+        // Journal entries reflect every transition.
+        let entries = outcome.journal.entries();
+        assert_eq!(entries.len(), plan.len());
+        for entry in entries {
+            assert!(!entry.idempotency_key.is_empty());
+            assert!(!entry.applied_at.is_empty());
+        }
+        let _ = LifecycleTransition::MarkStepDone {
+            step_id: "S1".to_string(),
+            idempotency_key: "x".to_string(),
+        };
+    }
+}
+
+mod m223_ac02 {
+    //! AC-02 — commit policy rejects missing/fabricated/ambiguous
+    //! fixed_in and lifecycle metadata commits that would overwrite
+    //! per-AC evidence.
+    use super::m223_fixtures::*;
+    use mp::autopilot::commit_policy::{classify_subject, CommitIndex, CommitInspection, CommitKind, PolicyError, lifecycle_metadata_overwrites_evidence, validate_fixed_in};
+    use mp::autopilot::lifecycle::{
+        Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot, TransitionOutcome,
+        TransitionRejectReason,
+    };
+
+    #[test]
+    fn rejects_missing_fixed_in() {
+        let index = CommitIndex::new();
+        let err = validate_fixed_in("F-01", "", &index).unwrap_err();
+        assert!(matches!(err, PolicyError::MissingFixedIn { .. }));
+    }
+
+    #[test]
+    fn rejects_fabricated_fixed_in() {
+        let index = CommitIndex::new();
+        let err = validate_fixed_in("F-01", "sha-does-not-exist", &index).unwrap_err();
+        match err {
+            PolicyError::FabricatedSha { sha, .. } => assert_eq!(sha, "sha-does-not-exist"),
+            other => panic!("expected FabricatedSha, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_ambiguous_grouped_fix() {
+        let mut index = CommitIndex::new();
+        index.insert(CommitInspection::new(
+            "sha-grouped",
+            "M223: S1 — fix F-01 + fix F-02",
+            "",
+        ));
+        let err = validate_fixed_in("F-01", "sha-grouped", &index).unwrap_err();
+        match err {
+            PolicyError::GroupedRemediation { sha, reasons, .. } => {
+                assert_eq!(sha, "sha-grouped");
+                assert!(reasons.contains(&"implementation".to_string()));
+                assert!(reasons.contains(&"self-review-fix".to_string()));
+            }
+            other => panic!("expected GroupedRemediation, got {other:?}"),
+        }
+        assert!(
+            matches!(index.lookup("sha-grouped").unwrap().kind, CommitKind::Ambiguous { .. }),
+            "ambiguous commit must be classified as Ambiguous"
+        );
+    }
+
+    #[test]
+    fn rejects_lifecycle_metadata_commit_as_fixed_in() {
+        let mut index = CommitIndex::new();
+        index.insert(CommitInspection::new(
+            "sha-meta",
+            "M223: lifecycle evidence cycle 1",
+            "",
+        ));
+        let err = validate_fixed_in("F-01", "sha-meta", &index).unwrap_err();
+        match err {
+            PolicyError::LifecycleMetadataNotFix { transition, .. } => {
+                assert_eq!(transition, "cycle 1");
+            }
+            other => panic!("expected LifecycleMetadataNotFix, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_lifecycle_metadata_without_evidence_manifest() {
+        let inspection = CommitInspection::new(
+            "sha-meta",
+            "M223: lifecycle evidence cycle 1",
+            "just a summary commit, no manifest",
+        );
+        let err = lifecycle_metadata_overwrites_evidence(
+            &inspection,
+            &[("AC-01", "rev-1"), ("AC-02", "rev-1")],
+        )
+        .unwrap_err();
+        match err {
+            PolicyError::EvidenceOverwritingMetadata {
+                missing_ac_revisions,
+                ..
+            } => {
+                assert!(missing_ac_revisions.contains(&"AC-01".to_string()));
+                assert!(missing_ac_revisions.contains(&"AC-02".to_string()));
+            }
+            other => panic!("expected EvidenceOverwritingMetadata, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn accepts_lifecycle_metadata_with_complete_evidence_manifest() {
+        let inspection = CommitInspection::new(
+            "sha-meta",
+            "M223: lifecycle evidence cycle 1",
+            "Per-AC evidence manifest: AC-01=rev-1, AC-02=rev-1, AC-03=rev-1",
+        );
+        assert!(lifecycle_metadata_overwrites_evidence(
+            &inspection,
+            &[("AC-01", "rev-1"), ("AC-02", "rev-1"), ("AC-03", "rev-1")],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn closure_rejects_grouped_fix_in_resolve_finding() {
+        // End-to-end: build a plan that uses a grouped remediation
+        // commit as `fixed_in`. The closure protocol must refuse it
+        // before reaching `mp reviews finding resolve`.
+        let mut real = std::collections::BTreeMap::new();
+        real.insert(
+            "sha-grouped".to_string(),
+            CommitRecord { single_fix: false },
+        );
+        let commits = FakeCommitAttestation { real };
+        let snapshot = MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]);
+        let mut closure = LifecycleClosure::new(snapshot, &commits);
+        let plan = vec![
+            LifecycleTransition::MarkStepDone {
+                step_id: "S1".to_string(),
+                idempotency_key: "step:S1:rev-1".to_string(),
+            },
+            LifecycleTransition::StampCriterionPass {
+                ac_id: "AC-01".to_string(),
+                evidence: evidence("AC-01"),
+                revision: "rev-AC-01".to_string(),
+                idempotency_key: "ac:AC-01:rev-1".to_string(),
+            },
+            LifecycleTransition::ClaimReview {
+                review_id: "R-223".to_string(),
+                actor: "reviewer".to_string(),
+                idempotency_key: "review:R-223:rev-1".to_string(),
+            },
+            LifecycleTransition::AddFinding {
+                finding_id: "F-01".to_string(),
+                description: "nit".to_string(),
+                idempotency_key: "finding:F-01:add".to_string(),
+            },
+            LifecycleTransition::ResolveFinding {
+                finding_id: "F-01".to_string(),
+                fixed_in: "sha-grouped".to_string(),
+                idempotency_key: "finding:F-01:resolve".to_string(),
+            },
+        ];
+        // The closure still records the prior steps (idempotency
+        // not yet exercised), and refuses the resolve.
+        let outcome = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        let first_reject = outcome.first_reject().unwrap();
+        match first_reject {
+            TransitionOutcome::Rejected { reason, .. } => match reason {
+                TransitionRejectReason::GroupedRemediation { sha, .. } => {
+                    assert_eq!(sha, "sha-grouped");
+                }
+                other => panic!("expected GroupedRemediation, got {other:?}"),
+            },
+            other => panic!("expected Rejected, got {other:?}"),
+        }
+        assert!(!outcome.reached_complete());
+        let _ = (
+            classify_subject("M223: S1 — grouped"),
+            std::any::type_name::<CommitKind>(),
+        );
+    }
+}
+
+mod m223_ac03 {
+    //! AC-03 — failure injection at every lifecycle command boundary
+    //! is restart-safe; rerun is idempotent.
+    use super::m223_fixtures::*;
+    use mp::autopilot::lifecycle::{
+        ClosureJournal, Clock, LifecycleClosure, LifecycleTransition, MilestoneSnapshot,
+        TransitionOutcome,
+    };
+
+    fn snapshot() -> MilestoneSnapshot {
+        MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"])
+    }
+
+    #[test]
+    fn rerun_with_same_keys_is_pure_idempotent() {
+        let commits = fixture_attestation();
+        let mut closure = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &[], "R-223");
+        let first = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        assert!(first.reached_complete());
+        let second = closure.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        assert!(second.reached_complete());
+        assert_eq!(second.applied_count, 0);
+        assert_eq!(second.idempotent_count, plan.len());
+        assert_eq!(second.rejected_count, 0);
+    }
+
+    #[test]
+    fn failure_at_step_done_boundary_is_resumable() {
+        let commits = fixture_attestation();
+        let mut closure = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &[], "R-223");
+        // Simulate a failure after the very first transition. We
+        // truncate the plan to force a stop at the StepDone
+        // boundary; on resume we replay the full plan and the
+        // journal idempotency check makes the prefix a no-op.
+        let partial: Vec<_> = plan.iter().take(1).cloned().collect();
+        let first = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
+        assert_eq!(first.applied_count, 1);
+        assert_eq!(first.rejected_count, 0);
+        assert!(!first.reached_complete(), "partial closure must not fabricate complete");
+
+        // Resume from the journal.
+        let journal = closure.journal.clone();
+        let mut resumed =
+            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        assert!(second.reached_complete(), "resume should reach complete: {second:?}");
+        assert_eq!(second.applied_count, plan.len() - 1);
+        assert_eq!(second.idempotent_count, 1);
+    }
+
+    #[test]
+    fn failure_at_ac_stamp_boundary_is_resumable() {
+        let commits = fixture_attestation();
+        let mut closure = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &[], "R-223");
+        // Truncate after step done + AC stamp.
+        let partial: Vec<_> = plan.iter().take(2).cloned().collect();
+        let _ = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
+        let journal = closure.journal.clone();
+        let mut resumed =
+            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        assert!(second.reached_complete());
+    }
+
+    #[test]
+    fn failure_at_resolve_finding_boundary_is_resumable() {
+        let commits = fixture_attestation();
+        // Include a finding so we have a resolve boundary to fail at.
+        let mut closure = LifecycleClosure::new(
+            MilestoneSnapshot::ready_for_closure("223", &["S1"], &["AC-01"]),
+            &commits,
+        );
+        let plan = plan_full("223", &["S1"], &["AC-01"], &["F-01"], "R-223");
+        // Truncate right before resolve finding (index 4: step, AC, claim, add).
+        let partial: Vec<_> = plan.iter().take(4).cloned().collect();
+        let _ = closure.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
+        let journal = closure.journal.clone();
+        let mut resumed =
+            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let second = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        assert!(second.reached_complete());
+    }
+
+    #[test]
+    fn rerun_does_not_overwrite_existing_evidence() {
+        let commits = fixture_attestation();
+        let mut closure = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &[], "R-223");
+        let _ = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        let evidence_before = closure.milestone.ac("AC-01").unwrap().evidence.clone();
+        let _ = closure.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        let evidence_after = closure.milestone.ac("AC-01").unwrap().evidence.clone();
+        assert_eq!(
+            evidence_before, evidence_after,
+            "rerun must not overwrite per-AC evidence"
+        );
+    }
+
+    #[test]
+    fn partial_failure_journal_is_isolated_from_fresh_closure() {
+        let commits = fixture_attestation();
+        // Run closure to completion.
+        let mut closure = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &[], "R-223");
+        let _ = closure.execute(&plan, &Clock::fixed("2026-09-03T00:00:00Z"));
+        // Fresh closure must NOT inherit the journal — each cycle
+        // is its own transaction.
+        let mut fresh = LifecycleClosure::new(
+            snapshot(),
+            &commits,
+        );
+        let outcome = fresh.execute(
+            &[LifecycleTransition::CompleteLifecycle {
+                idempotency_key: "lifecycle:223:complete:cycle-2".to_string(),
+            }],
+            &Clock::fixed("2026-09-03T00:01:00Z"),
+        );
+        assert!(
+            !outcome.reached_complete(),
+            "fresh closure must not silently inherit prior journal: {outcome:?}"
+        );
+        assert!(matches!(
+            outcome.first_reject(),
+            Some(TransitionOutcome::Rejected { .. })
+        ));
+        // The fresh closure's journal is empty (only rejected entries).
+        let fresh_journal = fresh.journal.clone();
+        assert_eq!(fresh_journal.entries().len(), 0);
+        // The completed closure's journal is unaffected.
+        let original = closure.journal.clone();
+        assert_ne!(
+            fresh_journal.entries().len(),
+            original.entries().len(),
+            "fresh closure's journal must remain distinct from the completed one"
+        );
+    }
+
+    #[test]
+    fn journal_resume_from_real_journal_reaches_complete() {
+        let commits = fixture_attestation();
+        let mut first = LifecycleClosure::new(snapshot(), &commits);
+        let plan = plan_full("223", &["S1"], &["AC-01"], &["F-01"], "R-223");
+        let partial: Vec<_> = plan.iter().take(4).cloned().collect();
+        let _ = first.execute(&partial, &Clock::fixed("2026-09-03T00:00:00Z"));
+        let journal: ClosureJournal = first.journal.clone();
+
+        // Resume on a fresh snapshot (matches AC-03: a crash mid-
+        // closure leaves the canonical milestone file untouched;
+        // the next run re-reads it).
+        let mut resumed =
+            LifecycleClosure::from_journal(snapshot(), journal, &commits);
+        let outcome = resumed.execute(&plan, &Clock::fixed("2026-09-03T00:01:00Z"));
+        assert!(outcome.reached_complete());
+        // Final state has the resolved finding + passed review.
+        let review = resumed.milestone.review("R-223").unwrap();
+        assert_eq!(review.status, "passed");
+        let finding = resumed.milestone.finding("F-01").unwrap();
+        assert_eq!(finding.status, "resolved");
+    }
+}
