@@ -149,6 +149,20 @@ pub enum AutopilotSessionCmd {
         /// Session id (e.g. `alpha`).
         id: String,
     },
+    /// M225 F-01 production wiring (AC-03): run the startup
+    /// recovery on `<id>`. Loads the session, runs
+    /// `recover_event_tail` against the current binary
+    /// provenance, and writes the session back if the cursor
+    /// was bumped. A `Rejected` verdict (incompatible schema
+    /// or binary) is surfaced as a structured report and the
+    /// session is NOT mutated. This is the explicit CLI
+    /// entry point for "resume from the last valid event
+    /// sequence" — used by recovery scripts and by the F-02
+    /// integration tests.
+    Recover {
+        /// Session id (e.g. `alpha`).
+        id: String,
+    },
     /// Apply a typed role-state transition to a session.
     ///
     /// Example:

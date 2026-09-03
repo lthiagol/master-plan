@@ -205,6 +205,46 @@ fn cmd_autopilot_session(
             let session = autopilot::load_session(ctx, &id).map_err(|e| anyhow::anyhow!("{e}"))?;
             emit_fields(format, &SessionShowReport::new(&id, &session), fields)
         }
+        AutopilotSessionCmd::Recover { id } => {
+            // M225 F-01 / AC-03 production wiring: run the
+            // startup recovery on the named session and emit
+            // the structured report. The recover function
+            // writes the session back on `Recovered` and
+            // leaves it untouched on `Rejected`. The caller
+            // sees one report per session.
+            let current = autopilot::spawn::MpBinaryProvenance::current();
+            let report = autopilot::run_startup_recovery(ctx, &id, &current)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            let payload = match &report.outcome {
+                autopilot::StartupRecoveryOutcome::Recovered {
+                    prev_cursor,
+                    next_cursor,
+                    event_count,
+                } => {
+                    json!({
+                        "ok": true,
+                        "session_id": report.session_id,
+                        "outcome": "recovered",
+                        "prev_cursor": prev_cursor,
+                        "next_cursor": next_cursor,
+                        "event_count": event_count,
+                    })
+                }
+                autopilot::StartupRecoveryOutcome::Rejected {
+                    reason,
+                    event_count,
+                } => {
+                    json!({
+                        "ok": false,
+                        "session_id": report.session_id,
+                        "outcome": "rejected",
+                        "reason": reason,
+                        "event_count": event_count,
+                    })
+                }
+            };
+            emit_fields(format, &payload, fields)
+        }
         AutopilotSessionCmd::Transition(args) => {
             cmd_autopilot_transition(ctx, args, format, fields)
         }
