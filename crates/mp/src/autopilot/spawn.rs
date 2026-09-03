@@ -711,6 +711,7 @@ pub struct SpawnInputs<'a> {
 /// Outcome of the spawn pipeline. Carries the per-role rendered
 /// prompts (for audit, AC-04), the per-pane handles, and the
 /// final session.json path.
+#[derive(Debug)]
 pub struct SpawnOutcome {
     /// Pane handles, one per physical pane, in the topology's
     /// canonical order.
@@ -826,13 +827,22 @@ pub fn spawn_session<O: HerdrSpawnOps>(
         let handle = match ops.start_agent(&bundle.label, &kind, &pane_id, &extras) {
             Ok(h) => h,
             Err(e) => {
+                // Roll back: delete every previously-started
+                // pane AND the just-created (but not started)
+                // pane, so no half-created pane survives on the
+                // operator's herdr workspace.
                 rollback(ops, &handles);
+                ops.delete_pane(&pane_id);
                 return Err(e);
             }
         };
         // Deliver the rendered prompt.
         if let Err(e) = ops.send_prompt(&pane_id, &bundle.prompt) {
+            // Roll back: every previously-started pane plus
+            // the just-started pane that never received its
+            // prompt.
             rollback(ops, &handles);
+            ops.delete_pane(&pane_id);
             return Err(e);
         }
         handles.push(handle);
@@ -909,31 +919,33 @@ fn persist_session(
         s
     };
 
-    // Topology → pane layout (Orchestrator first, then Runner,
-    // then Reviewer for 3-pane; supervisor first for collapsed
-    // topologies).
+    // Topology → pane layout. For collapsed topologies
+    // (1-pane, 2-pane supervisor) the schema still requires
+    // every role's pane_id to be populated; collapsed panes
+    // share the same pane_id across the roles that land on
+    // them. The label carries the supervisor marker so audit
+    // consumers can still distinguish.
+    let orch_handle = handles.iter().find(|h| h.label == "role-orchestrator-1");
+    let runner_handle = handles.iter().find(|h| h.label == "role-runner-1");
+    let reviewer_handle = handles.iter().find(|h| h.label == "role-reviewer-1");
+    let supervisor_handle = handles.iter().find(|h| h.label == "supervisor");
+    let pane_ref = |h: &SpawnedPane| PaneRef {
+        pane_id: h.pane_id.clone(),
+        label: Some(h.label.clone()),
+    };
+    let orch_pane_ref = orch_handle
+        .or(supervisor_handle)
+        .map(pane_ref);
+    let runner_pane_ref = runner_handle
+        .or(supervisor_handle)
+        .map(pane_ref);
+    let reviewer_pane_ref = reviewer_handle
+        .or(supervisor_handle)
+        .map(pane_ref);
     session.topology = PaneLayout {
-        orchestrator: handles
-            .iter()
-            .find(|h| h.label == "role-orchestrator-1")
-            .map(|h| PaneRef {
-                pane_id: h.pane_id.clone(),
-                label: Some(h.label.clone()),
-            }),
-        runner: handles
-            .iter()
-            .find(|h| h.label == "role-runner-1")
-            .map(|h| PaneRef {
-                pane_id: h.pane_id.clone(),
-                label: Some(h.label.clone()),
-            }),
-        reviewer: handles
-            .iter()
-            .find(|h| h.label == "role-reviewer-1")
-            .map(|h| PaneRef {
-                pane_id: h.pane_id.clone(),
-                label: Some(h.label.clone()),
-            }),
+        orchestrator: orch_pane_ref,
+        runner: runner_pane_ref,
+        reviewer: reviewer_pane_ref,
     };
 
     // Per-role config snapshots (with the rendered prompt for
