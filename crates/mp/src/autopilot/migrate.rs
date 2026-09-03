@@ -345,7 +345,7 @@ pub fn write_legacy_for_tests(path: &Path, state: &WatchState) -> Result<()> {
     }
     let json = serde_json::to_string_pretty(state)
         .with_context(|| format!("serialize legacy state for {}", path.display()))?;
-    atomic_write(path.to_path_buf(), format!("{json}\n"))
+    atomic_write(path, format!("{json}\n"))
         .with_context(|| format!("write legacy state to {}", path.display()))?;
     Ok(())
 }

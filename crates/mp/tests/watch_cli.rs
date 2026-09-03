@@ -191,7 +191,7 @@ fn autopilot_and_planning_sessions_are_separate_domains() {
     // 3. Both lists report success.
     let plan_list = env.run_json(&["session", "list"]);
     assert!(
-        plan_list["sessions"].as_array().unwrap().len() >= 1,
+        !plan_list["sessions"].as_array().unwrap().is_empty(),
         "planning list should contain the planning session"
     );
 
