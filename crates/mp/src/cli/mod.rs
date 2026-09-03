@@ -12,6 +12,7 @@ pub(crate) use parsers::files_value_parser;
 mod activity;
 mod agent;
 mod annotation;
+mod autopilot;
 mod backlog;
 mod brief;
 mod changelog;
@@ -38,6 +39,7 @@ mod track;
 pub use activity::ActivityCmd;
 pub use agent::{AgentCmd, HarnessCmd, SkillCmd};
 pub use annotation::AnnotationCmd;
+pub use autopilot::{AutopilotCmd, AutopilotNoteCmd, AutopilotSessionCmd, NoteArgs, TransitionArgs};
 pub use backlog::BacklogCmd;
 pub use brief::BriefCmd;
 pub use changelog::ChangelogCmd;
@@ -194,6 +196,11 @@ pub enum Commands {
     Annotation {
         #[command(subcommand)]
         cmd: AnnotationCmd,
+    },
+    /// M207: autopilot session/notes/transitions.
+    Autopilot {
+        #[command(subcommand)]
+        cmd: AutopilotCmd,
     },
     Brownfield {
         #[command(subcommand)]

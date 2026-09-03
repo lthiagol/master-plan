@@ -97,6 +97,21 @@ impl std::fmt::Display for TransitionError {
     }
 }
 
+impl std::str::FromStr for RoleState {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "idle" => Ok(RoleState::Idle),
+            "starting" => Ok(RoleState::Starting),
+            "working" => Ok(RoleState::Working),
+            "blocked" => Ok(RoleState::Blocked),
+            "done" => Ok(RoleState::Done),
+            "unknown" => Ok(RoleState::Unknown),
+            other => Err(format!("unknown role state {other:?}")),
+        }
+    }
+}
+
 impl std::error::Error for TransitionError {}
 
 /// Transition table. The mapping is intentional: an agent can

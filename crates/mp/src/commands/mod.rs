@@ -1,6 +1,7 @@
 pub(crate) mod activity;
 pub(crate) mod agent;
 pub(crate) mod annotation;
+pub(crate) mod autopilot;
 pub(crate) mod archive;
 pub(crate) mod backlog;
 pub(crate) mod brief;

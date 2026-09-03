@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::cli::{resolve_format, ActivityCmd, Cli, Commands, OverviewCmd, ReviewCmd};
 use crate::commands::activity as cmd_activity_mod;
 use crate::commands::annotation as cmd_annotation_mod;
+use crate::commands::autopilot as cmd_autopilot_mod;
 use crate::commands::backlog as cmd_backlog_mod;
 use crate::commands::brief as cmd_brief_mod;
 use crate::commands::brownfield as cmd_brownfield_mod;
@@ -125,6 +126,10 @@ pub(super) fn run(cli: Cli) -> Result<()> {
         Commands::Session { cmd } => {
             ctx.ensure_plan_exists()?;
             cmd_session_mod::cmd_session(&ctx, cmd, format)
+        }
+        Commands::Autopilot { cmd } => {
+            ctx.ensure_plan_exists()?;
+            cmd_autopilot_mod::cmd_autopilot(&ctx, cmd, format, &fields)
         }
         Commands::Agent { cmd } => super::agent::run(&ctx, cmd, format),
         Commands::Skill { cmd } => {
