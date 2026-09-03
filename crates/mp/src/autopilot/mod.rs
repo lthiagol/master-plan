@@ -59,7 +59,10 @@ pub use recovery::{
     RecoveredSession,
 };
 pub use role::{
-    pane_index_for, role_pane_slots, PaneSlots, Role, RoleSlot, Topology,
+    builtin_role_default, pane_index_for, resolve_role_config, resolve_role_config_full,
+    resolve_role_config_with_provenance, role_pane_slots, PaneSlots, ResolvedRoleConfig,
+    ResolvedRoleConfigWithProvenance, Role, RoleConfigOverride, RoleConfigSource, RoleSlot,
+    Topology,
 };
 #[allow(unused_imports)]
 use schema::validate_value as _;
