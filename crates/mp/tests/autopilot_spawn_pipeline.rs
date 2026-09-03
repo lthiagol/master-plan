@@ -329,4 +329,113 @@ fn harness_extra_flags_forwarded_on_agent_start_argv() {
     }
 }
 
+// F-01 regression test: Reviewer spawn_prompt_rendered must
+// contain the Reviewer template, NOT the Runner template.
+// The bug: rendered_for used to infer role from skill name
+// ('mp-coordinator' -> Orchestrator, _ -> Runner). The
+// Reviewer's built-in skill is 'mp-runner', so Reviewer
+// inputs fell through to the Runner arm and the persisted
+// roles.reviewer.spawn_prompt_rendered contained Runner
+// content (Runner boundaries block, Runner typed commands
+// including 'mp milestone complete' and 'mp milestone step
+// done'). Skill name is a harness-dispatch concern; role
+// classification is a template-selection concern.
+#[test]
+fn f01_regression_reviewer_prompt_uses_reviewer_template_not_runner() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = ctx_in(tmp.path());
+    let (si, ops) = make_inputs(&ctx, Topology::ThreeAgent);
+    spawn_session(&ops, &si).expect("pipeline should succeed");
+    let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
+    let reviewer_prompt = loaded
+        .roles
+        .reviewer
+        .as_ref()
+        .expect("reviewer role populated")
+        .spawn_prompt_rendered
+        .as_deref()
+        .expect("reviewer spawn_prompt_rendered populated");
+    // Reviewer template markers — must be present.
+    assert!(
+        reviewer_prompt.contains("# Spawn prompt — role: reviewer"),
+        "reviewer prompt must use Reviewer template header, got: {}",
+        &reviewer_prompt.lines().take(3).collect::<Vec<_>>().join("\n")
+    );
+    assert!(
+        reviewer_prompt.contains("You are the REVIEWER"),
+        "reviewer prompt must contain Reviewer boundaries block"
+    );
+    // Reviewer typed-command surface — must include mp reviews
+    // pass and must NOT include Runner's milestone commands
+    // (which used to leak through the buggy skill-name
+    // fallback).
+    assert!(
+        reviewer_prompt.contains("mp reviews pass <id>"),
+        "reviewer prompt must include `mp reviews pass <id>` command form"
+    );
+    // Runner template markers — must be ABSENT.
+    assert!(
+        !reviewer_prompt.contains("# Spawn prompt — role: runner"),
+        "reviewer prompt must NOT use Runner template header (F-01)"
+    );
+    assert!(
+        !reviewer_prompt.contains("You are the RUNNER"),
+        "reviewer prompt must NOT contain Runner boundaries block (F-01)"
+    );
+    // The Runner typed-transition list contains
+    // `mp milestone complete <id>` as a command form. With
+    // the F-01 bug, this leaked into the Reviewer prompt.
+    assert!(
+        !reviewer_prompt.contains("mp milestone complete <id>"),
+        "reviewer prompt must NOT contain Runner's `mp milestone complete <id>` command form (F-01)"
+    );
+    assert!(
+        !reviewer_prompt.contains("mp milestone step done <id>"),
+        "reviewer prompt must NOT contain Runner's `mp milestone step done <id>` command form (F-01)"
+    );
+    assert!(
+        !reviewer_prompt.contains("Per-AC evidence MUST be a real"),
+        "reviewer prompt must NOT contain Runner's per-AC evidence reminder (F-01)"
+    );
+}
+
+// F-01 regression: the same invariant must hold for the
+// Orchestrator and Runner slots too — no role's persisted
+// prompt should contain another role's template markers.
+#[test]
+fn f01_regression_orchestrator_and_runner_prompts_use_their_own_templates() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = ctx_in(tmp.path());
+    let (si, ops) = make_inputs(&ctx, Topology::ThreeAgent);
+    spawn_session(&ops, &si).expect("pipeline should succeed");
+    let loaded = mp::autopilot::session::load_session(&ctx, "sess-alpha").unwrap();
+
+    let orch_prompt = loaded
+        .roles
+        .orchestrator
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .as_deref()
+        .unwrap();
+    assert!(orch_prompt.contains("# Spawn prompt — role: orchestrator"));
+    assert!(orch_prompt.contains("You are the ORCHESTRATOR"));
+    assert!(!orch_prompt.contains("# Spawn prompt — role: runner"));
+    assert!(!orch_prompt.contains("# Spawn prompt — role: reviewer"));
+
+    let runner_prompt = loaded
+        .roles
+        .runner
+        .as_ref()
+        .unwrap()
+        .spawn_prompt_rendered
+        .as_deref()
+        .unwrap();
+    assert!(runner_prompt.contains("# Spawn prompt — role: runner"));
+    assert!(runner_prompt.contains("You are the RUNNER"));
+    assert!(runner_prompt.contains("mp milestone complete <id>"));
+    assert!(!runner_prompt.contains("# Spawn prompt — role: orchestrator"));
+    assert!(!runner_prompt.contains("# Spawn prompt — role: reviewer"));
+}
+
 // Tiny helper kept as a module-private function above.
