@@ -3,9 +3,9 @@
     "id": "208",
     "title": "mp autopilot CLI rename — pivot `mp watch` to `mp autopilot` with legacy alias",
     "slug": "mp-autopilot-cli-rename-pivot-mp-watch-to-mp-autopilot-with-legacy-alias",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,7 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.539371+00:00",
+    "lifecycle_at": "2026-09-03T18:57:05.367451+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -35,9 +35,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:28.906506+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-03T18:57:05.367452+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:28.906506+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-03T18:57:05.367452+00:00"
       },
       "specify": {
         "status": "done",
@@ -70,36 +78,36 @@
       "id": "AC-01",
       "description": "`mp autopilot --help` lists the autopilot verb tree (start, status, stop, output, result, config, session) with descriptions matching today's `mp watch` and `mp watch-control` sub-commands.",
       "verification": "cargo nextest run -p mp --test autopilot_cli_tree --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_cli_tree --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-02",
       "description": "`mp watch` and `mp autopilot` accept the same arguments and return identical exit codes and stdout bytes; the only permitted difference is the single legacy deprecation line on `mp watch` stderr.",
       "verification": "cargo nextest run -p mp --test watch_alias_equivalence --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_alias_equivalence --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-03",
       "description": "A versioned legacy watch-state fixture migrates once into the M207 session schema; status/list/show preserve session identity, queue order, pane IDs, and lifecycle state. Re-running migration is idempotent.",
       "verification": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast exit 0 (13/13 pass)"
     },
     {
       "id": "AC-04",
       "description": "Unknown, corrupt, or partially migrated legacy state fails with a typed diagnostic and leaves both the legacy source and any existing autopilot session unchanged.",
       "verification": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast exit 0 (13/13 pass)"
     },
     {
       "id": "AC-05",
       "description": "`mp session` planning workflows and `mp autopilot session` drive workflows have unambiguous CLI nesting, help text, storage paths, and diagnostics; neither command can read or mutate the other session domain.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (15/15 pass)"
     }
   ],
   "design_decisions": [
@@ -138,7 +146,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_cli_tree --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 208 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -158,7 +166,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_alias_equivalence --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 208 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -178,7 +186,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 208 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -199,7 +207,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_legacy_state_migration --no-fail-fast",
       "done_when": "AC-03 and AC-04 pass with exact fixture assertions.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03",
         "AC-04"
@@ -222,7 +230,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "done_when": "AC-05 proves cross-domain IDs and paths cannot be confused.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -234,7 +242,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-03",
     "branch": "",
     "evidence": ""
   }
