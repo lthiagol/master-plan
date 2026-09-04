@@ -24,8 +24,7 @@
 use std::collections::BTreeMap;
 
 use raul::tui::autopilot::{
-    OverridePanel, RoleOverride, SessionOverridesPayload, DEFAULT_REFRESH_SECS,
-    DEFAULT_TOPOLOGY,
+    OverridePanel, RoleOverride, SessionOverridesPayload, DEFAULT_REFRESH_SECS, DEFAULT_TOPOLOGY,
 };
 
 /// AC-03: the precedence baseline. With every role envelope empty,

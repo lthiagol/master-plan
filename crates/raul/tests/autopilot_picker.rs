@@ -35,10 +35,7 @@ fn picker_filters_to_autopilot_eligible_lifecycles() {
     // Every surviving row is eligible by definition — explicit
     // double-check so a future filter regression fails here too.
     for c in &candidates {
-        assert!(
-            is_picker_eligible(&c.lifecycle),
-            "{c:?} must be eligible"
-        );
+        assert!(is_picker_eligible(&c.lifecycle), "{c:?} must be eligible");
     }
 }
 
@@ -153,8 +150,7 @@ fn cursor_moves_correctly_across_the_list() {
     // Page-style movement (delta > 1) also wraps correctly.
     picker.move_cursor(5);
     assert_eq!(
-        picker.cursor,
-        1,
+        picker.cursor, 1,
         "delta > len must wrap modulo len (5 % 3 = 2; 2 + 2 = 4 % 3 = 1)"
     );
 }
