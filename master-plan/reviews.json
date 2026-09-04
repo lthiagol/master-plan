@@ -2087,6 +2087,14 @@
       "reviewed_at": "2026-09-04",
       "notes": "Cycle 4 final discipline re-review: cargo fmt --all -- --check exit 0; mp M229 filter 6/6 pass; raul M229 filter 1/1 pass; duplicate test attribute removed. F-01/F-02/F-03/F-04/F-05 all fixed; no new findings.",
       "milestone_completed_at": "2026-09-04"
+    },
+    {
+      "milestone_id": "229",
+      "verdict": "ok",
+      "reviewer": "reviewer-229",
+      "reviewed_at": "2026-09-04",
+      "notes": "Fix workflow: 7 CI failures resolved. AC-01..AC-05 verified (3/3, 3/3, 4/4, 1/1, 9/9 pass). fmt+clippy clean. TFTT: golden+schema reverts fail tests; herdr deferral revert passes locally (herdr on PATH) but fix is CI-parity correct per commit 03d55c2.",
+      "milestone_completed_at": "2026-09-04"
     }
   ],
   "comments": [
