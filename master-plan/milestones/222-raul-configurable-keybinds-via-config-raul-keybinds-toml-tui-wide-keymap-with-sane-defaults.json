@@ -3,9 +3,9 @@
     "id": "222",
     "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
     "slug": "raul-configurable-keybinds-via-config-raul-keybinds-toml-tui-wide-keymap-with-sane-defaults",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,7 +26,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T13:17:54.584442+00:00",
+    "lifecycle_at": "2026-09-04T03:05:24.924588+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -36,9 +36,17 @@
         "status": "done",
         "at": "2026-09-03T14:01:32.253459+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-04T03:05:24.924590+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:01:32.350971+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-04T03:05:24.924590+00:00"
       },
       "specify": {
         "status": "done",
@@ -70,57 +78,57 @@
       "id": "AC-01",
       "description": "At startup one shared Keybinds service loads global and per-lane overrides. With no file, every existing default remains unchanged; lanes do not parse the file independently.",
       "verification": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-02",
       "description": "A fixture remaps autopilot.pause to F1, reloads, and proves F1 invokes the canonical pause action while the prior Space binding no longer does; other actions retain defaults.",
       "verification": "cargo nextest run -p raul --test keybind_override_dispatch --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_override_dispatch --no-fail-fast exit 0 (5/5 pass)"
     },
     {
       "id": "AC-03",
       "description": "Unknown actions warn and are ignored; malformed keys or conflicting bindings reject only the affected section and retain its previous/default map. Diagnostics name section, action, and value without aborting raul.",
       "verification": "cargo nextest run -p raul --test keybind_invalid_entries --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_invalid_entries --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-04",
       "description": "Reload parses and validates a complete candidate before atomically swapping it. SIGHUP requests reload on Unix without doing I/O in the signal handler; an explicit reload action works on all platforms. Reload does not wait for user input, and failure preserves the previous map.",
       "verification": "cargo nextest run -p raul --test keybind_reload --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_reload --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-05",
       "description": "Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance.",
       "verification": "cargo nextest run -p raul --test settings_keybind_view --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test settings_keybind_view --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-06",
       "description": "The action registry enumerates every configurable global and lane action. Unknown names cannot shadow actions; global recovery actions remain reachable; duplicate key assignments within an active section are rejected with deterministic diagnostics.",
       "verification": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-07",
       "description": "Parser regressions cover the full documented key surface: underscore and dash aliases, double_quote/double-quote, page_up/page-down, BackTab/Backtab/back-tab, mixed case, modifiers, and combinations such as Ctrl+double-quote and Ctrl+page-up.",
       "verification": "cargo nextest run -p raul --test keybind_parser_aliases --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybind_parser_aliases --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-08",
       "description": "Migration from existing project `keybinds.*` configuration is deterministic: user-level keybinds.toml overrides legacy project bindings, legacy bindings override hardcoded defaults, reads never rewrite either source, and use of the legacy source emits one migration hint.",
       "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast exit 0 (21/21 pass)"
     }
   ],
   "design_decisions": [
@@ -172,7 +180,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
       "done_when": "AC-01 and AC-06 pass with dedicated registry/default tests.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-06"
@@ -195,7 +203,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybind_override_dispatch --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 222 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-02"
@@ -220,7 +228,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybind_reload --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 222 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -244,7 +252,7 @@
       ],
       "tests": "cargo nextest run -p raul --test settings_keybind_view --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 222 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -268,7 +276,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybind_invalid_entries --no-fail-fast",
       "done_when": "AC-03 passes for unknown, malformed, conflicting, and reserved-action fixtures.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -289,7 +297,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybind_parser_aliases --no-fail-fast",
       "done_when": "AC-07 passes across every documented alias and modifier combination.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -311,7 +319,7 @@
       ],
       "tests": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
       "done_when": "AC-08 proves precedence, no-write reads, and one migration hint.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -323,7 +331,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-04",
     "branch": "",
     "evidence": ""
   }
