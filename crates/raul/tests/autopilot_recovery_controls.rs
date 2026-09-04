@@ -169,6 +169,7 @@ fn cancel_collapses_in_session_state_to_terminal() {
 /// into the new session argv. The new session honors
 /// the user's last panel edits.
 #[test]
+#[allow(clippy::field_reassign_with_default)]
 fn restart_argv_preserves_panel_overrides() {
     use raul::tui::autopilot::{OverridePanel, SessionOverridesPayload};
     let mut panel = OverridePanel::default();

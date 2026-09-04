@@ -195,8 +195,8 @@ fn detail_panel_round_trips_through_serde() {
 /// AC-05: the detail panel never reads plan-zone
 /// files directly. The public surface exposes only
 /// `from_payloads` (pure function) + `render_to_string`
-/// + accessors. No path argument, no `std::fs::read`
-/// in the public surface.
+/// and the accessors. The public surface has no path
+/// argument and no `std::fs::read` call.
 #[test]
 fn detail_panel_has_no_filesystem_inputs() {
     let _: fn(&serde_json::Value, &[String], &Option<serde_json::Value>) -> DetailPanel =

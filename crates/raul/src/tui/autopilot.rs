@@ -1572,17 +1572,15 @@ impl Violation {
     /// each row's pane id to decide whether to draw the
     /// badge. `None` when the violation is not bound to a
     /// pane.
+    ///
+    /// M216: the violation's pane id lives on the same JSON
+    /// object — but since the typed enum doesn't carry it
+    /// directly, callers attach pane id by parsing
+    /// `parse_all` from a payload that includes `pane_id` on
+    /// each violation. We expose a sentinel here so the
+    /// contract is uniform with future variants.
     pub fn pane_id(&self) -> Option<&str> {
-        match self {
-            // M216: the violation's pane id lives on the
-            // same JSON object — but since the typed enum
-            // doesn't carry it directly, callers attach
-            // pane id by parsing `parse_all` from a payload
-            // that includes `pane_id` on each violation.
-            // We expose a sentinel here so the contract is
-            // uniform with future variants.
-            _ => None,
-        }
+        None
     }
 
     /// Parse the full violation list from a session-show
@@ -1913,10 +1911,13 @@ impl RecoveryControl {
     /// --detach`. The restart path creates a new session
     /// from the explicit queue — it does NOT revive the
     /// cancelled session. The override payload's topology
-    /// + poll_interval_ms are forwarded through the
+    /// and poll_interval_ms are forwarded through the
     /// `--topology` / `--poll-interval-ms` flags so the
     /// new session honors the user's last panel edits.
-    pub fn start_argv(ids: &[String], payload: &SessionOverridesPayload) -> Vec<String> {
+    pub fn start_argv(
+        ids: &[String],
+        payload: &SessionOverridesPayload,
+    ) -> Vec<String> {
         let mut argv = vec!["start".to_string()];
         for id in ids {
             argv.push(id.clone());
@@ -2025,7 +2026,7 @@ impl AcDetail {
                 // Sort: failed first, then passed, then pending.
                 // The renderer's red marker is for failed ACs;
                 // pending ACs render neutral.
-                rows.sort_by(|a, b| sort_key(&a.status).cmp(&sort_key(&b.status)));
+                rows.sort_by_key(|a| sort_key(&a.status));
                 rows
             });
         let rows = rows?;
@@ -2171,11 +2172,11 @@ impl Telemetry {
                         let last_change = role
                             .get("last_state_change_at")
                             .and_then(|v| v.as_str())
-                            .and_then(|s| parse_iso8601_secs(s));
+                            .and_then(parse_iso8601_secs);
                         let now = role
                             .get("now")
                             .and_then(|v| v.as_str())
-                            .and_then(|s| parse_iso8601_secs(s))
+                            .and_then(parse_iso8601_secs)
                             .unwrap_or(0);
                         Some(last_change.map(|t| now.saturating_sub(t)).unwrap_or(0))
                     })
