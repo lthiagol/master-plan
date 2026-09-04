@@ -4,7 +4,7 @@
 //! herdr is a hard architectural requirement for `mp autopilot start`
 //! (and the legacy `mp watch` alias): one pane-set, three roles, and
 //! workspace naming all depend on it. Unlike the precondition gate in
-//! [`crate::watch::preconditions::check_preconditions`] — which only
+//! [`crate::autopilot::drive::preconditions::check_preconditions`] — which only
 //! *surfaces* a diagnostic when herdr is unavailable — this gate is a
 //! hard refusal that exits 78 (EX_CONFIG) before any session directory
 //! is created, any plan state is written, or any spawn operation is
@@ -45,7 +45,9 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::watch::herdr_version::{HerdrCliShape, VersionFloor, REQUIRED_HERDR_VERSION_FLOOR};
+use crate::autopilot::drive::herdr_version::{
+    HerdrCliShape, VersionFloor, REQUIRED_HERDR_VERSION_FLOOR,
+};
 
 /// Exit code reserved by the agent contract for configuration errors
 /// (sysexits.h `EX_CONFIG`). Distinct from 2 (bulk partial failure /
@@ -72,7 +74,7 @@ pub enum GateReason {
     HerdrBelowFloor,
     /// herdr is on PATH and reports a compatible version, but its
     /// `agent start --help` does not list every flag in
-    /// [`crate::watch::herdr_version::EXPECTED_START_FLAGS`] or its
+    /// [`crate::autopilot::drive::herdr_version::EXPECTED_START_FLAGS`] or its
     /// `pane split --help` returned no output (i.e. the pane split
     /// subcommand is missing). This is the "shape mismatch" path —
     /// version says OK but the wire shape has drifted.
@@ -114,7 +116,7 @@ pub struct AutopilotGateError {
 /// inject a fake binary. The [`check_autopilot_herdr_gate_default`]
 /// wrapper resolves `which herdr` for the production call sites.
 pub fn check_autopilot_herdr_gate(herdr_bin: &Path) -> Result<(), Box<AutopilotGateError>> {
-    let shape = crate::watch::detect_herdr_cli(herdr_bin);
+    let shape = crate::autopilot::drive::detect_herdr_cli(herdr_bin);
     if !shape.on_path {
         return Err(Box::new(missing_gate_error()));
     }
@@ -125,12 +127,12 @@ pub fn check_autopilot_herdr_gate(herdr_bin: &Path) -> Result<(), Box<AutopilotG
 }
 
 /// Convenience wrapper: resolve the herdr binary via
-/// [`crate::watch::herdr::which_herdr`] and run the gate. When herdr
+/// [`crate::autopilot::drive::herdr::which_herdr`] and run the gate. When herdr
 /// is not on PATH, returns the [`GateReason::HerdrMissing`] error
 /// directly without probing a binary (saves one fork/exec pair on
 /// the failure path; keeps the missing-binary diagnostic clean).
 pub fn check_autopilot_herdr_gate_default() -> Result<(), Box<AutopilotGateError>> {
-    match crate::watch::herdr::which_herdr() {
+    match crate::autopilot::drive::herdr::which_herdr() {
         Some(bin) => check_autopilot_herdr_gate(&bin),
         None => Err(Box::new(missing_gate_error())),
     }

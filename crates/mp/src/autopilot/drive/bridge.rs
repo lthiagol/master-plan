@@ -343,12 +343,12 @@ pub fn clear_stage_done_sentinel(herdr_bin: &Path, pane_id: &str, timeout_ms: u6
 
 // ─── File-system helpers ────────────────────────────────────────────────────
 
-/// Locate the `herdr` binary on PATH. Mirror of [`crate::watch::herdr::which_herdr`]
+/// Locate the `herdr` binary on PATH. Mirror of [`crate::autopilot::drive::herdr::which_herdr`]
 /// but lives in the bridge module so callers that import
 /// `bridge::*` don't need to also import `herdr::*` just for the
 /// path resolution. Returns `None` when herdr is not on PATH.
 pub fn which_herdr() -> Option<PathBuf> {
-    crate::watch::herdr::which_herdr()
+    crate::autopilot::drive::herdr::which_herdr()
 }
 
 // ─── Producer-side best-effort helper ───────────────────────────────────────

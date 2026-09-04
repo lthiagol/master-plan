@@ -14,10 +14,10 @@
 mod common;
 
 use crate::common::TestEnv;
-use mp::config::RoleConfig;
-use mp::watch::{
+use mp::autopilot::drive::{
     ensure_pane, run_milestones, DriveOps, PaneHandle, Role, RoleConfigs, SystemDriveOps,
 };
+use mp::config::RoleConfig;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -79,7 +79,7 @@ fn empty_id_list_is_a_noop_with_all_complete_true() {
     let mp = install_fake_mp_complete(&bin_dir);
 
     let mut ops = SystemDriveOps::new(mp, herdr, env.tmp.path(), "1", role_configs());
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1,
         stall_timeout_ms: 0,
     });
@@ -246,7 +246,7 @@ fn run_milestones_processes_in_input_order_ac05() {
         &ids[0],
         role_configs(),
     );
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1,
         stall_timeout_ms: 0,
     });

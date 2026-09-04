@@ -19,7 +19,7 @@ mod common;
 
 use crate::common::fake_herdr::FakeHerdrBuilder;
 use crate::common::TestEnv;
-use mp::watch::{
+use mp::autopilot::drive::{
     deliver_prompt, lifecycle_advanced_past, read_agent_status, read_lifecycle_via_mp, send_prompt,
     wait_for_lifecycle_with, wait_for_readiness_with, LifecycleTarget, PaneHandle,
     ReadinessOptions, WaitOptions, WaitOutcome,

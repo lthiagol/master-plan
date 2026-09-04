@@ -2,7 +2,7 @@
 //! state to the `mp autopilot` session schema.
 //!
 //! The legacy file lives at `<plan_dir>/.mp/watch.state.json` and is
-//! defined by [`crate::watch::state::WatchState`] (schema_version=1).
+//! defined by [`crate::autopilot::drive::state::WatchState`] (schema_version=1).
 //! The destination is `<plan_dir>/autopilot/<id>/session.json` and is
 //! defined by [`crate::autopilot::session::AutopilotSession`]
 //! (schema_version=1, but a different shape).
@@ -30,13 +30,13 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::autopilot::drive::state::WatchState;
 use crate::autopilot::session::{
     load_session, save_session, AutopilotSession, EvidenceRefs, PaneLayout, PaneRef, QueueItem,
     RoleConfig, RoleName, RolesConfig, SessionStatus, Stage,
 };
 use crate::paths::PlanContext;
 use crate::store::{atomic_write, now_rfc3339};
-use crate::watch::state::WatchState;
 
 /// The migration source schema this module understands. Bumped when
 /// the legacy shape changes; older sources are migrated to the
@@ -136,7 +136,7 @@ pub enum MigrationOutcome {
 pub fn migrate_legacy_watch_state(
     ctx: &PlanContext,
 ) -> std::result::Result<MigrationOutcome, MigrationError> {
-    let source_path = crate::watch::default_state_path(&ctx.plan_dir);
+    let source_path = crate::autopilot::drive::default_state_path(&ctx.plan_dir);
     if !source_path.exists() {
         return Ok(MigrationOutcome::NoLegacyState { source_path });
     }
@@ -265,8 +265,8 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
             label: Some(pane.label.clone()),
         };
         match pane.role {
-            crate::watch::Role::Runner => runner = Some(pref),
-            crate::watch::Role::Coordinator => orchestrator = Some(pref),
+            crate::autopilot::drive::Role::Runner => runner = Some(pref),
+            crate::autopilot::drive::Role::Coordinator => orchestrator = Some(pref),
         }
     }
     let topology = PaneLayout {
@@ -340,7 +340,7 @@ fn build_session_from_legacy(legacy: &WatchState) -> AutopilotSession {
 
 /// Lower-level writer used by tests so a legacy fixture can be
 /// written without invoking the real driver. Mirrors
-/// [`crate::watch::state::WatchState::save`].
+/// [`crate::autopilot::drive::state::WatchState::save`].
 pub fn write_legacy_for_tests(path: &Path, state: &WatchState) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -404,7 +404,7 @@ mod tests {
     fn corrupt_legacy_state_surfaces_typed_error() {
         let tmp = tempfile::TempDir::new().unwrap();
         let ctx = ctx_in(tmp.path());
-        let state_path = crate::watch::default_state_path(&ctx.plan_dir);
+        let state_path = crate::autopilot::drive::default_state_path(&ctx.plan_dir);
         std::fs::create_dir_all(state_path.parent().unwrap()).unwrap();
         std::fs::write(&state_path, b"{not json").unwrap();
         let err = migrate_legacy_watch_state(&ctx).unwrap_err();
@@ -421,10 +421,10 @@ mod tests {
     fn idempotent_re_run_is_a_no_op() {
         let tmp = tempfile::TempDir::new().unwrap();
         let ctx = ctx_in(tmp.path());
-        let state_path = crate::watch::default_state_path(&ctx.plan_dir);
+        let state_path = crate::autopilot::drive::default_state_path(&ctx.plan_dir);
         let mut state = WatchState::fresh(&["207".to_string(), "209".to_string()]);
-        state.panes.push(crate::watch::state::PaneState {
-            role: crate::watch::Role::Runner,
+        state.panes.push(crate::autopilot::drive::state::PaneState {
+            role: crate::autopilot::drive::Role::Runner,
             label: "role-runner-1".into(),
             pane_id: "%42".into(),
             spawned_at: now_rfc3339(),

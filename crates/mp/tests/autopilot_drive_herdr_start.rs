@@ -8,7 +8,7 @@
 //! argv shape without requiring a real herdr server or PATH
 //! manipulation. Pure helpers (kind resolution, list-output parsing,
 //! label format) are covered by unit tests in
-//! `crates/mp/src/watch/herdr.rs`.
+//! `crates/mp/src/autopilot/drive/herdr.rs`.
 //!
 //! M197 change: the legacy `agent start <label> --cwd <root> --
 //! <harness argv>` shape is gone. The fake script now has to handle
@@ -24,11 +24,11 @@ mod common;
 
 use crate::common::fake_herdr::FakeHerdrBuilder;
 use crate::common::TestEnv;
-use mp::config::RoleConfig;
-use mp::watch::{
+use mp::autopilot::drive::{
     ensure_pane, find_existing_pane, parse_pane_id_from_start_output, resolve_harness_kind,
     spawn_pane, Role,
 };
+use mp::config::RoleConfig;
 
 #[test]
 fn spawn_pane_invokes_herdr_agent_start_with_correct_argv() {

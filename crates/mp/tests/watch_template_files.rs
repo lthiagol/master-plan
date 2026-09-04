@@ -70,8 +70,8 @@ fn watch_template_files_for_the_five_extracted_stages_exist() {
 ///     include_str! at compile time so the binary cannot ship stale.
 #[test]
 fn compiled_default_placeholders_match_disk_file_substitution_set() {
+    use mp::autopilot::drive::{build_prompt, PromptStage};
     use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta, Step};
-    use mp::watch::{build_prompt, PromptStage};
 
     let m = MilestoneFile {
         milestone: MilestoneMeta {

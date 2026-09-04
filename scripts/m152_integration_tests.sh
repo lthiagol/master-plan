@@ -5,7 +5,7 @@
 # `mp milestone step done S5`'s eval picks it up; copy-pastable
 # for ad-hoc invocation.
 set -euo pipefail
-cargo nextest run -p mp --test watch_resume        --no-fail-fast
+cargo nextest run -p mp --test autopilot_drive_resume        --no-fail-fast
 cargo nextest run -p mp --test watch_state_file   --no-fail-fast
 cargo nextest run -p mp --test watch_no_double_spawn --no-fail-fast
-cargo nextest run -p mp --test watch_signal        --no-fail-fast
+cargo nextest run -p mp --test autopilot_drive_signal        --no-fail-fast

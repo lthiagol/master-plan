@@ -11,11 +11,11 @@
 
 mod common;
 
-use mp::model::{MilestoneFile, MilestoneMeta};
-use mp::watch::{
+use mp::autopilot::drive::{
     drive_milestone, next_stage, should_skip, DriveOps, DriveOutcome, LifecycleTarget, PaneHandle,
     PromptStage, Role, StagePlan, WaitOutcome,
 };
+use mp::model::{MilestoneFile, MilestoneMeta};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
@@ -382,7 +382,7 @@ mod m223_fixtures {
 
     pub fn evidence(ac_id: &str) -> String {
         format!(
-            "cargo nextest run -p mp --test watch_execution --no-fail-fast -- {ac_id} exit 0 (1/1 pass)"
+            "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast -- {ac_id} exit 0 (1/1 pass)"
         )
     }
 
@@ -1531,7 +1531,7 @@ mod m226_fixtures {
     /// uses to bind the command to the milestone criterion.
     pub fn evidence(ac_id: &str, pass: usize, total: usize) -> String {
         format!(
-            "cargo nextest run -p mp --test watch_execution -E 'test(/m226_ac/)' --no-fail-fast -- {ac_id} exit 0 ({pass}/{total} pass)"
+            "cargo nextest run -p mp --test autopilot_drive_execution -E 'test(/m226_ac/)' --no-fail-fast -- {ac_id} exit 0 ({pass}/{total} pass)"
         )
     }
 
@@ -2614,6 +2614,7 @@ mod m226_ac03 {
 mod m226_f_regression {
     use crate::common::fake_herdr::FakeHerdrBuilder;
     use crate::common::TestEnv;
+    use mp::autopilot::drive::{DriveOps, Role, RoleConfigs, SystemDriveOps};
     use mp::autopilot::events::{EventKind, OrchestrationEvent};
     use mp::autopilot::session::{
         load_session, sample_session_for_tests, save_session, AutopilotSession,
@@ -2621,7 +2622,6 @@ mod m226_f_regression {
     use mp::autopilot::spawn::MpBinaryProvenance;
     use mp::config::RoleConfig;
     use mp::paths::PlanContext;
-    use mp::watch::{DriveOps, Role, RoleConfigs, SystemDriveOps};
     use serde_json::json;
     use std::path::Path;
 

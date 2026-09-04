@@ -257,9 +257,9 @@ fn watch_herdr_no_hardcoded_harness_match_arm() {
     //   }
     //
     // We pin the absence of that match-arm pattern in
-    // `crates/mp/src/watch/herdr.rs` so a future regression that
+    // `crates/mp/src/autopilot/drive/herdr.rs` so a future regression that
     // hand-rolls a per-harness argv again will trip this test.
-    let src = read_crate_src("src/watch/herdr.rs");
+    let src = read_crate_src("src/autopilot/drive/herdr.rs");
 
     // The pattern to grep for is a 3-arm match keyed on harness
     // names. The match arms used to live as `match harness {` ...
@@ -275,7 +275,7 @@ fn watch_herdr_no_hardcoded_harness_match_arm() {
 
     if has_first && has_second && has_third {
         panic!(
-            "mp watch src/watch/herdr.rs still contains the \
+            "mp watch src/autopilot/drive/herdr.rs still contains the \
              pre-M151 hardcoded match arm trio ({first_arm} / \
              {second_arm} / {third_arm}). Resolve harness argv \
              via HarnessRegistry::v1() instead."
@@ -289,10 +289,10 @@ fn watch_herdr_invokes_the_registry_for_default_argv() {
     // `HarnessRegistry` directly so the wiring cannot regress
     // back to a local match without removing the registry
     // mention too (which would itself trip a different gate).
-    let src = read_crate_src("src/watch/herdr.rs");
+    let src = read_crate_src("src/autopilot/drive/herdr.rs");
     assert!(
         src.contains("HarnessRegistry") && src.contains("resolve_argv"),
-        "src/watch/herdr.rs must call HarnessRegistry::resolve_argv \
+        "src/autopilot/drive/herdr.rs must call HarnessRegistry::resolve_argv \
          rather than a local match (M151 S3)."
     );
 }
@@ -383,7 +383,7 @@ fn registry_is_the_single_source_for_supported_set() {
     // harness another path rejects — exactly the divergence
     // M151 set out to prevent.
     let config = read_crate_src("src/config.rs");
-    let herdr = read_crate_src("src/watch/herdr.rs");
+    let herdr = read_crate_src("src/autopilot/drive/herdr.rs");
     let registry = read_crate_src("src/harness/registry.rs");
 
     for needle in ["\"opencode\"", "\"pi\"", "\"cursor\""] {

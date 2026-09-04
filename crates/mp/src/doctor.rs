@@ -291,7 +291,7 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     // missing or its `agent start` does not list both `--kind`
     // and `--pane`; the message carries the actionable upgrade
     // hint.
-    let herdr_shape = crate::watch::detect_herdr_cli_default();
+    let herdr_shape = crate::autopilot::drive::detect_herdr_cli_default();
     checks.push(DoctorCheck {
         name: "herdr_cli_shape".to_string(),
         ok: herdr_shape.compatible,
@@ -315,7 +315,7 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
                 .parsed_version
                 .as_deref()
                 .unwrap_or("(version unknown)"),
-            crate::watch::REQUIRED_HERDR_VERSION_FLOOR
+            crate::autopilot::drive::REQUIRED_HERDR_VERSION_FLOOR
         ),
         Err(err) => format!(
             "autopilot herdr gate: refused ({:?}) — {}",

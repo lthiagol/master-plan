@@ -110,10 +110,10 @@ pub use platform::install_signal_handlers;
 ///    "graceful shutdown: last lifecycle was `<last>`").
 pub fn perform_graceful_shutdown(
     ctx: &crate::paths::PlanContext,
-    state: &crate::watch::WatchState,
+    state: &crate::autopilot::drive::WatchState,
     active_milestone: Option<&str>,
     last_lifecycle: Option<&str>,
-    logger: Option<&crate::watch::WatchLogger>,
+    logger: Option<&crate::autopilot::drive::DriveLogger>,
 ) -> anyhow::Result<()> {
     // Step 1: flush the state file. This is the most important
     // step — without it, `--resume` cannot find the panes the run
@@ -121,7 +121,7 @@ pub fn perform_graceful_shutdown(
     // can still proceed to step 2.
     if let Err(e) = state.save_to_plan(ctx) {
         if let Some(l) = logger {
-            let _ = l.log(&crate::watch::WatchLogEntry::new(
+            let _ = l.log(&crate::autopilot::drive::DriveLogEntry::new(
                 "shutdown_flush_failed",
                 format!("watch.state.json flush failed: {e:#}"),
             ));
@@ -142,7 +142,7 @@ pub fn perform_graceful_shutdown(
         let flash = crate::reviews::add_comment(ctx, ms, "mp watch", &body, None, None, None);
         if let Err(e) = flash {
             if let Some(l) = logger {
-                let _ = l.log(&crate::watch::WatchLogEntry::new(
+                let _ = l.log(&crate::autopilot::drive::DriveLogEntry::new(
                     "shutdown_flash_failed",
                     format!("flash note add failed: {e:#}"),
                 ));
@@ -154,7 +154,7 @@ pub fn perform_graceful_shutdown(
 
 /// Test-only convenience: the canonical "send SIGINT, wait for
 /// the process to exit" sequence. Exposed so the integration test
-/// in `crates/mp/tests/watch_signal.rs` can drive a real
+/// in `crates/mp/tests/autopilot_drive_signal.rs` can drive a real
 /// interrupt. Kept in the lib (not under #[cfg(test)]) so a
 /// future ops helper that wants to ping a running watch process
 /// can reuse it; not part of the public-CLI surface.
@@ -207,7 +207,7 @@ pub fn write_shutdown_state_for_test(
     milestone_id: &str,
     last_lifecycle: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
-    use crate::watch::{MilestoneState, WatchState};
+    use crate::autopilot::drive::{MilestoneState, WatchState};
     let mut state = WatchState::fresh(&[milestone_id.to_string()]);
     state.upsert_milestone(MilestoneState {
         id: milestone_id.to_string(),
@@ -272,7 +272,7 @@ mod is_pid_alive_tests {
     }
 }
 
-/// Tests live in the integration crate (`tests/watch_signal.rs`).
+/// Tests live in the integration crate (`tests/autopilot_drive_signal.rs`).
 /// Inline unit tests cover the atomic flag plus the platform
 /// stub so the module-level behavior is exercised without a real
 /// signal.

@@ -239,8 +239,10 @@ fn emit_stage_done_best_effort_noop_when_herdr_pane_id_unset() {
 
     let _env = set_test_env(&bin_dir, None);
 
-    let emitted =
-        mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
+    let emitted = mp::autopilot::drive::emit_stage_done_best_effort(
+        "milestone-complete",
+        Some("test-milestone"),
+    );
     assert!(!emitted, "should be a no-op without HERDR_PANE_ID");
 
     let log_text = fake.read_log();
@@ -266,8 +268,10 @@ fn emit_stage_done_best_effort_invokes_herdr_once_with_sentinel() {
     // assertion below sees only the real call.
     warm_and_clear(&fake);
 
-    let emitted =
-        mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
+    let emitted = mp::autopilot::drive::emit_stage_done_best_effort(
+        "milestone-complete",
+        Some("test-milestone"),
+    );
     assert!(
         emitted,
         "should have emitted when HERDR_PANE_ID + herdr set"
@@ -335,8 +339,10 @@ fn emit_stage_done_best_effort_swallows_herdr_failure_without_panicking() {
     // M227 / WP2: deterministic warmup via shared harness.
     warm_and_clear(&fake);
 
-    let emitted =
-        mp::watch::emit_stage_done_best_effort("milestone-complete", Some("test-milestone"));
+    let emitted = mp::autopilot::drive::emit_stage_done_best_effort(
+        "milestone-complete",
+        Some("test-milestone"),
+    );
     assert!(
         !emitted,
         "herdr failure must be swallowed silently — false, not Err/panic"
@@ -505,7 +511,7 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
 // ─── Deterministic process-group timeout (M227 / WP2 / AC-02) ────────────────
 
 /// M227 / WP2 / AC-02: prove that
-/// [`mp::watch::bridge::run_herdr_with_timeout`] kills the entire
+/// [`mp::autopilot::drive::bridge::run_herdr_with_timeout`] kills the entire
 /// process group (parent sh + grandchild sleep) when the deadline
 /// fires — without fixed sleeps in the test body.
 ///
@@ -520,7 +526,7 @@ fn mp_milestone_complete_outside_herdr_pane_skips_report_agent() {
 /// grandchild's absence via `libc::kill(pid, 0) == -1` (ESRCH).
 ///
 /// The unit-level mirror test in
-/// `crates/mp/src/watch/bridge.rs::run_herdr_with_timeout_kills_entire_process_group`
+/// `crates/mp/src/autopilot/drive/bridge.rs::run_herdr_with_timeout_kills_entire_process_group`
 /// pins the same contract from inside the helper; this test pins
 /// it from the integration surface (the helper's public API as
 /// invoked by `watch_bridge_report`'s real callers).
@@ -548,7 +554,11 @@ fn mp_run_herdr_with_timeout_kills_grandchild_in_process_group() {
     // can synchronize on readiness.
     let script_path = fake.path().to_path_buf();
     let helper = std::thread::spawn(move || {
-        mp::watch::bridge::run_herdr_with_timeout(&script_path, &["pane", "get", "wA:p3"], 300)
+        mp::autopilot::drive::bridge::run_herdr_with_timeout(
+            &script_path,
+            &["pane", "get", "wA:p3"],
+            300,
+        )
     });
 
     // Poll for the pid file (no fixed sleeps — readiness

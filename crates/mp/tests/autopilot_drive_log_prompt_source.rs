@@ -1,7 +1,7 @@
 //! M153 S2 MEDIUM-1: end-to-end test for `prompt_source` log emission.
 //!
 //! The S2 done_when says "the log records 'override' vs 'default' per
-//! stage". This file pins that contract: a real `WatchLogger` attached
+//! stage". This file pins that contract: a real `DriveLogger` attached
 //! to a `DriveOps` receives a `prompt_source` event whenever the watch
 //! loop calls `build_prompt_with`, and the event's `message` field
 //! distinguishes the surface (default vs override) so an operator can
@@ -16,11 +16,11 @@ mod common;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
-use mp::model::{MilestoneFile, MilestoneMeta};
-use mp::watch::{
-    drive_milestone, BuildPromptRequest, DriveOps, DriveOutcome, LifecycleTarget, PaneHandle,
-    PromptStage, Role, WaitOutcome, WatchLogEntry, WatchLogger,
+use mp::autopilot::drive::{
+    drive_milestone, BuildPromptRequest, DriveLogEntry, DriveLogger, DriveOps, DriveOutcome,
+    LifecycleTarget, PaneHandle, PromptStage, Role, WaitOutcome,
 };
+use mp::model::{MilestoneFile, MilestoneMeta};
 
 fn ms(id: &str, lifecycle: &str) -> MilestoneFile {
     MilestoneFile {
@@ -40,8 +40,8 @@ fn ms(id: &str, lifecycle: &str) -> MilestoneFile {
 }
 
 /// Test-only `DriveOps` that forwards `log_event` to a real
-/// `WatchLogger` opened on a tempdir file. Backed by a script of
-/// canned milestones (the same pattern as `crates/mp/src/watch/
+/// `DriveLogger` opened on a tempdir file. Backed by a script of
+/// canned milestones (the same pattern as `crates/mp/src/autopilot/drive/
 /// state_machine.rs::Scripted`) so we can drive `drive_milestone`
 /// end-to-end without spawning subprocesses.
 struct LoggedScripted {
@@ -50,11 +50,11 @@ struct LoggedScripted {
     panes_ensured: RefCell<Vec<Role>>,
     handoffs: RefCell<Vec<String>>,
     plan_dir: PathBuf,
-    logger: WatchLogger,
+    logger: DriveLogger,
 }
 
 impl LoggedScripted {
-    fn new(seq: Vec<MilestoneFile>, plan_dir: PathBuf, logger: WatchLogger) -> Self {
+    fn new(seq: Vec<MilestoneFile>, plan_dir: PathBuf, logger: DriveLogger) -> Self {
         Self {
             milestones: RefCell::new(seq),
             prompts_sent: RefCell::new(vec![]),
@@ -92,11 +92,11 @@ impl DriveOps for LoggedScripted {
         Ok(())
     }
     fn log_event(&self, kind: &'static str, message: impl Into<String>) {
-        // Forward to the real WatchLogger. Tests assert on the JSONL
+        // Forward to the real DriveLogger. Tests assert on the JSONL
         // output of this logger rather than on the in-process
         // scripts — the integration value is "did the JSONL get
         // written at all?"
-        let entry = WatchLogEntry::new(kind, message);
+        let entry = DriveLogEntry::new(kind, message);
         let _ = self.logger.log(&entry);
     }
     fn wait_for_lifecycle(&mut self, _target: LifecycleTarget) -> anyhow::Result<WaitOutcome> {
@@ -129,7 +129,7 @@ fn prompt_source_default_event_lands_in_watch_log() {
     let plan_dir = tmp.path().join("plan");
     std::fs::create_dir_all(plan_dir.join("watch")).unwrap();
     let log_path = tmp.path().join("watch.log");
-    let logger = WatchLogger::open(&log_path).expect("open logger");
+    let logger = DriveLogger::open(&log_path).expect("open logger");
 
     let mut ops = LoggedScripted::new(
         vec![
@@ -184,7 +184,7 @@ fn prompt_source_override_event_lands_in_watch_log() {
     .unwrap();
 
     let log_path = tmp.path().join("watch.log");
-    let logger = WatchLogger::open(&log_path).expect("open logger");
+    let logger = DriveLogger::open(&log_path).expect("open logger");
 
     let mut ops = LoggedScripted::new(
         vec![
@@ -227,7 +227,7 @@ fn prompt_source_events_have_parseable_jsonl_shape() {
     let plan_dir = tmp.path().join("plan");
     std::fs::create_dir_all(plan_dir.join("watch")).unwrap();
     let log_path = tmp.path().join("watch.log");
-    let logger = WatchLogger::open(&log_path).expect("open logger");
+    let logger = DriveLogger::open(&log_path).expect("open logger");
 
     let mut ops = LoggedScripted::new(
         vec![
@@ -289,13 +289,18 @@ fn rereview_override_file_is_silently_ignored_at_render_time() {
     // driving a full script (ReReview isn't reached by execute-
     // prompt iterations in the canned milestone sequence).
     let m = ms("1", "complete");
-    let opts = mp::watch::PromptRenderOptions::default();
-    let (text, source) =
-        mp::watch::build_prompt_with(PromptStage::ReReview, &m, &opts, None, Some(&plan_dir));
+    let opts = mp::autopilot::drive::PromptRenderOptions::default();
+    let (text, source) = mp::autopilot::drive::build_prompt_with(
+        PromptStage::ReReview,
+        &m,
+        &opts,
+        None,
+        Some(&plan_dir),
+    );
 
     assert_eq!(
         source,
-        mp::watch::TemplateSource::Hardcoded("re-review"),
+        mp::autopilot::drive::TemplateSource::Hardcoded("re-review"),
         "ReReview source must be Hardcoded; got {source:?}"
     );
     assert!(
@@ -317,7 +322,7 @@ fn rereview_override_file_is_silently_ignored_at_render_time() {
 /// milestone + same inputs.
 #[test]
 fn build_prompt_request_struct_matches_legacy_positional_args() {
-    use mp::watch::PromptRenderOptions;
+    use mp::autopilot::drive::PromptRenderOptions;
 
     let tmp = tempfile::TempDir::new().unwrap();
     let plan_dir = tmp.path().join("plan");
@@ -326,8 +331,13 @@ fn build_prompt_request_struct_matches_legacy_positional_args() {
     let m = ms("M999", "approved");
     let opts = PromptRenderOptions::default();
 
-    let (legacy_text, legacy_source) =
-        mp::watch::build_prompt_with(PromptStage::Execute, &m, &opts, None, Some(&plan_dir));
+    let (legacy_text, legacy_source) = mp::autopilot::drive::build_prompt_with(
+        PromptStage::Execute,
+        &m,
+        &opts,
+        None,
+        Some(&plan_dir),
+    );
 
     let req = BuildPromptRequest {
         stage: PromptStage::Execute,
@@ -337,7 +347,7 @@ fn build_prompt_request_struct_matches_legacy_positional_args() {
         plan_dir: Some(plan_dir.as_path()),
     };
     let (struct_text, struct_source) =
-        mp::watch::build_prompt_with_request(&req).expect("build_prompt_with_request");
+        mp::autopilot::drive::build_prompt_with_request(&req).expect("build_prompt_with_request");
 
     assert_eq!(
         legacy_text, struct_text,

@@ -19,7 +19,7 @@
 
 use serde::Serialize;
 
-use crate::watch::WatchRunState;
+use crate::autopilot::drive::WatchRunState;
 
 /// Discriminated state of the latest recorded watch run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -75,7 +75,7 @@ pub fn classify_state(state: Option<&WatchRunState>, herdr_list_json: Option<&st
         return RunState::Terminal;
     }
 
-    let pid_alive = crate::watch::is_pid_alive(state.pid);
+    let pid_alive = crate::autopilot::drive::is_pid_alive(state.pid);
     if !pid_alive {
         return RunState::Stale {
             reason: format!("recorded pid {} not alive", state.pid),
@@ -98,7 +98,7 @@ pub fn classify_state(state: Option<&WatchRunState>, herdr_list_json: Option<&st
 /// JSON. A `herdr agent list` envelope (`{"agents": [...]}`) is the
 /// common shape; bare `[...]` is tolerated.
 fn panes_present(
-    pane_ids: &std::collections::HashMap<crate::watch::Role, String>,
+    pane_ids: &std::collections::HashMap<crate::autopilot::drive::Role, String>,
     herdr_list_json: &str,
 ) -> bool {
     if pane_ids.is_empty() {
@@ -127,7 +127,7 @@ fn panes_present(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::watch::{Role, RunOutcome};
+    use crate::autopilot::drive::{Role, RunOutcome};
     use std::collections::HashMap;
 
     fn empty_state() -> WatchRunState {

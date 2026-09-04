@@ -12,7 +12,7 @@
 //!   `--force` the gate is bypassed).
 //!
 //! The companion `mp watch --resume` reattach behavior is covered
-//! in `crates/mp/tests/watch_resume.rs` via the pure reconciler
+//! in `crates/mp/tests/autopilot_drive_resume.rs` via the pure reconciler
 //! layer; this file is specifically the gate / refusal contract.
 
 mod common;

@@ -14,10 +14,10 @@
 //! 6. `load_override` (the standalone helper) errors when no file
 //!    exists at either rung.
 
-use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta, Step};
-use mp::watch::{
+use mp::autopilot::drive::{
     build_prompt_with, load_override, PromptRenderOptions, PromptStage, TemplateSource,
 };
+use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta, Step};
 
 fn fixture_milestone() -> MilestoneFile {
     MilestoneFile {
@@ -509,7 +509,9 @@ fn load_override_helper_returns_text_for_headered_file() {
 
 // ─── M153 ext-review F-11 / F-12: shared reader surface ─────────────────────
 
-use mp::watch::{build_prompt_full, OverrideRefusalKind, OverrideRung, MAX_OVERRIDE_BYTES};
+use mp::autopilot::drive::{
+    build_prompt_full, OverrideRefusalKind, OverrideRung, MAX_OVERRIDE_BYTES,
+};
 
 /// F-11 / F-12: a headerless project-local override surfaces a
 /// structured diagnostic. The dry-run and live state machine both
@@ -525,7 +527,7 @@ fn headerless_plan_dir_override_emits_structured_diagnostic() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -557,7 +559,7 @@ fn empty_plan_dir_override_emits_empty_diagnostic() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -584,7 +586,7 @@ fn directory_override_is_rejected_as_not_regular() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -614,7 +616,7 @@ fn oversized_override_is_rejected_as_too_large() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -641,7 +643,7 @@ fn invalid_utf8_override_is_rejected_with_diagnostic() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -664,7 +666,7 @@ fn no_file_at_either_rung_produces_no_diagnostic() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -701,7 +703,7 @@ fn refused_override_dir_falls_through_to_valid_plan_dir_with_warning() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -750,7 +752,7 @@ fn symlink_override_is_rejected_as_not_regular() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,
@@ -791,7 +793,7 @@ fn fifo_override_is_rejected_as_not_regular() {
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
-    let req = mp::watch::BuildPromptRequest {
+    let req = mp::autopilot::drive::BuildPromptRequest {
         stage: PromptStage::Execute,
         milestone: &m,
         options: &opts,

@@ -11,7 +11,7 @@
 //! single blocking call so the existing CLI behavior is unchanged.
 //! Detach adds a fork/exec/wait dance that doesn't belong in the
 //! hot foreground loop. The persisted-state contract (AC-01, AC-06)
-//! is shared via [`crate::watch::WatchRunState`].
+//! is shared via [`crate::autopilot::drive::WatchRunState`].
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -19,11 +19,11 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use serde::Serialize;
 
+use crate::autopilot::drive::{PreconditionReport, WatchRunState};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
 use crate::config::ProjectConfig;
 use crate::paths::PlanContext;
-use crate::watch::{PreconditionReport, WatchRunState};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_watch_detached(
@@ -60,7 +60,7 @@ pub(crate) fn cmd_watch_detached(
     let mut state = WatchRunState::fresh(ids);
     state.log_path = Some(log_path.to_string_lossy().into_owned());
     state.state_path = Some(
-        crate::watch::default_run_state_path(&ctx.plan_dir)
+        crate::autopilot::drive::default_run_state_path(&ctx.plan_dir)
             .to_string_lossy()
             .into_owned(),
     );
@@ -162,8 +162,8 @@ pub(crate) fn cmd_watch_detached(
     let state_after = WatchRunState::load_from(&WatchRunState::path_for(&ctx.plan_dir))?
         .unwrap_or_else(|| WatchRunState::fresh(ids));
     let path = WatchRunState::path_for(&ctx.plan_dir);
-    let mut store = crate::watch::WatchRunStore::new(path, state_after);
-    store.transition(crate::watch::WatchTransition::Pid(child_pid))?;
+    let mut store = crate::autopilot::drive::WatchRunStore::new(path, state_after);
+    store.transition(crate::autopilot::drive::WatchTransition::Pid(child_pid))?;
 
     let _ = cfg; // keep cfg referenced for symmetry with cmd_watch_drive
     let report = DetachReport {

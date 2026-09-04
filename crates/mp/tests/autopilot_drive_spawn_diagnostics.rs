@@ -10,14 +10,14 @@
 //!   stderr).
 //!
 //! The watch log + sequencer integration tests in
-//! `watch_herdr_start.rs` cover the live `pane split` /
+//! `autopilot_drive_herdr_start.rs` cover the live `pane split` /
 //! `agent start` two-step. This file pins the diagnostic
 //! contract separately so a refactor of the herdr layer cannot
 //! silently drop the spawn error fields.
 
 mod common;
 
-use mp::watch::herdr::{
+use mp::autopilot::drive::herdr::{
     build_pane_split_args, build_start_args, extract_spawn_failure, SpawnFailure,
 };
 

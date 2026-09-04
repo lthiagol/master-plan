@@ -24,12 +24,12 @@
 mod common;
 
 use crate::common::{mp_bin, repo_root, TestEnv};
-use mp::config::RoleConfig;
-use mp::watch::{
+use mp::autopilot::drive::{
     clear_stage_done_sentinel, parse_custom_status_from_pane_get, sentinel_matches, DriveOps,
     LifecycleTarget, PaneHandle, Role, RoleConfigs, SystemDriveOps, WaitOutcome,
     STAGE_DONE_SENTINEL,
 };
+use mp::config::RoleConfig;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -191,7 +191,7 @@ esac"#,
     // "in-progress", the loop must keep polling and eventually bail
     // on the agent-status stall. We assert the bail proves F-10:
     // the loop did not advance on a stale signal.
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 50,
         stall_timeout_ms: 300,
     });
@@ -269,7 +269,7 @@ fi
     let _ = Command::new(&herdr).args(["pane", "get", "wA:p3"]).output();
 
     let mut ops = SystemDriveOps::new(mp, herdr, env.tmp.path(), "1", role_configs());
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 50,
         stall_timeout_ms: 0,
     });
@@ -360,7 +360,7 @@ fi
     // loop only starts a sentinel subprocess when budget permits; with
     // a 200ms sentinel timeout and a 1000ms lifecycle, budget allows
     // sentinel polls for the first ~800ms.
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1000,
         stall_timeout_ms: 0,
     });
@@ -467,7 +467,7 @@ fi
     // kills it within ~200ms. The next lifecycle poll at ~1000ms
     // (or sooner if the sentinel confirm via lifecycle ran first)
     // sees mp return self-reviewed and the loop returns Reached.
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1000,
         stall_timeout_ms: 0,
     });
@@ -571,7 +571,7 @@ fi
     let _ = Command::new(&mp).output();
 
     let mut ops = SystemDriveOps::new(mp, herdr, env.tmp.path(), "1", role_configs());
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1000,
         stall_timeout_ms: 0,
     });
@@ -672,7 +672,7 @@ fi
     let _ = Command::new(&mp).output();
 
     let mut ops = SystemDriveOps::new(mp, herdr, env.tmp.path(), "1", role_configs());
-    ops.set_wait_options(mp::watch::WaitOptions {
+    ops.set_wait_options(mp::autopilot::drive::WaitOptions {
         poll_interval_ms: 1000,
         stall_timeout_ms: 0,
     });

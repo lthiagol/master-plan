@@ -549,7 +549,7 @@ pub fn wait_for_readiness_with(
         // checks between iterations; this check covers the readiness
         // gate (where the spawn-to-prompt path blocks first) so a
         // Ctrl-C during initial spawn also exits cleanly.
-        if crate::watch::shutdown_requested() {
+        if crate::autopilot::drive::shutdown_requested() {
             bail!("graceful shutdown requested");
         }
 
@@ -575,7 +575,7 @@ pub fn wait_for_readiness_with(
         let mut remaining = poll;
         let slice = Duration::from_millis(100);
         while !remaining.is_zero() {
-            if crate::watch::shutdown_requested() {
+            if crate::autopilot::drive::shutdown_requested() {
                 bail!("graceful shutdown requested");
             }
             let chunk = remaining.min(slice);
@@ -813,9 +813,9 @@ where
         // shutdown signal up the stack — `drive_milestone` /
         // `SystemDriveOps::wait_for_lifecycle` translate that into
         // the `DriveOutcome::Shutdown` variant. The integration test
-        // pins this in `tests/watch_signal.rs::real_sigint_during_
+        // pins this in `tests/autopilot_drive_signal.rs::real_sigint_during_
         // watch_run_exits_zero_and_flushes_state`.
-        if crate::watch::shutdown_requested() {
+        if crate::autopilot::drive::shutdown_requested() {
             bail!("graceful shutdown requested");
         }
 
@@ -833,7 +833,7 @@ where
         // Re-check after the (possibly blocking) read_lifecycle
         // subprocess — `mp show milestone` can take seconds on a
         // cold filesystem; we want shutdown observed immediately.
-        if crate::watch::shutdown_requested() {
+        if crate::autopilot::drive::shutdown_requested() {
             bail!("graceful shutdown requested");
         }
 
@@ -864,7 +864,7 @@ where
         let mut remaining = poll;
         let slice = Duration::from_millis(100);
         while !remaining.is_zero() {
-            if crate::watch::shutdown_requested() {
+            if crate::autopilot::drive::shutdown_requested() {
                 bail!("graceful shutdown requested");
             }
             let chunk = remaining.min(slice);
@@ -1184,7 +1184,7 @@ mod tests {
     // ─── S4 + S5 unit tests ───────────────────────────────────────────────────
     // (placeholder kept intentionally blank: pure-function cases for
     // S4/S5 live in this module; behavioral cases that need a fake
-    // herdr binary live in tests/watch_herdr_wait.rs.)
+    // herdr binary live in tests/autopilot_drive_herdr_wait.rs.)
 
     #[test]
     fn lifecycle_target_roundtrips_str() {

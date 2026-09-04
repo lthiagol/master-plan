@@ -12,7 +12,7 @@
 mod common;
 
 use common::TestEnv;
-use mp::watch::{
+use mp::autopilot::drive::{
     default_run_state_path, LifecycleTarget, MilestoneState, PaneState, PromptStage, Role,
     RunOutcome, WatchRunState, WatchRunStore, WatchState, WatchTransition,
     WATCH_RUN_STATE_SCHEMA_VERSION, WATCH_STATE_SCHEMA_VERSION,
@@ -244,7 +244,7 @@ fn state_file_path_matches_default_path_helper() {
     let dir = env.tmp.path().join("master-plan");
     assert_eq!(
         WatchState::path_for(&dir),
-        mp::watch::default_state_path(&dir)
+        mp::autopilot::drive::default_state_path(&dir)
     );
 }
 
@@ -333,7 +333,7 @@ fn v2_state_round_trip_preserves_ac01_contract_fields() {
     s.record_pane(Role::Coordinator, "%7");
     s.log_path = Some("/tmp/watch.log".into());
     s.state_path = Some(path.display().to_string());
-    s.push_milestone_outcome(mp::watch::MilestoneRunOutcome {
+    s.push_milestone_outcome(mp::autopilot::drive::MilestoneRunOutcome {
         id: "170".into(),
         outcome: RunOutcome::Completed,
     });
@@ -360,7 +360,7 @@ fn v2_state_with_terminal_outcome_round_trips() {
     let path = run_state_path(&env);
     let mut s = WatchRunState::fresh(&["170".to_string()]);
     s.set_run_outcome(RunOutcome::GracefullyStopped);
-    s.push_milestone_outcome(mp::watch::MilestoneRunOutcome {
+    s.push_milestone_outcome(mp::autopilot::drive::MilestoneRunOutcome {
         id: "170".into(),
         outcome: RunOutcome::GracefullyStopped,
     });

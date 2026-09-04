@@ -17,7 +17,7 @@
 mod common;
 
 use crate::common::TestEnv;
-use mp::watch::{
+use mp::autopilot::drive::{
     install_signal_handlers, perform_graceful_shutdown, request_shutdown, shutdown_requested,
     write_shutdown_state_for_test, PaneState, Role, WatchState,
 };
@@ -134,7 +134,7 @@ fn signal_handlers_install_lazily_and_flip_shutdown_flag() {
     request_shutdown();
     assert!(shutdown_requested());
     // Reset so subsequent tests in this binary start clean.
-    mp::watch::clear_shutdown_flag();
+    mp::autopilot::drive::clear_shutdown_flag();
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
     // milestone. The state file is absent before, present after.
     let env = TestEnv::new();
     install_signal_handlers();
-    mp::watch::clear_shutdown_flag();
+    mp::autopilot::drive::clear_shutdown_flag();
 
     let id = seed_approved_milestone(&env, "shutdown-cleanup");
     let path = state_path(&env);
@@ -166,7 +166,7 @@ fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
         spawned_at: "t".into(),
         last_status: None,
     });
-    state.upsert_milestone(mp::watch::MilestoneState {
+    state.upsert_milestone(mp::autopilot::drive::MilestoneState {
         id: id.clone(),
         last_lifecycle: "in-progress".into(),
         target_lifecycle: "self-reviewed".into(),
@@ -213,7 +213,7 @@ fn perform_graceful_shutdown_is_resilient_when_milestone_load_fails() {
     // flash note, still flush the state file.
     let env = TestEnv::new();
     install_signal_handlers();
-    mp::watch::clear_shutdown_flag();
+    mp::autopilot::drive::clear_shutdown_flag();
 
     let path = state_path(&env);
     let state = WatchState::fresh(&[]);
@@ -270,7 +270,7 @@ fn real_sigint_during_watch_run_exits_zero_and_flushes_state() {
     // — this test is the cross-process check on the integration.
     let env = TestEnv::new();
     install_signal_handlers();
-    mp::watch::clear_shutdown_flag();
+    mp::autopilot::drive::clear_shutdown_flag();
 
     let bin_dir = env.tmp.path().join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
@@ -386,5 +386,5 @@ fn real_sigint_during_watch_run_exits_zero_and_flushes_state() {
 
     // Reset the global shutdown flag before the next test so
     // other modules see a clean slate.
-    mp::watch::clear_shutdown_flag();
+    mp::autopilot::drive::clear_shutdown_flag();
 }

@@ -314,6 +314,6 @@ fn version_floor_pin_protects_against_silent_floor_drift() {
     // future refactor that lowers it (e.g. "we accept 0.6.x
     // again") would silently break the gate contract. Pin the
     // floor at 0.7.0 so this test catches drift.
-    use mp::watch::REQUIRED_HERDR_VERSION_FLOOR;
+    use mp::autopilot::drive::REQUIRED_HERDR_VERSION_FLOOR;
     assert_eq!(REQUIRED_HERDR_VERSION_FLOOR, "0.7.0");
 }

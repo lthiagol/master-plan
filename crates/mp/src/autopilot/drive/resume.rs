@@ -6,7 +6,7 @@
 //! the resume path decides whether to re-attach (Live) or
 //! re-spawn (Dead / Missing) per role. The classifier is decoupled
 //! from I/O so tests can drive it with synthesized JSON fixtures
-//! (see `crates/mp/tests/watch_resume.rs`).
+//! (see `crates/mp/tests/autopilot_drive_resume.rs`).
 //!
 //! ## Layering
 //!
@@ -17,7 +17,7 @@
 //!
 //! ## Where the live list comes from
 //!
-//! [`crate::watch::herdr::list_panes`] runs `herdr agent list
+//! [`crate::autopilot::drive::herdr::list_panes`] runs `herdr agent list
 //! --format json` and returns the raw JSON. The same JSON shape
 //! the prior-step [`find_existing_pane`] helper already parses
 //! (`{"agents":[...]}` envelope or bare `[...]`); reconciliation
@@ -26,8 +26,8 @@
 
 use serde::Serialize;
 
-use crate::watch::herdr::{find_existing_pane, pane_label_for, Role, DEFAULT_PANE_N};
-use crate::watch::state::WatchState;
+use crate::autopilot::drive::herdr::{find_existing_pane, pane_label_for, Role, DEFAULT_PANE_N};
+use crate::autopilot::drive::state::WatchState;
 
 /// Per-role classification of the pane state at resume time.
 ///
@@ -140,7 +140,7 @@ fn classify_role(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::watch::state::{PaneState, WatchState};
+    use crate::autopilot::drive::state::{PaneState, WatchState};
 
     fn env(label: &str, pane_id: &str) -> String {
         format!(r#"{{"agents":[{{"name":"{label}","pane_id":"{pane_id}"}}]}}"#)

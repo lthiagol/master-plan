@@ -363,7 +363,7 @@ pub fn record_review_pass(
             }
             m.milestone.updated = store::today();
             store::write_milestone(&path, &m)?;
-            crate::watch::emit_stage_done_best_effort("reviews-pass", Some(&id));
+            crate::autopilot::drive::emit_stage_done_best_effort("reviews-pass", Some(&id));
         }
         // M202 S4.1: close the external-review stage on every
         // successful `verdict=ok` (whether or not the auto-promote

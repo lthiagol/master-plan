@@ -1,5 +1,31 @@
-//! `mp watch` — automated milestone execution via the herdr agent
-//! lifecycle (M149).
+//! `mp::autopilot::drive` — automated milestone execution via the
+//! herdr agent lifecycle.
+//!
+//! This tree was named `mp::watch` until the autopilot cutover. It is
+//! now the canonical drive engine; `mp watch` is only a CLI verb
+//! implemented by the thin compatibility adapter in
+//! [`crate::commands::watch`], which forwards here.
+//!
+//! ## Compatibility naming that intentionally survives here
+//!
+//! Two kinds of `Watch`-prefixed names remain, and both are
+//! deliberate — they mirror a retained *external* surface, so
+//! renaming the Rust identifier would make the code lie about what it
+//! reads and writes:
+//!
+//! - [`state`] / [`run_state`]: `WatchState`, `WatchRunState`,
+//!   `WatchRunStore`, `WatchTransition`, and their
+//!   `WATCH_*_SCHEMA_VERSION` constants read and write the legacy
+//!   on-disk `.mp/watch.state.json` (v1 and v2 of the same file).
+//!   The path and its schema are the persisted-state compatibility
+//!   contract; the reader stays until the legacy state file is
+//!   retired alongside the CLI alias.
+//! - [`prompts`]: the override rungs resolve `<plan_dir>/watch/` and
+//!   the compiled-in `templates/watch/<stage>.md` defaults — both
+//!   user-visible override locations.
+//!
+//! Everything else in this tree is named for the engine
+//! (`DriveLogger`, `DriveOps`, `drive_milestone`, …).
 //!
 //! Submodules:
 //! - [`preconditions`] — startup checks (S0).
@@ -13,7 +39,7 @@
 //!   → handoff until the milestone reaches complete (S7).
 //! - [`sequencer`] — cross-milestone sequencing with per-role pane
 //!   reuse (S8).
-//! - [`logging`] — structured JSONL watch log (S10).
+//! - [`logging`] — structured JSONL drive log (S10).
 //! - [`state`] — M152 crash-safe `.mp/watch.state.json` so a `--resume`
 //!   run can re-attach to live herdr panes instead of double-spawning.
 //! - [`resume`] — M152 herdr-list reconciliation + double-spawn guard.
@@ -69,7 +95,7 @@ pub fn resolve_herdr_binary() -> std::io::Result<std::path::PathBuf> {
         )
     })
 }
-pub use logging::{rfc3339_now, WatchLogEntry, WatchLogger};
+pub use logging::{rfc3339_now, DriveLogEntry, DriveLogger};
 pub use preconditions::{
     check_preconditions, default_log_path, try_lazy_auto_set, PreconditionCheck, PreconditionReport,
 };

@@ -112,7 +112,7 @@ pub enum VersionFloor {
 
 /// Probe the herdr CLI and return a [`HerdCliShape`]. Pure over the
 /// supplied binary path (so tests can inject a fake); the
-/// [`crate::watch::herdr::which_herdr`] default lives at
+/// [`crate::autopilot::drive::herdr::which_herdr`] default lives at
 /// [`detect_herdr_cli_default`].
 pub fn detect_herdr_cli(herdr_bin: &Path) -> HerdrCliShape {
     let version_out = run_capture(herdr_bin, &["--version"]);
@@ -169,12 +169,12 @@ pub fn detect_herdr_cli(herdr_bin: &Path) -> HerdrCliShape {
 }
 
 /// Convenience wrapper: resolve the herdr binary via
-/// [`crate::watch::herdr::which_herdr`] and probe it. When herdr
+/// [`crate::autopilot::drive::herdr::which_herdr`] and probe it. When herdr
 /// is not on PATH, returns a [`HerdCliShape`] with
 /// `on_path=false, compatible=false, parsed_version=None` so
 /// callers do not have to special-case the missing binary.
 pub fn detect_herdr_cli_default() -> HerdrCliShape {
-    match crate::watch::herdr::which_herdr() {
+    match crate::autopilot::drive::herdr::which_herdr() {
         Some(bin) => detect_herdr_cli(&bin),
         None => HerdrCliShape {
             compatible: false,

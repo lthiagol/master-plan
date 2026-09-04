@@ -3,12 +3,12 @@
 use anyhow::Result;
 use serde::Serialize;
 
+use crate::autopilot::drive;
+use crate::autopilot::drive::classification::{classify_state, RunState};
 use crate::model::{effective_lifecycle, MilestoneFile};
 use crate::paths::PlanContext;
 use crate::store;
 use crate::validate;
-use crate::watch;
-use crate::watch::classification::{classify_state, RunState};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct OverviewHealth {
@@ -63,7 +63,7 @@ pub struct StepRollup {
 /// Build health / totals / lifecycle / step rollups from the
 /// milestone snapshot. Reuses `validate::validate_plan_with_milestones`
 /// to share the existing gate-aware validate pass; reuses
-/// `watch::WatchRunState::load_from` for the watch-state derivation
+/// `drive::WatchRunState::load_from` for the watch-state derivation
 /// (M178 S1 v2 control-plane shape).
 pub fn build_health(ctx: &PlanContext) -> Result<OverviewHealthBundle> {
     let plan = store::load_plan(ctx).unwrap_or_default();
@@ -174,19 +174,19 @@ fn rollup_milestones(
 ///   recorded run has not produced a terminal result yet, so there
 ///   is nothing to summarize.
 /// - `running` — M178 classifies the run live
-///   ([`watch::RunState::Live`]).
-/// - `complete` — terminal outcome [`watch::RunOutcome::Completed`].
-/// - `failed` — terminal outcome [`watch::RunOutcome::PartialFailure`],
-///   [`watch::RunOutcome::Skipped`], [`watch::RunOutcome::Exhausted`].
+///   ([`drive::RunState::Live`]).
+/// - `complete` — terminal outcome [`drive::RunOutcome::Completed`].
+/// - `failed` — terminal outcome [`drive::RunOutcome::PartialFailure`],
+///   [`drive::RunOutcome::Skipped`], [`drive::RunOutcome::Exhausted`].
 /// - `stopped` — terminal outcome
-///   [`watch::RunOutcome::GracefullyStopped`].
+///   [`drive::RunOutcome::GracefullyStopped`].
 fn derive_watch_state(ctx: &PlanContext) -> &'static str {
-    let path = watch::default_run_state_path(&ctx.plan_dir);
-    let Some(state) = watch::WatchRunState::load_from(&path).ok().flatten() else {
+    let path = drive::default_run_state_path(&ctx.plan_dir);
+    let Some(state) = drive::WatchRunState::load_from(&path).ok().flatten() else {
         return "idle";
     };
     if let Some(outcome) = state.run_outcome.as_ref() {
-        use watch::RunOutcome::*;
+        use drive::RunOutcome::*;
         return match outcome {
             Completed => "complete",
             PartialFailure | Skipped { .. } | Exhausted { .. } => "failed",

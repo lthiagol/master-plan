@@ -8,8 +8,8 @@
 mod common;
 
 use crate::common::TestEnv;
+use mp::autopilot::drive::check_preconditions;
 use mp::config::ProjectConfig;
-use mp::watch::check_preconditions;
 use serde_json::Value;
 
 #[test]

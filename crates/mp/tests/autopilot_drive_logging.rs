@@ -1,29 +1,29 @@
 //! M149 S10 / AC-08: structured logging for `mp watch`.
 //!
-//! Exercises the WatchLogger end-to-end: entries are JSONL, optional
+//! Exercises the DriveLogger end-to-end: entries are JSONL, optional
 //! fields are skipped when absent, the parent dir is created on
 //! first open, and multiple entries land as separate lines.
 
 mod common;
 
-use mp::watch::{WatchLogEntry, WatchLogger};
+use mp::autopilot::drive::{DriveLogEntry, DriveLogger};
 
 #[test]
 fn open_creates_parent_dir_and_appends_entries_as_jsonl() {
     let env = tempfile::TempDir::new().unwrap();
     let log_path = env.path().join("nested/dir/watch.log");
-    let logger = WatchLogger::open(&log_path).unwrap();
+    let logger = DriveLogger::open(&log_path).unwrap();
 
     logger
         .log(
-            &WatchLogEntry::new("stage", "execute milestone")
+            &DriveLogEntry::new("stage", "execute milestone")
                 .milestone("42")
                 .role("runner")
                 .pane("%5"),
         )
         .unwrap();
     logger
-        .log(&WatchLogEntry::new("transition", "approved->in-progress").milestone("42"))
+        .log(&DriveLogEntry::new("transition", "approved->in-progress").milestone("42"))
         .unwrap();
 
     assert!(log_path.is_file());
@@ -50,8 +50,8 @@ fn open_creates_parent_dir_and_appends_entries_as_jsonl() {
 fn log_records_timestamps_in_rfc3339() {
     let env = tempfile::TempDir::new().unwrap();
     let log_path = env.path().join("watch.log");
-    let logger = WatchLogger::open(&log_path).unwrap();
-    logger.log(&WatchLogEntry::new("test", "ts")).unwrap();
+    let logger = DriveLogger::open(&log_path).unwrap();
+    logger.log(&DriveLogEntry::new("test", "ts")).unwrap();
     let text = std::fs::read_to_string(&log_path).unwrap();
     let v: serde_json::Value = serde_json::from_str(text.trim()).unwrap();
     let ts = v["ts"].as_str().unwrap();
@@ -62,10 +62,10 @@ fn log_records_timestamps_in_rfc3339() {
 
 #[test]
 fn in_memory_logger_captures_entries_in_order() {
-    let (logger, buf) = WatchLogger::in_memory();
+    let (logger, buf) = DriveLogger::in_memory();
     for i in 0..5 {
         logger
-            .log(&WatchLogEntry::new("iter", format!("entry {i}")))
+            .log(&DriveLogEntry::new("iter", format!("entry {i}")))
             .unwrap();
     }
     let captured = String::from_utf8(buf.lock().unwrap().clone()).unwrap();
@@ -80,21 +80,21 @@ fn in_memory_logger_captures_entries_in_order() {
 fn path_helper_returns_the_opened_path() {
     let env = tempfile::TempDir::new().unwrap();
     let log_path = env.path().join("watch.log");
-    let logger = WatchLogger::open(&log_path).unwrap();
+    let logger = DriveLogger::open(&log_path).unwrap();
     assert_eq!(logger.path(), log_path);
 }
 
 #[test]
 fn default_watch_log_path_lives_under_plan_dir_mp_subdir() {
     // Precondition-check default. The default-log-path contract is
-    // covered by watch_preconditions.rs; this test pins that the
+    // covered by autopilot_drive_preconditions.rs; this test pins that the
     // logger accepts that path shape without error.
     let env = tempfile::TempDir::new().unwrap();
     let plan_dir = env.path();
-    let log_path = mp::watch::default_log_path(plan_dir);
-    let logger = WatchLogger::open(&log_path).unwrap();
+    let log_path = mp::autopilot::drive::default_log_path(plan_dir);
+    let logger = DriveLogger::open(&log_path).unwrap();
     logger
-        .log(&WatchLogEntry::new("boot", "watch starting"))
+        .log(&DriveLogEntry::new("boot", "watch starting"))
         .unwrap();
     assert!(log_path.ends_with(".mp/watch.log"));
     assert!(log_path.is_file());

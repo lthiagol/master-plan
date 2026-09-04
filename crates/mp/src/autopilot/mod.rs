@@ -36,6 +36,14 @@
 //!   lifecycle-claim unbacked, unknown actor, evidence contract,
 //!   command-list). Topology-aware remediation lives in
 //!   [`recommend_remediation`].
+//! - [`drive`] — the herdr drive engine: preconditions, pane
+//!   spawn/wait, the stage-done bridge, lifecycle-stage prompts, the
+//!   driver loop, the cross-milestone sequencer, the JSONL run log,
+//!   and the crash-safe run/resume state. This tree was named
+//!   `mp::watch` before the autopilot cutover; it is now the
+//!   canonical `mp::autopilot::drive` engine and the `mp watch` CLI
+//!   verb is a thin compatibility adapter over it
+//!   (`commands::watch`), retained until the alias is removed.
 //! - [`review_env`] — M224's reviewer execution isolation and
 //!   clean-room policy. Records reviewer provenance (binary /
 //!   worktree / target dir / pid / actor identity), selects the
@@ -60,6 +68,7 @@
 pub mod ac_projection;
 pub mod commit_policy;
 pub mod cycle;
+pub mod drive;
 pub mod events;
 pub mod gate;
 pub mod lifecycle;

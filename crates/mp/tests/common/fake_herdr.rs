@@ -1,8 +1,8 @@
 //! Shared fake-herdr harness for autopilot integration tests.
 //!
 //! M227 / WP1: replaces the per-test ad-hoc `install_fake_herdr`
-//! shell-script builders scattered across `watch_herdr_wait.rs`,
-//! `watch_herdr_start.rs`, and `watch_bridge_report.rs` with one
+//! shell-script builders scattered across `autopilot_drive_herdr_wait.rs`,
+//! `autopilot_drive_herdr_start.rs`, and `autopilot_drive_bridge_report.rs` with one
 //! configurable test primitive.
 //!
 //! Goals:
@@ -14,7 +14,7 @@
 //!   represented as a configurable knob.
 //! - **Determinism**: per-call `sleep` and `exit-code` overrides let
 //!   tests drive the bounded subprocess helper
-//!   (`mp::watch::bridge::run_herdr_with_timeout`) into its
+//!   (`mp::autopilot::drive::bridge::run_herdr_with_timeout`) into its
 //!   timeout / failure / killpg paths without wall-clock sleeps in
 //!   the test body. The `warmup` helper pre-spawns the fake so the
 //!   next `Command::new("herdr")` from a real `mp` subprocess does
@@ -64,8 +64,8 @@
 //! binary MUST use [`FakeHerdrBuilder`] instead of writing a
 //! bespoke shell script.** The two ad-hoc builders that exist
 //! outside this module today
-//! (`watch_bridge_fastpath::install_fake_herdr`,
-//! `watch_sequential::install_fake_herdr_with_log`,
+//! (`autopilot_drive_bridge_fastpath::install_fake_herdr`,
+//! `autopilot_drive_sequencer::install_fake_herdr_with_log`,
 //! `watch_non_dry_run::install_fake_herdr`,
 //! `watch_no_double_spawn::install_fake_herdr_with_existing_panes`,
 //! `suites/status_readiness::install_fake_herdr_for_preconditions`)
@@ -300,7 +300,7 @@ impl FakeHerdrBuilder {
     /// Configure `pane get` (used by the bridge poll) to fork a
     /// long-running `sleep N &` grandchild and write its PID to the
     /// file at `pid_file`. Combined with a short
-    /// `mp::watch::bridge::run_herdr_with_timeout` deadline in the
+    /// `mp::autopilot::drive::bridge::run_herdr_with_timeout` deadline in the
     /// test, this drives the killpg path: the parent sh + the
     /// grandchild sleep must both be reaped when the helper times
     /// out.
@@ -669,7 +669,7 @@ mod tests {
         // The grandchild-sleep pattern is exercised end-to-end in
         // the integration test
         // `mp_run_herdr_with_timeout_kills_grandchild_in_process_group`
-        // (watch_bridge_report.rs). Here we only assert the
+        // (autopilot_drive_bridge_report.rs). Here we only assert the
         // script-side contract: the script forks a `sleep` and
         // writes its PID to the supplied file before `wait`ing.
         // Run the script with a tiny sleep so the test stays

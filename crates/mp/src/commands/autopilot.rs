@@ -88,7 +88,7 @@ fn cmd_autopilot_migrate(
     format: crate::cli::OutputFormat,
 ) -> Result<()> {
     use crate::autopilot::migrate;
-    let source_path = crate::watch::default_state_path(&ctx.plan_dir);
+    let source_path = crate::autopilot::drive::default_state_path(&ctx.plan_dir);
     if dry_run {
         if !source_path.exists() {
             return emit(
@@ -103,7 +103,7 @@ fn cmd_autopilot_migrate(
         // Inspect the legacy file without writing.
         let raw = std::fs::read(&source_path)
             .with_context(|| format!("read legacy watch state at {}", source_path.display()))?;
-        let state: crate::watch::state::WatchState = serde_json::from_slice(&raw)
+        let state: crate::autopilot::drive::state::WatchState = serde_json::from_slice(&raw)
             .with_context(|| format!("parse legacy watch state at {}", source_path.display()))?;
         return emit(
             format,

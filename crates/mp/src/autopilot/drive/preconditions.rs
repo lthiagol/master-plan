@@ -109,7 +109,7 @@ pub fn check_preconditions(cfg: &ProjectConfig, log_path: &Path) -> Precondition
 /// fail later in `pane_split` / `spawn_pane` with a less
 /// actionable error.
 fn check_herdr_cli_shape() -> PreconditionCheck {
-    let shape = crate::watch::detect_herdr_cli_default();
+    let shape = crate::autopilot::drive::detect_herdr_cli_default();
     PreconditionCheck {
         name: "herdr_cli_shape".to_string(),
         ok: shape.compatible,

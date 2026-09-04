@@ -364,7 +364,7 @@ pub fn lazy_auto_set_event(harness: &str) -> ActivityEvent {
 /// M178 `RunOutcome` variants onto the 5-state Overview watch
 /// summary (M180 `watch-summary-derivation` design decision).
 pub fn watch_outcome_event(
-    outcome: &crate::watch::RunOutcome,
+    outcome: &crate::autopilot::drive::RunOutcome,
     milestones: &[String],
 ) -> ActivityEvent {
     let ids = if milestones.is_empty() {
@@ -373,17 +373,21 @@ pub fn watch_outcome_event(
         milestones.join(",")
     };
     let (r#type, label) = match outcome {
-        crate::watch::RunOutcome::Completed => ("watch-completed", "completed"),
-        crate::watch::RunOutcome::PartialFailure => ("watch-failed", "partial-failure"),
-        crate::watch::RunOutcome::Skipped { .. } => ("watch-skipped", "skipped"),
-        crate::watch::RunOutcome::Exhausted { .. } => ("watch-exhausted", "exhausted"),
-        crate::watch::RunOutcome::GracefullyStopped => ("watch-stopped", "gracefully-stopped"),
+        crate::autopilot::drive::RunOutcome::Completed => ("watch-completed", "completed"),
+        crate::autopilot::drive::RunOutcome::PartialFailure => ("watch-failed", "partial-failure"),
+        crate::autopilot::drive::RunOutcome::Skipped { .. } => ("watch-skipped", "skipped"),
+        crate::autopilot::drive::RunOutcome::Exhausted { .. } => ("watch-exhausted", "exhausted"),
+        crate::autopilot::drive::RunOutcome::GracefullyStopped => {
+            ("watch-stopped", "gracefully-stopped")
+        }
         // M197 WP3 / AC-04: a verified spawn failure gets its
         // own activity tag. The argv + exit code is in the v2
         // control-plane state, so the activity entry just
         // needs a distinct type so dashboards can filter
         // "spawn failure" apart from "partial failure".
-        crate::watch::RunOutcome::SpawnFailed { .. } => ("watch-spawn-failed", "spawn-failed"),
+        crate::autopilot::drive::RunOutcome::SpawnFailed { .. } => {
+            ("watch-spawn-failed", "spawn-failed")
+        }
     };
     ActivityEvent::now(r#type, "", format!("mp watch {label} ({ids})"))
 }

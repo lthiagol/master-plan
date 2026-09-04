@@ -67,7 +67,6 @@ pub mod search;
 pub mod store;
 pub mod track_kind;
 pub mod validate;
-pub mod watch;
 
 pub use paths::PlanContext;
 

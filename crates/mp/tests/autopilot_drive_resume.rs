@@ -35,6 +35,7 @@ mod common;
 use common::fake_herdr::FakeHerdrBuilder;
 use common::TestEnv;
 use mp::autopilot::ac_projection::PerMilestoneProjections;
+use mp::autopilot::drive::{reconcile, PaneStatus};
 use mp::autopilot::events::{EventKind, OrchestrationEvent};
 use mp::autopilot::reconcile::{
     classify_pane_loss, PaneLossInput, PaneLossOutcome, PaneLossReason,
@@ -43,7 +44,6 @@ use mp::autopilot::session::{AutopilotSession, WorkingOn};
 use mp::autopilot::spawn::MpBinaryProvenance;
 use mp::autopilot::{load_session, save_session, AcProjection, AcStatus, RoleName};
 use mp::paths::PlanContext;
-use mp::watch::{reconcile, PaneStatus};
 use serde_json::json;
 use std::path::Path;
 
@@ -76,7 +76,7 @@ fn reconcile_classifies_both_panes_as_live_when_herdr_listing_matches() {
 
 #[test]
 fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let _ = env;
     let mut s = WatchState::fresh(&[]);
@@ -100,7 +100,7 @@ fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
 
 #[test]
 fn reconcile_prefers_herdr_pane_id_over_recorded_state() {
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let _ = env;
     let mut s = WatchState::fresh(&[]);
@@ -147,7 +147,7 @@ fn reconcile_does_not_panic_on_corrupt_herdr_list() {
 fn state_file_persists_across_save_load_resume_cycle() {
     // Black-box check: a state file written, then read back, then
     // passed through reconcile, must classify live panes correctly.
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let path = WatchState::path_for(&env.tmp.path().join("master-plan"));
 
@@ -160,7 +160,7 @@ fn state_file_persists_across_save_load_resume_cycle() {
         last_status: Some("working".into()),
     });
     s.save(&path).unwrap();
-    let restored: Option<WatchState> = mp::watch::WatchState::load_from(&path).unwrap();
+    let restored: Option<WatchState> = mp::autopilot::drive::WatchState::load_from(&path).unwrap();
     let r = reconcile(restored.as_ref(), &both_panes_alive());
     // Both panes show up in the herdr list — Live overrides any
     // prior state-of-the-world ambiguity.
@@ -171,7 +171,7 @@ fn state_file_persists_across_save_load_resume_cycle() {
 
 #[test]
 fn runner_only_in_state_is_dead_when_herdr_omits_it() {
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let _ = env;
     let mut s = WatchState::fresh(&[]);
@@ -192,7 +192,7 @@ fn runner_only_in_state_is_dead_when_herdr_omits_it() {
 
 #[test]
 fn any_needs_spawn_aggregates_per_role() {
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let _ = env;
     // Neither pane recorded, neither pane alive.
@@ -262,7 +262,7 @@ fn seed_state_roundtrips_through_reconcile() {
     // End-to-end pin: write a state file, load it back, classify
     // panes. The reconcile output is what `mp watch --resume` uses
     // to re-attach.
-    use mp::watch::{MilestoneState, PaneState, Role, WatchState};
+    use mp::autopilot::drive::{MilestoneState, PaneState, Role, WatchState};
     let env = TestEnv::new();
     let path = WatchState::path_for(&env.tmp.path().join("master-plan"));
     let mut s = WatchState::fresh(&["M152".into()]);
@@ -299,7 +299,7 @@ fn reconcile_with_empty_herdr_and_recorded_state_marks_dead() {
     // (the panes were killed when the parent process died). The
     // reconciler must mark every recorded pane as Dead so `--resume`
     // re-spawns them.
-    use mp::watch::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, WatchState};
     let env = TestEnv::new();
     let _ = env;
     let mut s = WatchState::fresh(&[]);
@@ -753,7 +753,7 @@ fn m225_f01_f02_regression_all_primitives_wired_and_exercised() {
     //    subsequent dispatch through the wired
     //    `dispatch_assignment` must report AlreadyApplied. We
     //    call the library function directly (the same way
-    //    `watch_herdr_start.rs` exercises the spawn pipeline
+    //    `autopilot_drive_herdr_start.rs` exercises the spawn pipeline
     //    with a FakeHerdrBuilder).
     use mp::autopilot::task_assign::{dispatch_assignment, AssignmentOutcome, TaskAssignment};
     let payload = TaskAssignment::new(

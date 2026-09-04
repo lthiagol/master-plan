@@ -8,7 +8,7 @@
 //! - `output`  — AC-05: bounded, structured output from the active pane.
 //! - `result`  — AC-06: read the latest terminal outcome.
 //!
-//! Each verb is a thin surface over [`crate::watch::WatchRunState`]
+//! Each verb is a thin surface over [`crate::autopilot::drive::WatchRunState`]
 //! and the existing herdr / shutdown / bridge primitives.
 
 use std::time::{Duration, Instant};
@@ -16,12 +16,14 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use serde::Serialize;
 
+use crate::autopilot::drive::{
+    is_pid_alive, RunOutcome, WatchRunState, WATCH_RUN_STATE_SCHEMA_VERSION,
+};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
 use crate::paths::PlanContext;
-use crate::watch::{is_pid_alive, RunOutcome, WatchRunState, WATCH_RUN_STATE_SCHEMA_VERSION};
 
-use super::super::watch::classification::{classify_state, StatusReport};
+use crate::autopilot::drive::classification::{classify_state, StatusReport};
 
 /// AC-01 / AC-03 / AC-06: read the latest-run state and emit a
 /// structured status. The classifier returns `Live` / `Stale` /
@@ -124,10 +126,13 @@ pub(crate) fn cmd_watch_control_stop(
                 match WatchRunState::load_from(&path) {
                     Ok(Some(s)) => {
                         if s.run_outcome.is_none() {
-                            let mut store = crate::watch::WatchRunStore::new(path.clone(), s);
-                            let _ = store.transition(crate::watch::WatchTransition::RunOutcome(
-                                RunOutcome::GracefullyStopped,
-                            ));
+                            let mut store =
+                                crate::autopilot::drive::WatchRunStore::new(path.clone(), s);
+                            let _ = store.transition(
+                                crate::autopilot::drive::WatchTransition::RunOutcome(
+                                    RunOutcome::GracefullyStopped,
+                                ),
+                            );
                         }
                     }
                     Ok(None) => {}
@@ -220,8 +225,8 @@ pub(crate) fn cmd_watch_control_output(
         role_override
             .as_deref()
             .and_then(|s| match s.to_ascii_lowercase().as_str() {
-                "runner" => Some(crate::watch::Role::Runner),
-                "coordinator" => Some(crate::watch::Role::Coordinator),
+                "runner" => Some(crate::autopilot::drive::Role::Runner),
+                "coordinator" => Some(crate::autopilot::drive::Role::Coordinator),
                 _ => None,
             });
 
@@ -229,7 +234,7 @@ pub(crate) fn cmd_watch_control_output(
     // active_role; otherwise default to Runner.
     let role = parsed_override
         .or(state.active_role)
-        .unwrap_or(crate::watch::Role::Runner);
+        .unwrap_or(crate::autopilot::drive::Role::Runner);
     let pane_id = match state.pane_ids.get(&role) {
         Some(id) => id.clone(),
         None => {
@@ -256,11 +261,11 @@ pub(crate) fn cmd_watch_control_output(
     // post-truncate so callers can cap the output regardless of
     // what herdr returned.
     let start = Instant::now();
-    let herdr_bin = crate::watch::resolve_herdr_binary().unwrap_or_default();
+    let herdr_bin = crate::autopilot::drive::resolve_herdr_binary().unwrap_or_default();
     let read_result: anyhow::Result<Option<String>> = if herdr_bin.as_os_str().is_empty() {
         Err(anyhow::anyhow!("herdr not on PATH"))
     } else {
-        crate::watch::read_custom_status_bounded(&herdr_bin, &pane_id, timeout_ms)
+        crate::autopilot::drive::read_custom_status_bounded(&herdr_bin, &pane_id, timeout_ms)
     };
     let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -358,7 +363,7 @@ fn raise_sigint(pid: u32) -> Result<()> {
 }
 
 fn read_herdr_list_best_effort() -> Option<String> {
-    let herdr_bin = crate::watch::resolve_herdr_binary().ok()?;
+    let herdr_bin = crate::autopilot::drive::resolve_herdr_binary().ok()?;
     let output = std::process::Command::new(&herdr_bin)
         .args(["agent", "list", "--format", "json"])
         .output()
@@ -385,7 +390,7 @@ struct StopReport {
 struct OutputReport {
     ok: bool,
     reason: String,
-    role: Option<crate::watch::Role>,
+    role: Option<crate::autopilot::drive::Role>,
     pane_id: Option<String>,
     bytes: usize,
     truncated: bool,

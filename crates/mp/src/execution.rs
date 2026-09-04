@@ -115,8 +115,8 @@ pub fn execution_check_with(
     // call them here so the verdict cannot drift between
     // surfaces.
     let cfg = store::load_config(ctx);
-    let log_path = crate::watch::default_log_path(&ctx.plan_dir);
-    let pre = crate::watch::check_preconditions(&cfg, &log_path);
+    let log_path = crate::autopilot::drive::default_log_path(&ctx.plan_dir);
+    let pre = crate::autopilot::drive::check_preconditions(&cfg, &log_path);
     let watch_readiness = WatchReadiness {
         ok: pre.ok,
         checks: pre

@@ -79,7 +79,7 @@ use crate::validate::{effective_execution_status, effective_spec_status};
 // ─── Lane model ───────────────────────────────────────────────────────
 
 /// Lane that produced a notification. Mirrors M209's three-role
-/// autopilot model. Distinct from `crate::watch::herdr::Role` (the
+/// autopilot model. Distinct from `crate::autopilot::drive::herdr::Role` (the
 /// legacy two-role model that mp watch still uses).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

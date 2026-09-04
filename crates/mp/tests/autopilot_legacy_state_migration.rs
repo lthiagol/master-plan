@@ -17,13 +17,13 @@
 mod common;
 
 use common::TestEnv;
+use mp::autopilot::drive::state::{PaneState, WatchState};
+use mp::autopilot::drive::Role;
 use mp::autopilot::{
     migrate_legacy_watch_state, sample_session_for_tests, save_session, MigrationError,
     MigrationOutcome, MIGRATED_SESSION_ID,
 };
 use mp::paths::PlanContext;
-use mp::watch::state::{PaneState, WatchState};
-use mp::watch::Role;
 use serde_json::Value;
 use std::path::Path;
 
@@ -35,7 +35,7 @@ fn ctx_in(dir: &Path) -> PlanContext {
 }
 
 fn write_legacy(ctx: &PlanContext, state: &WatchState) {
-    let path = mp::watch::default_state_path(&ctx.plan_dir);
+    let path = mp::autopilot::drive::default_state_path(&ctx.plan_dir);
     mp::autopilot::write_legacy_for_tests(&path, state).unwrap();
 }
 
@@ -123,7 +123,7 @@ fn versioned_legacy_fixture_migrates_once_preserving_identity_and_order() {
 
     // Source file is preserved (the migration never deletes the
     // legacy fixture).
-    assert!(mp::watch::default_state_path(&ctx.plan_dir).exists());
+    assert!(mp::autopilot::drive::default_state_path(&ctx.plan_dir).exists());
 
     // Schema migration audit entry is recorded on the session so
     // future downgrades are detectable.
@@ -171,7 +171,7 @@ fn re_running_migration_is_idempotent() {
 fn corrupt_legacy_state_surfaces_typed_error_and_preserves_source() {
     let env = TestEnv::new();
     let ctx = ctx_in(env.tmp.path());
-    let source_path = mp::watch::default_state_path(&ctx.plan_dir);
+    let source_path = mp::autopilot::drive::default_state_path(&ctx.plan_dir);
     std::fs::create_dir_all(source_path.parent().unwrap()).unwrap();
     std::fs::write(&source_path, b"{not json").unwrap();
 
@@ -209,7 +209,7 @@ fn unknown_legacy_schema_version_refuses_migration() {
         other => panic!("expected UnknownLegacySchema, got {other:?}"),
     }
     // Source preserved; no autopilot session was created.
-    assert!(mp::watch::default_state_path(&ctx.plan_dir).exists());
+    assert!(mp::autopilot::drive::default_state_path(&ctx.plan_dir).exists());
     let session_path = mp::autopilot::session::SessionPath::new(&ctx, MIGRATED_SESSION_ID).unwrap();
     assert!(!session_path.file.exists());
 }
@@ -228,7 +228,7 @@ fn partial_migration_leaves_existing_session_unchanged() {
     let pre_bytes = mp::autopilot::load_session(&ctx, MIGRATED_SESSION_ID).unwrap();
 
     // Write a corrupt legacy file alongside.
-    let source_path = mp::watch::default_state_path(&ctx.plan_dir);
+    let source_path = mp::autopilot::drive::default_state_path(&ctx.plan_dir);
     std::fs::create_dir_all(source_path.parent().unwrap()).unwrap();
     std::fs::write(&source_path, b"\xff\xfe\xfd garbage").unwrap();
 

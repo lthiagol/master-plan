@@ -1,4 +1,11 @@
-//! `mp watch` command surface (M149).
+//! `mp watch` command surface — **legacy compatibility adapter**.
+//!
+//! `mp watch` is the deprecated alias for `mp autopilot start`. This
+//! module is the only place in the tree that is *supposed* to carry
+//! `watch` naming: it owns the alias's argument parsing, its
+//! deprecation notice, and the `WatchPlan` / `WatchMilestone` dry-run
+//! JSON shapes that external consumers still read. All engine work is
+//! delegated to the canonical [`crate::autopilot::drive`] tree.
 //!
 //! S0 precondition check; S2 CLI dispatch + per-milestone dry-run
 //! preview; S3–S8 herdr layer + state machine + sequencer; S10
@@ -25,6 +32,12 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::json;
 
+use crate::autopilot::drive::{
+    build_pane_split_args, build_start_args, check_preconditions, default_log_path,
+    harness_extra_flags, next_stage, pane_label_for, resolve_harness_kind, run_milestones,
+    try_lazy_auto_set, which_herdr, DriveLogEntry, DriveLogger, PreconditionReport, PromptStage,
+    Role, SequencerReport, SystemDriveOps, DEFAULT_PANE_N,
+};
 use crate::autopilot::{AutopilotGateError, EX_AUTOPILOT_GATE};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
@@ -33,12 +46,6 @@ use crate::milestone::load_milestone_by_id;
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
 use crate::store;
-use crate::watch::{
-    build_pane_split_args, build_start_args, check_preconditions, default_log_path,
-    harness_extra_flags, next_stage, pane_label_for, resolve_harness_kind, run_milestones,
-    try_lazy_auto_set, which_herdr, PreconditionReport, PromptStage, Role, SequencerReport,
-    SystemDriveOps, WatchLogEntry, WatchLogger, DEFAULT_PANE_N,
-};
 
 /// Maximum state-machine iterations per milestone before giving up
 /// and halting the sequencer. Bounded to keep runaway remediation
@@ -315,7 +322,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // the drive loop polls the atomic on every iteration so a
     // Ctrl-C ends the run within one stage-transition latence.
     // Idempotent — calling twice is a no-op.
-    crate::watch::install_signal_handlers();
+    crate::autopilot::drive::install_signal_handlers();
 
     // Gate on preconditions before any subprocess work.
     if !preconditions.ok {
@@ -340,10 +347,10 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     })?;
 
     // Attach structured logger (S10 / review finding #2).
-    let logger = WatchLogger::open(log_path)
+    let logger = DriveLogger::open(log_path)
         .with_context(|| format!("mp watch: failed to open log file {}", log_path.display()))?;
     logger
-        .log(&WatchLogEntry::new(
+        .log(&DriveLogEntry::new(
             "boot",
             format!(
                 "mp watch starting: ids={:?} log={} resume={resume} force={force}",
@@ -353,7 +360,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
         ))
         .ok();
 
-    let role_configs = crate::watch::state_machine::RoleConfigs {
+    let role_configs = crate::autopilot::drive::state_machine::RoleConfigs {
         runner: cfg.runner_config().clone(),
         coordinator: cfg.coordinator_config().clone(),
     };
@@ -366,9 +373,12 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // `--force` skips the check (still re-uses on resume). A corrupt
     // or absent herdr list is treated as "no live panes" so the
     // check never blocks startup.
-    let herdr_list_json = crate::watch::list_panes(&herdr_bin).unwrap_or_default();
-    let recorded_state = crate::watch::WatchState::load(ctx).ok().flatten();
-    let reconciliation = crate::watch::reconcile(recorded_state.as_ref(), &herdr_list_json);
+    let herdr_list_json = crate::autopilot::drive::list_panes(&herdr_bin).unwrap_or_default();
+    let recorded_state = crate::autopilot::drive::WatchState::load(ctx)
+        .ok()
+        .flatten();
+    let reconciliation =
+        crate::autopilot::drive::reconcile(recorded_state.as_ref(), &herdr_list_json);
 
     // ─── M225 F-01 wiring (AC-03: resume from last valid event) ─────────
     // On every `mp watch` / `cmd_autopilot_start` invocation, run
@@ -388,7 +398,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             // Recovery scan itself failed (e.g. read_dir error).
             // Log + continue; the resume gate below still runs.
             logger
-                .log(&WatchLogEntry::new(
+                .log(&DriveLogEntry::new(
                     "startup_recovery_failed",
                     format!("{e}"),
                 ))
@@ -404,7 +414,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
                 event_count,
             } => {
                 logger
-                    .log(&WatchLogEntry::new(
+                    .log(&DriveLogEntry::new(
                         "startup_recovery_recovered",
                         format!(
                             "session={} prev_cursor={} next_cursor={} events={}",
@@ -418,7 +428,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
                 event_count,
             } => {
                 logger
-                    .log(&WatchLogEntry::new(
+                    .log(&DriveLogEntry::new(
                         "startup_recovery_rejected",
                         format!(
                             "session={} events={} reason={}",
@@ -433,14 +443,14 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
         (
             "runner",
             match &reconciliation.runner {
-                crate::watch::PaneStatus::Live { pane_id, .. } => Some(pane_id.as_str()),
+                crate::autopilot::drive::PaneStatus::Live { pane_id, .. } => Some(pane_id.as_str()),
                 _ => None,
             },
         ),
         (
             "coordinator",
             match &reconciliation.coordinator {
-                crate::watch::PaneStatus::Live { pane_id, .. } => Some(pane_id.as_str()),
+                crate::autopilot::drive::PaneStatus::Live { pane_id, .. } => Some(pane_id.as_str()),
                 _ => None,
             },
         ),
@@ -459,10 +469,13 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // fabricated completion after pane restart" — a `Dead` pane
     // with `AwaitingUser` outcome means the operator must
     // intervene; the drive loop must not silently re-spawn.
-    let runner_dead = matches!(reconciliation.runner, crate::watch::PaneStatus::Dead { .. });
+    let runner_dead = matches!(
+        reconciliation.runner,
+        crate::autopilot::drive::PaneStatus::Dead { .. }
+    );
     let coordinator_dead = matches!(
         reconciliation.coordinator,
-        crate::watch::PaneStatus::Dead { .. }
+        crate::autopilot::drive::PaneStatus::Dead { .. }
     );
     if runner_dead || coordinator_dead {
         for (role_label, is_dead) in [("runner", runner_dead), ("coordinator", coordinator_dead)] {
@@ -486,7 +499,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             match outcome {
                 crate::autopilot::PaneLossOutcome::SafeRespawn { .. } => {
                     logger
-                        .log(&WatchLogEntry::new(
+                        .log(&DriveLogEntry::new(
                             "pane_loss_safe_respawn",
                             format!("role={role_label}: stored prompt/actor absent; defaulting to re-spawn via state machine"),
                         ))
@@ -494,7 +507,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
                 }
                 crate::autopilot::PaneLossOutcome::AwaitingUser { reason } => {
                     logger
-                        .log(&WatchLogEntry::new(
+                        .log(&DriveLogEntry::new(
                             "pane_loss_awaiting_user",
                             format!("role={role_label} reason={reason}"),
                         ))
@@ -521,7 +534,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
              --force <ids...>` to bypass this check."
         );
         logger
-            .log(&WatchLogEntry::new(
+            .log(&DriveLogEntry::new(
                 "double_spawn_refused",
                 format!("refused on existing panes: {details}"),
             ))
@@ -569,13 +582,13 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // watch driver must run regardless of journal write success.
     crate::activity::append_event_best_effort(ctx, crate::activity::watch_started_event(ids))?;
     if let Some(poll) = poll_interval_ms {
-        ops.set_wait_options(crate::watch::WaitOptions {
+        ops.set_wait_options(crate::autopilot::drive::WaitOptions {
             poll_interval_ms: poll,
             ..ops.wait_options()
         });
     }
     if let Some(stall) = stall_timeout_ms {
-        ops.set_wait_options(crate::watch::WaitOptions {
+        ops.set_wait_options(crate::autopilot::drive::WaitOptions {
             stall_timeout_ms: stall,
             ..ops.wait_options()
         });
@@ -591,14 +604,14 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     if has_live_panes {
         for (role_label, pane_id) in &live_panes {
             let role = match *role_label {
-                "runner" => crate::watch::Role::Runner,
-                "coordinator" => crate::watch::Role::Coordinator,
+                "runner" => crate::autopilot::drive::Role::Runner,
+                "coordinator" => crate::autopilot::drive::Role::Coordinator,
                 _ => continue,
             };
             let label = format!("role-{role_label}-1");
             ops.pane_cache.insert(
                 role,
-                crate::watch::PaneHandle {
+                crate::autopilot::drive::PaneHandle {
                     label,
                     pane_id: pane_id.to_string(),
                     reused: true,
@@ -606,7 +619,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             );
         }
         logger
-            .log(&WatchLogEntry::new(
+            .log(&DriveLogEntry::new(
                 "resume_reuse",
                 format!(
                     "re-attaching to live panes: {}",
@@ -627,7 +640,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // state (the v2 schema also subsumes the v1 panes/milestones
     // tracking, so `--resume` against this file keeps working
     // through the existing reconciliation path).
-    let mut state = crate::watch::WatchRunState::fresh(ids);
+    let mut state = crate::autopilot::drive::WatchRunState::fresh(ids);
     // Carry the persisted panes/milestones v1-shape into the v2
     // struct so the legacy `--resume` reconciliation continues to
     // find pane id and last-known-lifecycle records.
@@ -638,7 +651,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // queue order.
     state.log_path = Some(log_path.to_string_lossy().into_owned());
     state.state_path = Some(
-        crate::watch::default_run_state_path(&ctx.plan_dir)
+        crate::autopilot::drive::default_run_state_path(&ctx.plan_dir)
             .to_string_lossy()
             .into_owned(),
     );
@@ -650,7 +663,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     match initial_state_save {
         Ok(path) => {
             logger
-                .log(&WatchLogEntry::new(
+                .log(&DriveLogEntry::new(
                     "state_persisted",
                     format!("initial state at {path}"),
                 ))
@@ -663,7 +676,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             // continues; the graceful-shutdown path will retry
             // the save before exit.
             logger
-                .log(&WatchLogEntry::new(
+                .log(&DriveLogEntry::new(
                     "state_persist_failed",
                     format!("initial state save failed: {e:#}"),
                 ))
@@ -682,7 +695,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // off. `perform_graceful_shutdown` does both; it never
     // bubbles its own errors so a cleanup hiccup never blocks
     // exit.
-    let graceful_shutdown = crate::watch::shutdown_requested();
+    let graceful_shutdown = crate::autopilot::drive::shutdown_requested();
     if graceful_shutdown {
         // Re-read milestones from disk to capture the latest
         // lifecycle for the flash note (instead of guessing from
@@ -699,20 +712,24 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
         // translate by lifting the v2 panes + milestones back into
         // a fresh v1 state. The v2 control-plane state itself is
         // already attached to ops and re-persisted below.
-        let mut legacy_state =
-            crate::watch::WatchState::fresh(&active.clone().into_iter().collect::<Vec<_>>());
-        if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Runner) {
-            legacy_state.upsert_pane(crate::watch::PaneState {
-                role: crate::watch::Role::Runner,
+        let mut legacy_state = crate::autopilot::drive::WatchState::fresh(
+            &active.clone().into_iter().collect::<Vec<_>>(),
+        );
+        if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
+            legacy_state.upsert_pane(crate::autopilot::drive::PaneState {
+                role: crate::autopilot::drive::Role::Runner,
                 label: pane.label.clone(),
                 pane_id: pane.pane_id.clone(),
                 spawned_at: "t".into(),
                 last_status: None,
             });
         }
-        if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Coordinator) {
-            legacy_state.upsert_pane(crate::watch::PaneState {
-                role: crate::watch::Role::Coordinator,
+        if let Some(pane) = ops
+            .pane_cache
+            .get(&crate::autopilot::drive::Role::Coordinator)
+        {
+            legacy_state.upsert_pane(crate::autopilot::drive::PaneState {
+                role: crate::autopilot::drive::Role::Coordinator,
                 label: pane.label.clone(),
                 pane_id: pane.pane_id.clone(),
                 spawned_at: "t".into(),
@@ -729,7 +746,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
                 .current_target()
                 .map(|t| t.as_str().to_string())
                 .unwrap_or_else(|| "self-reviewed".to_string());
-            legacy_state.upsert_milestone(crate::watch::MilestoneState {
+            legacy_state.upsert_milestone(crate::autopilot::drive::MilestoneState {
                 id: ms.to_string(),
                 last_lifecycle: lc.to_string(),
                 target_lifecycle,
@@ -745,11 +762,11 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             .run_state()
             .is_some_and(|state| state.run_outcome.is_none())
         {
-            let _ = ops.transition(crate::watch::WatchTransition::RunOutcome(
-                crate::watch::RunOutcome::GracefullyStopped,
+            let _ = ops.transition(crate::autopilot::drive::WatchTransition::RunOutcome(
+                crate::autopilot::drive::RunOutcome::GracefullyStopped,
             ));
         }
-        let _ = crate::watch::perform_graceful_shutdown(
+        let _ = crate::autopilot::drive::perform_graceful_shutdown(
             ctx,
             &legacy_state,
             active.as_deref(),
@@ -757,7 +774,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             Some(&logger),
         );
         logger
-            .log(&WatchLogEntry::new(
+            .log(&DriveLogEntry::new(
                 "shutdown_signal",
                 "graceful shutdown: state flushed + flash note recorded",
             ))
@@ -886,18 +903,18 @@ struct OverrideDiagnosticView {
 }
 
 impl OverrideDiagnosticView {
-    fn from(d: &crate::watch::OverrideDiagnostic) -> Self {
+    fn from(d: &crate::autopilot::drive::OverrideDiagnostic) -> Self {
         let rung = match d.rung {
-            crate::watch::OverrideRung::OverrideDir => "override_dir",
-            crate::watch::OverrideRung::PlanDir => "plan_dir",
+            crate::autopilot::drive::OverrideRung::OverrideDir => "override_dir",
+            crate::autopilot::drive::OverrideRung::PlanDir => "plan_dir",
         };
         let kind = match d.kind {
-            crate::watch::OverrideRefusalKind::NotRegular => "not_regular",
-            crate::watch::OverrideRefusalKind::TooLarge => "too_large",
-            crate::watch::OverrideRefusalKind::Empty => "empty",
-            crate::watch::OverrideRefusalKind::HeaderMissing => "header_missing",
-            crate::watch::OverrideRefusalKind::InvalidUtf8 => "invalid_utf8",
-            crate::watch::OverrideRefusalKind::ReadError => "read_error",
+            crate::autopilot::drive::OverrideRefusalKind::NotRegular => "not_regular",
+            crate::autopilot::drive::OverrideRefusalKind::TooLarge => "too_large",
+            crate::autopilot::drive::OverrideRefusalKind::Empty => "empty",
+            crate::autopilot::drive::OverrideRefusalKind::HeaderMissing => "header_missing",
+            crate::autopilot::drive::OverrideRefusalKind::InvalidUtf8 => "invalid_utf8",
+            crate::autopilot::drive::OverrideRefusalKind::ReadError => "read_error",
         };
         Self {
             rung,
@@ -922,19 +939,22 @@ struct WatchPlan {
 /// it means a crash leaves the recorded pane ids ready for
 /// `--resume` to re-attach to.
 #[allow(dead_code)]
-fn upsert_panes_from_cache(state: &mut crate::watch::WatchState, ops: &SystemDriveOps) {
-    if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Runner) {
-        state.upsert_pane(crate::watch::PaneState {
-            role: crate::watch::Role::Runner,
+fn upsert_panes_from_cache(state: &mut crate::autopilot::drive::WatchState, ops: &SystemDriveOps) {
+    if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
+        state.upsert_pane(crate::autopilot::drive::PaneState {
+            role: crate::autopilot::drive::Role::Runner,
             label: pane.label.clone(),
             pane_id: pane.pane_id.clone(),
             spawned_at: crate::store::now_rfc3339(),
             last_status: None,
         });
     }
-    if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Coordinator) {
-        state.upsert_pane(crate::watch::PaneState {
-            role: crate::watch::Role::Coordinator,
+    if let Some(pane) = ops
+        .pane_cache
+        .get(&crate::autopilot::drive::Role::Coordinator)
+    {
+        state.upsert_pane(crate::autopilot::drive::PaneState {
+            role: crate::autopilot::drive::Role::Coordinator,
             label: pane.label.clone(),
             pane_id: pane.pane_id.clone(),
             spawned_at: crate::store::now_rfc3339(),
@@ -948,26 +968,35 @@ fn upsert_panes_from_cache(state: &mut crate::watch::WatchState, ops: &SystemDri
 /// flat `pane_ids` map keyed by role. Both are read by `--resume` /
 /// `mp watch output`; the flat map is the new authoritative read
 /// path so callers don't have to scan the array.
-fn upsert_panes_from_cache_v2(state: &mut crate::watch::WatchRunState, ops: &SystemDriveOps) {
-    if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Runner) {
-        state.panes.push(crate::watch::PaneState {
-            role: crate::watch::Role::Runner,
+fn upsert_panes_from_cache_v2(
+    state: &mut crate::autopilot::drive::WatchRunState,
+    ops: &SystemDriveOps,
+) {
+    if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
+        state.panes.push(crate::autopilot::drive::PaneState {
+            role: crate::autopilot::drive::Role::Runner,
             label: pane.label.clone(),
             pane_id: pane.pane_id.clone(),
             spawned_at: crate::store::now_rfc3339(),
             last_status: None,
         });
-        state.record_pane(crate::watch::Role::Runner, pane.pane_id.clone());
+        state.record_pane(crate::autopilot::drive::Role::Runner, pane.pane_id.clone());
     }
-    if let Some(pane) = ops.pane_cache.get(&crate::watch::Role::Coordinator) {
-        state.panes.push(crate::watch::PaneState {
-            role: crate::watch::Role::Coordinator,
+    if let Some(pane) = ops
+        .pane_cache
+        .get(&crate::autopilot::drive::Role::Coordinator)
+    {
+        state.panes.push(crate::autopilot::drive::PaneState {
+            role: crate::autopilot::drive::Role::Coordinator,
             label: pane.label.clone(),
             pane_id: pane.pane_id.clone(),
             spawned_at: crate::store::now_rfc3339(),
             last_status: None,
         });
-        state.record_pane(crate::watch::Role::Coordinator, pane.pane_id.clone());
+        state.record_pane(
+            crate::autopilot::drive::Role::Coordinator,
+            pane.pane_id.clone(),
+        );
     }
 }
 
@@ -1083,17 +1112,22 @@ fn resolve_one(
             // runner pane will receive. Thread `plan_dir` and use
             // the diagnostics-aware renderer so refusal reasons
             // surface here too (F-11).
-            let req = crate::watch::BuildPromptRequest {
+            let req = crate::autopilot::drive::BuildPromptRequest {
                 stage: plan.stage,
                 milestone: &m,
-                options: &crate::watch::PromptRenderOptions::default(),
+                options: &crate::autopilot::drive::PromptRenderOptions::default(),
                 override_dir: None,
                 plan_dir: Some(&ctx.plan_dir),
             };
-            let rendered = crate::watch::build_prompt_full(&req, crate::watch::MAX_OVERRIDE_BYTES);
+            let rendered = crate::autopilot::drive::build_prompt_full(
+                &req,
+                crate::autopilot::drive::MAX_OVERRIDE_BYTES,
+            );
             entry.prompt_source = Some(rendered.source.label().to_string());
             entry.prompt_source_path = match &rendered.source {
-                crate::watch::TemplateSource::ProjectOverride(p) => Some(p.display().to_string()),
+                crate::autopilot::drive::TemplateSource::ProjectOverride(p) => {
+                    Some(p.display().to_string())
+                }
                 _ => None,
             };
             entry.override_diagnostics = rendered

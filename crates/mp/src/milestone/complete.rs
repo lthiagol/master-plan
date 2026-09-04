@@ -592,7 +592,7 @@ pub fn complete_milestone(
     // `mp` from a non-herdr shell). The sentinel is the latency
     // optimization for `mp watch`; `plan.json` lifecycle=complete
     // remains the source of truth.
-    crate::watch::emit_stage_done_best_effort("milestone-complete", Some(id));
+    crate::autopilot::drive::emit_stage_done_best_effort("milestone-complete", Some(id));
     // M180 S3: emit one lifecycle-transition event. Same-state calls
     // (re-complete) emit nothing; the primary mutation (evidence
     // refresh) is the only side effect.

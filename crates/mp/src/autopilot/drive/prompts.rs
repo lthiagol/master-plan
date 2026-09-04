@@ -31,7 +31,7 @@
 //! the re-review loop coalesces into the same body shape and only
 //! differs in the lifecycle target).
 //!
-//! Backed by property tests in `tests/watch_prompts.rs` (interpolation),
+//! Backed by property tests in `tests/autopilot_drive_prompts.rs` (interpolation),
 //! `tests/watch_template_files.rs` (file presence + byte equivalence),
 //! and `tests/watch_template_override.rs` (override resolution).
 //!
@@ -106,13 +106,13 @@ impl PromptStage {
     }
 
     /// Which role's pane this stage targets.
-    pub fn role(self) -> crate::watch::Role {
+    pub fn role(self) -> crate::autopilot::drive::Role {
         match self {
             PromptStage::Execute | PromptStage::SelfReview | PromptStage::Remediate => {
-                crate::watch::Role::Runner
+                crate::autopilot::drive::Role::Runner
             }
             PromptStage::ExternalReview | PromptStage::ReReview | PromptStage::Approve => {
-                crate::watch::Role::Coordinator
+                crate::autopilot::drive::Role::Coordinator
             }
         }
     }
@@ -564,15 +564,15 @@ pub fn resolve_template_full(
 
 fn compiled_default(stage: PromptStage) -> &'static str {
     match stage {
-        PromptStage::Execute => include_str!("../../../../templates/watch/execute.md"),
+        PromptStage::Execute => include_str!("../../../../../templates/watch/execute.md"),
         PromptStage::SelfReview => {
-            include_str!("../../../../templates/watch/self-review.md")
+            include_str!("../../../../../templates/watch/self-review.md")
         }
         PromptStage::ExternalReview => {
-            include_str!("../../../../templates/watch/external-review.md")
+            include_str!("../../../../../templates/watch/external-review.md")
         }
-        PromptStage::Remediate => include_str!("../../../../templates/watch/remediate.md"),
-        PromptStage::Approve => include_str!("../../../../templates/watch/approve.md"),
+        PromptStage::Remediate => include_str!("../../../../../templates/watch/remediate.md"),
+        PromptStage::Approve => include_str!("../../../../../templates/watch/approve.md"),
         PromptStage::ReReview => unreachable!("ReReview is not externalized"),
     }
 }
@@ -735,7 +735,7 @@ fn render_body(template: &str, ctx: &PromptCtx) -> String {
 
 /// Hardcoded fallback for stages that were not externalized under
 /// M153 S1 (`ReReview`). Kept byte-equivalent to the M149 baseline
-/// so the property tests at `tests/watch_prompts.rs` (which pin
+/// so the property tests at `tests/autopilot_drive_prompts.rs` (which pin
 /// every stage's render against a fixture milestone) continue to
 /// pass without modification.
 fn render_hardcoded_fallback(stage: PromptStage, ctx: &PromptCtx) -> String {
@@ -958,18 +958,30 @@ mod tests {
 
     #[test]
     fn role_routing_matches_design() {
-        assert_eq!(PromptStage::Execute.role(), crate::watch::Role::Runner);
-        assert_eq!(PromptStage::SelfReview.role(), crate::watch::Role::Runner);
-        assert_eq!(PromptStage::Remediate.role(), crate::watch::Role::Runner);
+        assert_eq!(
+            PromptStage::Execute.role(),
+            crate::autopilot::drive::Role::Runner
+        );
+        assert_eq!(
+            PromptStage::SelfReview.role(),
+            crate::autopilot::drive::Role::Runner
+        );
+        assert_eq!(
+            PromptStage::Remediate.role(),
+            crate::autopilot::drive::Role::Runner
+        );
         assert_eq!(
             PromptStage::ExternalReview.role(),
-            crate::watch::Role::Coordinator
+            crate::autopilot::drive::Role::Coordinator
         );
         assert_eq!(
             PromptStage::ReReview.role(),
-            crate::watch::Role::Coordinator
+            crate::autopilot::drive::Role::Coordinator
         );
-        assert_eq!(PromptStage::Approve.role(), crate::watch::Role::Coordinator);
+        assert_eq!(
+            PromptStage::Approve.role(),
+            crate::autopilot::drive::Role::Coordinator
+        );
     }
 
     #[test]

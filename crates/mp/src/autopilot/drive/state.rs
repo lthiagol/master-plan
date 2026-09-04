@@ -51,9 +51,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::autopilot::drive::Role;
 use crate::paths::PlanContext;
 use crate::store::atomic_write;
-use crate::watch::Role;
 
 /// Current state-file schema. Bumped when an incompatible change
 /// lands; [`WatchState::load`] surfaces a warning when reading a
@@ -199,7 +199,7 @@ impl WatchState {
     /// The layering smell (library code writing to stderr directly)
     /// is real but minor; a future refactor should plumb warnings
     /// through a return value so callers (e.g. `cmd_watch_drive`)
-    /// can route them via the `WatchLogger` instead.
+    /// can route them via the `DriveLogger` instead.
     pub fn load_from(path: &Path) -> Result<Option<Self>> {
         if !path.exists() {
             return Ok(None);

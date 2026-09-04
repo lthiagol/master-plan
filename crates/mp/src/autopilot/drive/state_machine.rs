@@ -19,18 +19,18 @@ use serde::Serialize;
 use crate::milestone::load_milestone_by_id;
 use std::path::Path;
 
-use crate::model::MilestoneFile;
-use crate::paths::PlanContext;
-use crate::watch::{
+use crate::autopilot::drive::{
     clear_stage_done_sentinel, ensure_pane, lifecycle_advanced_past, pane_label_for,
     read_agent_status, read_custom_status_bounded, read_lifecycle_via_mp, send_prompt,
     sentinel_matches, LifecycleTarget, PaneHandle, PromptStage, ReadinessOptions, Role, RunOutcome,
     WaitOptions, WaitOutcome, WatchRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS, DEFAULT_PANE_N,
 };
+use crate::model::MilestoneFile;
+use crate::paths::PlanContext;
 
 /// Operations the state machine needs. Implementations:
 /// - [`SystemDriveOps`] — production; spawns `mp` + `herdr` subprocesses.
-/// - `MockDriveOps` (in tests/watch_execution.rs) — canned sequences.
+/// - `MockDriveOps` (in tests/autopilot_drive_execution.rs) — canned sequences.
 pub trait DriveOps {
     /// Read the current on-disk milestone. Called at the top of each
     /// loop iteration to pick the next stage.
@@ -70,8 +70,8 @@ pub trait DriveOps {
     /// (`MockDriveOps`) don't need to override it.
     fn set_active_stage(
         &mut self,
-        stage: crate::watch::PromptStage,
-        target: crate::watch::LifecycleTarget,
+        stage: crate::autopilot::drive::PromptStage,
+        target: crate::autopilot::drive::LifecycleTarget,
     ) -> Result<()> {
         let _ = (stage, target);
         Ok(())
@@ -199,7 +199,7 @@ pub fn drive_milestone<O: DriveOps>(ops: &mut O, max_iterations: usize) -> Resul
         // iteration cadence — every stage transition waits at
         // least one poll interval, so this fires within ~1s of the
         // signal under default config.
-        if crate::watch::shutdown_requested() {
+        if crate::autopilot::drive::shutdown_requested() {
             return Ok(DriveOutcome::Shutdown);
         }
         if iter > max_iterations.max(1) {
@@ -213,7 +213,7 @@ pub fn drive_milestone<O: DriveOps>(ops: &mut O, max_iterations: usize) -> Resul
         // subprocess to also catch a signal that arrived while the
         // subprocess was spawning — the wait loop below also checks,
         // but adding one here shortens the worst-case latency.
-        if crate::watch::shutdown_requested() {
+        if crate::autopilot::drive::shutdown_requested() {
             return Ok(DriveOutcome::Shutdown);
         }
         // Complete is the goal state — check it before skip verdicts so
@@ -256,14 +256,17 @@ pub fn drive_milestone<O: DriveOps>(ops: &mut O, max_iterations: usize) -> Resul
             // can resolve `<plan_dir>/watch/<stage>.md` and log which
             // surface (override vs compiled default) served the body.
             let plan_dir = ops.plan_dir();
-            let req = crate::watch::BuildPromptRequest {
+            let req = crate::autopilot::drive::BuildPromptRequest {
                 stage: plan.stage,
                 milestone: &m,
-                options: &crate::watch::PromptRenderOptions::default(),
+                options: &crate::autopilot::drive::PromptRenderOptions::default(),
                 override_dir: None,
                 plan_dir: Some(plan_dir),
             };
-            let rendered = crate::watch::build_prompt_full(&req, crate::watch::MAX_OVERRIDE_BYTES);
+            let rendered = crate::autopilot::drive::build_prompt_full(
+                &req,
+                crate::autopilot::drive::MAX_OVERRIDE_BYTES,
+            );
             // M153 S2 done_when: "the log records 'override' vs
             // 'default' per stage". Logged per stage so an operator
             // can see which surface was used. F-11: each refused
@@ -290,10 +293,11 @@ pub fn drive_milestone<O: DriveOps>(ops: &mut O, max_iterations: usize) -> Resul
                     "{} → {}",
                     plan.stage.label(),
                     match &rendered.source {
-                        crate::watch::TemplateSource::ProjectOverride(p) =>
+                        crate::autopilot::drive::TemplateSource::ProjectOverride(p) =>
                             format!("override ({})", p.display()),
-                        crate::watch::TemplateSource::CompiledDefault => "default".to_string(),
-                        crate::watch::TemplateSource::Hardcoded(name) =>
+                        crate::autopilot::drive::TemplateSource::CompiledDefault =>
+                            "default".to_string(),
+                        crate::autopilot::drive::TemplateSource::Hardcoded(name) =>
                             format!("hardcoded ({name})"),
                     }
                 ),
@@ -353,11 +357,11 @@ pub struct SystemDriveOps {
     /// `watch.state.json` instead of a hardcoded placeholder.
     /// Set by [`Self::wait_for_lifecycle`] on every entry; cleared
     /// on milestone switch via [`Self::set_active_milestone`].
-    pub(crate) current_target: Option<crate::watch::LifecycleTarget>,
+    pub(crate) current_target: Option<crate::autopilot::drive::LifecycleTarget>,
     /// Optional structured logger. When `Some`, every herdr call +
     /// state-machine transition writes a JSONL entry. Review finding
     /// #2 / AC-08.
-    pub(crate) logger: Option<crate::watch::WatchLogger>,
+    pub(crate) logger: Option<crate::autopilot::drive::DriveLogger>,
     /// M178 S2: latest-run control-plane state. Updated on every
     /// pane spawn, prompt dispatch, lifecycle wait, and handoff.
     /// Persisted to `.mp/watch.state.json` via `persist_state`
@@ -367,7 +371,7 @@ pub struct SystemDriveOps {
     /// is `Option` so legacy callers (tests that build
     /// `SystemDriveOps::new(...)` directly) keep compiling without
     /// a state file — they just get `None` for the live status.
-    pub(crate) run_store: Option<crate::watch::WatchRunStore>,
+    pub(crate) run_store: Option<crate::autopilot::drive::WatchRunStore>,
     /// M226 F-01 wiring: autopilot session id used to consult the
     /// session event log for prior `AssignmentDispatched` events
     /// before spawning. Set via [`Self::set_session_id`] by the
@@ -417,8 +421,8 @@ impl SystemDriveOps {
     /// wait, and handoff updates the state, and callers can
     /// `persist_state` at any time to flush to disk.
     pub fn attach_run_state(&mut self, state: WatchRunState) {
-        let path = crate::watch::default_run_state_path(&self.plan_dir);
-        self.run_store = Some(crate::watch::WatchRunStore::new(path, state));
+        let path = crate::autopilot::drive::default_run_state_path(&self.plan_dir);
+        self.run_store = Some(crate::autopilot::drive::WatchRunStore::new(path, state));
     }
 
     /// Borrow the attached v2 state (if any). `None` for legacy
@@ -430,7 +434,7 @@ impl SystemDriveOps {
     /// Borrow the attached v2 state mutably.
     pub fn transition(
         &mut self,
-        event: crate::watch::WatchTransition,
+        event: crate::autopilot::drive::WatchTransition,
     ) -> anyhow::Result<Option<&WatchRunState>> {
         match self.run_store.as_mut() {
             Some(store) => Ok(Some(store.transition(event)?)),
@@ -462,7 +466,10 @@ impl SystemDriveOps {
             .run_state()
             .and_then(|state| state.queue.iter().position(|q| q == &id))
             .unwrap_or(0);
-        self.transition(crate::watch::WatchTransition::ActiveMilestone { index: idx, id })?;
+        self.transition(crate::autopilot::drive::WatchTransition::ActiveMilestone {
+            index: idx,
+            id,
+        })?;
         Ok(())
     }
 
@@ -470,7 +477,7 @@ impl SystemDriveOps {
     /// transition writes a JSONL entry. The logger is cloned cheaply
     /// (Arc-shared) so callers can keep a handle for independent
     /// writes.
-    pub fn set_logger(&mut self, logger: crate::watch::WatchLogger) {
+    pub fn set_logger(&mut self, logger: crate::autopilot::drive::DriveLogger) {
         self.logger = Some(logger);
     }
 
@@ -548,7 +555,7 @@ impl SystemDriveOps {
     /// pane context. No-op when no logger is attached.
     pub(crate) fn log_event(&self, kind: &'static str, message: impl Into<String>) {
         if let Some(logger) = &self.logger {
-            let mut entry = crate::watch::WatchLogEntry::new(kind, message);
+            let mut entry = crate::autopilot::drive::DriveLogEntry::new(kind, message);
             if let Some(id) = &self.active_milestone_id {
                 entry = entry.milestone(id);
             }
@@ -640,7 +647,7 @@ impl SystemDriveOps {
             // Ctrl-C during a real run blocks until the 30-min stall
             // timeout fires. Same bail pattern as the parallel
             // `wait_for_lifecycle_with` (used by the unit-test path).
-            if crate::watch::shutdown_requested() {
+            if crate::autopilot::drive::shutdown_requested() {
                 bail!("graceful shutdown requested");
             }
 
@@ -773,7 +780,7 @@ impl SystemDriveOps {
             let mut remaining = tick;
             let slice = Duration::from_millis(5);
             while !remaining.is_zero() {
-                if crate::watch::shutdown_requested() {
+                if crate::autopilot::drive::shutdown_requested() {
                     bail!("graceful shutdown requested");
                 }
                 let chunk = remaining.min(slice);
@@ -897,7 +904,7 @@ impl DriveOps for SystemDriveOps {
         match ensure_pane(
             &self.herdr_bin,
             role,
-            crate::watch::DEFAULT_PANE_N,
+            crate::autopilot::drive::DEFAULT_PANE_N,
             rc,
             self.project_root.as_path(),
         ) {
@@ -906,7 +913,7 @@ impl DriveOps for SystemDriveOps {
                 // M178 S2: record the pane id in the v2 control-plane state
                 // so `mp watch output` (S7) can address it without scanning
                 // the legacy v1 panes array.
-                self.transition(crate::watch::WatchTransition::PaneObserved {
+                self.transition(crate::autopilot::drive::WatchTransition::PaneObserved {
                     role,
                     pane_id: handle.pane_id.clone(),
                 })?;
@@ -919,8 +926,8 @@ impl DriveOps for SystemDriveOps {
                 // line. The state machine re-raises the error so
                 // the sequencer can convert it to
                 // `RunOutcome::SpawnFailed` and stop the run.
-                if let Some(failure) = crate::watch::herdr::extract_spawn_failure(&err) {
-                    let entry = crate::watch::WatchLogEntry::new(
+                if let Some(failure) = crate::autopilot::drive::herdr::extract_spawn_failure(&err) {
+                    let entry = crate::autopilot::drive::DriveLogEntry::new(
                         "spawn_error",
                         format!(
                             "herdr {} failed (exit {:?}): {}",
@@ -968,7 +975,10 @@ impl DriveOps for SystemDriveOps {
         });
         let pane_id = pane.pane_id.clone();
         if let Some(role) = pane_role {
-            self.transition(crate::watch::WatchTransition::PaneObserved { role, pane_id })?;
+            self.transition(crate::autopilot::drive::WatchTransition::PaneObserved {
+                role,
+                pane_id,
+            })?;
         }
         send_prompt(&self.herdr_bin, pane, text, &self.readiness)
     }
@@ -1008,20 +1018,22 @@ impl DriveOps for SystemDriveOps {
             _ => None,
         };
         if let Some(lc) = new_lifecycle {
-            self.transition(crate::watch::WatchTransition::LifecycleObserved(lc))?;
+            self.transition(crate::autopilot::drive::WatchTransition::LifecycleObserved(
+                lc,
+            ))?;
         }
         Ok(())
     }
 
     fn set_active_stage(
         &mut self,
-        stage: crate::watch::PromptStage,
-        target: crate::watch::LifecycleTarget,
+        stage: crate::autopilot::drive::PromptStage,
+        target: crate::autopilot::drive::LifecycleTarget,
     ) -> Result<()> {
         // M178 external-review F-01: update the v2 control-plane
         // state with the active stage + target so `mp watch-control
         // status` reads them during a live run.
-        self.transition(crate::watch::WatchTransition::ActiveStage { stage, target })?;
+        self.transition(crate::autopilot::drive::WatchTransition::ActiveStage { stage, target })?;
         Ok(())
     }
 }
@@ -1038,8 +1050,8 @@ impl SystemDriveOps {
         outcome: RunOutcome,
     ) -> Result<()> {
         let milestone_id = milestone_id.into();
-        use crate::watch::MilestoneRunOutcome;
-        self.transition(crate::watch::WatchTransition::MilestoneOutcome(
+        use crate::autopilot::drive::MilestoneRunOutcome;
+        self.transition(crate::autopilot::drive::WatchTransition::MilestoneOutcome(
             MilestoneRunOutcome {
                 id: milestone_id.clone(),
                 outcome: outcome.clone(),
@@ -1147,7 +1159,7 @@ mod tests {
         handoffs: Vec<String>,
         plan_dir: PathBuf,
         /// M153 S2 MEDIUM-3: in-module events collector. Field is
-        /// declared for parity with the `tests/watch_execution.rs`
+        /// declared for parity with the `tests/autopilot_drive_execution.rs`
         /// `Scripted` mock; the in-module `log_event` impl remains
         /// a no-op because the trait signature is `&self` (the
         /// field can't be mutated through `&self` without interior
@@ -1179,7 +1191,7 @@ mod tests {
             // for parity with the test-file mock (MEDIUM-3) but the
             // trait's `&self` signature can't mutate it without
             // interior mutability. Future tests that need in-module
-            // event assertions should swap to the `tests/watch_execution.rs`
+            // event assertions should swap to the `tests/autopilot_drive_execution.rs`
             // `Scripted` mock which collects events via `RefCell`.
         }
         fn plan_dir(&self) -> &Path {

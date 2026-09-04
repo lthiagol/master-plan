@@ -4,7 +4,7 @@
 //! state-machine transitions are logged to a configurable file with
 //! RFC3339 timestamps, the active milestone id, and the role label.
 //! Default path: `<plan_dir>/.mp/watch.log` (see
-//! [`crate::watch::default_log_path`]).
+//! [`crate::autopilot::drive::default_log_path`]).
 //!
 //! Shape: one JSON object per line (JSONL / ndjson). Picked over
 //! plain text because the watch log is consumed by both humans
@@ -22,7 +22,7 @@ use serde::Serialize;
 /// `"stage_transition"`, `"skip"`). The rest of the fields are
 /// optional context — present when the event has them.
 #[derive(Debug, Clone, Serialize)]
-pub struct WatchLogEntry<'a> {
+pub struct DriveLogEntry<'a> {
     pub ts: String,
     pub kind: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,7 +50,7 @@ pub struct WatchLogEntry<'a> {
     pub stderr: Option<String>,
 }
 
-impl<'a> WatchLogEntry<'a> {
+impl<'a> DriveLogEntry<'a> {
     /// Construct a minimal entry; chain the builder methods to add
     /// optional context.
     pub fn new(kind: &'a str, message: impl Into<String>) -> Self {
@@ -113,28 +113,28 @@ impl<'a> WatchLogEntry<'a> {
 /// handle) so the state machine + herdr layer can share one without
 /// threading it through every function.
 #[derive(Clone)]
-pub struct WatchLogger {
-    inner: std::sync::Arc<Mutex<WatchLoggerInner>>,
+pub struct DriveLogger {
+    inner: std::sync::Arc<Mutex<DriveLoggerInner>>,
 }
 
-impl std::fmt::Debug for WatchLogger {
+impl std::fmt::Debug for DriveLogger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let path = self
             .inner
             .try_lock()
             .map(|g| g.path.clone())
             .unwrap_or_default();
-        f.debug_struct("WatchLogger").field("path", &path).finish()
+        f.debug_struct("DriveLogger").field("path", &path).finish()
     }
 }
 
-struct WatchLoggerInner {
+struct DriveLoggerInner {
     path: PathBuf,
     /// When None, no writes happen. Lets tests construct a logger
     /// without touching disk.
     sink: Option<Box<dyn Write + Send>>,
 }
-impl WatchLogger {
+impl DriveLogger {
     /// Open (or create) the log file at `path` for append. The parent
     /// directory is created if missing.
     pub fn open(path: &Path) -> Result<Self> {
@@ -148,7 +148,7 @@ impl WatchLogger {
             .open(path)
             .with_context(|| format!("open watch log {}", path.display()))?;
         Ok(Self {
-            inner: std::sync::Arc::new(Mutex::new(WatchLoggerInner {
+            inner: std::sync::Arc::new(Mutex::new(DriveLoggerInner {
                 path: path.to_path_buf(),
                 sink: Some(Box::new(file)),
             })),
@@ -160,7 +160,7 @@ impl WatchLogger {
     /// I/O.
     pub fn null() -> Self {
         Self {
-            inner: std::sync::Arc::new(Mutex::new(WatchLoggerInner {
+            inner: std::sync::Arc::new(Mutex::new(DriveLoggerInner {
                 path: PathBuf::from("/dev/null"),
                 sink: Some(Box::new(std::io::sink())),
             })),
@@ -182,7 +182,7 @@ impl WatchLogger {
             }
         }
         let logger = Self {
-            inner: std::sync::Arc::new(Mutex::new(WatchLoggerInner {
+            inner: std::sync::Arc::new(Mutex::new(DriveLoggerInner {
                 path: PathBuf::from("/memory"),
                 sink: Some(Box::new(Adapter(buf.clone()))),
             })),
@@ -191,7 +191,7 @@ impl WatchLogger {
     }
 
     /// Append one entry as a single JSONL line.
-    pub fn log(&self, entry: &WatchLogEntry<'_>) -> Result<()> {
+    pub fn log(&self, entry: &DriveLogEntry<'_>) -> Result<()> {
         let mut line = serde_json::to_vec(entry)
             .with_context(|| format!("serialize log entry kind={}", entry.kind))?;
         line.push(b'\n');
@@ -266,8 +266,8 @@ mod tests {
     fn open_creates_parent_dir_if_missing() {
         let env = tempfile::TempDir::new().unwrap();
         let nested = env.path().join("a/b/c/watch.log");
-        let logger = WatchLogger::open(&nested).unwrap();
-        logger.log(&WatchLogEntry::new("test", "hello")).unwrap();
+        let logger = DriveLogger::open(&nested).unwrap();
+        logger.log(&DriveLogEntry::new("test", "hello")).unwrap();
         assert!(nested.is_file());
         let text = fs::read_to_string(&nested).unwrap();
         assert!(text.contains("\"kind\":\"test\""));
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn entry_builder_attaches_optional_context() {
-        let e = WatchLogEntry::new("herdr_call", "agent start")
+        let e = DriveLogEntry::new("herdr_call", "agent start")
             .milestone("42")
             .role("runner")
             .pane("%5");
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn entry_omits_none_optional_fields() {
-        let e = WatchLogEntry::new("skip", "lifecycle=draft");
+        let e = DriveLogEntry::new("skip", "lifecycle=draft");
         let s = serde_json::to_string(&e).unwrap();
         assert!(
             !s.contains("milestone_id"),
@@ -333,7 +333,7 @@ mod tests {
         // operator can diagnose a launch failure from the log
         // alone. Each field is a separate JSON property, not a
         // stringified blob, so `jq` can grep / project them.
-        let e = WatchLogEntry::new("spawn_error", "herdr agent start failed")
+        let e = DriveLogEntry::new("spawn_error", "herdr agent start failed")
             .role("runner")
             .spawn_error(
                 "agent start",
@@ -367,12 +367,12 @@ mod tests {
 
     #[test]
     fn in_memory_logger_captures_entries() {
-        let (logger, buf) = WatchLogger::in_memory();
+        let (logger, buf) = DriveLogger::in_memory();
         logger
-            .log(&WatchLogEntry::new("stage", "execute").milestone("7"))
+            .log(&DriveLogEntry::new("stage", "execute").milestone("7"))
             .unwrap();
         logger
-            .log(&WatchLogEntry::new("stage", "external_review").milestone("7"))
+            .log(&DriveLogEntry::new("stage", "external_review").milestone("7"))
             .unwrap();
         let captured = String::from_utf8(buf.lock().unwrap().clone()).unwrap();
         let lines: Vec<&str> = captured.lines().collect();
@@ -383,10 +383,10 @@ mod tests {
 
     #[test]
     fn null_logger_never_writes() {
-        let logger = WatchLogger::null();
+        let logger = DriveLogger::null();
         // The null logger's path is /dev/null; .log() should succeed
         // without producing any observable file.
-        logger.log(&WatchLogEntry::new("x", "y")).unwrap();
+        logger.log(&DriveLogEntry::new("x", "y")).unwrap();
     }
 
     #[test]
@@ -406,10 +406,10 @@ mod tests {
         // produce a complete JSONL line.
         let env = tempfile::TempDir::new().unwrap();
         let path = env.path().join("watch.log");
-        let a = WatchLogger::open(&path).unwrap();
-        let b = WatchLogger::open(&path).unwrap();
-        a.log(&WatchLogEntry::new("a", "first")).unwrap();
-        b.log(&WatchLogEntry::new("b", "second")).unwrap();
+        let a = DriveLogger::open(&path).unwrap();
+        let b = DriveLogger::open(&path).unwrap();
+        a.log(&DriveLogEntry::new("a", "first")).unwrap();
+        b.log(&DriveLogEntry::new("b", "second")).unwrap();
         let text = fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 2);
@@ -421,7 +421,7 @@ mod tests {
     fn path_returns_the_opened_path() {
         let env = tempfile::TempDir::new().unwrap();
         let path = env.path().join("watch.log");
-        let logger = WatchLogger::open(&path).unwrap();
+        let logger = DriveLogger::open(&path).unwrap();
         assert_eq!(logger.path(), path);
     }
 }

@@ -51,14 +51,14 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::autopilot::drive::{Role, WatchState};
 use crate::paths::PlanContext;
 use crate::store::atomic_write;
-use crate::watch::{Role, WatchState};
 
 use super::prompts::PromptStage;
 
 /// v2 schema marker. The legacy v1 constant
-/// ([`crate::watch::WATCH_STATE_SCHEMA_VERSION`]) stays at `1`; a v1
+/// ([`crate::autopilot::drive::WATCH_STATE_SCHEMA_VERSION`]) stays at `1`; a v1
 /// file is migrated on load rather than refused.
 pub const WATCH_RUN_STATE_SCHEMA_VERSION: u32 = 2;
 
@@ -128,7 +128,7 @@ impl RunOutcome {
 }
 
 /// Per-milestone outcome entry. Mirrors the sequencer's
-/// [`crate::watch::MilestoneOutcome`] but serializes as a flat
+/// [`crate::autopilot::drive::MilestoneOutcome`] but serializes as a flat
 /// tag-enum for easy consumption from outside the crate.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MilestoneRunOutcome {
@@ -211,9 +211,9 @@ pub struct WatchRunState {
 
     // ── Legacy v1 fields (preserved for --resume reconciliation) ────
     #[serde(default)]
-    pub panes: Vec<crate::watch::PaneState>,
+    pub panes: Vec<crate::autopilot::drive::PaneState>,
     #[serde(default)]
-    pub milestones: Vec<crate::watch::MilestoneState>,
+    pub milestones: Vec<crate::autopilot::drive::MilestoneState>,
 }
 
 impl WatchRunState {
@@ -225,7 +225,7 @@ impl WatchRunState {
         let panes = Vec::new();
         let milestones = active_milestones
             .iter()
-            .map(|id| crate::watch::MilestoneState {
+            .map(|id| crate::autopilot::drive::MilestoneState {
                 id: id.clone(),
                 last_lifecycle: "approved".to_string(),
                 target_lifecycle: "in-progress".to_string(),
@@ -393,7 +393,11 @@ impl WatchRunState {
     /// Set the active stage. Convenience helper that records both
     /// the stage label and its target lifecycle in one call so the
     /// two fields stay in sync.
-    pub fn set_active_stage(&mut self, stage: PromptStage, target: crate::watch::LifecycleTarget) {
+    pub fn set_active_stage(
+        &mut self,
+        stage: PromptStage,
+        target: crate::autopilot::drive::LifecycleTarget,
+    ) {
         self.watch_stage = Some(stage.label().to_string());
         self.target_lifecycle = Some(target.as_str().to_string());
         self.active_role = Some(stage.role());
@@ -432,7 +436,8 @@ impl WatchRunState {
         let pane_id = pane_id.into();
         let now = crate::store::now_rfc3339();
         self.pane_ids.insert(role, pane_id.clone());
-        let label = crate::watch::pane_label_for(role, crate::watch::DEFAULT_PANE_N);
+        let label =
+            crate::autopilot::drive::pane_label_for(role, crate::autopilot::drive::DEFAULT_PANE_N);
         if let Some(existing) = self.panes.iter_mut().find(|p| p.role == role) {
             // Preserve `spawned_at` on re-save (same contract as the
             // v1 PaneState::upsert_pane helper).
@@ -442,7 +447,7 @@ impl WatchRunState {
                 existing.spawned_at = now;
             }
         } else {
-            self.panes.push(crate::watch::PaneState {
+            self.panes.push(crate::autopilot::drive::PaneState {
                 role,
                 label,
                 pane_id,
@@ -484,7 +489,7 @@ pub enum WatchTransition {
     },
     ActiveStage {
         stage: PromptStage,
-        target: crate::watch::LifecycleTarget,
+        target: crate::autopilot::drive::LifecycleTarget,
     },
     LifecycleObserved(String),
     PaneObserved {
@@ -658,7 +663,7 @@ mod tests {
         s.set_current_lifecycle("in-progress");
         s.set_active_stage(
             PromptStage::Execute,
-            crate::watch::LifecycleTarget::SelfReviewed,
+            crate::autopilot::drive::LifecycleTarget::SelfReviewed,
         );
         s.record_pane(Role::Runner, "%5");
         s.record_pane(Role::Coordinator, "%7");
@@ -694,7 +699,7 @@ mod tests {
         let mut s = fresh_state(&["M170"]);
         s.set_active_stage(
             PromptStage::ExternalReview,
-            crate::watch::LifecycleTarget::Reviewed,
+            crate::autopilot::drive::LifecycleTarget::Reviewed,
         );
         assert_eq!(s.watch_stage.as_deref(), Some("external-review"));
         assert_eq!(s.target_lifecycle.as_deref(), Some("reviewed"));
@@ -708,7 +713,7 @@ mod tests {
         s.set_current_lifecycle("in-progress");
         s.set_active_stage(
             PromptStage::Execute,
-            crate::watch::LifecycleTarget::SelfReviewed,
+            crate::autopilot::drive::LifecycleTarget::SelfReviewed,
         );
         s.set_run_outcome(RunOutcome::Completed);
 

@@ -8,8 +8,10 @@
 mod common;
 
 use crate::common::TestEnv;
+use mp::autopilot::drive::{
+    all_stages, build_prompt, build_prompt_with, PromptRenderOptions, PromptStage,
+};
 use mp::model::{AcceptanceCriterion, MilestoneFile, MilestoneMeta, Step};
-use mp::watch::{all_stages, build_prompt, build_prompt_with, PromptRenderOptions, PromptStage};
 
 fn fixture(id: &str, title: &str) -> MilestoneFile {
     MilestoneFile {
@@ -217,7 +219,7 @@ fn empty_acs_and_steps_render_placeholder_text() {
 
 #[test]
 fn stage_role_routing_is_total_and_matches_design() {
-    use mp::watch::Role;
+    use mp::autopilot::drive::Role;
     let cases = [
         (PromptStage::Execute, Role::Runner),
         (PromptStage::SelfReview, Role::Runner),

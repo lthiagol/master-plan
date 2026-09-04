@@ -4,7 +4,7 @@
 //! This module is the typed foundation for M209's scope:
 //!
 //! - [`Role`] — the three autopilot roles (orchestrator, runner,
-//!   reviewer). Distinct from `crate::watch::herdr::Role`, the legacy
+//!   reviewer). Distinct from `crate::autopilot::drive::herdr::Role`, the legacy
 //!   two-role model that mp watch still uses; the migration lives in
 //!   A2 (out of scope here).
 //! - [`Topology`] — the one / two / three-pane pane count that the
@@ -49,7 +49,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Each role has its own slot in the pane topology ([`role_pane_slots`])
 /// and its own config ([`resolve_role_config`]). The legacy
-/// `coordinator` role from M149 / [`crate::watch::herdr::Role`] has no
+/// `coordinator` role from M149 / [`crate::autopilot::drive::herdr::Role`] has no
 /// direct mapping here — its work is split between `Orchestrator`
 /// (cycle decisions) and `Reviewer` (independent verification).
 ///

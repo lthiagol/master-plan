@@ -1311,7 +1311,7 @@ mod tests {
     }
 
     fn evidence(ac_id: &str) -> String {
-        format!("cargo nextest run -p mp --test watch_execution --no-fail-fast -- {ac_id} exit 0 (1/1 pass)")
+        format!("cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast -- {ac_id} exit 0 (1/1 pass)")
     }
 
     fn plan_full(
@@ -1516,7 +1516,7 @@ mod tests {
         let plan = vec![LifecycleTransition::StampCriterionPass {
             ac_id: "AC-01".to_string(),
             evidence:
-                "cargo nextest run -p mp --test watch_execution --no-fail-fast exit 0 (2/2 pass)"
+                "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast exit 0 (2/2 pass)"
                     .to_string(),
             revision: "rev-2".to_string(),
             idempotency_key: "ac:AC-01:rev-2".to_string(),

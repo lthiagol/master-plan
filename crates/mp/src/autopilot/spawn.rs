@@ -361,7 +361,11 @@ impl RealHerdrSpawnOps {
 
 impl HerdrSpawnOps for RealHerdrSpawnOps {
     fn ensure_workspace(&self, name: &str) -> Result<(), SpawnError> {
-        let bin = match self.herdr_bin.clone().or_else(crate::watch::which_herdr) {
+        let bin = match self
+            .herdr_bin
+            .clone()
+            .or_else(crate::autopilot::drive::which_herdr)
+        {
             Some(b) => b,
             None => {
                 return Err(SpawnError::WorkspaceEnsureFailed {
@@ -387,7 +391,11 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
     }
 
     fn create_pane(&self, _cwd: &Path, ordinal: usize) -> Result<String, SpawnError> {
-        let bin = match self.herdr_bin.clone().or_else(crate::watch::which_herdr) {
+        let bin = match self
+            .herdr_bin
+            .clone()
+            .or_else(crate::autopilot::drive::which_herdr)
+        {
             Some(b) => b,
             None => {
                 return Err(SpawnError::PaneCreateFailed {
@@ -400,7 +408,7 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
         match out {
             Ok(o) if o.status.success() => {
                 let stdout = String::from_utf8_lossy(&o.stdout).into_owned();
-                let pane_id = crate::watch::parse_pane_id_from_start_output(&stdout)
+                let pane_id = crate::autopilot::drive::parse_pane_id_from_start_output(&stdout)
                     .unwrap_or_else(|| format!("pane-{}", ordinal + 1));
                 Ok(pane_id)
             }
@@ -422,7 +430,11 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
         pane_id: &str,
         extras: &[String],
     ) -> Result<SpawnedPane, SpawnError> {
-        let bin = match self.herdr_bin.clone().or_else(crate::watch::which_herdr) {
+        let bin = match self
+            .herdr_bin
+            .clone()
+            .or_else(crate::autopilot::drive::which_herdr)
+        {
             Some(b) => b,
             None => {
                 return Err(SpawnError::AgentStartFailed {
@@ -460,7 +472,11 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
     }
 
     fn send_prompt(&self, pane_id: &str, text: &str) -> Result<(), SpawnError> {
-        let bin = match self.herdr_bin.clone().or_else(crate::watch::which_herdr) {
+        let bin = match self
+            .herdr_bin
+            .clone()
+            .or_else(crate::autopilot::drive::which_herdr)
+        {
             Some(b) => b,
             None => {
                 return Err(SpawnError::PromptSendFailed {
@@ -504,7 +520,11 @@ impl HerdrSpawnOps for RealHerdrSpawnOps {
     }
 
     fn delete_pane(&self, pane_id: &str) {
-        let Some(bin) = self.herdr_bin.clone().or_else(crate::watch::which_herdr) else {
+        let Some(bin) = self
+            .herdr_bin
+            .clone()
+            .or_else(crate::autopilot::drive::which_herdr)
+        else {
             return;
         };
         let _ = Command::new(&bin)

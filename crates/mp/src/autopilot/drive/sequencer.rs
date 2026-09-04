@@ -28,7 +28,7 @@
 
 use serde::Serialize;
 
-use crate::watch::{drive_milestone, DriveOutcome, RunOutcome, SystemDriveOps};
+use crate::autopilot::drive::{drive_milestone, DriveOutcome, RunOutcome, SystemDriveOps};
 
 /// Per-milestone entry in the [`SequencerReport`]. Mirrors the
 /// [`DriveOutcome`] plus the input id for traceability.
@@ -98,7 +98,7 @@ pub fn run_milestones(
                 // `DriveOutcome::SpawnFailed` so the normal outcome
                 // arm below records it consistently. Any other
                 // error is re-raised unchanged.
-                if let Some(failure) = crate::watch::herdr::extract_spawn_failure(&err) {
+                if let Some(failure) = crate::autopilot::drive::herdr::extract_spawn_failure(&err) {
                     let run_outcome = RunOutcome::SpawnFailed {
                         command: failure.command,
                         argv: failure.argv,
@@ -213,7 +213,9 @@ pub fn run_milestones(
                 .unwrap_or_else(|| "queue did not complete".to_string());
             RunOutcome::Skipped { reason }
         };
-        ops.transition(crate::watch::WatchTransition::RunOutcome(aggregate.clone()))?;
+        ops.transition(crate::autopilot::drive::WatchTransition::RunOutcome(
+            aggregate.clone(),
+        ))?;
         let queue: Vec<String> = ops.run_state().map(|s| s.queue.clone()).unwrap_or_default();
         crate::activity::append_event_best_effort(
             &crate::paths::PlanContext {
@@ -242,7 +244,7 @@ mod tests {
         // The all_complete / any_skipped / any_exhausted flags are
         // vacuous for an empty input — the property holds by
         // construction. Pane reuse + ordering with real fake binaries
-        // are covered by tests/watch_sequential.rs (SystemDriveOps
+        // are covered by tests/autopilot_drive_sequencer.rs (SystemDriveOps
         // reads milestones from disk, which the unit-test fixture
         // does not provide).
         let env = tempfile::TempDir::new().unwrap();
@@ -251,7 +253,7 @@ mod tests {
             env.path().join("herdr"),
             env.path().to_path_buf(),
             "1",
-            crate::watch::state_machine::RoleConfigs::default(),
+            crate::autopilot::drive::state_machine::RoleConfigs::default(),
         );
         let report = run_milestones(&mut ops, &[], 5).unwrap();
         assert!(report.all_complete);

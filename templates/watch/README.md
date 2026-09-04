@@ -12,12 +12,12 @@ replacements without recompiling:
 
 `mp watch` logs a `prompt_source` event per stage whose value
 distinguishes `override`, `default`, and `hardcoded (re-review)`
-(see `crates/mp/src/watch/prompts.rs::TemplateSource::label`).
+(see `crates/mp/src/autopilot/drive/prompts.rs::TemplateSource::label`).
 
 ## Placeholders
 
 Four placeholders are substituted at render time by
-`render_body` in `crates/mp/src/watch/prompts.rs`:
+`render_body` in `crates/mp/src/autopilot/drive/prompts.rs`:
 
 | Placeholder | Substituted with |
 |-------------|-------------------|
@@ -42,7 +42,7 @@ applies the following policy to every override rung (caller
 | Check | Threshold | Diagnostic kind |
 |-------|-----------|-----------------|
 | File is a regular file | `symlink_metadata().file_type().is_file()` | `not_regular` |
-| File size | ≤ `MAX_OVERRIDE_BYTES` (1 MiB, see `crates/mp/src/watch/prompts.rs`) | `too_large` |
+| File size | ≤ `MAX_OVERRIDE_BYTES` (1 MiB, see `crates/mp/src/autopilot/drive/prompts.rs`) | `too_large` |
 | Non-empty | `text.trim().is_empty() == false` | `empty` |
 | Has `{header}` placeholder | `text.contains("{header}")` | `header_missing` |
 | Valid UTF-8 | `String::from_utf8` succeeds | `invalid_utf8` |
@@ -55,7 +55,7 @@ JSONL event per refusal and the dry-run preview surfaces the
 diagnostic in an `override_diagnostics` array. `NotFound` (no
 file at the rung) is the **only** silent case.
 
-`MAX_OVERRIDE_BYTES` is exposed via `mp::watch::MAX_OVERRIDE_BYTES`
+`MAX_OVERRIDE_BYTES` is exposed via `mp::autopilot::drive::MAX_OVERRIDE_BYTES`
 for callers that want to thread a different cap (tests, hardening
 in a future hot loop). The default is 1 MiB; the largest shipped
 template is ≈ 1 KiB.
@@ -75,7 +75,7 @@ is what the dry-run preview renders against.
 - The 5 files in this directory correspond to stages
   `[Execute, SelfReview, ExternalReview, Remediate, Approve]`.
   `ReReview` is **NOT** extracted — it remains a hardcoded Rust
-  template (see `crates/mp/src/watch/prompts.rs::render_hardcoded_fallback`).
+  template (see `crates/mp/src/autopilot/drive/prompts.rs::render_hardcoded_fallback`).
   Operators writing `<plan_dir>/watch/re-review.md` will see the
   hardcoded body; the override file is silently ignored. This is
   intentional and matches S1's 5-file scope.
@@ -99,7 +99,7 @@ is what the dry-run preview renders against.
 
 When M-nnn adds a 6th externalized stage, update all of:
 1. The new `<stage>.md` file (placeholders documented above).
-2. `crates/mp/src/watch/prompts.rs::resolve_template` match arm.
+2. `crates/mp/src/autopilot/drive/prompts.rs::resolve_template` match arm.
 3. `PromptStage::is_externalized` (currently `!ReReview`).
 4. `crates/mp/tests/watch_template_files.rs::EXPECTED_FILES`.
 5. The sentinels in `watch_template_files.rs::compiled_default_contains_unique_file_sentinels`.

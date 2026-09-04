@@ -19,7 +19,9 @@
 mod common;
 
 use crate::common::TestEnv;
-use mp::watch::{is_pid_alive, RunOutcome, WatchRunState, WATCH_RUN_STATE_SCHEMA_VERSION};
+use mp::autopilot::drive::{
+    is_pid_alive, RunOutcome, WatchRunState, WATCH_RUN_STATE_SCHEMA_VERSION,
+};
 use std::path::Path;
 
 fn state_path(env: &TestEnv) -> std::path::PathBuf {
@@ -125,7 +127,7 @@ fn result_returns_latest_terminal_outcome() {
     let env = TestEnv::new();
     write_state_with(&env, |s| {
         s.set_run_outcome(RunOutcome::Completed);
-        s.push_milestone_outcome(mp::watch::MilestoneRunOutcome {
+        s.push_milestone_outcome(mp::autopilot::drive::MilestoneRunOutcome {
             id: "170".into(),
             outcome: RunOutcome::Completed,
         });
@@ -209,8 +211,9 @@ fn output_returns_structured_error_when_herdr_missing() {
     // return a bounded, structured error — never hang.
     let env = TestEnv::new();
     write_state_with(&env, |s| {
-        s.pane_ids.insert(mp::watch::Role::Runner, "%5".into());
-        s.active_role = Some(mp::watch::Role::Runner);
+        s.pane_ids
+            .insert(mp::autopilot::drive::Role::Runner, "%5".into());
+        s.active_role = Some(mp::autopilot::drive::Role::Runner);
     });
     let out = output_cmd(&env, &["--timeout-ms", "1000", "--max-bytes", "512"]);
     assert!(
@@ -281,7 +284,7 @@ fn create_approved_milestone(env: &TestEnv, slug: &str) -> String {
 }
 
 // `WatchRunState::fresh` shadowed by the helper above; the unit tests
-// for the v2 model live in crates/mp/src/watch/run_state.rs.
+// for the v2 model live in crates/mp/src/autopilot/drive/run_state.rs.
 #[allow(dead_code)]
 fn _unused_pin() -> u32 {
     WATCH_RUN_STATE_SCHEMA_VERSION
