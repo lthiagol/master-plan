@@ -36,6 +36,16 @@ this file actually uses (entries 23+).
 
 <!-- Add newest entries at the top. -->
 
+## Entry 49 — 2026-09-03 — Runner implements autopilot primitives but does not wire them into production hot path (no-production-caller pattern)  <!-- points-at: M228 -->
+
+- When:           2026-09-03, autopilot orchestration session driving M225 (restart + reconciliation) and M226 (end-to-end certification). mp-herdr-log2.txt documents the full session.
+- Command:        `mp reviews finding list <id>` after each cycle 1 — the reviewer's cold build caught 3 separate primitives exported but never called by production code.
+- Observed:       In M225, `was_already_applied`, `classify_pane_loss`, `recover_event_tail`, `cross_check_canonical` were all `pub` in `crates/mp/src/autopilot/reconcile.rs` but the production spawn path called none of them. In M226, the same pattern recurred with `dispatch_assignment`, `LifecycleClosure`, `topology_preflight` / `topology_policy` / `start_cycle` — all exported, none called by production. The tests passed because they called the libraries directly, not because production used them. Each primitive had its own unit-test surface but no end-to-end production-path test.
+- Suspected:      The runner contract focuses on "implement the spec" — implementing the types, methods, and per-AC unit tests. The contract does NOT focus on "wire into the production hot path" — that step is implicit and easy to skip, especially when the milestone's spec describes a library surface rather than a production caller. The runner treats the milestone as "build a library"; the orchestrator expects "build a system".
+- Verdict:        **bug** — recurring pattern in session 2 (M225 F-01 + F-02 + M226 F-01 + F-02 + F-03, all HIGH severity). Not a one-off.
+- One-line:       Runner contract produces libraries; production never imports them. The "wire to production" step is missing from the contract and from the test surface.
+- Status:         **bug** — 2 occurrences in session 2 (M225 + M226). Workaround for current milestones: cycle 2 prompt explicitly says "find the production path, wire the primitive, add a regression test". Long-term fix: amend the runner contract to include a "wire to production" step + production-path regression tests with `_production_path_` naming convention. Filed here for tracking; the contract amendment is the right scope for M228 (post-cutover cleanup).
+
 ## Entry 48 — 2026-09-03 — `mp milestone step done` / `mp milestone complete` / `mp milestone criterion pass` do not write activity.json events  <!-- points-at: M225 -->
 
 - When:           2026-09-03, autopilot orchestration session driving M207, M209, M211, M212, M213 (the autopilot foundation set). mp-herdr-log2.txt documents the full session.
