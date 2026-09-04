@@ -2015,6 +2015,14 @@
       "reviewed_at": "2026-09-03",
       "notes": "Cycle 2 (tightened blockers-only). All 3 prior HIGH findings have real production-path wiring: F-01 dispatch_assignment integrated into SystemDriveOps::ensure_pane with session-id-driven was_already_applied dedup (8560545); F-02 LifecycleClosure::execute runs in complete_milestone with validate_complete gate (723cdf5); F-03 topology_preflight refuses 1-pane Full at cmd_watch entry (440d935). 4 regression tests (m226_f01_consults_session, m226_f01_falls_through_when_no_prior, m226_f02_lifecycle_closure_runs_on_complete, m226_f03_topology_preflight_refuses_one_pane_full) all pass; tests assert behavior (fake herdr argv log, exit code, JSON output) not existence. Full m226 sweep 17/17 (13 base + 4 regression). F-01/F-02/F-03 tests would fail if their wiring reverted — verified by reading the test bodies: F-01 asserts !log.contains('agent start') + handle.reused=true; F-02 asserts open-finding case fails with LifecycleClosure/open text; F-03 asserts 1-pane Full case fails with topology_preflight/full_milestone_requires_reviewer text. cargo fmt clean. No new findings.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "214",
+      "verdict": "ok",
+      "reviewer": "reviewer-214",
+      "reviewed_at": "2026-09-04",
+      "notes": "M214 cycle 1 — full raul suite (1090/1090) + 4 AC verification commands all pass on cold build. cargo fmt clean, clippy clean, consumer-surface-lint clean. Filed F-01 (low, spec_interpretation): runner kept internal watch.rs + Watch struct/field unchanged; rationale is the out-of-scope bullet 'internal Watch-prefixed identifiers stay' — defensible, internally coherent (file name = struct name = field name), user-visible surface (Lane::Autopilot, ui.show_autopilot_tab) is fully migrated. Resolved F-01 with no runner action required; verdict ok.",
+      "milestone_completed_at": "2026-09-03"
     }
   ],
   "comments": [

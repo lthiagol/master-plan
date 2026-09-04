@@ -3,8 +3,8 @@
     "id": "214",
     "title": "raul Autopilot lane — rename Watch → Autopilot and migrate the settings key",
     "slug": "raul-autopilot-lane-rename-watch-autopilot-and-migrate-the-settings-key",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,19 +17,23 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T23:54:57.361807+00:00",
+    "lifecycle_at": "2026-09-04T00:01:05.721207+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:02.789120+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-04T00:01:14.957523+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-03T23:54:57.361809+00:00"
+        "at": "2026-09-04T00:01:14.957523+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T00:01:14.989809+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.139576+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T00:01:14.989812+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-04T00:01:05.721209+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-03T23:54:57.361809+00:00"
+        "at": "2026-09-04T00:01:14.957523+00:00"
       },
       "specify": {
         "status": "done",
@@ -220,5 +236,18 @@
     "date": "2026-09-03",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "spec_interpretation",
+      "description": "Scope says 'Rename crates/raul/src/tui/watch.rs module -> crates/raul/src/tui/autopilot.rs' (in_scope). The runner kept watch.rs and the internal Watch struct / watch field / watch_poller untouched because the next scope bullet explicitly carves out 'internal Watch-prefixed identifiers that are not user-visible.' The interpretation is internally coherent (file name matches struct name matches field name) and the user-visible surface is correct (Lane::Autopilot, ui.show_autopilot_tab, label 'Autopilot'). However, the design_decisions entry rename_strategy says 'Rename in one milestone across enum, module, render dispatch, settings key — all together,' which the literal module rename did not do. Suggested follow-up: amend the milestone's design_decisions to record this carve-out explicitly so the next groomer does not re-litigate it, or rename the module + struct together in a future cleanup. Does not block M214's user-visible contract.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "041a50e",
+      "created": "2026-09-04",
+      "resolved": "2026-09-04"
+    }
+  ]
 }
