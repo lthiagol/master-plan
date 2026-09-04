@@ -76,8 +76,8 @@
       "id": "AC-02",
       "description": "Unreachable legacy prompt stages, orphan coordinator-only state, superseded bridge wake-up code, and dead template runtime paths are removed only after coverage proves the M207-M226 replacements.",
       "verification": "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast exit 0 (83/83 pass)"
     },
     {
       "id": "AC-03",
@@ -143,7 +143,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast",
       "done_when": "AC-02 proves replacements before each deletion.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],

@@ -309,9 +309,40 @@ fn real_sigint_during_watch_run_exits_zero_and_flushes_state() {
     let mut stdout_pipe = child.stdout.take();
     let mut stderr_pipe = child.stderr.take();
 
-    // Wait long enough for the run to start (preconditions pass,
-    // first herdr interaction happens, the fake wait hangs).
-    std::thread::sleep(Duration::from_millis(1000));
+    // Wait for the child to actually be *ready* for the signal
+    // instead of guessing with a fixed sleep. `cmd_watch` calls
+    // `install_signal_handlers()` before it opens the JSONL drive
+    // log, so the log file appearing on disk is proof the handlers
+    // are already installed. A fixed sleep raced here: under a
+    // saturated machine (full-suite parallel run) the child had not
+    // reached handler installation within 1s, the default SIGINT
+    // disposition killed it, and the assert below saw
+    // "terminated by signal 2" instead of exit 0.
+    let log_file = env
+        .tmp
+        .path()
+        .join("master-plan")
+        .join(".mp")
+        .join("watch.log");
+    let ready_deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        if log_file
+            .metadata()
+            .map(|m| m.is_file() && m.len() > 0)
+            .unwrap_or(false)
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < ready_deadline,
+            "mp watch never opened its drive log at {}; the run did not start",
+            log_file.display()
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    // Small settle so the loop is inside the lifecycle poll (where
+    // the shutdown flag is checked) rather than mid-startup.
+    std::thread::sleep(Duration::from_millis(250));
 
     let r = unsafe { libc::kill(pid as libc::pid_t, libc::SIGINT) };
     assert_eq!(r, 0, "kill must succeed against the spawned child");
