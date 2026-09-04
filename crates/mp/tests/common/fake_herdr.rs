@@ -578,6 +578,89 @@ fn set_executable(path: &Path) {
     fs::set_permissions(path, perms).expect("chmod 0o755 fake-herdr");
 }
 
+/// Install a minimal stub `herdr` script under `<env.tmp>/fake-bin/`
+/// and return a `PATH` string with that directory prepended to the
+/// current `PATH`.
+///
+/// **Purpose.** `mp doctor` (and the project-mode `doctor_project`
+/// path) gate `report.ok` on a `herdr_cli_shape` check that flips to
+/// `false` whenever `which herdr` returns `None`. CI runners ship
+/// without herdr installed, so any doctor-touching test that also
+/// asserts `out.status.success()` flakes the same way the
+/// pre-existing `real_sigint` flake did. The fixture
+/// (`tests/fixtures/projects/…`) and the in-tree `make install` flow
+/// already pre-set PATH to a real herdr, but ad-hoc tests that just
+/// spawn `mp` via `env.run` / `env.run_with_env` inherit the
+/// developer / CI parent PATH.
+///
+/// **What the stub does.** Responds to `--version`,
+/// `agent start --help`, and `pane split --help` with the minimum
+/// payload the gate accepts (a `MAJOR.MINOR.PATCH` ≥ 0.7.0, the
+/// `--kind` / `--pane` flags the gate looks for in `agent start
+/// --help`, and a non-empty `pane split --help`). Every other
+/// invocation echoes `ok` and exits 0 — doctor never asks anything
+/// else, so the surface stays trivial.
+///
+/// **Usage.** Pair with `env.run_with_env(&[("PATH", &path)],
+/// args)` so the spawned `mp` subprocess resolves `herdr` to the
+/// stub. The path is fully owned by the test's `TempDir`, so no
+/// cross-test coordination is needed.
+///
+/// **Why not the full `FakeHerdrBuilder`?** That builder covers the
+/// `mp autopilot` / `mp watch` surface (agent list, pane get, pane
+/// split, killpg traps, etc.). Doctor only needs three subcommands,
+/// and the builder's argv-log / warmup / version knobs are dead
+/// weight there. This helper is the doctor-specific analogue.
+pub fn install_fake_herdr_for_doctor(env: &crate::common::TestEnv) -> String {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin_dir = env.tmp.path().join("fake-bin");
+    fs::create_dir_all(&bin_dir).expect("fake-bin dir");
+    let bin = bin_dir.join("herdr");
+    let script = r#"#!/bin/sh
+case "$1:$2:$3" in
+  --version:*)
+    cat <<'V'
+herdr 0.7.3
+V
+    ;;
+  agent:start:--help)
+    cat <<'H'
+Usage: herdr agent start <NAME> --kind <KIND> --pane <ID>
+
+Options:
+  --kind <KIND>  Harness kind
+  --pane <ID>    Existing pane id
+H
+    ;;
+  pane:split:--help)
+    cat <<'P'
+Usage: herdr pane split [OPTIONS]
+
+Options:
+  --cwd <PATH>  Pane cwd
+P
+    ;;
+  *)
+    echo ok
+    ;;
+esac
+"#;
+    fs::write(&bin, script).expect("write stub herdr");
+    let mut perms = fs::metadata(&bin).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&bin, perms).expect("chmod 0o755 stub herdr");
+
+    let existing = std::env::var_os("PATH").unwrap_or_default();
+    let mut parts: Vec<std::path::PathBuf> = std::env::split_paths(&existing).collect();
+    parts.insert(0, bin_dir);
+    std::env::join_paths(parts)
+        .expect("join PATH")
+        .to_string_lossy()
+        .into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
