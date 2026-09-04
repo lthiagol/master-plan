@@ -1914,10 +1914,7 @@ impl RecoveryControl {
     /// and poll_interval_ms are forwarded through the
     /// `--topology` / `--poll-interval-ms` flags so the
     /// new session honors the user's last panel edits.
-    pub fn start_argv(
-        ids: &[String],
-        payload: &SessionOverridesPayload,
-    ) -> Vec<String> {
+    pub fn start_argv(ids: &[String], payload: &SessionOverridesPayload) -> Vec<String> {
         let mut argv = vec!["start".to_string()];
         for id in ids {
             argv.push(id.clone());
