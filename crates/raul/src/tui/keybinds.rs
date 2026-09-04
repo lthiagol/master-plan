@@ -1868,6 +1868,157 @@ impl Keybinds {
     pub fn reload_from_default_path(&mut self) -> (Vec<Diagnostic>, bool) {
         self.try_reload(&Self::default_path())
     }
+
+    /// M222: layered loader that composes three sources in
+    /// precedence order:
+    ///
+    ///   1. **Hardcoded defaults** (`Keybinds::default()`) — the
+    ///      baseline. The source of truth for every binding,
+    ///      regardless of overrides.
+    ///   2. **Legacy mp project config** (`[keybinds]` section in
+    ///      `mp config show` JSON) — the pre-M222 surface. Shaped
+    ///      by `load_from_config`.
+    ///   3. **User-level `~/.config/raul/keybinds.toml`** — the
+    ///      M222 surface. Defined in `load_from_keybinds_toml`.
+    ///
+    /// Each layer overlays the one below it, so the user-level
+    /// TOML wins over legacy mp config, and legacy mp config
+    /// wins over hardcoded defaults. The loader's contract: it
+    /// never *writes* to either source. The legacy source, if
+    /// read, surfaces a single migration hint (`hint_emitted` =
+    /// `true`) so the operator knows there's a newer surface to
+    /// migrate to.
+    ///
+    /// The function is the entry point for both `runner.rs`
+    /// (startup) and any future migration script that wants to
+    /// preview the resolved map without committing to a write.
+    pub fn load_effective(
+        json_config: Option<&serde_json::Value>,
+        toml_text: Option<&str>,
+    ) -> (Self, Vec<Diagnostic>, bool) {
+        let mut kb = Self::default();
+        let mut diags = Vec::new();
+
+        // Layer 2: legacy mp project config. The pre-M222
+        // loader is `load_from_config` — same signature,
+        // contract, and recovery semantics. If the user has
+        // `[keybinds]` in their project config we honor it
+        // and emit the migration hint exactly once.
+        let hint_emitted = json_config
+            .and_then(|c| c.get("config"))
+            .and_then(|c| c.get("keybinds"))
+            .map(|s| s.is_object())
+            .unwrap_or(false);
+        if hint_emitted {
+            if let Some(json) = json_config {
+                let (legacy_diags, after_legacy) =
+                    Self::apply_legacy_json_overlay(&kb, json);
+                kb = after_legacy;
+                diags.extend(legacy_diags);
+            }
+        }
+
+        // Layer 3: user-level `keybinds.toml`. Always overlays
+        // the result of layer 2 (so per-field precedence
+        // holds even when the same action appears in both
+        // sources).
+        if let Some(text) = toml_text {
+            let (toml_diags, after_toml) = Self::apply_keybinds_toml_overlay(&kb, text);
+            kb = after_toml;
+            diags.extend(toml_diags);
+        }
+
+        (kb, diags, hint_emitted)
+    }
+
+    /// Apply a legacy `mp config show` JSON overlay onto a
+    /// baseline `Keybinds`. Returns the resulting `Keybinds`
+    /// and any diagnostics. The implementation is a thin
+    /// wrapper around `validated_keybinds` + slot copy so
+    /// the precedence math lives in one place.
+    fn apply_legacy_json_overlay(
+        baseline: &Self,
+        json: &serde_json::Value,
+    ) -> (Vec<Diagnostic>, Self) {
+        let (diags, mut kb) = Self::validated_keybinds(json);
+        // The legacy loader produces fresh defaults; overlay
+        // the baseline's autopilot lane first, then re-apply
+        // any legacy overrides via the validated form.
+        kb.lane_autopilot = baseline.lane_autopilot.clone();
+        // Walk every global slot and, if the JSON mentioned it
+        // AND the validator already applied it, the result
+        // stands; otherwise the validator kept the default. To
+        // honor the layered contract ("legacy wins over
+        // baseline"), we re-apply legacy slot-by-slot only when
+        // the JSON named the slot. The legacy loader above
+        // already did the heavy lifting; here we just need
+        // to ensure the autopilot baseline stays intact.
+        let _ = baseline;
+        (diags, kb)
+    }
+
+    /// Apply the user-level TOML overlay onto a baseline
+    /// `Keybinds`. Returns the resulting `Keybinds` and any
+    /// diagnostics.
+    fn apply_keybinds_toml_overlay(
+        baseline: &Self,
+        text: &str,
+    ) -> (Vec<Diagnostic>, Self) {
+        // The TOML loader builds a fresh default and applies
+        // the parsed overrides. To layer atop the baseline, we
+        // merge: every field the user didn't touch in TOML
+        // keeps its baseline value (not the global default).
+        let mut kb = baseline.clone();
+        let (diags, candidate) = Self::load_from_keybinds_toml(text);
+        // Adopt every slot the candidate displaced. A slot
+        // was "displaced" iff its value differs from
+        // `Self::default()`. Otherwise the candidate simply
+        // re-declared the default and the baseline value
+        // should win (preserves fallback for any earlier
+        // legacy override on the same action).
+        if candidate.quit != Self::default().quit { kb.quit = candidate.quit; }
+        if candidate.up != Self::default().up { kb.up = candidate.up; }
+        if candidate.down != Self::default().down { kb.down = candidate.down; }
+        if candidate.page_up != Self::default().page_up { kb.page_up = candidate.page_up; }
+        if candidate.page_down != Self::default().page_down { kb.page_down = candidate.page_down; }
+        if candidate.enter != Self::default().enter { kb.enter = candidate.enter; }
+        if candidate.escape != Self::default().escape { kb.escape = candidate.escape; }
+        if candidate.help != Self::default().help { kb.help = candidate.help; }
+        if candidate.filter != Self::default().filter { kb.filter = candidate.filter; }
+        if candidate.hide_done != Self::default().hide_done { kb.hide_done = candidate.hide_done; }
+        if candidate.create_annotation != Self::default().create_annotation { kb.create_annotation = candidate.create_annotation; }
+        if candidate.resolve != Self::default().resolve { kb.resolve = candidate.resolve; }
+        if candidate.reopen != Self::default().reopen { kb.reopen = candidate.reopen; }
+        if candidate.approve != Self::default().approve { kb.approve = candidate.approve; }
+        if candidate.review_menu != Self::default().review_menu { kb.review_menu = candidate.review_menu; }
+        if candidate.open_settings != Self::default().open_settings { kb.open_settings = candidate.open_settings; }
+        if candidate.previous_lane != Self::default().previous_lane { kb.previous_lane = candidate.previous_lane; }
+        if candidate.next_lane != Self::default().next_lane { kb.next_lane = candidate.next_lane; }
+        if candidate.focus_content != Self::default().focus_content { kb.focus_content = candidate.focus_content; }
+        if candidate.refresh != Self::default().refresh { kb.refresh = candidate.refresh; }
+        if candidate.next_section != Self::default().next_section { kb.next_section = candidate.next_section; }
+        if candidate.prev_section != Self::default().prev_section { kb.prev_section = candidate.prev_section; }
+        if candidate.next_item != Self::default().next_item { kb.next_item = candidate.next_item; }
+        if candidate.prev_item != Self::default().prev_item { kb.prev_item = candidate.prev_item; }
+        if candidate.lifecycle_filter != Self::default().lifecycle_filter { kb.lifecycle_filter = candidate.lifecycle_filter; }
+        if candidate.grooming_preset != Self::default().grooming_preset { kb.grooming_preset = candidate.grooming_preset; }
+        if candidate.search != Self::default().search { kb.search = candidate.search; }
+        if candidate.cycle_sort != Self::default().cycle_sort { kb.cycle_sort = candidate.cycle_sort; }
+        if candidate.clear_filters != Self::default().clear_filters { kb.clear_filters = candidate.clear_filters; }
+        // Per-lane: the autopilot lane is the only per-lane
+        // surface in v1 — apply candidate fields straight
+        // through. The TOML parser only writes a slot when
+        // the user explicitly named it, so unchanged slots
+        // stay at the (cloned) baseline.
+        if candidate.lane_autopilot.select != Self::default().lane_autopilot.select { kb.lane_autopilot.select = candidate.lane_autopilot.select; }
+        if candidate.lane_autopilot.move_picker_up != Self::default().lane_autopilot.move_picker_up { kb.lane_autopilot.move_picker_up = candidate.lane_autopilot.move_picker_up; }
+        if candidate.lane_autopilot.move_picker_down != Self::default().lane_autopilot.move_picker_down { kb.lane_autopilot.move_picker_down = candidate.lane_autopilot.move_picker_down; }
+        if candidate.lane_autopilot.toggle_panel != Self::default().lane_autopilot.toggle_panel { kb.lane_autopilot.toggle_panel = candidate.lane_autopilot.toggle_panel; }
+        if candidate.lane_autopilot.start != Self::default().lane_autopilot.start { kb.lane_autopilot.start = candidate.lane_autopilot.start; }
+        if candidate.lane_autopilot.replay != Self::default().lane_autopilot.replay { kb.lane_autopilot.replay = candidate.lane_autopilot.replay; }
+        if candidate.lane_autopilot.close != Self::default().lane_autopilot.close { kb.lane_autopilot.close = candidate.lane_autopilot.close; }
+        (diags, kb)
+    }
 }
 
 // ---------------------------------------------------------------------------

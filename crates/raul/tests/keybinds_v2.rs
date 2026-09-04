@@ -12,6 +12,21 @@ use raul::tui::action::Action;
 use raul::tui::keybinds::Keybinds;
 use serde_json::json;
 
+// ---------------------------------------------------------------------------
+// M222 S7: migration precedence for `keybinds.toml`.
+//
+// The legacy `mp` project config surfaced the same set of
+// overrides through the JSON `[keybinds]` section. M222
+// introduces the user-level `~/.config/raul/keybinds.toml`.
+// The transition contract:
+//   * Hardcoded defaults < legacy `[keybinds]` JSON <
+//     user-level `keybinds.toml`.
+//   * `load_effective` returns the resolved `Keybinds`,
+//     accumulating diagnostics, and a `hint_emitted` flag
+//     the runner uses to surface the migration hint exactly
+//     once when the legacy source is read.
+// ---------------------------------------------------------------------------
+
 fn ev(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
@@ -306,4 +321,145 @@ fn help_lists_all_bindings_for_multi_binding_action() {
         2,
         "expected exactly two bindings; got: {parts:?}"
     );
+}
+
+
+// ---------------------------------------------------------------------------
+// M222 S7: layered loader. New tests below pin the precedence
+// contract that user-level keybinds.toml > legacy mp-config
+// JSON > hardcoded defaults. Reads from either source are
+// always non-destructive; the legacy source emits one
+// migration hint.
+// ---------------------------------------------------------------------------
+
+fn pair(c: KeyCode, m: KeyModifiers) -> (KeyCode, KeyModifiers) {
+    (c, m)
+}
+
+/// AC-08 (precedence): user-level TOML wins over legacy JSON.
+/// Without a user-level file, the legacy `[keybinds]` JSON
+/// routes through to the effective map; with both sources
+/// reading the same action, the TOML wins.
+#[test]
+fn load_effective_user_level_toml_overrides_legacy_json() {
+    let legacy = json!({
+        "config": {
+            "keybinds": {
+                "quit": "ctrl+x"
+            }
+        }
+    });
+    let toml = "[global]\nquit = \"ctrl+y\"\n";
+    let (kb, diags, hint) = Keybinds::load_effective(Some(&legacy), Some(toml));
+    assert!(diags.is_empty());
+    assert!(hint, "legacy use must emit a migration hint");
+    assert_eq!(
+        kb.quit,
+        vec![pair(KeyCode::Char('y'), KeyModifiers::CONTROL)],
+        "user-level TOML must win over legacy JSON"
+    );
+}
+
+/// AC-08 (no rewrite): reads from the legacy `[keybinds]`
+/// section never update the source. We assert the source
+/// payload is unchanged by passing an owned `Value` and
+/// comparing it post-call.
+#[test]
+fn load_effective_does_not_mutate_legacy_json() {
+    let legacy_json = json!({
+        "config": {
+            "keybinds": {
+                "quit": "ctrl+x"
+            },
+            "ui": { "color": true }
+        }
+    });
+    let before = legacy_json.clone();
+    let _ = Keybinds::load_effective(Some(&legacy_json), None);
+    assert_eq!(
+        legacy_json, before,
+        "load_effective must not mutate the legacy JSON payload"
+    );
+}
+
+/// AC-08 (legacy wins over hardcoded defaults): with no
+/// user-level TOML, the legacy JSON override for `quit`
+/// reaches the effective map.
+#[test]
+fn load_effective_legacy_json_overrides_default() {
+    let legacy = json!({
+        "config": {
+            "keybinds": {
+                "quit": "ctrl+x"
+            }
+        }
+    });
+    let (kb, _, _) = Keybinds::load_effective(Some(&legacy), None);
+    assert_eq!(
+        kb.quit,
+        vec![pair(KeyCode::Char('x'), KeyModifiers::CONTROL)],
+        "legacy mp config must reach the effective map when no TOML is present"
+    );
+}
+
+/// AC-08 (one migration hint): the layered loader returns a
+/// `hint_emitted` flag the runner uses to push the migration
+/// notice to stderr *once*. The flag MUST be `false` when no
+/// legacy source is read and `true` only when the legacy
+/// `[keybinds]` section was actually consulted.
+#[test]
+fn load_effective_hint_emitted_only_when_legacy_section_is_present() {
+    // No legacy section: hint = false.
+    let (_no_legacy, diags1, hint1) = Keybinds::load_effective(None, Some("[global]\nquit = \"x\"\n"));
+    assert!(!hint1, "without legacy JSON the hint must NOT fire");
+    assert!(diags1.is_empty(), "clean TOML must not warn");
+
+    // Legacy section present but no user-level TOML: hint = true.
+    let legacy = json!({ "config": { "keybinds": { "quit": "x" } } });
+    let (legacy_only, _, hint2) = Keybinds::load_effective(Some(&legacy), None);
+    assert!(hint2, "legacy source presence must fire the hint exactly once");
+    assert_eq!(legacy_only.quit, vec![pair(KeyCode::Char('x'), KeyModifiers::empty())]);
+
+    // Both sources present: hint = true (legacy still consulted).
+    let (both, _, hint3) =
+        Keybinds::load_effective(Some(&legacy), Some("[global]\nquit = \"y\"\n"));
+    assert!(hint3, "legacy source use must fire the hint exactly once per load");
+    assert_eq!(both.quit, vec![pair(KeyCode::Char('y'), KeyModifiers::empty())]);
+}
+
+/// AC-08 (per-lane precedence): the user-level TOML also wins
+/// over the legacy JSON for per-lane actions. The autopilot
+/// section is the only per-lane surface in v1.
+#[test]
+fn load_effective_user_toml_overrides_legacy_for_lane_autopilot() {
+    let legacy = json!({
+        "config": {
+            "keybinds": {
+                "quit": "ctrl+x"
+            }
+        }
+    });
+    let toml = "[autopilot]\nselect = \"f1\"\n";
+    let (kb, _, hint) = Keybinds::load_effective(Some(&legacy), Some(toml));
+    assert!(hint);
+    assert_eq!(
+        kb.quit,
+        vec![pair(KeyCode::Char('x'), KeyModifiers::CONTROL)],
+        "legacy global override still wins for fields not in TOML"
+    );
+    assert_eq!(
+        kb.lane_autopilot.select,
+        vec![pair(KeyCode::F(1), KeyModifiers::empty())],
+        "TOML autopilot override applies to the per-lane field"
+    );
+}
+
+/// AC-08 (no legacy source): both layers skip cleanly. No
+/// hint, no diagnostics; defaults end-to-end.
+#[test]
+fn load_effective_with_no_legacy_and_no_toml_keeps_defaults() {
+    let (kb, diags, hint) = Keybinds::load_effective(None, None);
+    assert!(!hint);
+    assert!(diags.is_empty());
+    assert_eq!(kb, Keybinds::default());
 }
