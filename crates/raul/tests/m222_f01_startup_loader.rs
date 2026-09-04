@@ -117,8 +117,7 @@ fn startup_precedence_user_toml_overrides_legacy_json() {
 
     let resolved = resolve_default_path_under(&config_root);
     let toml_text = fs::read_to_string(&resolved).expect("read toml");
-    let (kb, _, hint) =
-        Keybinds::load_effective(Some(&legacy_json), Some(&toml_text));
+    let (kb, _, hint) = Keybinds::load_effective(Some(&legacy_json), Some(&toml_text));
     assert!(hint, "legacy JSON presence fires the migration hint");
     assert_eq!(
         kb.quit,

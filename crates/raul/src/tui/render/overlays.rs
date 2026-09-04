@@ -7,6 +7,7 @@ use ratatui::Frame;
 use crate::theme::Palette as ThemePalette;
 use crate::tui::app::{App, CoApprovalAction, CoApprovalState};
 use crate::tui::key_combo::{format_key_combo, KeyCombo};
+use crate::tui::keybinds::KeybindsViewRow;
 use crate::tui::mode::Mode;
 #[allow(unused_imports)]
 // keybind_default_label + value_for_key are used inside nested fns below
@@ -360,12 +361,47 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
 
     let palette = *app.effective_palette();
 
+    // M222 F-02 fix: the read-only keybinds view renders at
+    // the TOP of the Settings lane regardless of whether
+    // settings state is loaded. AC-05 is about the
+    // operator-visible surface, not the schema cache —
+    // showing the effective keymap is independent of the
+    // `[keybinds]` config editor surface that follows it.
+    //
+    // On tall panes (height ≥ 60) we expand the view so the
+    // per-lane `[autopilot]` section is reachable; on
+    // shorter panes we cap at 6 rows so the M201
+    // description-card + section-header layout below keeps
+    // its room. The view is always at least 3 rows so the
+    // TOML header is reachable.
+    let view_height = if overlay_area.height >= 60 {
+        (overlay_area.height / 2).clamp(6, 45)
+    } else {
+        6u16.min(overlay_area.height / 3).clamp(3, 6)
+    };
+    let view_area = Rect {
+        x: overlay_area.x,
+        y: overlay_area.y,
+        width: overlay_area.width,
+        height: view_height,
+    };
+    render_keybinds_view(frame, palette, app, view_area);
+    // Remaining area below the view is reserved for the
+    // legacy v1 settings surface (config list, description
+    // card, edit popup).
+    let below = Rect {
+        x: overlay_area.x,
+        y: overlay_area.y + view_height,
+        width: overlay_area.width,
+        height: overlay_area.height.saturating_sub(view_height),
+    };
+
     let Some(state) = app.settings.as_ref() else {
         let msg = Paragraph::new("Loading settings…")
             .block(Block::default().borders(Borders::ALL).title(LANE_SETTINGS))
             .alignment(Alignment::Center)
             .style(Style::default().fg(palette.dim));
-        frame.render_widget(msg, overlay_area);
+        frame.render_widget(msg, below);
         return;
     };
 
@@ -374,27 +410,26 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
     // the framed list. The hint includes `mp --version` so the
     // operator can see what they have installed.
     if state.schema.is_none() {
-        render_settings_schema_unavailable(frame, palette, overlay_area, state);
+        render_settings_schema_unavailable(frame, palette, below, state);
         return;
     }
 
     // Card height reservation: title (1) + 4 label/value rows + hint
     // footer (1) + borders (2) = 9. Clamp so the list keeps at least
     // 5 rows on tight panes.
-    let card_height = 9u16.min(overlay_area.height.saturating_sub(5));
+    let card_height = 9u16.min(below.height.saturating_sub(5));
     let list_area = Rect {
-        x: overlay_area.x,
-        y: overlay_area.y,
-        width: overlay_area.width,
-        height: overlay_area.height.saturating_sub(card_height),
+        x: below.x,
+        y: below.y,
+        width: below.width,
+        height: below.height.saturating_sub(card_height),
     };
     let card_area = Rect {
-        x: overlay_area.x,
-        y: overlay_area.y + list_area.height,
-        width: overlay_area.width,
+        x: below.x,
+        y: below.y + list_area.height,
+        width: below.width,
         height: card_height,
     };
-
     render_settings_list(frame, palette, state, list_area);
     render_settings_description_card(frame, palette, state, card_area);
 
@@ -463,6 +498,137 @@ pub(super) fn render_settings_lane(frame: &mut Frame, app: &App, overlay_area: R
             frame.render_widget(Paragraph::new(body), inner);
         }
     }
+}
+
+/// M222 F-02 fix: render the read-only effective keymap view
+/// at the top of the Settings lane. The view carries:
+///   * the external TOML path (`~/.config/raul/keybinds.toml`),
+///   * a row per action with section, action name, default combo,
+///     effective combo, and an override marker,
+///   * the `[autopilot]` per-lane section.
+///
+/// The legacy `[keybinds]` JSON config list is preserved BELOW
+/// the view (cycle-2 scope = blockers only — do not regress
+/// the v1 config editor). The view is intentionally
+/// read-only: AC-05 explicitly disallows in-app editing.
+///
+/// `view_area.height` may be as small as 3 rows on tight
+/// panes — we degrade gracefully by trimming the rendered
+/// rows and dropping the trailing `[autopilot]` section if
+/// there isn't room.
+fn render_keybinds_view(frame: &mut Frame, palette: ThemePalette, app: &App, area: Rect) {
+    let view = app.keybinds.view();
+    let toml_path = view.toml_path.to_string_lossy().to_string();
+
+    // Header line: TOML path + override count. Truncates to fit
+    // the available width so the panel never overflows the
+    // pane.
+    let header = format!(
+        " TOML: {}  ({} override{}) ",
+        toml_path,
+        view.overridden_count(),
+        if view.overridden_count() == 1 {
+            ""
+        } else {
+            "s"
+        }
+    );
+    let header_style = Style::default()
+        .fg(palette.accent)
+        .add_modifier(Modifier::BOLD);
+
+    // Render the rows: section header + row lines, one per
+    // entry. Trim to fit the available height (subtract 2 for
+    // the bordering).
+    let inner_h = area.height.saturating_sub(2) as usize;
+    if inner_h == 0 {
+        return;
+    }
+    // Reserve 1 row for the TOML header.
+    let body_h = inner_h.saturating_sub(1);
+    let mut lines: Vec<Line> = Vec::with_capacity(inner_h);
+    lines.push(Line::from(Span::styled(
+        truncate_for_width(&header, area.width as usize),
+        header_style,
+    )));
+
+    // First emit `[global]` rows, then `[autopilot]` rows, so
+    // the panel matches the order the registry exposes.
+    let mut last_section: Option<&'static str> = None;
+    let mut rendered = 0usize;
+    for row in &view.rows {
+        if rendered >= body_h {
+            break;
+        }
+        if Some(row.section) != last_section {
+            last_section = Some(row.section);
+            // Section banner uses `[]` to match the
+            // keybinds.toml syntax the operator types.
+            let banner = format!("[{}]", row.section);
+            lines.push(Line::from(Span::styled(
+                truncate_for_width(&format!(" {banner} "), area.width as usize),
+                Style::default().fg(palette.dim),
+            )));
+            rendered += 1;
+            if rendered >= body_h {
+                break;
+            }
+        }
+        lines.push(render_keybinds_view_row(row, palette, area.width as usize));
+        rendered += 1;
+    }
+
+    let body = Paragraph::new(Text::from(lines)).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain)
+            .title(" Keymap (read-only) "),
+    );
+    frame.render_widget(body, area);
+}
+
+/// Render a single `KeybindsViewRow` as a `Line` carrying the
+/// action name, default combo, effective combo, and an
+/// override marker (`*`) when `effective != default`.
+fn render_keybinds_view_row(
+    row: &KeybindsViewRow,
+    palette: ThemePalette,
+    width: usize,
+) -> Line<'static> {
+    let marker = if row.overridden { "*" } else { " " };
+    let raw = format!(
+        "  {marker} {:<14} {:<14} → {:<14}",
+        row.action,
+        truncate_for_width(&row.default_combo, 14),
+        truncate_for_width(&row.effective_combo, 14),
+    );
+    let style = if row.overridden {
+        Style::default()
+            .fg(palette.warn)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    Line::from(Span::styled(truncate_for_width(&raw, width), style))
+}
+
+/// Truncate `s` to at most `width` characters, appending `…`
+/// when truncated so the panel never wraps.
+fn truncate_for_width(s: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let n = s.chars().count();
+    if n <= width {
+        return s.to_string();
+    }
+    if width == 1 {
+        return "…".to_string();
+    }
+    let keep = width.saturating_sub(1);
+    let mut out: String = s.chars().take(keep).collect();
+    out.push('…');
+    out
 }
 
 /// M201: render the top block — a bordered list with section headers,
