@@ -100,8 +100,8 @@
       "id": "AC-05",
       "description": "The poller diffs API snapshots for rendering only and emits local UI StateChanged events with sequence/revision information; it never writes session state or relays progress to the orchestrator.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_state_diff --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poll_state_diff --no-fail-fast exit 0 (13/13 pass)"
     },
     {
       "id": "AC-06",
@@ -237,7 +237,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poll_state_diff --no-fail-fast",
       "done_when": "AC-05 evidence stamped via `mp milestone criterion pass 217 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
