@@ -656,3 +656,149 @@ pub fn validate_extras_json(extras: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ─── S4: session replay shell ─────────────────────────────────────────
+
+/// A read-only event timeline derived from `mp autopilot session
+/// show`. The shell never reads `master-plan/` files directly —
+/// the caller passes the JSON envelope produced by the `mp`
+/// subprocess. Each event becomes one row in the timeline.
+///
+/// The struct intentionally drops typed-event coupling
+/// (`autopilot::events::OrchestrationEvent`) so the surface stays
+/// self-contained and testable. Future steps can promote the
+/// timeline to a richer renderer without rewiring this module.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplayShell {
+    pub session_id: String,
+    pub status: String,
+    pub last_updated: String,
+    pub events: Vec<ReplayEvent>,
+}
+
+/// One row in the replay timeline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplayEvent {
+    pub seq: u64,
+    pub kind: String,
+    pub actor: String,
+    /// Body text rendered from the event payload's `body` /
+    /// `description` / `message` keys. The shell keeps the field as
+    /// a plain string so callers can render it directly without
+    /// touching the JSON envelope.
+    pub body: String,
+}
+
+impl ReplayShell {
+    /// Build the shell from `mp autopilot session show <id>` JSON.
+    /// The envelope shape is the canonical `SessionShowReport`
+    /// payload (`ok`, `session_id`, `session.*`). Empty sessions
+    /// produce an empty timeline — the renderer surfaces a
+    /// "no events yet" placeholder rather than crashing.
+    pub fn from_session_show(show_payload: &Value) -> Self {
+        let session_id = show_payload
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                show_payload
+                    .get("session")
+                    .and_then(|s| s.get("id"))
+                    .and_then(|v| v.as_str())
+            })
+            .unwrap_or("")
+            .to_string();
+        let status = show_payload
+            .get("session")
+            .and_then(|s| s.get("status"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let last_updated = show_payload
+            .get("session")
+            .and_then(|s| s.get("last_updated"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let events = show_payload
+            .get("session")
+            .and_then(|s| s.get("events"))
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .map(|evt| {
+                        let seq = evt.get("seq").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let kind = evt
+                            .get("kind")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        let actor = evt
+                            .get("actor")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let body = evt
+                            .get("body")
+                            .or_else(|| evt.get("description"))
+                            .or_else(|| evt.get("message"))
+                            .map(|v| match v {
+                                Value::String(s) => s.clone(),
+                                other => other.to_string(),
+                            })
+                            .unwrap_or_default();
+                        ReplayEvent {
+                            seq,
+                            kind,
+                            actor,
+                            body,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self {
+            session_id,
+            status,
+            last_updated,
+            events,
+        }
+    }
+
+    /// Build the shell from a list entry (id, status, last_updated
+    /// only — no events). The session list is the entry point that
+    /// produces a session_id; subsequent `session show` calls
+    /// populate the event timeline.
+    pub fn from_session_list_entry(list_entry: &Value) -> Self {
+        let session_id = list_entry
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let status = list_entry
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let last_updated = list_entry
+            .get("last_updated")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        Self {
+            session_id,
+            status,
+            last_updated,
+            events: Vec::new(),
+        }
+    }
+
+    /// True when the shell has at least one event row.
+    pub fn has_events(&self) -> bool {
+        !self.events.is_empty()
+    }
+
+    /// Read-only view of the timeline.
+    pub fn timeline(&self) -> &[ReplayEvent] {
+        &self.events
+    }
+}
