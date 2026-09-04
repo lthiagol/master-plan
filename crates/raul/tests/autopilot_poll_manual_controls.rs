@@ -10,11 +10,12 @@
 //!   is rendered in the lane footer, because a paused poll and a
 //!   stalled drive look identical on a frozen screen otherwise.
 //!
-//! Keybind note: the spec names plain `p` for the toggle, but
-//! M216 ships `p` as *pause the session* on this lane. The toggle
-//! takes `Ctrl-p` rather than silently rebinding a shipped
-//! destructive control; `toggle_poll = "p"` in `keybinds.toml`
-//! restores the spec's letter for users who want it.
+//! Keybind note: plain `p` is already bound to *pause the
+//! session* on this lane, so the poll toggle takes `Ctrl-p`
+//! rather than silently displacing a shipped destructive control.
+//! Getting plain `p` onto the toggle requires rebinding **both**
+//! `toggle_poll` and `pause` in `keybinds.toml` — `pause` is
+//! matched first, so moving only the toggle would leave it dead.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use raul::tui::action::Action;

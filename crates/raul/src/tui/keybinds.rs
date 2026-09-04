@@ -230,13 +230,17 @@ pub struct AutopilotLaneKeybinds {
     pub close_detail: Vec<KeyCombo>,
     /// M217 AC-03: toggle the lane's auto-refresh on/off.
     ///
-    /// Default `Ctrl-p`. The milestone spec names plain `p` for
-    /// this toggle, but M216 already ships `p` as *pause the
-    /// session* on this lane — a far more destructive action to
-    /// hit by accident. Rebinding pause would silently change a
-    /// shipped control, so the poll toggle takes the `Ctrl`
-    /// variant of the same mnemonic and users who want plain `p`
-    /// can set `toggle_poll = "p"` in `keybinds.toml`.
+    /// Default `Ctrl-p`. Plain `p` is already bound to `pause` on
+    /// this lane (pause the running session) — a far more
+    /// destructive action to hit by accident — so the poll toggle
+    /// takes the `Ctrl` variant of the same mnemonic rather than
+    /// silently displacing a shipped control.
+    ///
+    /// A user who wants plain `p` for the poll toggle must rebind
+    /// **both** slots in `keybinds.toml`: setting
+    /// `toggle_poll = "p"` alone leaves `pause` on the same key,
+    /// and `pause` is matched first, so the toggle would never
+    /// fire. Move `pause` elsewhere in the same edit.
     pub toggle_poll: Vec<KeyCombo>,
 }
 

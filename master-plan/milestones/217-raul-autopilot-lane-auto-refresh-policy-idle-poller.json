@@ -101,7 +101,7 @@
     },
     {
       "id": "AC-03",
-      "description": "Manual `r` triggers an immediate refresh; the poll timer is reset so it does not fire again immediately. Manual `p` toggles the poll on/off; the toggle state is visible in the lane footer.",
+      "description": "Manual `r` triggers an immediate refresh; the poll timer is reset so it does not fire again immediately. `Ctrl-p` toggles the poll on/off; the toggle state is visible in the lane footer. The toggle is bound to `Ctrl-p` rather than plain `p` because plain `p` is already bound to pause-the-session on this lane (M216 AC-06); taking plain `p` for the poll toggle would silently regress a shipped control. Users who prefer plain `p` must rebind both `lane_autopilot.toggle_poll` and `lane_autopilot.pause` in keybinds.toml, since rebinding the toggle alone lands on the pause key.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast",
       "status": "passed",
       "evidence": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast exit 0 (14/14 pass)"
