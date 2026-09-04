@@ -1844,11 +1844,11 @@ impl DetailPanel {
     /// column on the Autopilot lane.
     pub fn render_to_string(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!(" Detail ({}) \n", self.milestone_id));
-        out.push_str(&format!(" drift={} {} \n", self.drift, self.cap));
+        out.push_str(&format!("Detail ({})\n", self.milestone_id));
+        out.push_str(&format!(" drift={} {}\n", self.drift, self.cap));
         out.push_str(" cycles:\n");
         if self.cycles.is_empty() {
-            out.push_str("  (none) \n");
+            out.push_str("  (none)\n");
         } else {
             for c in &self.cycles {
                 out.push_str(&format!("  - {c}\n"));
@@ -1856,7 +1856,7 @@ impl DetailPanel {
         }
         out.push_str(" findings:\n");
         if self.findings.is_empty() {
-            out.push_str("  (none) \n");
+            out.push_str("  (none)\n");
         } else {
             for f in &self.findings {
                 out.push_str(&format!("  - {f}\n"));
@@ -1864,7 +1864,7 @@ impl DetailPanel {
         }
         out.push_str(" history:\n");
         if self.history.is_empty() {
-            out.push_str("  (none) \n");
+            out.push_str("  (none)\n");
         } else {
             for h in &self.history {
                 out.push_str(&format!("  - {h}\n"));

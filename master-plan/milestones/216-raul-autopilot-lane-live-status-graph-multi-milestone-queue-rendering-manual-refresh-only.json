@@ -103,8 +103,8 @@
       "id": "AC-05",
       "description": "The detail panel consumes session show/events, reviews finding list, and M213 next-action APIs. It never reads activity.json or session files directly. Golden fixtures cover cycles, findings, history, drift, and cap fields.",
       "verification": "cargo nextest run -p raul --test autopilot_detail_panel --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_detail_panel --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-06",
@@ -240,7 +240,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_detail_panel --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 216 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
