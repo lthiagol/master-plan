@@ -3,9 +3,9 @@
     "id": "222",
     "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
     "slug": "raul-configurable-keybinds-via-config-raul-keybinds-toml-tui-wide-keymap-with-sane-defaults",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,8 +26,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-04T03:11:28.903526+00:00",
+    "lifecycle_at": "2026-09-04T03:34:46.724213+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -49,9 +48,13 @@
         "status": "done",
         "at": "2026-09-03T14:01:32.350971+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T03:34:46.724214+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-04T03:11:28.903527+00:00"
+        "status": "done",
+        "at": "2026-09-04T03:34:46.724214+00:00"
       },
       "self-review": {
         "status": "done",
@@ -350,11 +353,11 @@
       "severity": "high",
       "category": "production-wiring",
       "description": "Production startup does not load the user-level keybinds.toml. runner.rs:409 calls Keybinds::load(runner), which reads only the legacy [keybinds] JSON via load_from_config. The M222 layered loader Keybinds::load_effective (keybinds.rs:1890) is library-only — no production caller. TOML applies only on SIGHUP (runner.rs:451) or Action::ReloadKeybinds (action.rs:926). Violates AC-01 ('At startup one shared Keybinds service loads global and per-lane overrides'), AC-08 ('user-level keybinds.toml overrides legacy project bindings'), and docs/raul/keybinds.md ('raul reads ~/.config/raul/keybinds.toml ... at startup').",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-222",
-      "fixed_in": "",
+      "fixed_in": "a82c5fb",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "anchor": {
         "path": "crates/raul/src/tui/runner.rs",
         "new_range": {
@@ -378,11 +381,11 @@
       "severity": "high",
       "category": "production-wiring",
       "description": "Settings lane does not render the new KeybindsView. Keybinds::view() and KeybindsView are defined (keybinds.rs:1356, 2248) but never called from any renderer. render_settings_lane (render/overlays.rs:358) renders only the legacy [keybinds] JSON config surface. AC-05 ('Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance') is library-tested only.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-222",
-      "fixed_in": "",
+      "fixed_in": "e59e84a",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "anchor": {
         "path": "crates/raul/src/tui/keybinds.rs",
         "new_range": {
