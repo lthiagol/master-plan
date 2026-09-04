@@ -59,8 +59,7 @@ fn session_with_ac_pass_fail() -> serde_json::Value {
 /// ACs come before passed, and passed before pending.
 #[test]
 fn ac_detail_parses_pass_fail_rows_for_active_milestone() {
-    let ac = AcDetail::from_payload(&session_with_ac_pass_fail())
-        .expect("ac detail parsed");
+    let ac = AcDetail::from_payload(&session_with_ac_pass_fail()).expect("ac detail parsed");
     assert_eq!(ac.milestone_id, "209");
     assert_eq!(ac.rows.len(), 4);
     // Failed first (red marker in the renderer).

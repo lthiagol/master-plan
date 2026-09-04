@@ -109,30 +109,24 @@ fn manual_refresh_populates_queue_view_for_multi_milestone() {
 fn refresh_function_has_no_filesystem_inputs() {
     // The exposed API takes only `&Value` payloads —
     // no `path: &Path`, no `&str` for filenames.
-    let _: fn(&mut AutopilotLaneState, &serde_json::Value, &serde_json::Value) =
-        refresh_from_json;
+    let _: fn(&mut AutopilotLaneState, &serde_json::Value, &serde_json::Value) = refresh_from_json;
     // The signature pins the no-IO contract: a future
     // addition that takes a path argument would break
     // the dispatcher's call site in `action.rs`.
 }
 
 /// AC-03: production-path regression. The adapter is
-    // reachable from `action.rs` through
-    // `crate::tui::autopilot::refresh::refresh_lane`. The
-    // dispatcher calls this entry point whenever the
-    // operator presses `r`; the typed surfaces flip from
-    // empty to populated.
+// reachable from `action.rs` through
+// `crate::tui::autopilot::refresh::refresh_lane`. The
+// dispatcher calls this entry point whenever the
+// operator presses `r`; the typed surfaces flip from
+// empty to populated.
 #[test]
 fn refresh_entry_point_is_reachable_from_the_dispatcher() {
     // The function path is stable. A future refactor
     // that moves the module breaks the dispatcher
     // signature — this test pins the contract.
-    let path = std::any::type_name::<
-        fn(
-            &mut raul::tui::app::App,
-            &raul::mp_runner::MpRunner,
-        ),
-    >();
+    let path = std::any::type_name::<fn(&mut raul::tui::app::App, &raul::mp_runner::MpRunner)>();
     // Sanity: the autopilot module exists; the dispatcher
     // references it via `crate::tui::autopilot::refresh::*`.
     let _ = path;

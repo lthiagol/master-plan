@@ -51,11 +51,8 @@ fn detail_panel_renders_all_five_blocks() {
         "F-02: stale cycle > cap".to_string(),
     ];
     let next_action = serde_json::json!({"action": "rerun"});
-    let panel = DetailPanel::from_payloads(
-        &session_show_with_history(),
-        &findings,
-        &Some(next_action),
-    );
+    let panel =
+        DetailPanel::from_payloads(&session_show_with_history(), &findings, &Some(next_action));
     let rendered = panel.render_to_string();
     let expected = "\
 Detail (209)
@@ -81,11 +78,7 @@ Detail (209)
 /// stripped so the detail pane matches the picker ids.
 #[test]
 fn detail_panel_strips_m_prefix_from_milestone_id() {
-    let panel = DetailPanel::from_payloads(
-        &session_show_with_history(),
-        &[],
-        &None,
-    );
+    let panel = DetailPanel::from_payloads(&session_show_with_history(), &[], &None);
     assert_eq!(panel.milestone_id, "209");
     assert!(!panel.milestone_id.starts_with('M'));
 }
@@ -95,11 +88,7 @@ fn detail_panel_strips_m_prefix_from_milestone_id() {
 /// rows matching the active milestone.
 #[test]
 fn detail_panel_history_filters_to_active_milestone_only() {
-    let panel = DetailPanel::from_payloads(
-        &session_show_with_history(),
-        &[],
-        &None,
-    );
+    let panel = DetailPanel::from_payloads(&session_show_with_history(), &[], &None);
     // M211 rows must NOT appear in M209's history.
     assert_eq!(panel.history.len(), 2);
     assert!(
@@ -147,7 +136,10 @@ fn detail_panel_appends_next_action_as_a_finding_row() {
         &Some(serde_json::json!({"action": "rerun"})),
     );
     assert!(
-        panel.findings.iter().any(|f| f.contains("next-action: rerun")),
+        panel
+            .findings
+            .iter()
+            .any(|f| f.contains("next-action: rerun")),
         "next-action must surface in findings; got {:?}",
         panel.findings
     );
@@ -158,11 +150,7 @@ fn detail_panel_appends_next_action_as_a_finding_row() {
 /// the renderer surfaces.
 #[test]
 fn detail_panel_handles_empty_findings() {
-    let panel = DetailPanel::from_payloads(
-        &session_show_with_history(),
-        &[],
-        &None,
-    );
+    let panel = DetailPanel::from_payloads(&session_show_with_history(), &[], &None);
     assert!(panel.findings.is_empty());
     assert!(
         panel.render_to_string().contains("findings:\n  (none)"),
@@ -211,11 +199,8 @@ fn detail_panel_round_trips_through_serde() {
 /// in the public surface.
 #[test]
 fn detail_panel_has_no_filesystem_inputs() {
-    let _: fn(
-        &serde_json::Value,
-        &[String],
-        &Option<serde_json::Value>,
-    ) -> DetailPanel = DetailPanel::from_payloads;
+    let _: fn(&serde_json::Value, &[String], &Option<serde_json::Value>) -> DetailPanel =
+        DetailPanel::from_payloads;
 }
 
 /// AC-05: production-path regression. The detail

@@ -43,7 +43,10 @@ fn violation_parse_all_handles_every_variant() {
     assert_eq!(violations.len(), 3);
 
     match &violations[0] {
-        Violation::RoleViolation { name, evidence_hint } => {
+        Violation::RoleViolation {
+            name,
+            evidence_hint,
+        } => {
             assert_eq!(name, "missing_notify");
             assert_eq!(evidence_hint, "role did not emit notify within 60s");
         }

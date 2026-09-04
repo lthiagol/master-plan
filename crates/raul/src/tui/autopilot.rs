@@ -1267,12 +1267,7 @@ impl StatusGraph {
             let marker = if i == 0 { ">" } else { " " };
             out.push_str(&format!(
                 "{} {} | {} | {} | {} | {}\n",
-                marker,
-                row.label,
-                row.pane_id,
-                row.role_skill,
-                row.last_notify,
-                row.last_verdict,
+                marker, row.label, row.pane_id, row.role_skill, row.last_notify, row.last_verdict,
             ));
         }
         out
@@ -1492,11 +1487,7 @@ pub mod refresh {
     /// repopulates the lane's typed fields. Exposed so the
     /// golden-file tests can drive the refresh without
     /// shelling out to `mp`.
-    pub fn refresh_from_json(
-        app: &mut AutopilotLaneState,
-        session_show: &Value,
-        status: &Value,
-    ) {
+    pub fn refresh_from_json(app: &mut AutopilotLaneState, session_show: &Value, status: &Value) {
         if session_show.is_null() {
             app.status_graph = None;
             app.queue_view = None;
@@ -1794,10 +1785,7 @@ impl DetailPanel {
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
                         let cycle = entry.get("cycle").and_then(|v| v.as_u64()).unwrap_or(0);
-                        let outcome = entry
-                            .get("outcome")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
+                        let outcome = entry.get("outcome").and_then(|v| v.as_str()).unwrap_or("");
                         if !mid.is_empty() && milestone_id == mid.trim_start_matches('M') {
                             Some(format!("cycle={cycle} outcome={outcome}"))
                         } else {
@@ -1821,10 +1809,7 @@ impl DetailPanel {
             .unwrap_or_else(|| "cap=∞".to_string());
         let mut findings = findings.to_vec();
         if let Some(next) = next_action {
-            let action = next
-                .get("action")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let action = next.get("action").and_then(|v| v.as_str()).unwrap_or("");
             if !action.is_empty() {
                 findings.push(format!("next-action: {action}"));
             }
@@ -1890,21 +1875,13 @@ impl RecoveryControl {
     /// <session>`. The output is owned `String`s so the
     /// dispatcher can pass `&str` slices through `run_raw`.
     pub fn pause_argv(session_id: &str) -> Vec<String> {
-        vec![
-        "control".into(),
-        "pause".into(),
-        session_id.to_string(),
-        ]
+        vec!["control".into(), "pause".into(), session_id.to_string()]
     }
 
     /// Build the argv for `mp autopilot control resume
     /// <session>`.
     pub fn resume_argv(session_id: &str) -> Vec<String> {
-        vec![
-        "control".into(),
-        "resume".into(),
-        session_id.to_string(),
-        ]
+        vec!["control".into(), "resume".into(), session_id.to_string()]
     }
 
     /// Build the argv for `mp autopilot control cancel
@@ -1913,10 +1890,10 @@ impl RecoveryControl {
     /// kills an active session.
     pub fn cancel_argv(session_id: &str) -> Vec<String> {
         vec![
-        "control".into(),
-        "cancel".into(),
-        session_id.to_string(),
-        "--confirm".into(),
+            "control".into(),
+            "cancel".into(),
+            session_id.to_string(),
+            "--confirm".into(),
         ]
     }
 
@@ -1924,11 +1901,11 @@ impl RecoveryControl {
     /// <session> --message <MSG>`.
     pub fn steer_argv(session_id: &str, message: &str) -> Vec<String> {
         vec![
-        "control".into(),
-        "steer".into(),
-        session_id.to_string(),
-        "--message".into(),
-        message.to_string(),
+            "control".into(),
+            "steer".into(),
+            session_id.to_string(),
+            "--message".into(),
+            message.to_string(),
         ]
     }
 
@@ -2094,11 +2071,7 @@ impl AcDetail {
     /// golden-file tests assert the overflow shape.
     pub fn render_to_string(&self, viewport_h: usize) -> String {
         let mut out = String::new();
-        out.push_str(&format!(
-            "ACs ({} / {})\n",
-            self.passed(),
-            self.total(),
-        ));
+        out.push_str(&format!("ACs ({} / {})\n", self.passed(), self.total(),));
         let visible = self.rows.iter().take(viewport_h);
         for row in visible {
             let marker = match row.status.as_str() {
@@ -2113,10 +2086,7 @@ impl AcDetail {
             ));
         }
         if self.rows.len() > viewport_h {
-            out.push_str(&format!(
-                " ... ({} more)\n",
-                self.rows.len() - viewport_h
-            ));
+            out.push_str(&format!(" ... ({} more)\n", self.rows.len() - viewport_h));
         }
         out
     }
@@ -2226,10 +2196,7 @@ impl Telemetry {
             .and_then(|v| v.as_array())
         {
             for entry in arr {
-                let outcome = entry
-                    .get("outcome")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let outcome = entry.get("outcome").and_then(|v| v.as_str()).unwrap_or("");
                 if outcome.is_empty() {
                     continue;
                 }
@@ -2254,10 +2221,7 @@ impl Telemetry {
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let status = entry
-                            .get("status")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
+                        let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("");
                         let entry = pass_fail.entry(id).or_insert((0, 0));
                         match status {
                             "passed" => entry.0 += 1,

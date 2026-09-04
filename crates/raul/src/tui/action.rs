@@ -976,8 +976,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             let Some(session_id) = app.autopilot.active_session_id() else {
                 return Ok(());
             };
-            let argv =
-                crate::tui::autopilot::RecoveryControl::pause_argv(&session_id);
+            let argv = crate::tui::autopilot::RecoveryControl::pause_argv(&session_id);
             let _ = runner.run_raw_allow_failure(
                 "autopilot",
                 &argv.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -987,8 +986,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             let Some(session_id) = app.autopilot.active_session_id() else {
                 return Ok(());
             };
-            let argv =
-                crate::tui::autopilot::RecoveryControl::resume_argv(&session_id);
+            let argv = crate::tui::autopilot::RecoveryControl::resume_argv(&session_id);
             let _ = runner.run_raw_allow_failure(
                 "autopilot",
                 &argv.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -1003,8 +1001,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             let Some(session_id) = app.autopilot.active_session_id() else {
                 return Ok(());
             };
-            let argv =
-                crate::tui::autopilot::RecoveryControl::cancel_argv(&session_id);
+            let argv = crate::tui::autopilot::RecoveryControl::cancel_argv(&session_id);
             let _ = runner.run_raw_allow_failure(
                 "autopilot",
                 &argv.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -1026,10 +1023,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
                 .cloned()
                 .unwrap_or_default()
                 .to_session_overrides();
-            let argv = crate::tui::autopilot::RecoveryControl::start_argv(
-                ids,
-                &payload,
-            );
+            let argv = crate::tui::autopilot::RecoveryControl::start_argv(ids, &payload);
             let _ = runner.run_raw_allow_failure(
                 "autopilot",
                 &argv.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -1042,10 +1036,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             let Some(session_id) = app.autopilot.active_session_id() else {
                 return Ok(());
             };
-            let argv = crate::tui::autopilot::RecoveryControl::steer_argv(
-                &session_id,
-                &message,
-            );
+            let argv = crate::tui::autopilot::RecoveryControl::steer_argv(&session_id, &message);
             let _ = runner.run_raw_allow_failure(
                 "autopilot",
                 &argv.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -1056,8 +1047,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // reads `app.autopilot.expanded_violation` to decide
             // whether to draw the click-to-expand panel below
             // the badge.
-            if app.autopilot.expanded_violation.as_deref() == Some(pane_id.as_str())
-            {
+            if app.autopilot.expanded_violation.as_deref() == Some(pane_id.as_str()) {
                 app.autopilot.expanded_violation = None;
             } else {
                 app.autopilot.expanded_violation = Some(pane_id);

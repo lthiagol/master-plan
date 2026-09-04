@@ -117,7 +117,9 @@ fn status_graph_surfaces_run_state_in_header() {
         let graph = StatusGraph::from_payloads(&session_show_payload(), &status);
         assert_eq!(graph.run_state, kind);
         assert!(
-            graph.render_to_string().contains(&format!("run_state={kind}")),
+            graph
+                .render_to_string()
+                .contains(&format!("run_state={kind}")),
             "header must carry run_state={kind}"
         );
     }

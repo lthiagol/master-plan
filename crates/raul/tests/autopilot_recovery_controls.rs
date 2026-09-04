@@ -44,10 +44,7 @@ fn resume_argv_builds_canonical_avro() {
 #[test]
 fn cancel_argv_includes_confirm_flag() {
     let argv = RecoveryControl::cancel_argv("alpha");
-    assert_eq!(
-        argv,
-        vec!["control", "cancel", "alpha", "--confirm"]
-    );
+    assert_eq!(argv, vec!["control", "cancel", "alpha", "--confirm"]);
 }
 
 /// AC-06: the steer client builds the canonical argv
@@ -74,7 +71,7 @@ fn steer_argv_carries_message_payload() {
 /// payload's topology + poll_interval_ms are forwarded.
 #[test]
 fn start_argv_includes_topology_and_poll_interval() {
-    use raul::tui::autopilot::{SessionOverridesPayload, SessionConfigOverrides};
+    use raul::tui::autopilot::{SessionConfigOverrides, SessionOverridesPayload};
     let payload = SessionOverridesPayload {
         config_overrides: SessionConfigOverrides {
             topology: "two-agent".to_string(),
@@ -103,7 +100,7 @@ fn start_argv_includes_topology_and_poll_interval() {
 /// when the override panel leaves it unset.
 #[test]
 fn start_argv_omits_poll_interval_when_unset() {
-    use raul::tui::autopilot::{SessionOverridesPayload, SessionConfigOverrides};
+    use raul::tui::autopilot::{SessionConfigOverrides, SessionOverridesPayload};
     let payload = SessionOverridesPayload {
         config_overrides: SessionConfigOverrides {
             topology: "three-agent".to_string(),
@@ -173,9 +170,7 @@ fn cancel_collapses_in_session_state_to_terminal() {
 /// the user's last panel edits.
 #[test]
 fn restart_argv_preserves_panel_overrides() {
-    use raul::tui::autopilot::{
-        OverridePanel, SessionOverridesPayload,
-    };
+    use raul::tui::autopilot::{OverridePanel, SessionOverridesPayload};
     let mut panel = OverridePanel::default();
     panel.topology = "one-agent".to_string();
     panel.refresh_secs = 5;
