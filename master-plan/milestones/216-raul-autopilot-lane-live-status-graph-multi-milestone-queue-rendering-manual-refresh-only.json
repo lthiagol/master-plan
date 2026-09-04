@@ -75,15 +75,15 @@
       "id": "AC-01",
       "description": "Status graph renders per-pane rows with all five fields (label, pane ID, role skill, last notify, last verdict) in golden-file tests; formatting matches the lane's existing text/cursor conventions.",
       "verification": "cargo nextest run -p raul --test autopilot_status_graph --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_status_graph --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-02",
       "description": "Multi-milestone queue view renders when session has > 1 milestone; the active milestone is highlighted.",
       "verification": "cargo nextest run -p raul --test autopilot_queue_view --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_queue_view --no-fail-fast exit 0 (8/8 pass)"
     },
     {
       "id": "AC-03",
@@ -159,7 +159,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_status_graph --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 216 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -179,7 +179,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_queue_view --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 216 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],

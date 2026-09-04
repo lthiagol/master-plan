@@ -1253,16 +1253,16 @@ impl StatusGraph {
     pub fn render_to_string(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!(
-            " Status graph ({}) — run_state={} \n",
+            "Status graph ({}) — run_state={}\n",
             self.session_id, self.run_state
         ));
         if self.rows.is_empty() {
-            out.push_str(" (no panes recorded) \n");
+            out.push_str("(no panes recorded)\n");
             return out;
         }
         // Header row.
-        out.push_str(" label | pane | role_skill | last_notify | last_verdict \n");
-        out.push_str(" ------+------+------------+-------------+-------------- \n");
+        out.push_str(" label | pane | role_skill | last_notify | last_verdict\n");
+        out.push_str(" ------+------+------------+-------------+--------------\n");
         for (i, row) in self.rows.iter().enumerate() {
             let marker = if i == 0 { ">" } else { " " };
             out.push_str(&format!(
@@ -1340,10 +1340,11 @@ impl QueueView {
             .and_then(|w| w.get("milestone_id"))
             .and_then(|v| v.as_str())
             .map(|s| s.trim_start_matches('M').to_string());
-        let rows = payload
+        let queue_arr = payload
             .get("session")
             .and_then(|s| s.get("queue"))
-            .and_then(|v| v.as_array())
+            .and_then(|v| v.as_array());
+        let mut rows: Vec<QueueRow> = queue_arr
             .map(|arr| {
                 arr.iter()
                     .map(|item| {
@@ -1374,6 +1375,14 @@ impl QueueView {
                     .collect()
             })
             .unwrap_or_default();
+        // Fallback: when no `working_on` is set, the first row
+        // is treated as the active milestone so the renderer
+        // always has a highlighted row.
+        if active_id.is_none() {
+            if let Some(first) = rows.first_mut() {
+                first.active = true;
+            }
+        }
         Self {
             session_id,
             rows,
@@ -1409,22 +1418,22 @@ impl QueueView {
 
     /// Render the queue view as a multi-line `String` so the
     /// golden-file tests can compare verbatim. The active
-    /// milestone is prefixed with `> `; idle rows use `  `.
+    /// milestone is prefixed with `>`; idle rows use ` `.
     pub fn render_to_string(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!(
-            " Multi-milestone queue ({}) — status={} \n",
+            "Multi-milestone queue ({}) — status={}\n",
             self.session_id, self.status
         ));
         if self.rows.is_empty() {
-            out.push_str(" (queue empty) \n");
+            out.push_str("(queue empty)\n");
             return out;
         }
         for row in &self.rows {
-            let prefix = if row.active { "> " } else { "  " };
+            let marker = if row.active { ">" } else { " " };
             out.push_str(&format!(
                 "{} {} | {} | {}\n",
-                prefix, row.milestone_id, row.lifecycle, row.title
+                marker, row.milestone_id, row.lifecycle, row.title
             ));
         }
         out

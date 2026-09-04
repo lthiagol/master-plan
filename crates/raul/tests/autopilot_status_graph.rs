@@ -71,7 +71,7 @@ fn status_graph_renders_one_row_per_pane_with_five_fields() {
     let graph = StatusGraph::from_payloads(&session_show_payload(), &status_payload());
     let rendered = graph.render_to_string();
     let expected = "\
- Status graph (alpha) — run_state=live
+Status graph (alpha) — run_state=live
  label | pane | role_skill | last_notify | last_verdict
  ------+------+------------+-------------+--------------
 > role-runner-1 | %5 | mp-runner | 2026-09-04T00:01:00Z | pass
@@ -84,7 +84,10 @@ fn status_graph_renders_one_row_per_pane_with_five_fields() {
 /// AC-01: when `session.queue` is empty but
 /// `state.pane_ids` is populated, the graph synthesizes
 /// one row per pane id so the graph still draws (the
-/// session hasn't recorded per-pane rows yet).
+/// session hasn't recorded per-pane rows yet). The
+/// iteration order follows the BTreeMap alphabetic
+/// ordering the production parser uses (coordinator /
+/// reviewer / runner for the canonical 3-pane topology).
 #[test]
 fn status_graph_synthesizes_rows_when_queue_is_empty() {
     let session_show = serde_json::json!({
@@ -93,10 +96,12 @@ fn status_graph_synthesizes_rows_when_queue_is_empty() {
     });
     let graph = StatusGraph::from_payloads(&session_show, &status_payload());
     assert_eq!(graph.rows.len(), 3);
-    assert_eq!(graph.rows[0].label, "role-runner-1");
-    assert_eq!(graph.rows[0].pane_id, "%5");
-    assert_eq!(graph.rows[1].label, "role-coordinator-1");
-    assert_eq!(graph.rows[2].label, "role-reviewer-1");
+    // BTreeMap iteration is alphabetical — coordinator first,
+    // reviewer, runner last.
+    assert_eq!(graph.rows[0].label, "role-coordinator-1");
+    assert_eq!(graph.rows[0].pane_id, "%7");
+    assert_eq!(graph.rows[1].label, "role-reviewer-1");
+    assert_eq!(graph.rows[2].label, "role-runner-1");
 }
 
 /// AC-01: the run-state classifier (live / stale / terminal)
@@ -181,5 +186,5 @@ fn status_graph_is_reachable_from_the_lane_state() {
     let graph = StatusGraph::from_payloads(&session_show_payload(), &status_payload());
     state.status_graph = Some(graph);
     let rendered = state.status_graph().unwrap().render_to_string();
-    assert!(rendered.starts_with(" Status graph (alpha) — run_state=live"));
+    assert!(rendered.starts_with("Status graph (alpha) — run_state=live"));
 }
