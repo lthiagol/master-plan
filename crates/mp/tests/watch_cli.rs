@@ -272,22 +272,116 @@ fn autopilot_help_no_longer_advertises_migrate_verb() {
 // legacy `mp watch` family entirely. ────────────────────────────────
 
 #[test]
-fn m229_f01_production_autopilot_path_routes_through_autopilot_drive_not_watch() {
-    // The legacy modules must be GONE from the production command tree:
-    // `commands::watch`, `commands::watch_control`, `commands::watch_detach`.
+fn m229_f01_autopilot_start_dry_run_emits_autopilot_log_path_not_watch_log() {
+    // F-03 / cycle 3 behavioral pin: run the production
+    // `mp autopilot start <id> --dry-run` dispatch end-to-end
+    // and verify the output JSON names the renamed
+    // `.mp/autopilot.log` path. The legacy `cmd_watch` path
+    // surfaced `.mp/watch.log`; a regression to that dispatch
+    // would re-emit the legacy filename in the dry-run report.
     let env = TestEnv::new();
-    let out = env.run(&["autopilot", "start", "--help"]);
-    assert!(
-        out.status.success(),
-        "autopilot start --help must exit 0; got stderr={}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    // Create an approved+ready milestone so the autopilot
+    // dry-run path goes past the early `planning/approval`
+    // gate and through `cmd_autopilot_drive`.
+    let payload = serde_json::json!({
+        "title": "f-03 dry-run fixture",
+        "intent": {"outcome": "f-03 dry-run"},
+        "problem": {"description": "f-03 fixture"},
+        "scope": {"in_scope": ["x"], "out_of_scope": ["y", "z"]},
+        "acceptance_criteria": [
+            {"description": "ac", "verification": "manual: yes"}
+        ]
+    });
+    let create_out = env.run_json(&[
+        "milestone",
+        "create",
+        "--json",
+        &payload.to_string(),
+        "--format",
+        "json",
+    ]);
+    let id = create_out["milestone"]["id"]
+        .as_str()
+        .expect("created milestone id");
+    env.run(&["milestone", "set-spec-status", id, "ready"]);
+    env.run(&["milestone", "approve", id, "--format", "json"]);
+
+    // Run the canonical autopilot entry point. With a stale
+    // dispatch to `commands::watch`, this would print
+    // `log_file = ".../.mp/watch.log"`.
+    let out = env.run(&["autopilot", "start", id, "--dry-run", "--format", "json"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    // The new help text must reference the canonical autopilot log
-    // path; the legacy `watch.log` reference must be absent.
+    // The dry-run report may surface precondition non-green
+    // for a bare TestEnv (no harness skill installed), but the
+    // dispatch routing is still exercised — `log_file` is set
+    // before the precondition check.
     assert!(
-        stdout.contains("autopilot"),
-        "autopilot start --help must reference the canonical autopilot module"
+        stdout.contains("autopilot.log"),
+        "production dispatch must surface the renamed `.mp/autopilot.log` log path; got stdout: {stdout}"
+    );
+    assert!(
+        !stdout.contains("watch.log"),
+        "production dispatch must NOT surface the legacy `.mp/watch.log` path; got stdout: {stdout}"
+    );
+    // Additionally: the autopilot surface was reached (not the
+    // legacy `mp watch` CLI surface, which no longer exists).
+    assert!(
+        out.status.success() || stdout.contains("autopilot.log"),
+        "autopilot start --dry-run must reach the autopilot dispatcher and surface the autopilot.log path; got exit {:?} stdout: {stdout}",
+        out.status.code()
+    );
+}
+
+#[test]
+fn m229_f01_cmd_autopilot_start_dispatches_to_autopilot_drive_not_watch() {
+    // F-03 / cycle 3 source-pin: the F-01 regression must FAIL if
+    // `cmd_autopilot_start` is reverted to call the legacy
+    // `commands::watch::cmd_watch`. The earlier cycle 2 test only
+    // invoked `mp autopilot start --help`, which exits at clap's
+    // help handler before the dispatch ever runs. This test parses
+    // the production source and asserts the call routing, so a
+    // regression that restored `commands::watch::cmd_watch(…)`
+    // (or any `commands::watch::*` reference) inside
+    // `cmd_autopilot_start` would fail to compile or trip the
+    // assert below.
+    let dispatch_path = common::repo_root().join("crates/mp/src/commands/autopilot.rs");
+    let source = std::fs::read_to_string(&dispatch_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", dispatch_path.display()));
+
+    // Pin the fn boundary: the body of `cmd_autopilot_start` must
+    // sit immediately after the marker comment.
+    let start_marker = "pub(crate) fn cmd_autopilot_start(";
+    let body_start = source
+        .find(start_marker)
+        .unwrap_or_else(|| panic!("cmd_autopilot_start not found in {dispatch_path:?}"));
+    // Capture the fn body by counting braces from the open paren of
+    // the arg list through the close brace of the function. A flat
+    // forward search for matching `{` after `-> Result<()>` suffices
+    // for the current source shape (single return-expression block).
+    let body_open = source[body_start..]
+        .find('{')
+        .map(|i| body_start + i)
+        .expect("cmd_autopilot_start body opens with {");
+    let body_close = source[body_open..]
+        .find("}\n")
+        .map(|i| body_open + i + 1)
+        .expect("cmd_autopilot_start body closes with }");
+    let body = &source[body_open..body_close];
+
+    assert!(
+        body.contains("autopilot_drive::cmd_autopilot_drive"),
+        "cmd_autopilot_start must call crate::commands::autopilot_drive::cmd_autopilot_drive; body:\n{body}"
+    );
+    // The legacy `commands::watch::cmd_watch` MUST NOT appear in
+    // the dispatch body. A regression that re-introduces the
+    // `commands/watch` shim fails here.
+    assert!(
+        !body.contains("commands::watch") && !body.contains("commands/watch"),
+        "cmd_autopilot_start must NOT call the legacy commands::watch::cmd_watch; body:\n{body}"
+    );
+    assert!(
+        !body.contains("::cmd_watch"),
+        "cmd_autopilot_start must NOT call any cmd_watch alias; body:\n{body}"
     );
 }
 
@@ -355,6 +449,7 @@ fn m229_f02_legacy_show_watch_tab_config_key_is_removed() {
 }
 
 #[test]
+
 fn m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness() {
     // The execution readiness field must surface as
     // `autopilot_readiness` (not `watch_readiness`) in
