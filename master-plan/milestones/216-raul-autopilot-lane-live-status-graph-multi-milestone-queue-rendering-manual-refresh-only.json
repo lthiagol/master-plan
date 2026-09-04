@@ -124,8 +124,8 @@
       "id": "AC-08",
       "description": "Active-session telemetry aggregates: in the detail view, alongside `drifted` (time-since-last-state-change for the active stage), render cross-milestone aggregates — total time-in-active-stage across all three panes, attempts-per-stage (how many times each cycle stage has been entered across the queue), per-AC pass/fail counts across milestones. Aggregates are computed from session.json state on each refresh; they reset on session start. Golden-file tests cover a synthetic session with one shipped milestone + one in-flight + one pending milestone.",
       "verification": "cargo nextest run -p raul --test autopilot_telemetry --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_telemetry --no-fail-fast exit 0 (10/10 pass)"
     }
   ],
   "design_decisions": [
@@ -303,7 +303,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_telemetry --no-fail-fast",
       "done_when": "AC-08 evidence is stamped via `mp milestone criterion pass 216 AC-08 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],

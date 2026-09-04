@@ -2285,14 +2285,14 @@ impl Telemetry {
     /// golden output is stable across runs.
     pub fn render_to_string(&self) -> String {
         let mut out = String::new();
-        out.push_str(" Telemetry \n");
+        out.push_str("Telemetry\n");
         out.push_str(&format!(
-            " total_time_in_active_stage = {} \n",
+            " total_time_in_active_stage = {}\n",
             self.total_time_in_active_stage
         ));
         out.push_str(" attempts_per_stage:\n");
         if self.attempts_per_stage.is_empty() {
-            out.push_str("  (none) \n");
+            out.push_str("  (none)\n");
         } else {
             for (stage, count) in &self.attempts_per_stage {
                 out.push_str(&format!("  {stage} = {count}\n"));
@@ -2300,7 +2300,7 @@ impl Telemetry {
         }
         out.push_str(" per_ac_pass_fail:\n");
         if self.per_ac_pass_fail.is_empty() {
-            out.push_str("  (none) \n");
+            out.push_str("  (none)\n");
         } else {
             for (id, p, f) in &self.per_ac_pass_fail {
                 out.push_str(&format!("  {id} = passed:{p} failed:{f}\n"));
