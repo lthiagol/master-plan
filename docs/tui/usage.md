@@ -30,12 +30,16 @@ that routes the click / wheel to the active lane's renderer.
 
 ### What works
 
-- **Single click** — selects the row under the cursor on every
-  list-bearing lane (Milestones, Backlog, Ideas, Path, Overview,
-  Settings, Autopilot). The click resolution is driven by the
-  pre-computed `ViewState` rects, so a click on the visible row
-  always resolves to the row id rendered at that pixel — no
-  hardcoded offsets.
+- **Single click** — selects the row under the cursor on the
+  list-bearing lanes with a rendered selection row (Milestones,
+  Backlog, Ideas, Overview, Autopilot). The click resolution is
+  driven by the pre-computed `ViewState` rects, so a click on the
+  visible row always resolves to the row id rendered at that
+  pixel — no hardcoded offsets. Path click is detail-open only
+  (no selection row exists — selection lives on
+  `dashboard.next_action`). Settings click selection is deferred
+  to a follow-up milestone; for now a click on the Settings lane
+  is a no-op.
 - **Double click** — opens the detail view on Milestones,
   Backlog, Ideas, Path, and Autopilot. Overview and Settings are
   **selection-only** by design: Overview inbox rows route through

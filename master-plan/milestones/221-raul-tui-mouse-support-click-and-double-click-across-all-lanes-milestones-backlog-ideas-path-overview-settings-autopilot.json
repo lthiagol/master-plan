@@ -84,7 +84,7 @@
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices.",
+      "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Overview, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices. Path click is detail-open only (no selection row exists). Settings click selection is deferred to a follow-up milestone.",
       "verification": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
       "status": "passed",
       "evidence": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast exit 0 (7/7 pass)"

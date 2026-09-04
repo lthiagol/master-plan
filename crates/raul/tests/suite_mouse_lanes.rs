@@ -264,23 +264,33 @@ fn click_on_path_lane_does_not_change_selection_when_no_next_action() {
     );
 }
 
-// ─── Settings ──────────────────────────────────────────────────────
+// ─── Settings (click selection deferred to follow-up M222) ─────────
 
 #[test]
-fn click_on_settings_row_updates_selected_idx() {
+fn click_on_settings_row_is_noop_for_selection() {
     use raul::tui::mode::SettingsState;
     let mut app = App::new();
     app.active_lane = Lane::Settings;
     app.settings = Some(SettingsState::new(serde_json::json!({})));
     app.selected_index = 0;
-    // Settings selection lives on state.selected_idx, which
-    // currently has no dedicated mouse plumbing in M221 (the
-    // renderer does not emit per-row hit areas for Settings yet).
-    // The contract is "click does not crash and selection is
-    // preserved". A future M222 follow-up will add Settings
-    // hit areas.
+    // M221: Settings click selection is deliberately deferred to a
+    // follow-up milestone. The dispatch short-circuits — Settings
+    // state must survive a stray click (no panic, no reset). The
+    // production hot path lives in `tui::mouse::handle_dispatch`
+    // which returns `false` for Lane::Settings today.
     let runner = mp_runner();
+    let before_selected = app.settings.as_ref().map(|s| s.selected_idx).unwrap_or(0);
+    let before_index = app.selected_index;
     handle_mouse(&mut app, &runner, click(20, 10), (120, 30)).unwrap();
+    assert_eq!(
+        app.selected_index, before_index,
+        "Settings click must not mutate selected_index (M221: deferred to follow-up)"
+    );
+    assert_eq!(
+        app.settings.as_ref().map(|s| s.selected_idx).unwrap_or(0),
+        before_selected,
+        "Settings click must not mutate settings.selected_idx (M221: deferred to follow-up)"
+    );
     assert!(
         app.settings.is_some(),
         "Settings state must survive a stray click"
