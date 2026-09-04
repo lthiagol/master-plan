@@ -23,7 +23,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -72,28 +72,28 @@
     {
       "id": "AC-01",
       "description": "Picker renders drivable milestones from `mp list milestones`, filtered to the autopilot-eligible lifecycles; toggle selection preserves insertion order; cursor moves correctly across the list.",
-      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_picker --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Override panel captures topology, refresh interval, and per-role model/harness/skill/extras. Empty model/skill values mean inherit; unknown harness, invalid topology, malformed extras, and non-positive refresh values are rejected before persistence.",
-      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_overrides_validation --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "On Start, overrides persist to the new session and win over project defaults for that session; a second session without overrides uses project defaults. Both effective configurations are asserted through dry-run/session show.",
-      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_override_precedence --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Past-session mode consumes `mp autopilot session list/show`, never reads plan files directly, and opens a read-only replay shell backed by session events. M216 may enrich the shared detail renderer without being required for this milestone.",
-      "verification": "cargo nextest run -p raul --test tui_modes --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_session_replay --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
