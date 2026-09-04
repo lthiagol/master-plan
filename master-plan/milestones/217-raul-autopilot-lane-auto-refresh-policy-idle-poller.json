@@ -93,8 +93,8 @@
       "id": "AC-04",
       "description": "Per-session `refresh_secs` override (set via D2's override panel) is honored; the polish default (2s) applies when no override.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_override_respected --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poll_override_respected --no-fail-fast exit 0 (15/15 pass)"
     },
     {
       "id": "AC-05",
@@ -216,7 +216,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poll_override_respected --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 217 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
