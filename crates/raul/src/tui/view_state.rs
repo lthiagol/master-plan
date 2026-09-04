@@ -646,13 +646,16 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
                 // Settings content is the modal overlay; no list rects.
             }
             Lane::Autopilot => {
-                // M179 / M214: the Autopilot lane's selection model
-                // is multi-select with a stable ordered queue — the
-                // hit-test surface is computed by the Autopilot
-                // module's renderer (S3/S6) and is independent of
-                // the legacy `selected_index` + scrollbar path.
-                // No list-rect computation here until S6 ships the
-                // dedicated picker layout.
+                // M221: hit areas for the Autopilot picker. The
+                // renderer (`render::watch::render_picker`) takes
+                // the LEFT 40% of the content area; each candidate
+                // occupies one row inside the bordered block. We
+                // mirror that geometry here so a click on a row
+                // resolves to that candidate's id and the picker
+                // cursor moves (single-click) or toggles selection
+                // (double-click via `Action::AutopilotToggleSelect`
+                // dispatched by the mouse handler).
+                compute_autopilot_picker_rects(&mut view, app, content_area);
             }
         }
     } else if app.content == ContentState::CoApproval {
@@ -1208,6 +1211,75 @@ fn compute_overview_list_rects(view: &mut ViewState, app: &App, area: Rect) {
 
 #[allow(dead_code)]
 fn _junk_marker_removed() {}
+
+/// M221: hit areas for the Autopilot lane picker. The renderer
+/// (`render::watch::render_picker`) splits the content area 40/60
+/// and lays out each candidate as a single row inside a bordered
+/// block on the left; we mirror that geometry here so click
+/// resolution agrees with the rendered glyphs by construction.
+///
+/// Each candidate gets one `ListItemHitArea` keyed by the
+/// candidate's `id`. The picker surface does NOT use a scrollbar
+/// (the picker is intentionally short — the queue panel above
+/// is the multi-row surface), so no scrollbar hit area is added
+/// here.
+fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
+    if area.width < 4 || area.height < 4 {
+        return;
+    }
+
+    // The picker takes the left 40% of the content area — same
+    // split as `render_watch_lane`.
+    let picker_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: (area.width as u32 * 40 / 100) as u16,
+        height: area.height,
+    };
+
+    // Prefer the typed picker candidates; fall back to the legacy
+    // `app.watch.candidates` so the backcompat surface stays
+    // clickable (the same backcompat path `render_picker` walks).
+    let candidates: Vec<String> = if !app.autopilot.picker.candidates.is_empty() {
+        app.autopilot
+            .picker
+            .candidates
+            .iter()
+            .map(|c| c.id.clone())
+            .collect()
+    } else {
+        app.watch.candidates.iter().map(|c| c.id.clone()).collect()
+    };
+    if candidates.is_empty() {
+        return;
+    }
+
+    // Picker block: bordered box at `picker_area`. Border eats
+    // the top + bottom rows; data starts at `picker_area.y + 1`
+    // and is `area.height - 2` rows tall.
+    let inner_y_start = picker_area.y.saturating_add(1);
+    let inner_height = picker_area.height.saturating_sub(2);
+    if inner_height == 0 {
+        return;
+    }
+    let inner_x = picker_area.x.saturating_add(1);
+    let inner_width = picker_area.width.saturating_sub(2);
+
+    for (i, id) in candidates.iter().enumerate() {
+        if i as u16 >= inner_height {
+            break;
+        }
+        view.list_item_rects.push(ListItemHitArea {
+            id: id.clone(),
+            rect: Rect {
+                x: inner_x,
+                y: inner_y_start.saturating_add(i as u16),
+                width: inner_width,
+                height: 1,
+            },
+        });
+    }
+}
 
 /// M157: single vertical Path tree scrollbar. Mirrors detail-scroll
 /// semantics (`path_scroll` / `path_max_scroll`) rather than the

@@ -734,6 +734,13 @@ pub struct App {
     /// code never reads this; tests use it to assert coalescing
     /// (e.g. 100 rapid toggles → 1 disk write).
     pub debounced_write_count: u64,
+    /// M221: last `(x, y, timestamp)` of a left-button click,
+    /// for double-click classification. `None` when no click has
+    /// been observed yet. The runner's mouse handler reads this
+    /// via [`crate::tui::mouse::classify_click`] and resets it
+    /// after a Double is dispatched so a third click starts the
+    /// sequence over.
+    pub last_click: Option<(u16, u16, std::time::Instant)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -828,6 +835,7 @@ impl App {
             pending_filter_writes: std::collections::BTreeMap::new(),
             last_pending_change_at: None,
             debounced_write_count: 0,
+            last_click: None,
         }
     }
 

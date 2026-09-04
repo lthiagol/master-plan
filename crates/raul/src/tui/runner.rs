@@ -15,6 +15,7 @@ use ratatui::Terminal;
 
 use super::action::{self, Action};
 use super::app::{App, ContentState, Lane};
+use super::mouse;
 use super::render;
 use super::render::scrollbar::track_click_to_scroll;
 use super::view_state::{self, ScrollableId, ScrollbarHitArea};
@@ -803,6 +804,13 @@ pub fn tab_hit_test_for_layout(
 /// this path — `view.tab_hit_areas` / `view.list_item_rects` /
 /// `view.board_card_rects` are the single sources of truth.
 ///
+/// M221: click classification + double-click debouncing moved to
+/// [`crate::tui::mouse`] so every lane uses the same
+/// `RAUL_NO_MOUSE` / click-window logic. The dispatch body
+/// below still owns lane-specific wiring (tab clicks, scrollbar
+/// track clicks, autopilot toggle, annotation-thread selection),
+/// but the per-row click math lives in `tui::mouse`.
+///
 /// `pub` so integration tests in `crates/raul/tests/` can dispatch
 /// synthetic mouse events (clicks per M135 F-04, wheel events per the
 /// M169-rev scrollbar fix). Re-exported under
@@ -815,6 +823,14 @@ pub fn handle_mouse(
     term_size: (u16, u16),
 ) -> Result<()> {
     use crossterm::event::MouseButton;
+
+    // M221: operator escape hatch. `RAUL_NO_MOUSE=1` disables mouse
+    // capture / handling for the entire session — keyboard stays
+    // canonical. Reads the env on every event so a config flip
+    // takes effect without restarting raul.
+    if mouse::mouse_disabled() {
+        return Ok(());
+    }
 
     let x = mouse.column;
     let y = mouse.row;
@@ -844,53 +860,129 @@ pub fn handle_mouse(
                     if x >= r.x && x < r.x.saturating_add(r.width) {
                         app.select_lane(hit.id);
                         load_data_for_lane(runner, app)?;
+                        app.last_click = None;
                         return Ok(());
                     }
                 }
-            } else if let Some(hit) = view
+                return Ok(());
+            }
+
+            // Scrollbar-track click wins over list-row selection
+            // (external-review F-01 / AC-04). A click on the gutter
+            // never selects the row underneath.
+            if let Some(hit) = view
                 .scrollbar_rects
                 .iter()
                 .find(|h| point_in_rect(x, y, h.rect))
             {
-                // External-review F-01 / AC-04: track click jumps scroll
-                // before list/board row selection so a click on the
-                // gutter never selects a row underneath.
                 apply_scrollbar_track_click(app, hit, y);
+                app.last_click = None;
                 return Ok(());
-            } else if app.content == ContentState::List {
-                // M135 F-02: list-row clicks read from
-                // `view.list_item_rects` instead of the hardcoded
-                // `y.saturating_sub(3)` offset. The offset only
-                // approximated the Milestones/Backlog bordered-table
-                // layout and was wrong for the Overview inbox (whose
-                // block sits inside the dashboard vertical split, and
-                // whose items are 3 rows tall). Walking the pre-computed
-                // rects agrees with render by construction (L41).
-                if let Some(idx) = resolve_list_click(app, &view, x, y) {
-                    app.selected_index = idx;
-                    app.touch();
-                    return Ok(());
+            }
+
+            // M221: classify single vs double click before any
+            // state mutation. A double-click escalates to detail
+            // open (where the lane supports it). The classification
+            // happens against the same `(x, y, now)` triple the
+            // helper stores on the App.
+            let now = std::time::Instant::now();
+            let click_kind = mouse::classify_click(app.last_click, x, y, now);
+            let was_double = click_kind == mouse::ClickKind::Double;
+            // Always record the new click — even when it ends up
+            // being a Double, so a third click starts the
+            // sequence over (no infinite-double on rapid clicks).
+            app.last_click = Some((x, y, now));
+
+            // Lane-specific content state dispatches first —
+            // annotation-thread clicks, settings list clicks, and
+            // the autopilot picker toggle all have bespoke
+            // behaviour that doesn't fit `mouse::handle_dispatch`.
+            if app.content == ContentState::AnnotationThread {
+                if !was_double {
+                    if let Some(hit) = view
+                        .list_item_rects
+                        .iter()
+                        .find(|hit| point_in_rect(x, y, hit.rect))
+                    {
+                        if let Some(position) = app
+                            .visible_annotations()
+                            .iter()
+                            .position(|annotation| annotation.id == hit.id)
+                        {
+                            app.selected_annotation_index = position;
+                            app.touch();
+                        }
+                    }
                 }
-            } else if app.content == ContentState::AnnotationThread {
+                return Ok(());
+            }
+
+            // Autopilot picker double-click → toggle selection
+            // (mirrors Space in keyboard navigation). The lane
+            // itself routes through `Action::AutopilotToggleSelect`
+            // so the picker state stays in one place.
+            if app.active_lane == Lane::Autopilot
+                && was_double
+                && mouse::double_click_opens_detail(Lane::Autopilot)
+            {
                 if let Some(hit) = view
                     .list_item_rects
                     .iter()
                     .find(|hit| point_in_rect(x, y, hit.rect))
                 {
-                    if let Some(position) = app
-                        .visible_annotations()
+                    let id = hit.id.clone();
+                    if let Some(pos) = app
+                        .autopilot
+                        .picker
+                        .candidates
                         .iter()
-                        .position(|annotation| annotation.id == hit.id)
+                        .position(|c| c.id == id)
                     {
-                        app.selected_annotation_index = position;
-                        app.touch();
-                        return Ok(());
+                        app.autopilot.picker.cursor = pos;
+                        action::apply_action(
+                            app,
+                            runner,
+                            action::Action::AutopilotToggleSelect,
+                        )?;
                     }
+                    return Ok(());
                 }
+            }
+
+            // Path lane double-click → drill into the next-action
+            // milestone detail (mirrors keyboard Enter on Path).
+            if app.active_lane == Lane::Path
+                && was_double
+                && mouse::double_click_opens_detail(Lane::Path)
+            {
+                // The Path lane has no list rects (selection lives
+                // entirely on `dashboard.next_action`). A double-click
+                // anywhere in the content area runs the Enter handler.
+                action::apply_action(app, runner, action::Action::Enter)?;
+                return Ok(());
+            }
+
+            // Default path: single-click row select / double-click
+            // open detail for Milestones, Backlog, Ideas (the
+            // canonical list-bearing lanes), and single-click row
+            // select for Overview + Settings. `handle_dispatch`
+            // returns true when it consumed the click.
+            if app.content == ContentState::List
+                && mouse::handle_dispatch(app, &view, x, y, was_double)
+            {
+                return Ok(());
             }
         }
         MouseEventKind::Drag(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left) => {
-            // Reserved for S6 (tab-bar scroll) and future drag-to-select.
+            // Up clears the click-history so a click-then-drag-then-
+            // release doesn't accidentally classify as a double.
+            // (A genuine double-click is Down + Down; the Up arm
+            // never fires between them because the user is still
+            // holding the button — the next Down arrives with the
+            // button held and gets classified by Down-handler
+            // sequence.) Reserved for S6 (tab-bar scroll) and
+            // future drag-to-select.
+            app.last_click = None;
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             // M91 S7: wheel up/down scrolls the focused list. When the
@@ -906,6 +998,14 @@ pub fn handle_mouse(
             // the milestone" because `app.move_up` / `app.move_down`
             // already handle the detail scroll case (decrementing
             // `detail_scroll`); only the dispatch gate was wrong.
+            //
+            // M221: extended the gate to all 7 lanes (Milestones,
+            // Backlog, Ideas, Path, Overview, Settings, Autopilot) so
+            // the wheel matches the keyboard-scroll behaviour per
+            // AC-03. `app.move_up` / `app.move_down` already dispatch
+            // per-lane, so the lane-specific scroll bar (Path's
+            // `path_scroll`, Autopilot's picker, Settings's
+            // `selected_idx`) advances on wheel.
             let scrollable = matches!(
                 app.content,
                 ContentState::List
@@ -914,11 +1014,7 @@ pub fn handle_mouse(
                     | ContentState::AnnotationThread
             );
             if y >= 2 && scrollable {
-                match mouse.kind {
-                    MouseEventKind::ScrollUp => app.move_up(),
-                    MouseEventKind::ScrollDown => app.move_down(),
-                    _ => {}
-                }
+                mouse::handle_wheel(app, mouse.kind);
             }
             // Wheel on tab bar / header / non-scrollable content is a no-op.
         }
@@ -978,6 +1074,13 @@ fn apply_scrollbar_track_click(app: &mut App, hit: &ScrollbarHitArea, y: u16) {
 ///
 /// `pub(crate)` so `tui_view_state.rs` can assert the resolution directly
 /// (F-04) without going through the full dispatch path.
+///
+/// M221: kept as a thin wrapper around the new
+/// [`crate::tui::mouse::resolve_list_click`] helper so the
+/// pre-existing in-file unit tests (which assert this exact
+/// signature) keep working unchanged. New dispatch code goes
+/// through `tui::mouse::handle_dispatch` directly.
+#[allow(dead_code)]
 pub(crate) fn resolve_list_click(
     app: &App,
     view: &view_state::ViewState,

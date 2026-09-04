@@ -11,6 +11,7 @@ pub mod lane_cache;
 pub mod markdown;
 pub mod mode;
 pub mod modes;
+pub mod mouse;
 pub mod palette;
 pub mod path_view;
 pub mod progress;
