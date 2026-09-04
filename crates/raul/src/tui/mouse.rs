@@ -283,7 +283,23 @@ fn dispatch_single_click(app: &mut App, row_id: &str) -> bool {
 /// `Down` → `move_down`, modulo the lane-specific rules in
 /// [`crate::tui::runner::handle_mouse`]. Returns `true` when the
 /// event was consumed.
+///
+/// The Autopilot lane is special-cased here: the picker cursor
+/// has no canonical `selected_index` integration (it lives on
+/// `app.autopilot.picker.cursor`), so `move_down` would silently
+/// no-op. The wheel handler dispatches the equivalent of `j`/`k`
+/// directly via `Picker::move_cursor`.
 pub fn handle_wheel(app: &mut App, kind: MouseEventKind) -> bool {
+    if app.active_lane == super::app::Lane::Autopilot {
+        let delta: i64 = match kind {
+            MouseEventKind::ScrollUp => -1,
+            MouseEventKind::ScrollDown => 1,
+            _ => return false,
+        };
+        app.autopilot.picker.move_cursor(delta);
+        app.touch();
+        return true;
+    }
     match kind {
         MouseEventKind::ScrollUp => {
             app.move_up();
