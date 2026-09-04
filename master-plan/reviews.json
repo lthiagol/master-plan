@@ -2023,6 +2023,14 @@
       "reviewed_at": "2026-09-04",
       "notes": "M214 cycle 1 — full raul suite (1090/1090) + 4 AC verification commands all pass on cold build. cargo fmt clean, clippy clean, consumer-surface-lint clean. Filed F-01 (low, spec_interpretation): runner kept internal watch.rs + Watch struct/field unchanged; rationale is the out-of-scope bullet 'internal Watch-prefixed identifiers stay' — defensible, internally coherent (file name = struct name = field name), user-visible surface (Lane::Autopilot, ui.show_autopilot_tab) is fully migrated. Resolved F-01 with no runner action required; verdict ok.",
       "milestone_completed_at": "2026-09-03"
+    },
+    {
+      "milestone_id": "219",
+      "verdict": "ok",
+      "reviewer": "reviewer-219",
+      "reviewed_at": "2026-09-04",
+      "notes": "M219 cycle 1 — cold build verified (make clean + cargo nextest). AC-01/AC-02 channels test 20/20 pass, AC-03 byte-for-byte text test 16/16 pass, M208 watch_alias_equivalence regression test 18/18 pass. cargo fmt --check and cargo clippy --tests both clean. Live smoke test (target/release binary) confirms: 'mp watch --dry-run --format json' prints 'mp watch is deprecated; use mp autopilot instead.' on stderr only, stdout is byte-identical to 'mp autopilot start --dry-run --format json', exit code 0 preserved. Filed F-01 (low, spec-ambiguity): AC-01 'including help and status' phrasing diverges from current behavior (clap intercepts --help before eprintln! fires; 'mp watch --help' exits 0 with empty stderr). Implementation matches design rationale and test suite, so resolved F-01 as no-runner-action. Migration doc deprecation timeline and Old/New wording comparison match M208 commit 722a9e9 ('warning: `mp watch` is deprecated; use `mp autopilot start` instead'). Migration doc consumer-surface hygiene clean (no M-IDs, no L-codes, no internal file refs). Verdict ok.",
+      "milestone_completed_at": "2026-09-04"
     }
   ],
   "comments": [

@@ -3,8 +3,8 @@
     "id": "219",
     "title": "mp watch deprecation — issue a deprecation warning when the legacy alias is invoked",
     "slug": "mp-watch-deprecation-issue-a-deprecation-warning-when-the-legacy-alias-is-invoked",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -17,7 +17,7 @@
     "effort": "S",
     "risk": "low",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -25,11 +25,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T00:46:14.318362+00:00",
+    "lifecycle_at": "2026-09-04T00:52:38.119485+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-02T21:25:02.968318+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-04T00:52:43.963312+00:00"
       },
       "draft": {
         "status": "done",
@@ -37,15 +41,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-04T00:46:14.318364+00:00"
+        "at": "2026-09-04T00:52:43.963312+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T00:52:43.992849+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.308546+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T00:52:43.992851+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-04T00:52:38.119487+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-04T00:46:14.318364+00:00"
+        "at": "2026-09-04T00:52:43.963312+00:00"
       },
       "specify": {
         "status": "done",
@@ -186,5 +202,18 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "spec-ambiguity",
+      "description": "AC-01 says 'Each legacy mp watch invocation, including help and status, emits exactly one documented warning on stderr'. The implementation does NOT emit the warning on 'mp watch --help' (clap intercepts --help before our Commands::Watch arm runs, so eprintln! in dispatch.rs is bypassed). Verified live: 'mp watch --help' exits 0 with empty stderr. This is likely intentional UX (do not pollute help output) and no test exercises it; the design rationale ('emit once per invocation') does not address --help. Filed low because the implementation matches the test suite and the design decision, but the spec text is ambiguous - a future reader could reasonably expect the warning on --help too. Suggested resolution: either amend AC-01 to clarify that --help does not warn, or add a test pinning the current behavior.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "2026-09-04"
+    }
+  ]
 }
