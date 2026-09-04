@@ -73,29 +73,29 @@
       "id": "AC-01",
       "description": "Picker renders drivable milestones from `mp list milestones`, filtered to the autopilot-eligible lifecycles; toggle selection preserves insertion order; cursor moves correctly across the list.",
       "verification": "cargo nextest run -p raul --test autopilot_picker --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_picker --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-02",
       "description": "Override panel captures topology, refresh interval, and per-role model/harness/skill/extras. Empty model/skill values mean inherit; unknown harness, invalid topology, malformed extras, and non-positive refresh values are rejected before persistence.",
       "verification": "cargo nextest run -p raul --test autopilot_overrides_validation --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_overrides_validation --no-fail-fast exit 0 (15/15 pass)"
     },
     {
       "id": "AC-03",
       "description": "On Start, overrides persist to the new session and win over project defaults for that session; a second session without overrides uses project defaults. Both effective configurations are asserted through dry-run/session show.",
       "verification": "cargo nextest run -p raul --test autopilot_override_precedence --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_override_precedence --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-04",
       "description": "Past-session mode consumes `mp autopilot session list/show`, never reads plan files directly, and opens a read-only replay shell backed by session events. M216 may enrich the shared detail renderer without being required for this milestone.",
       "verification": "cargo nextest run -p raul --test autopilot_session_replay --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_session_replay --no-fail-fast exit 0 (10/10 pass)"
     }
   ],
   "design_decisions": [
@@ -129,7 +129,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_picker --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 215 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -149,7 +149,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_overrides_validation --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 215 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -170,7 +170,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_override_precedence --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 215 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -191,7 +191,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_session_replay --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 215 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
