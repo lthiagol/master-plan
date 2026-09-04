@@ -67,7 +67,18 @@ fn brownfield_scan_and_doctor_detected() {
     assert_eq!(report["domain"], "api");
     assert!(!report["signals"].as_array().unwrap().is_empty());
 
-    let doctor = env.run(&["doctor", "--project", "--format", "json"]);
+    // CI runners ship without `herdr` on PATH; doctor gates
+    // `report.ok` on the herdr shape check, so the bare
+    // `env.run(["doctor", ...])` would exit non-zero under CI
+    // even though the brownfield detection contract holds.
+    // Stub a herdr that satisfies the `which_herdr` +
+    // `agent start --help` / `pane split --help` shape probes
+    // so the test stays self-contained.
+    let path = crate::common::fake_herdr::install_fake_herdr_for_doctor(&env);
+    let doctor = env.run_with_env(
+        &[("PATH", &path)],
+        &["doctor", "--project", "--format", "json"],
+    );
     assert!(doctor.status.success());
     let doc: serde_json::Value = serde_json::from_slice(&doctor.stdout).unwrap();
     assert_eq!(doc["detected"]["brownfield_likely"], true);
