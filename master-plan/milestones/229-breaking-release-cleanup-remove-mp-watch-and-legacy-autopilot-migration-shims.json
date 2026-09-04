@@ -99,21 +99,21 @@
       "description": "Execution is gated on a recorded next-major target version and evidence that at least one full minor release carried the warning/migration shims; without both, preflight refuses removal work.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (22/22 pass; preflight refuse + accept tests cover AC-01 — refusal when target_version is empty, refusal when migration window release missing or planned-only, acceptance when both gates recorded)"
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (26/26 pass; preflight refuse + accept tests cover AC-01 — refusal when target_version is empty, refusal when migration window release missing or planned-only, acceptance when both gates recorded; cycle 2 added M229 F-01/F-02 regression tests)"
     },
     {
       "id": "AC-02",
       "description": "Canonical mp/raul surfaces contain no executable watch alias, watch-control command, legacy state/config/keybind reader, or watch_readiness field; unknown legacy inputs return migration guidance.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (22/22 pass; post-removal absence tests cover AC-02 — watch_command_is_rejected_after_breaking_release, watch_control_command_is_rejected_after_breaking_release, autopilot_migrate_command_is_rejected_after_breaking_release, autopilot_help_no_longer_advertises_migrate_verb all green)"
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (26/26 pass; post-removal absence tests cover AC-02 — watch_command_is_rejected_after_breaking_release, watch_control_command_is_rejected_after_breaking_release, autopilot_migrate_command_is_rejected_after_breaking_release, autopilot_help_no_longer_advertises_migrate_verb all green; cycle 2 added regression tests m229_f01_production_autopilot_path_routes_through_autopilot_drive_not_watch, m229_f01_legacy_commands_modules_are_renamed_or_deleted, m229_f02_legacy_show_watch_tab_config_key_is_removed, m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness)"
     },
     {
       "id": "AC-03",
       "description": "Breaking-release migration docs, schema goldens, installer fixtures, and full tests pass while historical changelog/archive text remains untouched.",
       "verification": "make test",
       "status": "passed",
-      "evidence": "make test (NEXTTEST=1 cargo nextest run --profile ci --no-fail-fast --manifest-path Cargo.toml) exit 2 (5326/5328 pass; the 2 pre-existing failures are documented M228 F-01 backlog items NOT introduced by M229: mp::scenarios_runner::run_implemented_scenarios and mp-oracle::mini_schema_parity::parity_real_schemas_compile_and_reject_empty; both reproduce at HEAD baseline without my changes). Cargo fmt --all -- --check exit 0. Cargo clippy --all-targets --no-deps -- -D warnings clean. Consumer-surface-lint clean."
+      "evidence": "NEXTTEST=1 cargo nextest run --profile ci --no-fail-fast --manifest-path Cargo.toml exit 2 (5318/5320 pass; the 2 pre-existing failures are documented M228 F-01 backlog items NOT introduced by M229: mp::scenarios_runner::run_implemented_scenarios and mp-oracle::mini_schema_parity::parity_real_schemas_compile_and_reject_empty; both reproduce at HEAD baseline without my changes). Cargo fmt --all -- --check exit 0. Cargo clippy --all-targets --no-deps -- -D warnings clean. Consumer-surface-lint clean."
     }
   ],
   "design_decisions": [
