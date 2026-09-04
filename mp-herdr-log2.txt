@@ -1255,3 +1255,106 @@ The skill would encode:
 ### Going idle
 
 10/10 batch done. Closing the M214 tab. The autopilot foundation is complete and certified.
+
+---
+
+## 2026-09-03 ~19:00 — SESSION 3 RETROSPECTIVE — 8/8 done, autopilot follow-on batch complete
+
+### Aggregate stats
+
+| M | Status | Cycles | Findings | Commits | Severity (highest) |
+|---|---|---|---|---|---|
+| M219 | complete/verified | 1 | 1 LOW (spec-ambiguity, no-op) | 8 | LOW |
+| M215 | complete/verified | 2 (1 reject) | F-01 HIGH (no production caller) | 14 | HIGH |
+| M221 | complete/verified | 2 (1 reject) | F-01 MEDIUM (AC over-claim) + 3 LOW (no-op) | 14 | MEDIUM |
+| M222 | complete/verified | 3 (1 reject + 1 cycle 3 reject on test strength) | F-01+F-02 HIGH (no production caller) + F-03 HIGH (test gap) | 17 | HIGH |
+| M216 | complete/verified | 2 (1 reject on cargo fmt) | 1 MEDIUM (F-04: cargo fmt) | 11 | MEDIUM |
+| M217 | complete/verified | 2 (1 reject) | F-01 MEDIUM (AC-03 keybind text) | 12 | MEDIUM |
+| M228 | complete/verified | 1 | F-01 LOW (3 pre-existing mp failures documented) | 14 | LOW |
+| M229 | complete/verified | 4 (3 reject: 2 production-wiring + 1 test-strength + 1 cargo fmt) | F-01 HIGH + F-02 MEDIUM + F-03 HIGH (test) + F-05 HIGH (test) | 18 | HIGH |
+| **TOTAL** | **8/8** | **17 review cycles** | **11 fixed** | **~108** | |
+
+Cycle budget used: 17 of 32 possible (8 milestones × 4 max). 53% of the hard cap.
+
+### Cycle distribution
+
+- **1 cycle (clean)**: M219, M228 (2 milestones)
+- **2 cycles (1 reject)**: M215, M221, M216, M217 (4 milestones)
+- **3 cycles**: M222 (1 reject cycle 1, 1 reject cycle 2 on test strength)
+- **4 cycles**: M229 (3 rejects: production wiring cycle 2, test strength cycle 3, cargo fmt cycle 4)
+
+### Reviewer-caught real bug rate
+
+- **5 of 8 milestones** had reviewer-caught real bugs triggering cycle 2+ (M215, M221, M222, M216, M217, M229 = 6 actually, but M228 only had 1 LOW backlog). 75% rate.
+- **All caught on cold build** — the runner's incremental build missed them every time.
+
+### Patterns reinforced (now 5th occurrence of the M225/M226 family)
+
+The "no production caller" pattern (typed library, never wired into production hot path) was caught in:
+- **M215** F-01 (picker/override panel/replay shell never wired)
+- **M222** F-01+F-02 (keybinds loader + Settings keybinds view never wired)
+- **M229** F-01+F-02 (autopilot_start delegation + ui.show_watch_tab fallback still in production)
+
+The "test gap" sub-pattern (regression tests pass for the wrong reasons — they call the library, not the production path) was caught in:
+- **M222** F-03 (startup loader tests called `load_effective` directly, not `load_layered`)
+- **M229** F-03+F-05 (F-01 wiring test + F-02 readiness test didn't exercise production path)
+
+This is the **M207/M208/M210 F-01 lesson at scale** — it keeps recurring because the runner's discipline is "implement the spec" but the spec doesn't say "wire to production."
+
+### Discipline failures caught (R14 + M216)
+
+The runner's pre-notify gate failed 3 times in this batch:
+- **M222 cycle 1**: runner skipped `mp milestone complete 222` (orchestrator fixed as R-late manual state fix)
+- **M216 cycle 1**: `cargo fmt --all -- --check` failed because runner ran `cargo fmt --all` (write) before final commit, not after
+- **M229 cycle 3**: duplicate `#[test]` attribute in strengthened test (same M216 lesson — check must be the LAST command before notify)
+- **M229 cycle 4**: also a fmt issue, fixed in cycle 4
+
+This is now a 4-occurrence pattern. The runner contract's pre-notify gate should be amended to require:
+1. `cargo fmt --all -- --check` as the LAST command before notify (after all commits, not before)
+2. `mp milestone complete <id>` as part of the gate (verify lifecycle transition happened)
+3. `git log --oneline -1` to verify the runner didn't skip a commit
+
+### F-02 pre-empt count
+
+8 of 8 autopilot milestones in session 3 needed F-02 pre-empts. Total pre-empts across all 3 sessions: ~17 (1 in session 1, 8 in session 2's 10-milestone batch, 8 in session 3's 8-milestone batch). 100% of autopilot specs since 09412e2.
+
+### Notable
+
+- **M229 hit the hard limit (cycle 4)** — first time in any session. The combination of 2 production-wiring fixes (F-01+F-02 in cycle 2) + 2 test-strength fixes (F-03+F-05 in cycle 3) + 1 cargo fmt fix (cycle 4) exhausted the cycle budget. The substantive work was correct by cycle 2; cycles 3 and 4 were test-quality and discipline fixes.
+
+- **3 pre-existing mp test failures** confirmed at c2ebe69 (M217 merge): migrate idempotent re-run, scenarios_runner golden drift, oracle mini_schema_parity. Filed as dogfood entry 50. Not M217/M228/M229 regressions.
+
+- **`mp reviews pass` not called for M229** (until cycle 4) — the milestone was at terminal state but reviews.json was missing the record. The cycle 4 reviewer finally called it, recording the verdict.
+
+- **Runner's contract-conflict flag at M217 cycle 3** (called `mp reviews finding resolve` despite cycle 1 deny-list) — runner correctly noted the conflict and followed the more recent cycle 3 prompt instruction. The contract model needs to be amended: cycle N prompt can authorize calls that cycle 1 prompt denied, when the cycle N context requires it.
+
+### Final state
+
+- **8/8 milestones complete/verified** in session 3
+- **Branch `wip` is 275 commits ahead of `origin/wip`** (approximate)
+- **Working tree clean** (except the uncommitted log entry I'm appending now)
+- **Dogfood log**: 6 entries (48, 47, 46, 45, 49, 50 new)
+- **Original autopilot batch (M207-M229)**: 23 milestones, all complete/verified across sessions 1+2+3
+
+### Forward-looking
+
+With M229 done, the autopilot batch is COMPLETE. The remaining milestones in the plan are:
+- M207-M229 all done
+- All other milestones at lifecycle=complete
+- Only M174 is cancelled
+
+The next batch of work is **the next autopilot milestone set** (M215-M217 are already done; what's next?). Looking at the autopilot set:
+- Done: M207-M229
+- Next: M210 was done; M214 was done; M215-M229 done
+
+So all 23 autopilot milestones are done. The next batch would be **post-cutover work** (M228 is "post-cutover internal cleanup" — already done; M229 is "breaking-release cleanup" — already done).
+
+What's left in the broader plan? Let me check.
+
+Actually, the original mp-herdr-log2.txt session mentioned the user wanted to drive M208, M210, M218, M220, M227, M223, M224, M225, M226, M214, M215, M216, M217, M219, M221, M222, M228, M229 — all done in sessions 2+3. The autopilot set is complete.
+
+Beyond autopilot, the user's plan is just regular milestones. With the autopilot foundation shipped + certified + breaking-released, the project's next steps are downstream consumers (e.g., real milestones that use `mp autopilot start`).
+
+### Going idle
+
+8/8 batch done. The autopilot follow-on work is complete. Going to file a final closeout entry in the log and report to the user.
