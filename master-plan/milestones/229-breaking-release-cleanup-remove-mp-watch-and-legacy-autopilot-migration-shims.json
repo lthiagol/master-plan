@@ -3,9 +3,9 @@
     "id": "229",
     "title": "breaking-release cleanup — remove mp watch and legacy autopilot migration shims",
     "slug": "breaking-release-cleanup-remove-mp-watch-and-legacy-autopilot-migration-shims",
-    "lifecycle": "remediation",
-    "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -27,8 +27,7 @@
     "blocked_by": "",
     "target_version": "3.0.0",
     "executed_by": "",
-    "remediation_pre_state": "complete",
-    "lifecycle_at": "2026-09-04T08:39:33.766339+00:00",
+    "lifecycle_at": "2026-09-04T09:32:07.909925+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -37,6 +36,10 @@
       "complete": {
         "status": "done",
         "at": "2026-09-04T08:18:44.832965+00:00"
+      },
+      "document": {
+        "status": "done",
+        "at": "2026-09-04T09:32:07.927066+00:00"
       },
       "draft": {
         "status": "done",
@@ -54,9 +57,13 @@
         "status": "done",
         "at": "2026-09-03T14:16:28.403134+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T09:32:07.909926+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-04T08:39:33.766340+00:00"
+        "status": "done",
+        "at": "2026-09-04T09:32:07.909926+00:00"
       },
       "self-review": {
         "status": "done",
@@ -210,11 +217,11 @@
       "severity": "high",
       "category": "spec-gap",
       "description": "AC-02 remains violated in the canonical runtime path. cmd_autopilot_start delegates directly to commands/watch.rs::cmd_watch, whose implementation still owns the legacy watch driver and writes the .mp/watch.state.json state. Canonical autopilot status/stop/output/result delegate to commands/watch_control.rs and WatchRunState over that same legacy file, while execution.rs still exports the forbidden watch_readiness field. Removing only the Clap variants hides the aliases but leaves production autopilot dependent on the removed legacy state/control implementation and exposes the forbidden compatibility field. Refactor the canonical autopilot path onto canonical session/state/readiness surfaces and remove the legacy path.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "115c7a6",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "anchor": {
         "path": "crates/mp/src/commands/autopilot.rs",
         "new_range": {
@@ -230,11 +237,11 @@
       "severity": "medium",
       "category": "spec-gap",
       "description": "AC-02 also leaves the explicitly scoped legacy configuration and role/keybind readers in production. mp ProjectConfig and config commands still expose ui.show_watch_tab; raul UiConfig::from_config_payload falls back from show_autopilot_tab to that legacy key; autopilot role resolution still maps the orchestrator to agent.coordinator through resolve_with_legacy_fallback; and raul still layers the project [keybinds] section. M229 scope explicitly requires removing ui.show_watch_tab, the agent.coordinator role fallback, and the project keybinds fallback, while migration.md claims those surfaces are removed. Remove these readers/fallbacks and make unknown legacy inputs follow the required migration guidance.",
-      "status": "open",
+      "status": "fixed",
       "author": "",
-      "fixed_in": "",
+      "fixed_in": "a7eaeff",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "anchor": {
         "path": "crates/mp/src/config.rs",
         "new_range": {
