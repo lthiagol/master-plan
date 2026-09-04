@@ -3,9 +3,9 @@
     "id": "221",
     "title": "raul TUI mouse support — click and double-click across all lanes (Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot)",
     "slug": "raul-tui-mouse-support-click-and-double-click-across-all-lanes-milestones-backlog-ideas-path-overview-settings-autopilot",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -18,7 +18,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-03",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -26,7 +26,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T01:54:35.291331+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-04T02:03:54.749345+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -40,9 +41,17 @@
         "status": "done",
         "at": "2026-09-04T01:54:35.291333+00:00"
       },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T02:03:54.749346+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:00:52.184490+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-04T02:03:54.749346+00:00"
       },
       "self-review": {
         "status": "done",
@@ -296,5 +305,87 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "category": "spec_gap",
+      "description": "AC-01 description, docs/tui/usage.md lines 35-38, and the test name click_on_settings_row_updates_selected_idx all claim that Settings single-click selects the visible row. The implementation deliberately defers Settings click selection to a future M222 follow-up: crates/raul/src/tui/mouse.rs:dispatch_single_click returns false for Lane::Settings (line 270-277) with a comment that 'the renderer does not emit per-row hit areas for Settings yet'. The test body itself (suite_mouse_lanes.rs:269-287) only asserts no-crash and Settings state survival, not that state.selected_idx changes. Net effect: AC-01 promises 'click selects across ... Settings ...' but the implementation delivers a no-op. Fix: either implement Settings click-to-select in M221 (renderer emits Settings row hit areas + dispatch_single_click mutates settings.selected_idx), or tighten AC-01 + docs/tui/usage.md to say Settings click selection is deferred to M222. Reproducer: cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast passes 7/7 but the Settings test is a no-crash smoke test, not a behavior assertion.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/src/tui/mouse.rs",
+        "new_range": {
+          "start_line": 270,
+          "end_line": 270
+        },
+        "side": "new"
+      },
+      "summary": "AC-01 + docs over-claim Settings click selection; impl is no-op"
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "category": "test_gap",
+      "description": "AC-02 description names Path as one of the five detail-bearing double-click lanes ('Milestones, Backlog, Ideas, Path, and Autopilot'). The implementation is wired at crates/raul/src/tui/runner.rs:950-959 (Lane::Path + was_double + double_click_opens_detail(Lane::Path) -> apply_action(Action::Enter)). However, crates/raul/tests/suite_mouse_details.rs has NO Path double-click test — only Milestones, Backlog, Ideas, Autopilot have detail-open tests, plus Overview/Settings negative tests. This is a test gap that risks silent regression if the Path branch in handle_mouse is removed or refactored. Fix: add a Path double-click test that seeds dashboard.next_action and asserts that the action dispatch drills into the milestone detail (the keyboard Enter equivalent). Repro: rg 'double_click.*path|Lane::Path' crates/raul/tests/suite_mouse_details.rs returns no matches.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/src/tui/runner.rs",
+        "new_range": {
+          "start_line": 950,
+          "end_line": 950
+        },
+        "side": "new"
+      },
+      "summary": "Path double-click detail-open has no test pinning it"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "category": "spec_imprecision",
+      "description": "AC-01 description lists Path in 'selects the correct visible row across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot'. However, the implementation deliberately scopes Path click to detail-open only (no selection row exists — Path has no list_item_rects, selection lives on dashboard.next_action as a single string). The test click_on_path_lane_does_not_change_selection_when_no_next_action (suite_mouse_lanes.rs:245-265) explicitly asserts selected_index is unchanged on Path click and the test docstring states 'the spec scopes Path click to detail-open, not selection — see S3'. docs/tui/usage.md:35-38 echoes the same misclassification. Fix: tighten AC-01 to 'single click selects the visible row across Milestones, Backlog, Ideas, Overview, and Autopilot (Path click is detail-open only)'. Same fix for docs/tui/usage.md line 35. Severity low because the implementation matches the runner's interpretation and the behavior is documented in code/test comments, but the AC text is loose.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/tests/suite_mouse_lanes.rs",
+        "new_range": {
+          "start_line": 245,
+          "end_line": 245
+        },
+        "side": "new"
+      },
+      "summary": "AC-01 imprecisely lists Path in click-to-select; Path click is detail-only"
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "category": "test_weakness",
+      "description": "crates/raul/tests/suite_mouse_scroll.rs:233-259 wheel_on_settings_advances_selected_idx has a loose assertion: it checks 'selected_idx >= before' instead of 'selected_idx > before'. With before=0 and SETTINGS_KEYS having 15+ entries (settings.rs:16), the test passes whether wheel on Settings actually advances selected_idx or not — a no-op implementation would still satisfy '>= 0'. The test comment says 'We only assert no panic here — Settings wheel support is a forward-looking nicety', which is honest but the test NAME promises 'advances'. The production hot path is correct (crates/raul/src/tui/app.rs:989-1001 / 1151-1166 handle Settings in move_up/move_down, which the wheel handler calls), so this is purely a regression-guard weakness, not a behavior bug. Fix: tighten the assertion to '> before' (with appropriate seed state), or rename the test to wheel_on_settings_does_not_regress_selected_idx.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/tests/suite_mouse_scroll.rs",
+        "new_range": {
+          "start_line": 252,
+          "end_line": 252
+        },
+        "side": "new"
+      },
+      "summary": "wheel_on_settings_advances_selected_idx assertion is weak (>=, not >)"
+    }
+  ]
 }
