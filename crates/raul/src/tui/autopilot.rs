@@ -1992,7 +1992,9 @@ impl AcDetail {
     /// The payload's `session.queue[i].ac_pass_fail[]`
     /// block carries one entry per AC: `{ id, status,
     /// evidence }`. We pick the entry matching the
-    /// active milestone.
+    /// active milestone. Returns `None` when the
+    /// active milestone has no `ac_pass_fail` block or
+    /// the block is empty.
     pub fn from_payload(payload: &Value) -> Option<Self> {
         let milestone_id = payload
             .get("session")
@@ -2000,7 +2002,7 @@ impl AcDetail {
             .and_then(|w| w.get("milestone_id"))
             .and_then(|v| v.as_str())
             .map(|s| s.trim_start_matches('M').to_string())?;
-        let rows: Vec<AcDetailRow> = payload
+        let rows: Option<Vec<AcDetailRow>> = payload
             .get("session")
             .and_then(|s| s.get("queue"))
             .and_then(|v| v.as_array())
@@ -2048,8 +2050,11 @@ impl AcDetail {
                 // pending ACs render neutral.
                 rows.sort_by(|a, b| sort_key(&a.status).cmp(&sort_key(&b.status)));
                 rows
-            })
-            .unwrap_or_default();
+            });
+        let rows = rows?;
+        if rows.is_empty() {
+            return None;
+        }
         Some(Self { milestone_id, rows })
     }
 
@@ -2090,7 +2095,7 @@ impl AcDetail {
     pub fn render_to_string(&self, viewport_h: usize) -> String {
         let mut out = String::new();
         out.push_str(&format!(
-            " ACs ({} / {}) \n",
+            "ACs ({} / {})\n",
             self.passed(),
             self.total(),
         ));
@@ -2109,7 +2114,7 @@ impl AcDetail {
         }
         if self.rows.len() > viewport_h {
             out.push_str(&format!(
-                " ... ({} more) \n",
+                " ... ({} more)\n",
                 self.rows.len() - viewport_h
             ));
         }

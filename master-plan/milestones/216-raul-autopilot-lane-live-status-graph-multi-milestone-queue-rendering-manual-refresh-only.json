@@ -117,8 +117,8 @@
       "id": "AC-07",
       "description": "Per-AC visualization: in the per-milestone detail view, below the cycle-flow timeline, render an `ACs (passed / total)` row-by-row breakdown sourced from session.json `queue[i].ac_pass_fail`. Each row shows AC id + description (truncated) + status (passed / failed / pending) + the stamped evidence string. Failed ACs are visually distinct (red marker); pending ACs are neutral. The list scrolls if it overflows the panel. Golden-file tests cover the three status paths and overflow scrolling.",
       "verification": "cargo nextest run -p raul --test autopilot_ac_detail --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_ac_detail --no-fail-fast exit 0 (11/11 pass)"
     },
     {
       "id": "AC-08",
@@ -282,7 +282,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_ac_detail --no-fail-fast",
       "done_when": "AC-07 evidence is stamped via `mp milestone criterion pass 216 AC-07 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
