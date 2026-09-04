@@ -1359,7 +1359,7 @@ impl Keybinds {
         // Globals first — matches the resolution order of
         // `Keybinds::resolve`.
         for name in Self::global_action_names() {
-            let effective = Self::extract_global(&self, name)
+            let effective = Self::extract_global(self, name)
                 .cloned()
                 .unwrap_or_default();
             let default = Self::extract_global(&defaults, name)
@@ -1581,10 +1581,7 @@ impl Keybinds {
             ));
         }
         let ap = [
-            (
-                "select",
-                defaults.lane_autopilot.select.as_slice(),
-            ),
+            ("select", defaults.lane_autopilot.select.as_slice()),
             (
                 "move_picker_up",
                 defaults.lane_autopilot.move_picker_up.as_slice(),
@@ -1671,12 +1668,8 @@ impl Keybinds {
         let known_autopilot: std::collections::HashSet<&'static str> =
             Self::autopilot_action_names().iter().copied().collect();
 
-        let reserved_recovery: std::collections::HashSet<&'static str> = [
-            "escape",
-            "quit",
-        ]
-        .into_iter()
-        .collect();
+        let reserved_recovery: std::collections::HashSet<&'static str> =
+            ["escape", "quit"].into_iter().collect();
 
         for (section, lines) in sections.sections {
             // A malformed section header (`[bad`) was already
@@ -1692,7 +1685,7 @@ impl Keybinds {
                 // Unknown section header — emit a diagnostic.
                 diags.push(Diagnostic {
                     field: format!("[{}]", section),
-                    message: format!("unknown section; valid sections: [global], [autopilot]"),
+                    message: "unknown section; valid sections: [global], [autopilot]".to_string(),
                 });
                 continue;
             };
@@ -1713,7 +1706,7 @@ impl Keybinds {
                 if !known.contains(name) {
                     diags.push(Diagnostic {
                         field: format!("{}.{}", section, name),
-                        message: format!("unknown action; cannot shadow existing actions"),
+                        message: "unknown action; cannot shadow existing actions".to_string(),
                     });
                     continue;
                 }
@@ -1729,7 +1722,9 @@ impl Keybinds {
                     None => {
                         diags.push(Diagnostic {
                             field: format!("{}.{}", section, name),
-                            message: format!("invalid value: {value:?} (expected string or array of strings)"),
+                            message: format!(
+                                "invalid value: {value:?} (expected string or array of strings)"
+                            ),
                         });
                         continue;
                     }
@@ -1796,9 +1791,7 @@ impl Keybinds {
     pub fn load_from_path(path: &std::path::Path) -> (Vec<Diagnostic>, Self) {
         match std::fs::read_to_string(path) {
             Ok(text) => Self::load_from_keybinds_toml(&text),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                (Vec::new(), Self::default())
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Vec::new(), Self::default()),
             Err(e) => {
                 let mut diags = Vec::new();
                 diags.push(Diagnostic {
@@ -1817,7 +1810,9 @@ impl Keybinds {
     pub fn default_path() -> std::path::PathBuf {
         if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
             if !xdg.is_empty() {
-                return std::path::PathBuf::from(xdg).join("raul").join("keybinds.toml");
+                return std::path::PathBuf::from(xdg)
+                    .join("raul")
+                    .join("keybinds.toml");
             }
         }
         if let Ok(home) = std::env::var("HOME") {
@@ -1911,8 +1906,7 @@ impl Keybinds {
             .unwrap_or(false);
         if hint_emitted {
             if let Some(json) = json_config {
-                let (legacy_diags, after_legacy) =
-                    Self::apply_legacy_json_overlay(&kb, json);
+                let (legacy_diags, after_legacy) = Self::apply_legacy_json_overlay(&kb, json);
                 kb = after_legacy;
                 diags.extend(legacy_diags);
             }
@@ -1960,10 +1954,7 @@ impl Keybinds {
     /// Apply the user-level TOML overlay onto a baseline
     /// `Keybinds`. Returns the resulting `Keybinds` and any
     /// diagnostics.
-    fn apply_keybinds_toml_overlay(
-        baseline: &Self,
-        text: &str,
-    ) -> (Vec<Diagnostic>, Self) {
+    fn apply_keybinds_toml_overlay(baseline: &Self, text: &str) -> (Vec<Diagnostic>, Self) {
         // The TOML loader builds a fresh default and applies
         // the parsed overrides. To layer atop the baseline, we
         // merge: every field the user didn't touch in TOML
@@ -1976,47 +1967,122 @@ impl Keybinds {
         // re-declared the default and the baseline value
         // should win (preserves fallback for any earlier
         // legacy override on the same action).
-        if candidate.quit != Self::default().quit { kb.quit = candidate.quit; }
-        if candidate.up != Self::default().up { kb.up = candidate.up; }
-        if candidate.down != Self::default().down { kb.down = candidate.down; }
-        if candidate.page_up != Self::default().page_up { kb.page_up = candidate.page_up; }
-        if candidate.page_down != Self::default().page_down { kb.page_down = candidate.page_down; }
-        if candidate.enter != Self::default().enter { kb.enter = candidate.enter; }
-        if candidate.escape != Self::default().escape { kb.escape = candidate.escape; }
-        if candidate.help != Self::default().help { kb.help = candidate.help; }
-        if candidate.filter != Self::default().filter { kb.filter = candidate.filter; }
-        if candidate.hide_done != Self::default().hide_done { kb.hide_done = candidate.hide_done; }
-        if candidate.create_annotation != Self::default().create_annotation { kb.create_annotation = candidate.create_annotation; }
-        if candidate.resolve != Self::default().resolve { kb.resolve = candidate.resolve; }
-        if candidate.reopen != Self::default().reopen { kb.reopen = candidate.reopen; }
-        if candidate.approve != Self::default().approve { kb.approve = candidate.approve; }
-        if candidate.review_menu != Self::default().review_menu { kb.review_menu = candidate.review_menu; }
-        if candidate.open_settings != Self::default().open_settings { kb.open_settings = candidate.open_settings; }
-        if candidate.previous_lane != Self::default().previous_lane { kb.previous_lane = candidate.previous_lane; }
-        if candidate.next_lane != Self::default().next_lane { kb.next_lane = candidate.next_lane; }
-        if candidate.focus_content != Self::default().focus_content { kb.focus_content = candidate.focus_content; }
-        if candidate.refresh != Self::default().refresh { kb.refresh = candidate.refresh; }
-        if candidate.next_section != Self::default().next_section { kb.next_section = candidate.next_section; }
-        if candidate.prev_section != Self::default().prev_section { kb.prev_section = candidate.prev_section; }
-        if candidate.next_item != Self::default().next_item { kb.next_item = candidate.next_item; }
-        if candidate.prev_item != Self::default().prev_item { kb.prev_item = candidate.prev_item; }
-        if candidate.lifecycle_filter != Self::default().lifecycle_filter { kb.lifecycle_filter = candidate.lifecycle_filter; }
-        if candidate.grooming_preset != Self::default().grooming_preset { kb.grooming_preset = candidate.grooming_preset; }
-        if candidate.search != Self::default().search { kb.search = candidate.search; }
-        if candidate.cycle_sort != Self::default().cycle_sort { kb.cycle_sort = candidate.cycle_sort; }
-        if candidate.clear_filters != Self::default().clear_filters { kb.clear_filters = candidate.clear_filters; }
+        if candidate.quit != Self::default().quit {
+            kb.quit = candidate.quit;
+        }
+        if candidate.up != Self::default().up {
+            kb.up = candidate.up;
+        }
+        if candidate.down != Self::default().down {
+            kb.down = candidate.down;
+        }
+        if candidate.page_up != Self::default().page_up {
+            kb.page_up = candidate.page_up;
+        }
+        if candidate.page_down != Self::default().page_down {
+            kb.page_down = candidate.page_down;
+        }
+        if candidate.enter != Self::default().enter {
+            kb.enter = candidate.enter;
+        }
+        if candidate.escape != Self::default().escape {
+            kb.escape = candidate.escape;
+        }
+        if candidate.help != Self::default().help {
+            kb.help = candidate.help;
+        }
+        if candidate.filter != Self::default().filter {
+            kb.filter = candidate.filter;
+        }
+        if candidate.hide_done != Self::default().hide_done {
+            kb.hide_done = candidate.hide_done;
+        }
+        if candidate.create_annotation != Self::default().create_annotation {
+            kb.create_annotation = candidate.create_annotation;
+        }
+        if candidate.resolve != Self::default().resolve {
+            kb.resolve = candidate.resolve;
+        }
+        if candidate.reopen != Self::default().reopen {
+            kb.reopen = candidate.reopen;
+        }
+        if candidate.approve != Self::default().approve {
+            kb.approve = candidate.approve;
+        }
+        if candidate.review_menu != Self::default().review_menu {
+            kb.review_menu = candidate.review_menu;
+        }
+        if candidate.open_settings != Self::default().open_settings {
+            kb.open_settings = candidate.open_settings;
+        }
+        if candidate.previous_lane != Self::default().previous_lane {
+            kb.previous_lane = candidate.previous_lane;
+        }
+        if candidate.next_lane != Self::default().next_lane {
+            kb.next_lane = candidate.next_lane;
+        }
+        if candidate.focus_content != Self::default().focus_content {
+            kb.focus_content = candidate.focus_content;
+        }
+        if candidate.refresh != Self::default().refresh {
+            kb.refresh = candidate.refresh;
+        }
+        if candidate.next_section != Self::default().next_section {
+            kb.next_section = candidate.next_section;
+        }
+        if candidate.prev_section != Self::default().prev_section {
+            kb.prev_section = candidate.prev_section;
+        }
+        if candidate.next_item != Self::default().next_item {
+            kb.next_item = candidate.next_item;
+        }
+        if candidate.prev_item != Self::default().prev_item {
+            kb.prev_item = candidate.prev_item;
+        }
+        if candidate.lifecycle_filter != Self::default().lifecycle_filter {
+            kb.lifecycle_filter = candidate.lifecycle_filter;
+        }
+        if candidate.grooming_preset != Self::default().grooming_preset {
+            kb.grooming_preset = candidate.grooming_preset;
+        }
+        if candidate.search != Self::default().search {
+            kb.search = candidate.search;
+        }
+        if candidate.cycle_sort != Self::default().cycle_sort {
+            kb.cycle_sort = candidate.cycle_sort;
+        }
+        if candidate.clear_filters != Self::default().clear_filters {
+            kb.clear_filters = candidate.clear_filters;
+        }
         // Per-lane: the autopilot lane is the only per-lane
         // surface in v1 — apply candidate fields straight
         // through. The TOML parser only writes a slot when
         // the user explicitly named it, so unchanged slots
         // stay at the (cloned) baseline.
-        if candidate.lane_autopilot.select != Self::default().lane_autopilot.select { kb.lane_autopilot.select = candidate.lane_autopilot.select; }
-        if candidate.lane_autopilot.move_picker_up != Self::default().lane_autopilot.move_picker_up { kb.lane_autopilot.move_picker_up = candidate.lane_autopilot.move_picker_up; }
-        if candidate.lane_autopilot.move_picker_down != Self::default().lane_autopilot.move_picker_down { kb.lane_autopilot.move_picker_down = candidate.lane_autopilot.move_picker_down; }
-        if candidate.lane_autopilot.toggle_panel != Self::default().lane_autopilot.toggle_panel { kb.lane_autopilot.toggle_panel = candidate.lane_autopilot.toggle_panel; }
-        if candidate.lane_autopilot.start != Self::default().lane_autopilot.start { kb.lane_autopilot.start = candidate.lane_autopilot.start; }
-        if candidate.lane_autopilot.replay != Self::default().lane_autopilot.replay { kb.lane_autopilot.replay = candidate.lane_autopilot.replay; }
-        if candidate.lane_autopilot.close != Self::default().lane_autopilot.close { kb.lane_autopilot.close = candidate.lane_autopilot.close; }
+        if candidate.lane_autopilot.select != Self::default().lane_autopilot.select {
+            kb.lane_autopilot.select = candidate.lane_autopilot.select;
+        }
+        if candidate.lane_autopilot.move_picker_up != Self::default().lane_autopilot.move_picker_up
+        {
+            kb.lane_autopilot.move_picker_up = candidate.lane_autopilot.move_picker_up;
+        }
+        if candidate.lane_autopilot.move_picker_down
+            != Self::default().lane_autopilot.move_picker_down
+        {
+            kb.lane_autopilot.move_picker_down = candidate.lane_autopilot.move_picker_down;
+        }
+        if candidate.lane_autopilot.toggle_panel != Self::default().lane_autopilot.toggle_panel {
+            kb.lane_autopilot.toggle_panel = candidate.lane_autopilot.toggle_panel;
+        }
+        if candidate.lane_autopilot.start != Self::default().lane_autopilot.start {
+            kb.lane_autopilot.start = candidate.lane_autopilot.start;
+        }
+        if candidate.lane_autopilot.replay != Self::default().lane_autopilot.replay {
+            kb.lane_autopilot.replay = candidate.lane_autopilot.replay;
+        }
+        if candidate.lane_autopilot.close != Self::default().lane_autopilot.close {
+            kb.lane_autopilot.close = candidate.lane_autopilot.close;
+        }
         (diags, kb)
     }
 }
@@ -2064,9 +2130,8 @@ pub mod sighup {
         extern "C" fn handler(_sig: libc::c_int) {
             RELOAD_REQUESTED.store(true, Ordering::Relaxed);
         }
-        let prev = unsafe {
-            libc::signal(libc::SIGHUP, handler as *const () as libc::sighandler_t)
-        };
+        let prev =
+            unsafe { libc::signal(libc::SIGHUP, handler as *const () as libc::sighandler_t) };
         if prev == libc::SIG_ERR {
             return Err("failed to install SIGHUP handler".to_string());
         }
