@@ -154,8 +154,7 @@ pub fn mp_flow_stage_index(slug: &str) -> Option<usize> {
 ///   - `reviewed`        → "external-review" (8/12 — passed the review queue)
 ///   - `remediation`     → "remediate"  (9/12)
 ///   - `cancelled`       → "approve"    (4/12 — closed before/at approval;
-///                                        the last stage a legacy cancel
-///                                        could meaningfully reach)
+///     the last stage a legacy cancel could meaningfully reach)
 ///   - `draft` / empty / anything else → "draft" (1/12)
 pub fn legacy_lifecycle_to_mp_flow_stage(lifecycle: &str) -> &'static str {
     match lifecycle {
