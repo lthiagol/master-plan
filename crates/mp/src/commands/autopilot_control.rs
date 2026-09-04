@@ -17,7 +17,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use crate::autopilot::drive::{
-    is_pid_alive, RunOutcome, AutopilotRunState, AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
+    is_pid_alive, AutopilotRunState, RunOutcome, AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
 };
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;

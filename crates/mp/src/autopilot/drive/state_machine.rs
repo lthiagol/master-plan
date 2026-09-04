@@ -22,8 +22,9 @@ use std::path::Path;
 use crate::autopilot::drive::{
     clear_stage_done_sentinel, ensure_pane, lifecycle_advanced_past, pane_label_for,
     read_agent_status, read_custom_status_bounded, read_lifecycle_via_mp, send_prompt,
-    sentinel_matches, LifecycleTarget, PaneHandle, PromptStage, ReadinessOptions, Role, RunOutcome,
-    WaitOptions, WaitOutcome, AutopilotRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS, DEFAULT_PANE_N,
+    sentinel_matches, AutopilotRunState, LifecycleTarget, PaneHandle, PromptStage,
+    ReadinessOptions, Role, RunOutcome, WaitOptions, WaitOutcome, DEFAULT_BRIDGE_POLL_TIMEOUT_MS,
+    DEFAULT_PANE_N,
 };
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
@@ -464,10 +465,9 @@ impl SystemDriveOps {
             .run_state()
             .and_then(|state| state.queue.iter().position(|q| q == &id))
             .unwrap_or(0);
-        self.transition(crate::autopilot::drive::AutopilotRunTransition::ActiveMilestone {
-            index: idx,
-            id,
-        })?;
+        self.transition(
+            crate::autopilot::drive::AutopilotRunTransition::ActiveMilestone { index: idx, id },
+        )?;
         Ok(())
     }
 
@@ -911,10 +911,12 @@ impl DriveOps for SystemDriveOps {
                 // M178 S2: record the pane id in the v2 control-plane state
                 // so `mp watch output` (S7) can address it without scanning
                 // the legacy v1 panes array.
-                self.transition(crate::autopilot::drive::AutopilotRunTransition::PaneObserved {
-                    role,
-                    pane_id: handle.pane_id.clone(),
-                })?;
+                self.transition(
+                    crate::autopilot::drive::AutopilotRunTransition::PaneObserved {
+                        role,
+                        pane_id: handle.pane_id.clone(),
+                    },
+                )?;
                 Ok(handle)
             }
             Err(err) => {
@@ -973,10 +975,9 @@ impl DriveOps for SystemDriveOps {
         });
         let pane_id = pane.pane_id.clone();
         if let Some(role) = pane_role {
-            self.transition(crate::autopilot::drive::AutopilotRunTransition::PaneObserved {
-                role,
-                pane_id,
-            })?;
+            self.transition(
+                crate::autopilot::drive::AutopilotRunTransition::PaneObserved { role, pane_id },
+            )?;
         }
         send_prompt(&self.herdr_bin, pane, text, &self.readiness)
     }
@@ -1016,9 +1017,9 @@ impl DriveOps for SystemDriveOps {
             _ => None,
         };
         if let Some(lc) = new_lifecycle {
-            self.transition(crate::autopilot::drive::AutopilotRunTransition::LifecycleObserved(
-                lc,
-            ))?;
+            self.transition(
+                crate::autopilot::drive::AutopilotRunTransition::LifecycleObserved(lc),
+            )?;
         }
         Ok(())
     }
@@ -1031,7 +1032,9 @@ impl DriveOps for SystemDriveOps {
         // M178 external-review F-01: update the v2 control-plane
         // state with the active stage + target so `mp watch-control
         // status` reads them during a live run.
-        self.transition(crate::autopilot::drive::AutopilotRunTransition::ActiveStage { stage, target })?;
+        self.transition(
+            crate::autopilot::drive::AutopilotRunTransition::ActiveStage { stage, target },
+        )?;
         Ok(())
     }
 }
@@ -1049,12 +1052,14 @@ impl SystemDriveOps {
     ) -> Result<()> {
         let milestone_id = milestone_id.into();
         use crate::autopilot::drive::MilestoneRunOutcome;
-        self.transition(crate::autopilot::drive::AutopilotRunTransition::MilestoneOutcome(
-            MilestoneRunOutcome {
-                id: milestone_id.clone(),
-                outcome: outcome.clone(),
-            },
-        ))?;
+        self.transition(
+            crate::autopilot::drive::AutopilotRunTransition::MilestoneOutcome(
+                MilestoneRunOutcome {
+                    id: milestone_id.clone(),
+                    outcome: outcome.clone(),
+                },
+            ),
+        )?;
         Ok(())
     }
 }

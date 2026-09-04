@@ -56,7 +56,7 @@ fn keep_and_shorten_inventory_comments_are_tag_free() {
             &["Empty-phase findings count as self-review"][..],
         ),
         (
-            "crates/mp/src/autopilot/drive/run_state.rs",
+            "crates/mp/src/autopilot/drive/run_state_v2.rs",
             &["A schema-version mismatch on a *future*"][..],
         ),
         (

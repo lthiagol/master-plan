@@ -11,7 +11,7 @@ use mp::autopilot::drive::{DriveLogEntry, DriveLogger};
 #[test]
 fn open_creates_parent_dir_and_appends_entries_as_jsonl() {
     let env = tempfile::TempDir::new().unwrap();
-    let log_path = env.path().join("nested/dir/watch.log");
+    let log_path = env.path().join("nested/dir/autopilot.log");
     let logger = DriveLogger::open(&log_path).unwrap();
 
     logger
@@ -49,7 +49,7 @@ fn open_creates_parent_dir_and_appends_entries_as_jsonl() {
 #[test]
 fn log_records_timestamps_in_rfc3339() {
     let env = tempfile::TempDir::new().unwrap();
-    let log_path = env.path().join("watch.log");
+    let log_path = env.path().join("autopilot.log");
     let logger = DriveLogger::open(&log_path).unwrap();
     logger.log(&DriveLogEntry::new("test", "ts")).unwrap();
     let text = std::fs::read_to_string(&log_path).unwrap();
@@ -79,7 +79,7 @@ fn in_memory_logger_captures_entries_in_order() {
 #[test]
 fn path_helper_returns_the_opened_path() {
     let env = tempfile::TempDir::new().unwrap();
-    let log_path = env.path().join("watch.log");
+    let log_path = env.path().join("autopilot.log");
     let logger = DriveLogger::open(&log_path).unwrap();
     assert_eq!(logger.path(), log_path);
 }
@@ -96,6 +96,6 @@ fn default_watch_log_path_lives_under_plan_dir_mp_subdir() {
     logger
         .log(&DriveLogEntry::new("boot", "watch starting"))
         .unwrap();
-    assert!(log_path.ends_with(".mp/watch.log"));
+    assert!(log_path.ends_with(".mp/autopilot.log"));
     assert!(log_path.is_file());
 }

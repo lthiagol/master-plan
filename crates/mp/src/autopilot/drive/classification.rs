@@ -58,7 +58,10 @@ pub struct StatusReport {
 /// Classify the latest state into live/stale/terminal. The herdr
 /// list is optional; pass `None` when herdr is unavailable and the
 /// PID probe alone drives the verdict.
-pub fn classify_state(state: Option<&AutopilotRunState>, herdr_list_json: Option<&str>) -> RunState {
+pub fn classify_state(
+    state: Option<&AutopilotRunState>,
+    herdr_list_json: Option<&str>,
+) -> RunState {
     let Some(state) = state else {
         // No state file → no recorded run. The caller reports this
         // as `null` (or treats it as terminal-idle); we map it to

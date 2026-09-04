@@ -36,14 +36,19 @@ pub struct UiConfig {
     /// is read-only on mp config — the flag is loaded once at startup
     /// via `UiConfig::load` and never written back.
     pub review_hunk_enabled: bool,
-    /// M198 / M214: the `ui.show_autopilot_tab` flag read from mp's
-    /// project config (renamed from `ui.show_watch_tab` in M214). When
-    /// true, raul's tab bar includes the Autopilot lane; when false
-    /// (the default), the Autopilot lane is filtered out of the tab
-    /// bar, the hit-test areas, and the prev/next navigation. Loaded
-    /// once at startup; restart raul to pick up mid-session changes.
-    /// Independent of `mp autopilot` — the `mp` binary's `mp autopilot`
-    /// command always works regardless of this flag.
+    /// M198 / M214 / M229: the `ui.show_autopilot_tab` flag read
+    /// from mp's project config. When true, raul's tab bar includes
+    /// the Autopilot lane; when false (the default), the Autopilot
+    /// lane is filtered out of the tab bar, the hit-test areas, and
+    /// the prev/next navigation. Loaded once at startup; restart
+    /// raul to pick up mid-session changes. Independent of
+    /// `mp autopilot` — the `mp` binary's `mp autopilot` command
+    /// always works regardless of this flag.
+    ///
+    /// M229: the legacy `ui.show_watch_tab` back-compat shim was
+    /// removed by the breaking-release cleanup. Adopters with the
+    /// legacy key in their config see `false` after upgrade; the
+    /// Settings tab can re-enable the surface explicitly.
     pub show_autopilot_tab: bool,
 }
 
@@ -73,13 +78,9 @@ impl UiConfig {
     }
 
     /// Parse a `UiConfig` from a raw `mp config show` JSON payload.
-    /// Extracted from [`UiConfig::load`] so the M214 single-read
-    /// back-compat shim (`ui.show_watch_tab` →
-    /// `ui.show_autopilot_tab`) is unit-testable without a real
-    /// `MpRunner`. Public so the migration test in
-    /// `crates/raul/tests/autopilot_settings_key_migration.rs` can
-    /// pin both the legacy-key fallback and the new-key-wins
-    /// precedence.
+    /// Extracted from [`UiConfig::load`] so it is unit-testable
+    /// without a real `MpRunner`. Public so test files can pin the
+    /// canonical key surface.
     pub fn from_config_payload(data: &Value) -> Self {
         let mut cfg = Self::default();
         let ui = &data["config"]["ui"];
@@ -105,18 +106,10 @@ impl UiConfig {
         if let Some(h) = data["config"]["review"]["hunk"].as_bool() {
             cfg.review_hunk_enabled = h;
         }
-        // M198 / M214: read `ui.show_autopilot_tab` (renamed from
-        // `ui.show_watch_tab`). Single-read back-compat shim: when
-        // the new key is unset but the legacy `ui.show_watch_tab`
-        // is present, the read honors the legacy value without
-        // rewriting it (the next explicit Settings save writes the
-        // new key). When both are set, the new key wins so a
-        // user-driven save overrides any stale legacy value. An
-        // absent value keeps the default so a missing config
-        // never accidentally re-enables the tab.
+        // M198 / M229: read the canonical `ui.show_autopilot_tab`.
+        // The legacy `ui.show_watch_tab` key is no longer honored;
+        // configs carrying the legacy key see the default `false`.
         if let Some(s) = ui["show_autopilot_tab"].as_bool() {
-            cfg.show_autopilot_tab = s;
-        } else if let Some(s) = ui["show_watch_tab"].as_bool() {
             cfg.show_autopilot_tab = s;
         }
         cfg

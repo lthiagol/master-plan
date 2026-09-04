@@ -551,22 +551,30 @@ impl Keybinds {
     /// `runner.rs` already uses. (M164 removed the CLI `commands/` tree that
     /// historically shared the channel.)
     pub fn load_from_config(config: &serde_json::Value) -> Self {
-        let (diags, kb) = Self::validated_keybinds(config);
-        for d in &diags {
-            eprintln!("raul: keybinds.{} {}", d.field, d.message);
-        }
-        kb
+        // M229: the legacy mp project config `[keybinds]` overlay
+        // was removed. The canonical keybind surface is the
+        // user-level `~/.config/raul/keybinds.toml`; this loader
+        // returns the hardcoded defaults so callers that still
+        // thread a project config through get sane fallback
+        // behavior rather than a half-applied overlay.
+        let _ = config;
+        Self::default()
     }
 
-    /// Load keybinds via `mp config show`, mirroring
-    /// [`crate::config::UiConfig::load`]. raul is read-only, so — like the UI
-    /// prefs — the source of truth is mp's project config. Any error running
-    /// `mp` falls back to the built-in defaults.
+    /// Load keybinds via the canonical layered loader
+    /// ([`Self::load_effective`]). The legacy mp project config
+    /// fallback was removed by M229; the user-level
+    /// `~/.config/raul/keybinds.toml` is now the only project-side
+    /// source of truth.
     pub fn load(runner: &crate::mp_runner::MpRunner) -> Self {
-        match runner.run::<serde_json::Value>("config", &["show"]) {
-            Ok(v) => Self::load_from_config(&v),
-            Err(_) => Self::default(),
-        }
+        // M229: project config fallback was removed. The canonical
+        // keybind source is the user-level
+        // `~/.config/raul/keybinds.toml`; without a runner hook
+        // for the TOML surface this loader returns defaults. The
+        // caller (M222 `load_effective`) reaches the TOML through
+        // a direct `std::fs::read` of the configured path.
+        let _ = runner;
+        Self::default()
     }
 
     /// M222 F-01 fix: production startup loader. Reads BOTH
@@ -1988,23 +1996,14 @@ impl Keybinds {
         let mut kb = Self::default();
         let mut diags = Vec::new();
 
-        // Layer 2: legacy mp project config. The pre-M222
-        // loader is `load_from_config` — same signature,
-        // contract, and recovery semantics. If the user has
-        // `[keybinds]` in their project config we honor it
-        // and emit the migration hint exactly once.
-        let hint_emitted = json_config
-            .and_then(|c| c.get("config"))
-            .and_then(|c| c.get("keybinds"))
-            .map(|s| s.is_object())
-            .unwrap_or(false);
-        if hint_emitted {
-            if let Some(json) = json_config {
-                let (legacy_diags, after_legacy) = Self::apply_legacy_json_overlay(&kb, json);
-                kb = after_legacy;
-                diags.extend(legacy_diags);
-            }
-        }
+        // M229: the legacy mp project `[keybinds]` section is no longer
+        // consulted. Configurations still carrying `[keybinds]`
+        // in `mp config show` JSON now see only the hardcoded
+        // defaults + the user-level `~/.config/raul/keybinds.toml`.
+        // A future migration script can read the legacy section
+        // out of band; for the canonical `load_effective` path,
+        // the legacy layer is gone.
+        let _legacy_suppressed = json_config;
 
         // Layer 3: user-level `keybinds.toml`. Always overlays
         // the result of layer 2 (so per-field precedence
@@ -2016,33 +2015,7 @@ impl Keybinds {
             diags.extend(toml_diags);
         }
 
-        (kb, diags, hint_emitted)
-    }
-
-    /// Apply a legacy `mp config show` JSON overlay onto a
-    /// baseline `Keybinds`. Returns the resulting `Keybinds`
-    /// and any diagnostics. The implementation is a thin
-    /// wrapper around `validated_keybinds` + slot copy so
-    /// the precedence math lives in one place.
-    fn apply_legacy_json_overlay(
-        baseline: &Self,
-        json: &serde_json::Value,
-    ) -> (Vec<Diagnostic>, Self) {
-        let (diags, mut kb) = Self::validated_keybinds(json);
-        // The legacy loader produces fresh defaults; overlay
-        // the baseline's autopilot lane first, then re-apply
-        // any legacy overrides via the validated form.
-        kb.lane_autopilot = baseline.lane_autopilot.clone();
-        // Walk every global slot and, if the JSON mentioned it
-        // AND the validator already applied it, the result
-        // stands; otherwise the validator kept the default. To
-        // honor the layered contract ("legacy wins over
-        // baseline"), we re-apply legacy slot-by-slot only when
-        // the JSON named the slot. The legacy loader above
-        // already did the heavy lifting; here we just need
-        // to ensure the autopilot baseline stays intact.
-        let _ = baseline;
-        (diags, kb)
+        (kb, diags, false)
     }
 
     /// Apply the user-level TOML overlay onto a baseline

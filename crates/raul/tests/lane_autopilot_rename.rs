@@ -50,8 +50,8 @@ fn autopilot_label_and_compact_label_use_new_names() {
 }
 
 /// AC-01: when the operator's `ui.show_autopilot_tab = true`, the
-/// Autopilot lane is in the visible list — same as the pre-M214
-/// contract under `ui.show_watch_tab`.
+/// Autopilot lane is in the visible list. The pre-M214 contract
+/// under `ui.show_watch_tab` no longer exists (removed by M229).
 #[test]
 fn autopilot_visible_when_show_autopilot_tab_is_true() {
     let visible = Lane::ordered_visible(true);

@@ -247,12 +247,12 @@ fn check_role_config(name: &str, label: &str, rc: &crate::config::RoleConfig) ->
     }
 }
 
-/// M209 AC-05: run the unified legacy-to-autopilot role resolution
-/// at precondition time. Surfaces a typed diagnostic when the new
-/// `autopilot.roles.<role>.*` surface and the legacy
-/// `agent.<role>.*` surface disagree on `harness` or `model`, and
-/// reports the resolved harness so `mp watch --dry-run` (and JSON
-/// output) reflects what the spawn will actually use.
+/// M209 / M229 AC-05: resolve the autopilot role at precondition
+/// time. M229 removed the legacy `agent.runner` /
+/// `agent.coordinator` fallback — autopilot roles are configured
+/// solely through the new `autopilot.roles.<role>.*` surface. The
+/// role key for each role uses the canonical name (`orchestrator`,
+/// `runner`, `reviewer`).
 fn check_role_config_resolution(
     cfg: &ProjectConfig,
     label: &str,
@@ -261,35 +261,14 @@ fn check_role_config_resolution(
     let check_name = format!("{label}_role_resolved");
     let autopilot_key = role.as_str();
     let ovr = cfg.autopilot.roles.get(autopilot_key);
-    let legacy_runner = if matches!(role, crate::autopilot::role::Role::Runner) {
-        Some(cfg.runner_config())
-    } else {
-        None
-    };
-    let legacy_coordinator = if matches!(role, crate::autopilot::role::Role::Orchestrator) {
-        Some(cfg.coordinator_config())
-    } else {
-        None
-    };
-    match crate::autopilot::resolve_with_legacy_fallback(
-        role,
-        ovr,
-        legacy_runner,
-        legacy_coordinator,
-    ) {
-        Ok(resolved) => PreconditionCheck {
-            name: check_name,
-            ok: true,
-            message: format!(
-                "{label}.role resolved: harness={} skill={}",
-                resolved.harness, resolved.skill
-            ),
-        },
-        Err(err) => PreconditionCheck {
-            name: check_name,
-            ok: false,
-            message: format!("{label}.role resolution failed: {err}"),
-        },
+    let resolved = crate::autopilot::resolve_role_config_full(role, ovr, None);
+    PreconditionCheck {
+        name: check_name,
+        ok: true,
+        message: format!(
+            "{label}.role resolved: harness={} skill={}",
+            resolved.harness, resolved.skill
+        ),
     }
 }
 

@@ -293,11 +293,11 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "Glyph set used by list decorators and section markers.",
     ),
     (
-        "ui.show_watch_tab",
+        "ui.show_autopilot_tab",
         "bool",
         "false",
         None,
-        "Show the Watch lane in the tab bar. The `mp watch` command is unaffected — only the TUI surface reacts.",
+        "Show the Autopilot lane in the tab bar. The `mp autopilot` command is unaffected — only the TUI surface reacts.",
     ),
     (
         "ui.theme",
@@ -384,7 +384,7 @@ pub fn build_schema_report() -> ConfigSchemaReport {
                 // tests below for the regression guard.
                 "ui.color" => cfg.ui.color.unwrap_or(true).to_string(),
                 "ui.hide_done" => cfg.ui.hide_done.unwrap_or(false).to_string(),
-                "ui.show_watch_tab" => cfg.ui.show_watch_tab.unwrap_or(false).to_string(),
+                "ui.show_autopilot_tab" => cfg.ui.show_autopilot_tab.unwrap_or(false).to_string(),
                 "git.auto_commit" => cfg.git.auto_commit.unwrap_or(false).to_string(),
                 "git.auto_push" => cfg.git.auto_push.unwrap_or(false).to_string(),
                 "git.commit_on_milestone_complete" => cfg
@@ -587,8 +587,8 @@ mod tests {
                 &cfg.ui.hide_done.unwrap_or(false).to_string(),
             ),
             (
-                "ui.show_watch_tab",
-                &cfg.ui.show_watch_tab.unwrap_or(false).to_string(),
+                "ui.show_autopilot_tab",
+                &cfg.ui.show_autopilot_tab.unwrap_or(false).to_string(),
             ),
             (
                 "git.auto_commit",

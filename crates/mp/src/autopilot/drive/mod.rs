@@ -79,6 +79,10 @@ pub fn resolve_herdr_binary() -> std::io::Result<std::path::PathBuf> {
         )
     })
 }
+pub use legacy_state::{
+    default_legacy_state_path, AutopilotLegacyState, MilestoneState, PaneState,
+    AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION,
+};
 pub use logging::{rfc3339_now, DriveLogEntry, DriveLogger};
 pub use preconditions::{
     check_preconditions, default_log_path, try_lazy_auto_set, PreconditionCheck, PreconditionReport,
@@ -97,10 +101,6 @@ pub use sequencer::{run_milestones, MilestoneOutcome, SequencerReport};
 pub use shutdown::{
     clear_shutdown_flag, install_signal_handlers, is_pid_alive, perform_graceful_shutdown,
     request_shutdown, shutdown_requested, write_shutdown_state_for_test,
-};
-pub use legacy_state::{
-    default_legacy_state_path, AutopilotLegacyState, MilestoneState, PaneState,
-    AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION,
 };
 pub use state_machine::{
     drive_milestone, next_stage, should_skip, DriveOps, DriveOutcome, RoleConfigs, StagePlan,

@@ -591,9 +591,10 @@ pub struct App {
     /// on (N anchored)" indicator. Loaded once via `UiConfig::load`;
     /// restart raul to pick up mid-session flag changes.
     pub review_hunk_enabled: bool,
-    /// M198: the `ui.show_autopilot_tab` flag read from mp's project
-    /// config (M214: renamed from `ui.show_watch_tab`; the legacy key
-    /// is honored as a single-read shim — see [`crate::config::UiConfig::load`]).
+    /// M198 / M214 / M229: the `ui.show_autopilot_tab` flag read from
+    /// mp's project config. The legacy `ui.show_watch_tab` key was
+    /// removed by M229; the back-compat shim on
+    /// [`crate::config::UiConfig::load`] no longer honors it.
     /// When `false` (the default), the Autopilot lane is
     /// filtered out of the tab bar, the hit-test areas, and the
     /// prev/next navigation. Loaded once via `UiConfig::load`;

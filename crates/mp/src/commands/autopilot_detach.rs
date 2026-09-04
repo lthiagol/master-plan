@@ -19,7 +19,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use serde::Serialize;
 
-use crate::autopilot::drive::{PreconditionReport, AutopilotRunState};
+use crate::autopilot::drive::{AutopilotRunState, PreconditionReport};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
 use crate::config::ProjectConfig;
@@ -163,7 +163,9 @@ pub(crate) fn cmd_autopilot_drive_detached(
         .unwrap_or_else(|| AutopilotRunState::fresh(ids));
     let path = AutopilotRunState::path_for(&ctx.plan_dir);
     let mut store = crate::autopilot::drive::AutopilotRunStore::new(path, state_after);
-    store.transition(crate::autopilot::drive::AutopilotRunTransition::Pid(child_pid))?;
+    store.transition(crate::autopilot::drive::AutopilotRunTransition::Pid(
+        child_pid,
+    ))?;
 
     let _ = cfg; // keep cfg referenced for symmetry with cmd_watch_drive
     let report = DetachReport {
@@ -171,7 +173,9 @@ pub(crate) fn cmd_autopilot_drive_detached(
         detach: true,
         detached_pid: child_pid,
         log_file: log_path.display().to_string(),
-        state_file: AutopilotRunState::path_for(&ctx.plan_dir).display().to_string(),
+        state_file: AutopilotRunState::path_for(&ctx.plan_dir)
+            .display()
+            .to_string(),
         preconditions,
         message: format!(
             "detached watch started; pid={child_pid}; poll with `mp watch-control status`"

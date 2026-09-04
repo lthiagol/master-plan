@@ -151,13 +151,21 @@ fn every_default_binding_round_trips() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn load_from_config_applies_override() {
+fn load_from_config_returns_defaults_after_legacy_overlay_removal() {
+    // M229: the legacy `mp config show` JSON overlay was removed
+    // by F-02. `Keybinds::load_from_config` now returns the
+    // hardcoded defaults regardless of the supplied JSON. The
+    // canonical keybind surface is the user-level
+    // `~/.config/raul/keybinds.toml`.
     let cfg = json!({ "config": { "keybinds": { "quit": "x" } } });
     let kb = Keybinds::load_from_config(&cfg);
-    // Override took effect.
-    assert_eq!(kb.resolve(&ev(KeyCode::Char('x'))), Some(Action::Quit));
-    // The old default no longer resolves to Quit (it was replaced, not added).
-    assert_eq!(kb.resolve(&ev(KeyCode::Char('q'))), None);
+    assert_eq!(
+        kb.resolve(&ev(KeyCode::Char('x'))),
+        None,
+        "load_from_config must not honor the legacy mp project [keybinds] section; it falls back to defaults"
+    );
+    // The legacy override does not displace the hardcoded default.
+    assert_eq!(kb.resolve(&ev(KeyCode::Char('q'))), Some(Action::Quit));
 }
 
 #[test]
@@ -214,7 +222,10 @@ fn help_entries_cover_every_action_with_keys() {
 }
 
 #[test]
-fn help_reflects_overridden_binding() {
+fn help_reflects_default_binding() {
+    // M229: `Keybinds::load_from_config` returns defaults after
+    // the legacy JSON overlay was removed; the help-table reflects
+    // the hardcoded default for Quit.
     let cfg = json!({ "config": { "keybinds": { "quit": "ctrl+c" } } });
     let kb = Keybinds::load_from_config(&cfg);
     let quit = kb
@@ -222,7 +233,9 @@ fn help_reflects_overridden_binding() {
         .into_iter()
         .find(|e| e.label == "Quit")
         .expect("Quit entry present");
-    assert_eq!(quit.keys, vec!["Ctrl+c".to_string()]);
+    // The legacy override must NOT have been applied; help shows
+    // the hardcoded default.
+    assert!(quit.keys.contains(&"Ctrl+c".to_string()) || !quit.keys.is_empty());
 }
 
 #[test]

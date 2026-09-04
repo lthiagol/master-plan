@@ -48,7 +48,9 @@ pub(crate) fn cmd_autopilot(
     match cmd {
         AutopilotCmd::Start(args) => cmd_autopilot_start(ctx, args, format),
         AutopilotCmd::Status { summary } => {
-            crate::commands::autopilot_control::cmd_autopilot_control_status(ctx, summary, format, fields)
+            crate::commands::autopilot_control::cmd_autopilot_control_status(
+                ctx, summary, format, fields,
+            )
         }
         AutopilotCmd::Stop { pid, timeout_secs } => {
             crate::commands::autopilot_control::cmd_autopilot_control_stop(
@@ -67,7 +69,9 @@ pub(crate) fn cmd_autopilot(
             ctx, max_bytes, timeout_ms, role, format, fields,
         ),
         AutopilotCmd::Result { force } => {
-            crate::commands::autopilot_control::cmd_autopilot_control_result(ctx, force, format, fields)
+            crate::commands::autopilot_control::cmd_autopilot_control_result(
+                ctx, force, format, fields,
+            )
         }
         AutopilotCmd::Session { cmd } => cmd_autopilot_session(ctx, cmd, format, fields),
         AutopilotCmd::Note { cmd } => match cmd {

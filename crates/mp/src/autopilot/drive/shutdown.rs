@@ -207,7 +207,7 @@ pub fn write_shutdown_state_for_test(
     milestone_id: &str,
     last_lifecycle: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
-    use crate::autopilot::drive::{MilestoneState, AutopilotLegacyState};
+    use crate::autopilot::drive::{AutopilotLegacyState, MilestoneState};
     let mut state = AutopilotLegacyState::fresh(&[milestone_id.to_string()]);
     state.upsert_milestone(MilestoneState {
         id: milestone_id.to_string(),

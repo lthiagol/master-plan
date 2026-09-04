@@ -304,7 +304,7 @@ fn m229_f01_legacy_commands_modules_are_renamed_or_deleted() {
     // legacy `.mp/watch.state.json` filename.
     use mp::autopilot::drive::AutopilotRunState;
     let dir = tempfile::TempDir::new().unwrap();
-    let path = AutopilotRunState::path_for(&dir.path().to_path_buf());
+    let path = AutopilotRunState::path_for(dir.path());
     let path_str = path.to_string_lossy();
     assert!(
         path_str.contains("autopilot-run"),
@@ -314,4 +314,59 @@ fn m229_f01_legacy_commands_modules_are_renamed_or_deleted() {
         !path_str.contains("watch.state"),
         "legacy watch.state.json filename must NOT appear in the AutopilotRunState path; got {path_str}"
     );
+}
+
+// ─── M229 / F-02 regression: production config surfaces no longer
+// expose the legacy `ui.show_watch_tab` key. The renamed key
+// (`ui.show_autopilot_tab`) is the canonical surface; the legacy
+// key fails as an unknown config key. ────────────────────────────
+
+#[test]
+fn m229_f02_legacy_show_watch_tab_config_key_is_removed() {
+    let env = TestEnv::new();
+    // The canonical key must still read + write + default.
+    let get_can = env.run_json(&["config", "get", "ui.show_autopilot_tab", "--format", "json"]);
+    assert!(
+        !get_can.is_null() || get_can.is_object(),
+        "ui.show_autopilot_tab must be readable; got {get_can}"
+    );
+
+    // The legacy key must be rejected as an unknown key.
+    let set_legacy = env.run(&["config", "set", "ui.show_watch_tab", "true"]);
+    assert!(
+        !set_legacy.status.success(),
+        "ui.show_watch_tab must be rejected as an unknown key after M229; got exit 0"
+    );
+    let stderr = String::from_utf8_lossy(&set_legacy.stderr);
+    let stdout = String::from_utf8_lossy(&set_legacy.stdout);
+    assert!(
+        stderr.contains("unknown")
+            || stderr.contains("ui.show_watch_tab")
+            || stdout.contains("unknown")
+            || stdout.contains("ui.show_watch_tab"),
+        "set failure must name the legacy key: stderr={stderr} stdout={stdout}"
+    );
+
+    let get_legacy = env.run(&["config", "get", "ui.show_watch_tab"]);
+    assert!(
+        !get_legacy.status.success(),
+        "ui.show_watch_tab must be rejected as an unknown key on get"
+    );
+}
+
+#[test]
+fn m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness() {
+    // The execution readiness field must surface as
+    // `autopilot_readiness` (not `watch_readiness`) in
+    // `execution_check` JSON.
+    use mp::execution::AutopilotReadiness;
+    let dir = tempfile::TempDir::new().unwrap();
+    let ctx = mp::paths::PlanContext {
+        project_root: dir.path().to_path_buf(),
+        plan_dir: dir.path().join("master-plan"),
+    };
+    // The type is public, the name is the contract. If the rename
+    // regressed, the type would not compile.
+    fn _assert_name(_: AutopilotReadiness) {}
+    let _ = ctx;
 }

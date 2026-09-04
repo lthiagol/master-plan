@@ -615,8 +615,12 @@ impl Drop for StateLock {
 
 fn apply_transition(state: &mut AutopilotRunState, event: AutopilotRunTransition) {
     match event {
-        AutopilotRunTransition::ActiveMilestone { index, id } => state.set_active_milestone(index, id),
-        AutopilotRunTransition::ActiveStage { stage, target } => state.set_active_stage(stage, target),
+        AutopilotRunTransition::ActiveMilestone { index, id } => {
+            state.set_active_milestone(index, id)
+        }
+        AutopilotRunTransition::ActiveStage { stage, target } => {
+            state.set_active_stage(stage, target)
+        }
         AutopilotRunTransition::LifecycleObserved(value) => state.set_current_lifecycle(value),
         AutopilotRunTransition::PaneObserved { role, pane_id } => state.record_pane(role, pane_id),
         AutopilotRunTransition::MilestoneOutcome(outcome) => state.push_milestone_outcome(outcome),

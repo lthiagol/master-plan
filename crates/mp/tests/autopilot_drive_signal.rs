@@ -19,7 +19,7 @@ mod common;
 use crate::common::TestEnv;
 use mp::autopilot::drive::{
     install_signal_handlers, perform_graceful_shutdown, request_shutdown, shutdown_requested,
-    write_shutdown_state_for_test, PaneState, Role, AutopilotLegacyState,
+    write_shutdown_state_for_test, AutopilotLegacyState, PaneState, Role,
 };
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -181,7 +181,9 @@ fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
 
     // Step 1: state file exists.
     assert!(path.is_file(), "state file must be flushed");
-    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path)
+        .unwrap()
+        .expect("loads");
     assert_eq!(loaded.milestone(&id).unwrap().last_lifecycle, "in-progress");
     assert_eq!(loaded.pane_for(Role::Runner).unwrap().pane_id, "%5");
 
@@ -239,7 +241,9 @@ fn write_shutdown_state_for_test_seeds_state_file() {
     };
     let path = write_shutdown_state_for_test(&plan_ctx, "M-test", "in-progress").unwrap();
     assert!(path.is_file());
-    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path)
+        .unwrap()
+        .expect("loads");
     assert_eq!(
         loaded.milestone("M-test").unwrap().last_lifecycle,
         "in-progress"
@@ -407,7 +411,9 @@ fn real_sigint_during_autopilot_run_exits_zero_and_flushes_state() {
         path.is_file(),
         "graceful shutdown must leave .mp/autopilot-run.state.json flushed"
     );
-    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path)
+        .unwrap()
+        .expect("loads");
     let tracked = loaded
         .milestone(&id)
         .expect("in-flight milestone must appear in flushed state");

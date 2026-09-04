@@ -654,7 +654,7 @@ fn sort_section_unchanged() {
         bl["value"]
     );
 
-    // UI keys (color, icons, theme, hide_done, show_watch_tab)
+    // UI keys (color, icons, theme, hide_done, show_autopilot_tab)
     // survive untouched. Default config has none of these on
     // disk, but the schema/round-trip path must not drop them
     // when filter is in play.
@@ -665,7 +665,7 @@ fn sort_section_unchanged() {
         "ui.icons",
         "ui.theme",
         "ui.hide_done",
-        "ui.show_watch_tab",
+        "ui.show_autopilot_tab",
     ] {
         assert!(
             !body.contains(&format!("{key} ")) && !body.contains(&format!("{key}:")),

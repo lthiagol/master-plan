@@ -389,13 +389,15 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // that toggle the flag mid-session need a restart for the
     // indicator to flip (acceptable for the human surface).
     app.review_hunk_enabled = ui_config.review_hunk_enabled;
-    // M198 / M214: same pattern as `review_hunk_enabled` — read
-    // `ui.show_autopilot_tab` (renamed from `ui.show_watch_tab`)
-    // once at startup and pin it on App. When `false` (the
-    // default), the Autopilot lane is filtered out of the tab
-    // bar, the hit-test areas, and the prev/next navigation.
-    // Mid-session flips need a restart, which the spec accepts:
-    // the toggle is a setup-time decision, not a hot key.
+    // M198 / M214 / M229: same pattern as `review_hunk_enabled` —
+    // read `ui.show_autopilot_tab` once at startup and pin it on
+    // App. The legacy `ui.show_watch_tab` key was removed by M229
+    // and the back-compat shim dropped from `UiConfig::load`.
+    // When `false` (the default), the Autopilot lane is filtered
+    // out of the tab bar, the hit-test areas, and the prev/next
+    // navigation. Mid-session flips need a restart, which the
+    // spec accepts: the toggle is a setup-time decision, not a
+    // hot key.
     app.show_autopilot_tab = ui_config.show_autopilot_tab;
     // M198 S4 / AC-04 / M214: if the operator toggled Autopilot
     // off while the active lane was Autopilot (stale state, e.g.

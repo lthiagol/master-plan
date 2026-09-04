@@ -337,10 +337,11 @@ fn pair(c: KeyCode, m: KeyModifiers) -> (KeyCode, KeyModifiers) {
 
 /// AC-08 (precedence): user-level TOML wins over legacy JSON.
 /// Without a user-level file, the legacy `[keybinds]` JSON
-/// routes through to the effective map; with both sources
-/// reading the same action, the TOML wins.
+/// M229: the user-level TOML is the only project-side keybind
+/// source. The legacy mp project `[keybinds]` JSON overlay was
+/// removed; callers passing both still see only the TOML value.
 #[test]
-fn load_effective_user_level_toml_overrides_legacy_json() {
+fn load_effective_toml_wins_with_no_legacy_overlay() {
     let legacy = json!({
         "config": {
             "keybinds": {
@@ -351,41 +352,21 @@ fn load_effective_user_level_toml_overrides_legacy_json() {
     let toml = "[global]\nquit = \"ctrl+y\"\n";
     let (kb, diags, hint) = Keybinds::load_effective(Some(&legacy), Some(toml));
     assert!(diags.is_empty());
-    assert!(hint, "legacy use must emit a migration hint");
+    assert!(
+        !hint,
+        "M229: the migration hint no longer fires (legacy overlay removed)"
+    );
     assert_eq!(
         kb.quit,
         vec![pair(KeyCode::Char('y'), KeyModifiers::CONTROL)],
-        "user-level TOML must win over legacy JSON"
+        "user-level TOML is the only project-side keybind source"
     );
 }
 
-/// AC-08 (no rewrite): reads from the legacy `[keybinds]`
-/// section never update the source. We assert the source
-/// payload is unchanged by passing an owned `Value` and
-/// comparing it post-call.
+/// M229: a legacy `[keybinds]` JSON override does NOT reach the
+/// effective map. The legacy section is silently ignored.
 #[test]
-fn load_effective_does_not_mutate_legacy_json() {
-    let legacy_json = json!({
-        "config": {
-            "keybinds": {
-                "quit": "ctrl+x"
-            },
-            "ui": { "color": true }
-        }
-    });
-    let before = legacy_json.clone();
-    let _ = Keybinds::load_effective(Some(&legacy_json), None);
-    assert_eq!(
-        legacy_json, before,
-        "load_effective must not mutate the legacy JSON payload"
-    );
-}
-
-/// AC-08 (legacy wins over hardcoded defaults): with no
-/// user-level TOML, the legacy JSON override for `quit`
-/// reaches the effective map.
-#[test]
-fn load_effective_legacy_json_overrides_default() {
+fn load_effective_legacy_json_does_not_override_default() {
     let legacy = json!({
         "config": {
             "keybinds": {
@@ -396,54 +377,48 @@ fn load_effective_legacy_json_overrides_default() {
     let (kb, _, _) = Keybinds::load_effective(Some(&legacy), None);
     assert_eq!(
         kb.quit,
-        vec![pair(KeyCode::Char('x'), KeyModifiers::CONTROL)],
-        "legacy mp config must reach the effective map when no TOML is present"
+        Keybinds::default().quit,
+        "legacy mp config no longer reaches the effective map (M229 removed the overlay)"
     );
 }
 
-/// AC-08 (one migration hint): the layered loader returns a
-/// `hint_emitted` flag the runner uses to push the migration
-/// notice to stderr *once*. The flag MUST be `false` when no
-/// legacy source is read and `true` only when the legacy
-/// `[keybinds]` section was actually consulted.
+/// M229: the migration hint no longer fires. The loader returns
+/// `hint_emitted = false` regardless of whether the legacy
+/// JSON is supplied.
 #[test]
-fn load_effective_hint_emitted_only_when_legacy_section_is_present() {
-    // No legacy section: hint = false.
+fn load_effective_hint_never_fires_after_m229() {
     let (_no_legacy, diags1, hint1) =
         Keybinds::load_effective(None, Some("[global]\nquit = \"x\"\n"));
-    assert!(!hint1, "without legacy JSON the hint must NOT fire");
+    assert!(!hint1);
     assert!(diags1.is_empty(), "clean TOML must not warn");
 
-    // Legacy section present but no user-level TOML: hint = true.
     let legacy = json!({ "config": { "keybinds": { "quit": "x" } } });
     let (legacy_only, _, hint2) = Keybinds::load_effective(Some(&legacy), None);
     assert!(
-        hint2,
-        "legacy source presence must fire the hint exactly once"
+        !hint2,
+        "M229: hint must NOT fire even when the legacy [keybinds] section is present"
     );
     assert_eq!(
         legacy_only.quit,
-        vec![pair(KeyCode::Char('x'), KeyModifiers::empty())]
+        Keybinds::default().quit,
+        "legacy section must not drive the effective map"
     );
 
-    // Both sources present: hint = true (legacy still consulted).
     let (both, _, hint3) =
         Keybinds::load_effective(Some(&legacy), Some("[global]\nquit = \"y\"\n"));
-    assert!(
-        hint3,
-        "legacy source use must fire the hint exactly once per load"
-    );
+    assert!(!hint3, "M229: hint never fires under load_effective");
     assert_eq!(
         both.quit,
-        vec![pair(KeyCode::Char('y'), KeyModifiers::empty())]
+        vec![pair(KeyCode::Char('y'), KeyModifiers::empty())],
+        "the user-level TOML still wins when present"
     );
 }
 
-/// AC-08 (per-lane precedence): the user-level TOML also wins
-/// over the legacy JSON for per-lane actions. The autopilot
-/// section is the only per-lane surface in v1.
+/// M229: per-lane precedence — the legacy JSON override is no
+/// longer consulted; the user-level TOML is the only
+/// project-side source of truth.
 #[test]
-fn load_effective_user_toml_overrides_legacy_for_lane_autopilot() {
+fn load_effective_toml_wins_for_lane_autopilot() {
     let legacy = json!({
         "config": {
             "keybinds": {
@@ -453,11 +428,11 @@ fn load_effective_user_toml_overrides_legacy_for_lane_autopilot() {
     });
     let toml = "[autopilot]\nselect = \"f1\"\n";
     let (kb, _, hint) = Keybinds::load_effective(Some(&legacy), Some(toml));
-    assert!(hint);
+    assert!(!hint);
     assert_eq!(
         kb.quit,
-        vec![pair(KeyCode::Char('x'), KeyModifiers::CONTROL)],
-        "legacy global override still wins for fields not in TOML"
+        Keybinds::default().quit,
+        "legacy global override no longer drives the effective map"
     );
     assert_eq!(
         kb.lane_autopilot.select,

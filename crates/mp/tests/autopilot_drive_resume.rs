@@ -76,7 +76,7 @@ fn reconcile_classifies_both_panes_as_live_when_herdr_listing_matches() {
 
 #[test]
 fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let _ = env;
     let mut s = AutopilotLegacyState::fresh(&[]);
@@ -100,7 +100,7 @@ fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
 
 #[test]
 fn reconcile_prefers_herdr_pane_id_over_recorded_state() {
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let _ = env;
     let mut s = AutopilotLegacyState::fresh(&[]);
@@ -147,7 +147,7 @@ fn reconcile_does_not_panic_on_corrupt_herdr_list() {
 fn state_file_persists_across_save_load_resume_cycle() {
     // Black-box check: a state file written, then read back, then
     // passed through reconcile, must classify live panes correctly.
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let path = AutopilotLegacyState::path_for(&env.tmp.path().join("master-plan"));
 
@@ -160,7 +160,8 @@ fn state_file_persists_across_save_load_resume_cycle() {
         last_status: Some("working".into()),
     });
     s.save(&path).unwrap();
-    let restored: Option<mp::autopilot::drive::AutopilotLegacyState> = mp::autopilot::drive::AutopilotLegacyState::load_from(&path).unwrap();
+    let restored: Option<mp::autopilot::drive::AutopilotLegacyState> =
+        mp::autopilot::drive::AutopilotLegacyState::load_from(&path).unwrap();
     let r = reconcile(restored.as_ref(), &both_panes_alive());
     // Both panes show up in the herdr list — Live overrides any
     // prior state-of-the-world ambiguity.
@@ -171,7 +172,7 @@ fn state_file_persists_across_save_load_resume_cycle() {
 
 #[test]
 fn runner_only_in_state_is_dead_when_herdr_omits_it() {
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let _ = env;
     let mut s = AutopilotLegacyState::fresh(&[]);
@@ -192,7 +193,7 @@ fn runner_only_in_state_is_dead_when_herdr_omits_it() {
 
 #[test]
 fn any_needs_spawn_aggregates_per_role() {
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let _ = env;
     // Neither pane recorded, neither pane alive.
@@ -266,7 +267,7 @@ fn seed_state_roundtrips_through_reconcile() {
     // End-to-end pin: write a state file, load it back, classify
     // panes. The reconcile output is what `mp watch --resume` uses
     // to re-attach.
-    use mp::autopilot::drive::{MilestoneState, PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, MilestoneState, PaneState, Role};
     let env = TestEnv::new();
     let path = AutopilotLegacyState::path_for(&env.tmp.path().join("master-plan"));
     let mut s = AutopilotLegacyState::fresh(&["M152".into()]);
@@ -285,7 +286,9 @@ fn seed_state_roundtrips_through_reconcile() {
     });
     s.save(&path).unwrap();
 
-    let restored = AutopilotLegacyState::load_from(&path).unwrap().expect("state");
+    let restored = AutopilotLegacyState::load_from(&path)
+        .unwrap()
+        .expect("state");
     let r = reconcile(Some(&restored), &both_panes_alive());
     // herdr is authoritative over pane_id, but restored state still
     // tells the resume path "this role had a pane that may or may
@@ -303,7 +306,7 @@ fn reconcile_with_empty_herdr_and_recorded_state_marks_dead() {
     // (the panes were killed when the parent process died). The
     // reconciler must mark every recorded pane as Dead so `--resume`
     // re-spawns them.
-    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
+    use mp::autopilot::drive::{AutopilotLegacyState, PaneState, Role};
     let env = TestEnv::new();
     let _ = env;
     let mut s = AutopilotLegacyState::fresh(&[]);

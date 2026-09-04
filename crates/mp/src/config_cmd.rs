@@ -171,11 +171,12 @@ pub fn config_get(ctx: &PlanContext, key: &str) -> Result<Value> {
         "ui.icons" => Ok(json!(cfg.ui.icons.as_deref().unwrap_or("unicode"))),
         "ui.theme" => Ok(json!(cfg.ui.theme.as_deref().unwrap_or("mocha"))),
         "ui.hide_done" => Ok(json!(cfg.ui.hide_done.unwrap_or(false))),
-        // M198 WP1: the Watch tab is hidden by default. Operators
-        // opt in via `mp config set ui.show_watch_tab true`. The
-        // raul TUI surface filters the Watch lane out of the tab
-        // bar when this returns `false` (the default).
-        "ui.show_watch_tab" => Ok(json!(cfg.ui.show_watch_tab.unwrap_or(false))),
+        // M198 WP1 / M229: the autopilot TUI tab is hidden by
+        // default. Operators opt in via
+        // `mp config set ui.show_autopilot_tab true`. The legacy
+        // `ui.show_watch_tab` key was removed by M229's
+        // breaking-release cleanup.
+        "ui.show_autopilot_tab" => Ok(json!(cfg.ui.show_autopilot_tab.unwrap_or(false))),
         _ => bail!("unknown config key: {key}"),
     }
 }
@@ -342,12 +343,12 @@ fn apply_config_set(cfg: &mut ProjectConfig, key: &str, value: &str) -> Result<(
         "ui.icons" => cfg.ui.icons = Some(parse_icons(value)?),
         "ui.theme" => cfg.ui.theme = Some(value.to_string()),
         "ui.hide_done" => cfg.ui.hide_done = Some(parse_bool(value)?),
-        // M198 WP1: same shape as `ui.hide_done` — bool, defaults
-        // to `false` (Watch tab hidden). The on-disk config never
-        // sees `null`; an explicit `false` is a valid value the
-        // operator can stage and the doctor + TUI surfaces can
-        // render as the "default" state.
-        "ui.show_watch_tab" => cfg.ui.show_watch_tab = Some(parse_bool(value)?),
+        // M198 WP1 / M229: same shape as `ui.hide_done` — bool,
+        // defaults to `false` (Autopilot tab hidden). The on-disk
+        // config never sees `null`; an explicit `false` is a valid
+        // value the operator can stage and the doctor + TUI
+        // surfaces can render as the "default" state.
+        "ui.show_autopilot_tab" => cfg.ui.show_autopilot_tab = Some(parse_bool(value)?),
         _ => bail!("unknown config key: {key}"),
     }
     Ok(())

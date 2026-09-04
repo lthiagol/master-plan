@@ -393,13 +393,13 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     };
     checks.push(auto_set_check);
 
-    // M198 WP1 / AC-05: surface the current `ui.show_watch_tab`
+    // M198 WP1 / AC-05 / M229: surface the current `ui.show_autopilot_tab`
     // value in the UI section. The check is informational —
     // `ok=true` regardless of the value, because both `true` and
     // `false` are valid operator choices. The message names the
     // effective value plus the source (`explicit set` vs
     // `default false`) so the operator can see whether the
-    // Watch tab will appear in their next `raul` session.
+    // Autopilot tab will appear in their next `raul` session.
     //
     // F-04: include a "restart raul to take effect" hint so
     // the operator who toggles the flag and expects the tab
@@ -408,17 +408,17 @@ pub fn doctor_project(ctx: &PlanContext) -> DoctorReport {
     // The Settings tab help text already says this, but the
     // operator who lands in doctor first (e.g. via CI / a
     // debugging flow) will see it here too.
-    let show_watch = cfg.ui.show_watch_tab.unwrap_or(false);
+    let show_autopilot = cfg.ui.show_autopilot_tab.unwrap_or(false);
     checks.push(DoctorCheck {
-        name: "ui_show_watch_tab".to_string(),
+        name: "ui_show_autopilot_tab".to_string(),
         ok: true,
         message: format!(
-            "ui.show_watch_tab = {} ({}) — restart raul to take effect",
-            show_watch,
-            if cfg.ui.show_watch_tab.is_some() {
+            "ui.show_autopilot_tab = {} ({}) — restart raul to take effect",
+            show_autopilot,
+            if cfg.ui.show_autopilot_tab.is_some() {
                 "explicit set"
             } else {
-                "default false (Watch tab hidden in raul)"
+                "default false (Autopilot tab hidden in raul)"
             }
         ),
     });

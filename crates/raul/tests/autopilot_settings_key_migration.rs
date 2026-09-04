@@ -1,19 +1,22 @@
-//! M214 AC-02: settings key migration.
+//! M214 / M229 AC-02: settings key migration + M229 cleanup.
 //!
-//! `ui.show_autopilot_tab` controls Autopilot lane visibility. If
-//! it is absent and `ui.show_watch_tab` exists, reads honor the
-//! legacy value without rewriting. The next explicit Settings save
-//! persists the new key. When both keys exist, the new key wins.
+//! `ui.show_autopilot_tab` is the canonical key for the Autopilot
+//! lane visibility toggle. M229 removed the legacy
+//! `ui.show_watch_tab` back-compat shim from
+//! `UiConfig::from_config_payload`: configs carrying only the
+//! legacy key now see the default `false` after upgrade. Operators
+//! who kept the tab visible must opt in explicitly via the new key.
 
 use raul::config::UiConfig;
 use serde_json::json;
 
-/// AC-02: with only `ui.show_watch_tab = true` in the config payload,
-/// `UiConfig::show_autopilot_tab` reads as `true`. The read does
-/// NOT rewrite the legacy key — `show_autopilot_tab` stays absent
-/// in the input payload after the parse.
+/// M229: with only `ui.show_watch_tab = true` in the config payload,
+/// the legacy key is no longer honored. `show_autopilot_tab` reads
+/// as `false` (the default). The read also does NOT promote the
+/// legacy value to the new key — that responsibility belongs to
+/// the on-disk upgrade path.
 #[test]
-fn legacy_key_only_is_honored_without_rewrite() {
+fn legacy_key_alone_no_longer_drives_show_autopilot_tab() {
     let payload = json!({
         "config": {
             "ui": {
@@ -25,25 +28,12 @@ fn legacy_key_only_is_honored_without_rewrite() {
     });
     let cfg = UiConfig::from_config_payload(&payload);
     assert!(
-        cfg.show_autopilot_tab,
-        "legacy `ui.show_watch_tab = true` must surface as `show_autopilot_tab = true`"
-    );
-    // The original payload is preserved verbatim — the read does
-    // not rewrite the legacy key. The next explicit Settings save
-    // writes the new key on top.
-    assert_eq!(
-        payload["config"]["ui"].get("show_autopilot_tab"),
-        None,
-        "from_config_payload must not mutate the input payload"
-    );
-    assert_eq!(
-        payload["config"]["ui"]["show_watch_tab"],
-        json!(true),
-        "legacy key must remain in the input payload — the read shim never deletes it"
+        !cfg.show_autopilot_tab,
+        "M229 removed the legacy show_watch_tab back-compat shim; the legacy key must NOT drive show_autopilot_tab"
     );
 }
 
-/// AC-02: with only `ui.show_autopilot_tab = true`, the new key
+/// M214: with only `ui.show_autopilot_tab = true`, the new key
 /// drives `show_autopilot_tab` directly. The legacy key is not
 /// consulted.
 #[test]
@@ -59,8 +49,8 @@ fn new_key_only_is_used_directly() {
     assert!(cfg.show_autopilot_tab);
 }
 
-/// AC-02: when both keys are present, the new key wins so a
-/// user-driven save overrides any stale legacy value.
+/// M229: when both keys are present, the new key wins. The legacy
+/// key has no back-compat meaning; the new key is authoritative.
 #[test]
 fn new_key_wins_over_legacy_when_both_present() {
     let payload = json!({
@@ -74,7 +64,7 @@ fn new_key_wins_over_legacy_when_both_present() {
     let cfg = UiConfig::from_config_payload(&payload);
     assert!(
         !cfg.show_autopilot_tab,
-        "new key must win over legacy when both are present (user-driven save overrides stale legacy value)"
+        "new key must win over legacy when both are present"
     );
 }
 
@@ -96,9 +86,7 @@ fn absent_keys_default_to_false() {
     );
 }
 
-/// AC-02: the App field mirrors the parsed value. `App::show_autopilot_tab`
-/// defaults to `false` in `App::new` — same as the parsed default — so a
-/// fresh app behaves identically to an app loaded with no key.
+/// App default matches parsed default.
 #[test]
 fn app_default_matches_parsed_default() {
     use raul::tui::app::App;
@@ -109,19 +97,10 @@ fn app_default_matches_parsed_default() {
     );
 }
 
-/// AC-02: when the operator toggles `ui.show_autopilot_tab = true`
-/// via the raul Settings lane and presses `s` to save, the staged
-/// edit writes through `mp config set ui.show_autopilot_tab true`
-/// (the new key — the legacy key is not consulted on the write
-/// path). Pin this with a dry-run: the staged key string is exactly
-/// `ui.show_autopilot_tab` regardless of which value is currently on
-/// disk.
+/// Settings lane does not advertise the legacy key.
 #[test]
-fn settings_lane_saves_under_new_key_only() {
+fn settings_lane_exposes_only_new_key() {
     use raul::tui::modes::settings::SETTINGS_KEYS;
-    // The Settings lane's flat key list must contain `ui.show_autopilot_tab`
-    // and must NOT contain `ui.show_watch_tab` — saving the new key writes
-    // to the new key only, never the legacy key.
     let keys: Vec<&str> = SETTINGS_KEYS.iter().map(|(_, k)| *k).collect();
     assert!(
         keys.contains(&"ui.show_autopilot_tab"),
@@ -129,6 +108,6 @@ fn settings_lane_saves_under_new_key_only() {
     );
     assert!(
         !keys.contains(&"ui.show_watch_tab"),
-        "Settings lane must NOT expose ui.show_watch_tab — the legacy key is read-only; got {keys:?}"
+        "Settings lane must NOT expose ui.show_watch_tab — the legacy key was removed; got {keys:?}"
     );
 }

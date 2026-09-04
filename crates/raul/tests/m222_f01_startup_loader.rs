@@ -255,13 +255,13 @@ fn startup_with_no_user_toml_falls_back_to_defaults() {
     let resolved = resolve_default_path_under(&config_root);
     let toml_text = fs::read_to_string(&resolved).ok();
     let (kb, diags, hint) = Keybinds::load_effective(None, toml_text.as_deref());
-    assert!(!hint, "no legacy JSON means no migration hint");
+    assert!(!hint, "M229: legacy JSON was removed; the hint never fires");
     assert!(diags.is_empty(), "missing TOML is silent");
     assert_eq!(kb, Keybinds::default());
 }
 
 #[test]
-fn startup_precedence_user_toml_overrides_legacy_json() {
+fn startup_precedence_user_toml_alone_drives_effective() {
     let dir = tempfile::tempdir().expect("tempdir");
     let config_root = dir.path().join("raul");
     fs::create_dir_all(&config_root).expect("mkdir");
@@ -279,15 +279,19 @@ fn startup_precedence_user_toml_overrides_legacy_json() {
     let resolved = resolve_default_path_under(&config_root);
     let toml_text = fs::read_to_string(&resolved).expect("read toml");
     let (kb, _, hint) = Keybinds::load_effective(Some(&legacy_json), Some(&toml_text));
-    assert!(hint, "legacy JSON presence fires the migration hint");
+    assert!(!hint, "M229: hint no longer fires");
     assert_eq!(
         kb.quit,
         vec![(KeyCode::Char('y'), KeyModifiers::CONTROL)],
-        "user-level TOML must win for `quit`"
+        "user-level TOML wins for quit"
     );
+    // M229: the legacy `help = F1` no longer survives — the legacy
+    // JSON overlay was removed. The help binding falls back to the
+    // hardcoded default (or the TOML override, of which there is
+    // none here).
     assert_eq!(
         kb.help,
-        vec![(KeyCode::F(1), KeyModifiers::empty())],
-        "legacy `help = F1` must survive when TOML doesn't name the field"
+        Keybinds::default().help,
+        "M229: legacy mp config [keybinds] no longer overlays the effective map"
     );
 }
