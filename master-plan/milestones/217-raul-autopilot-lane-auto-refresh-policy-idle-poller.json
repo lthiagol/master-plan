@@ -3,9 +3,9 @@
     "id": "217",
     "title": "raul Autopilot lane — auto-refresh policy + idle poller",
     "slug": "raul-autopilot-lane-auto-refresh-policy-idle-poller",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -29,8 +29,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-04T05:25:07.812240+00:00",
+    "lifecycle_at": "2026-09-04T05:29:42.483194+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -42,7 +41,7 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-04T05:14:30.856821+00:00"
+        "at": "2026-09-04T05:31:24.673402+00:00"
       },
       "external-review": {
         "status": "done",
@@ -52,13 +51,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.239450+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T05:29:42.483195+00:00"
+      },
       "remediate": {
-        "status": "in_progress",
-        "at": "2026-09-04T05:25:07.812241+00:00"
+        "status": "done",
+        "at": "2026-09-04T05:29:42.483195+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-04T05:14:30.856821+00:00"
+        "at": "2026-09-04T05:31:24.673402+00:00"
       },
       "specify": {
         "status": "done",
@@ -340,11 +343,11 @@
       "severity": "medium",
       "category": "spec-gap",
       "description": "Spec says plain `p` toggles the poll; implementation is Ctrl-p. Documented deviation, but M222 rebind path collides with M216 pause binding. See rationale for resolution options.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-217",
-      "fixed_in": "",
+      "fixed_in": "1d1a3e1",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "phase": "external",
       "summary": "AC-03 specifies plain `p` but implementation binds Ctrl-p",
       "rationale": "AC-03 description (master-plan/milestones/217) says: Manual `p` toggles the poll on/off; the toggle state is visible in the lane footer. The implementation binds the toggle to Ctrl-p (crossterm ctrl(KeyCode::Char('p'))) at crates/raul/src/tui/keybinds.rs:267 and :356, with the deviation explained in a doc comment (lines 232-239) and pinned by the test m217_ac03_default_toggle_binding_is_ctrl_p at crates/raul/tests/autopilot_poll_manual_controls.rs:199.\n\nReason for deviation: M216 already shipped plain `p` as pause-the-session (crates/raul/src/tui/keybinds.rs:208-210, M216 AC-06) and rebinding pause would silently regress M216 control.\n\nThe rebind-via-M222 workaround documented in the doc comment (toggle_poll = \"p\" in keybinds.toml) does not actually achieve the spec'd behavior because the user would be rebinding onto M216 pause key.\n\nResolution options the runner should pick one of: (1) update AC-03 spec to reflect Ctrl-p via `mp milestone ac update 217 AC-03`, (2) move M216 pause to a different key (e.g. Ctrl-p) so the M217 toggle can take plain `p` as spec'd, or (3) escalate the conflict through a spec-grill / inter-milestone reconciliation.\n\nThe deviation is real, documented, and the rebind path is incomplete; the spec text and implementation must be brought into agreement before the milestone can complete."
