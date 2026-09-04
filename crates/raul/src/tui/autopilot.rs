@@ -13,10 +13,12 @@
 //! payloads (never reads `master-plan/` directly) and renders the
 //! event timeline as a read-only strip.
 //!
-//! The structures are pure data — no App / Mode coupling, no
-//! subprocess calls — so the test surface is fully isolated. The
-//! production hot path (keybinds, lane wiring) lives in `action.rs`
-//! and `keybinds.rs`; this module is the typed model.
+//! The lane state ([`AutopilotLaneState`]) wires the typed model into
+//! the production hot path: the picker is what the Autopilot lane
+//! renders, the panel is what `<o>` toggles open / closed, the
+//! replay shell is what the past-session mode opens, and the
+//! panel's [`OverridePanel::to_session_overrides`] is what `<s>`
+//! persists on Start.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -785,5 +787,261 @@ impl ReplayShell {
     /// Read-only view of the timeline.
     pub fn timeline(&self) -> &[ReplayEvent] {
         &self.events
+    }
+}
+
+// ─── F-01 wiring: AutopilotLaneState ──────────────────────────────────
+
+/// F-01: the Autopilot lane's production hot-path state. Holds the
+/// picker, the override panel, and the replay shell — plus the
+/// "is the panel open?" / "is the replay shell open?" flags the
+/// renderer reads to decide which surface to draw.
+///
+/// `App::autopilot` is the single field that holds this struct;
+/// `apply_action` mutates it through the `Action::Autopilot*`
+/// variants, and `render_watch_lane` reads `picker` /
+/// `panel_open` / `replay_shell` to drive the visible surface.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AutopilotLaneState {
+    /// The picker view of drivable milestones. The renderer reads
+    /// `picker.candidates` + `picker.selected` for the picker
+    /// pane. The mutators are `Picker::{refresh_candidates,
+    /// toggle_select, move_cursor}` — invoked by the new
+    /// `Action::Autopilot*` dispatchers.
+    pub picker: Picker,
+    /// The override panel form state. `None` until the user
+    /// presses `<o>` (which calls `ensure_panel`); `Some` after.
+    /// The `panel_open` flag is the source of truth for whether
+    /// the panel is *visible* (the value persists across
+    /// open/close toggles so the user gets their typed values back).
+    pub panel: Option<OverridePanel>,
+    /// The replay shell for the past-session mode. `None` until
+    /// `Action::AutopilotOpenReplay` runs; `Some` after, until
+    /// `Action::AutopilotCloseReplay` clears it.
+    pub replay_shell: Option<ReplayShell>,
+    /// `true` when the override panel is the visible buffer. The
+    /// flag is independent of `panel` so opening + closing the
+    /// panel preserves the typed values across toggle cycles.
+    pub panel_open: bool,
+    /// `true` when the replay shell is the visible surface. Like
+    /// `panel_open`, the flag is independent of `replay_shell`.
+    pub replay_open: bool,
+}
+
+impl AutopilotLaneState {
+    /// Empty lane state. Used by `App::new()` and on a full reset.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Lazily construct a default [`OverridePanel`]. Idempotent —
+    /// calling twice returns the same value.
+    pub fn ensure_panel(&mut self) -> &mut OverridePanel {
+        if self.panel.is_none() {
+            self.panel = Some(OverridePanel::new());
+        }
+        self.panel.as_mut().expect("just-inserted")
+    }
+
+    /// Toggle the override panel's visibility. The first open
+    /// constructs a default panel; subsequent opens keep the
+    /// typed values so the user's edits survive a close/reopen.
+    pub fn toggle_panel(&mut self) {
+        if self.panel_open {
+            self.panel_open = false;
+        } else {
+            let _ = self.ensure_panel();
+            self.panel_open = true;
+        }
+    }
+
+    /// Open the override panel unconditionally. No-op when
+    /// already open.
+    pub fn open_panel(&mut self) {
+        let _ = self.ensure_panel();
+        self.panel_open = true;
+    }
+
+    /// Close the override panel. The panel's values persist.
+    pub fn close_panel(&mut self) {
+        self.panel_open = false;
+    }
+
+    /// Open the replay shell with the supplied [`ReplayShell`].
+    /// Replaces any existing shell.
+    pub fn open_replay(&mut self, shell: ReplayShell) {
+        self.replay_shell = Some(shell);
+        self.replay_open = true;
+    }
+
+    /// Close the replay shell. The last-loaded timeline is
+    /// retained on `replay_shell` so a re-open doesn't re-fetch.
+    pub fn close_replay(&mut self) {
+        self.replay_open = false;
+    }
+
+    /// Forward to `Picker::refresh_candidates` so the dispatcher
+    /// can wire the picker refresh in one line.
+    pub fn refresh_picker(&mut self, list_payload: &Value) {
+        self.picker.refresh_candidates(list_payload);
+    }
+
+    /// Forward to `Picker::toggle_select` for the cursor's current
+    /// candidate. Returns `true` when a row was toggled.
+    pub fn toggle_picker_select(&mut self) -> bool {
+        let Some(c) = self.picker.cursor_candidate() else {
+            return false;
+        };
+        let id = c.id.clone();
+        self.picker.toggle_select(&id);
+        true
+    }
+
+    /// Forward to `Picker::move_cursor`.
+    pub fn move_picker_cursor(&mut self, delta: i64) {
+        self.picker.move_cursor(delta);
+    }
+
+    /// Read-only view of the override panel's current value. The
+    /// caller should check `panel_open` separately — this returns
+    /// `Some` even when the panel is closed (the panel persists
+    /// across toggles).
+    pub fn panel(&self) -> Option<&OverridePanel> {
+        self.panel.as_ref()
+    }
+
+    /// Mutable view of the override panel's current value.
+    pub fn panel_mut(&mut self) -> Option<&mut OverridePanel> {
+        self.panel.as_mut()
+    }
+
+    /// True when the picker has at least one selection AND the
+    /// lane is not currently rendering the panel / replay shell.
+    /// Drives `<s>` (Start) availability.
+    pub fn can_start(&self) -> bool {
+        !self.panel_open && !self.replay_open && self.picker.has_selection()
+    }
+}
+
+#[cfg(test)]
+mod f01_tests {
+    use super::*;
+
+    fn list_payload() -> Value {
+        serde_json::json!({
+            "milestones": [
+                {"id": "M207", "title": "Pilot S2", "lifecycle": "approved"},
+                {"id": "M209", "title": "Coordination", "lifecycle": "in-progress"},
+            ]
+        })
+    }
+
+    #[test]
+    fn empty_lane_state_has_no_panel_or_replay() {
+        let state = AutopilotLaneState::empty();
+        assert!(state.picker.candidates.is_empty());
+        assert!(state.panel.is_none());
+        assert!(state.replay_shell.is_none());
+        assert!(!state.panel_open);
+        assert!(!state.replay_open);
+        assert!(!state.can_start());
+    }
+
+    #[test]
+    fn ensure_panel_is_idempotent_and_initialises_default_panel() {
+        let mut state = AutopilotLaneState::empty();
+        let p1 = state.ensure_panel().clone();
+        let p2 = state.ensure_panel().clone();
+        assert_eq!(p1, p2);
+        assert_eq!(p1, OverridePanel::new());
+    }
+
+    #[test]
+    fn toggle_panel_opens_then_closes_and_preserves_typed_values() {
+        let mut state = AutopilotLaneState::empty();
+        state.toggle_panel();
+        assert!(state.panel_open);
+        assert!(state.panel.is_some());
+
+        // Type something.
+        if let Some(panel) = state.panel.as_mut() {
+            panel.topology = "two-agent".to_string();
+            panel.refresh_secs = 5;
+        }
+        let snapshot = state.panel.clone();
+
+        // Close + reopen — the typed values survive.
+        state.toggle_panel();
+        assert!(!state.panel_open);
+        state.toggle_panel();
+        assert!(state.panel_open);
+        assert_eq!(state.panel, snapshot);
+    }
+
+    #[test]
+    fn open_replay_replaces_existing_shell() {
+        let mut state = AutopilotLaneState::empty();
+        let shell_a = ReplayShell {
+            session_id: "alpha".to_string(),
+            status: "active".to_string(),
+            last_updated: "2026-09-04T00:00:00Z".to_string(),
+            events: vec![],
+        };
+        state.open_replay(shell_a);
+        assert!(state.replay_open);
+        assert_eq!(state.replay_shell.as_ref().unwrap().session_id, "alpha");
+
+        // Replace — the new shell wins.
+        let shell_b = ReplayShell {
+            session_id: "beta".to_string(),
+            status: "completed".to_string(),
+            last_updated: "2026-09-04T00:00:00Z".to_string(),
+            events: vec![],
+        };
+        state.open_replay(shell_b);
+        assert_eq!(state.replay_shell.as_ref().unwrap().session_id, "beta");
+    }
+
+    #[test]
+    fn close_replay_keeps_the_shell_for_reopen() {
+        let mut state = AutopilotLaneState::empty();
+        let shell = ReplayShell {
+            session_id: "alpha".to_string(),
+            status: "active".to_string(),
+            last_updated: "2026-09-04T00:00:00Z".to_string(),
+            events: vec![],
+        };
+        state.open_replay(shell.clone());
+        state.close_replay();
+        assert!(!state.replay_open);
+        assert_eq!(state.replay_shell, Some(shell));
+    }
+
+    #[test]
+    fn toggle_picker_select_returns_false_when_picker_is_empty() {
+        let mut state = AutopilotLaneState::empty();
+        assert!(!state.toggle_picker_select());
+    }
+
+    #[test]
+    fn can_start_requires_picker_selection_and_no_panel_or_replay() {
+        let mut state = AutopilotLaneState::empty();
+        state.refresh_picker(&list_payload());
+        assert!(!state.can_start());
+
+        state.toggle_picker_select();
+        assert!(state.can_start());
+
+        // Open the panel — Start is blocked while editing.
+        state.toggle_panel();
+        assert!(!state.can_start());
+
+        // Close the panel — Start is unblocked.
+        state.toggle_panel();
+        assert!(state.can_start());
+
+        // Open the replay — Start is blocked again.
+        state.open_replay(ReplayShell::default());
+        assert!(!state.can_start());
     }
 }

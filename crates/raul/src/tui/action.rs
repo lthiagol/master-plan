@@ -255,6 +255,35 @@ pub enum Action {
     WatchMoveQueue { delta: i64 },
     /// Clear all queue selections on the Watch lane (`c`).
     WatchClearQueue,
+
+    // ---- M215: Autopilot lane (F-01 wiring) -----------------------
+    /// Toggle the highlighted picker's selection (Space on the
+    /// Autopilot lane). Routes through the typed
+    /// [`crate::tui::autopilot::Picker`].
+    AutopilotToggleSelect,
+    /// Move the picker cursor up/down on the Autopilot lane
+    /// (`j` / `k`). Routes through the typed Picker.
+    AutopilotMovePicker { delta: i64 },
+    /// Toggle the per-drive override panel open / closed (`o` on
+    /// the Autopilot lane). First open constructs a default
+    /// [`crate::tui::autopilot::OverridePanel`]; subsequent
+    /// toggles preserve the typed values across the close/reopen
+    /// cycle.
+    AutopilotTogglePanel,
+    /// Persist the override panel via
+    /// [`crate::tui::autopilot::OverridePanel::to_session_overrides`]
+    /// and shell out to `mp autopilot start <ids>` — the `<s>`
+    /// action on the Autopilot lane. Refused when the picker is
+    /// empty, the panel is open, or the replay shell is open.
+    AutopilotStart,
+    /// Open the past-session mode: fetch `mp autopilot session
+    /// list`, build a [`crate::tui::autopilot::ReplayShell`]
+    /// from the first entry (or the supplied id), and surface
+    /// it on the lane.
+    AutopilotOpenReplay,
+    /// Close the past-session mode (`Esc` while the replay shell
+    /// is open).
+    AutopilotCloseReplay,
 }
 
 /// Apply an `Action` to `app`. This is the single place that mutates `App`
@@ -776,6 +805,106 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         }
         Action::WatchClearQueue => {
             app.watch.clear_selection();
+        }
+
+        // ---- M215 / F-01: Autopilot lane production hot path ----
+        Action::AutopilotToggleSelect => {
+            let _ = app.autopilot.toggle_picker_select();
+        }
+        Action::AutopilotMovePicker { delta } => {
+            app.autopilot.move_picker_cursor(delta);
+        }
+        Action::AutopilotTogglePanel => {
+            app.autopilot.toggle_panel();
+        }
+        Action::AutopilotStart => {
+            // F-01: validate, build the persisted payload via
+            // OverridePanel::to_session_overrides, and shell out to
+            // `mp autopilot start <ids...>`. The can_start gate
+            // mirrors the same check the renderer uses to decide
+            // whether to bind `<s>`.
+            if !app.autopilot.can_start() {
+                return Ok(());
+            }
+            let payload = app
+                .autopilot
+                .panel()
+                .cloned()
+                .unwrap_or_default()
+                .to_session_overrides();
+            let ids: Vec<String> = app.autopilot.picker.queue_ids().to_vec();
+            if ids.is_empty() {
+                return Ok(());
+            }
+            // Persist the typed payload to the mp autopilot config
+            // namespace. Each non-default per-role field is written
+            // through `mp autopilot config set` so the dry-run honors
+            // it. Topology + poll_interval_ms land on `autopilot.*`.
+            if let Some(role_payload) = payload
+                .roles
+                .iter()
+                .next()
+                .map(|(role, value)| (role.clone(), value.clone()))
+            {
+                if let Some(harness) = role_payload.1.get("harness").and_then(|v| v.as_str()) {
+                    let key = format!("autopilot.roles.{}.harness", role_payload.0);
+                    let _ = runner.run_raw("autopilot", &["config", "set", &key, harness]);
+                }
+                if let Some(model) = role_payload.1.get("model").and_then(|v| v.as_str()) {
+                    let key = format!("autopilot.roles.{}.model", role_payload.0);
+                    let _ = runner.run_raw("autopilot", &["config", "set", &key, model]);
+                }
+                if let Some(skill) = role_payload.1.get("skill").and_then(|v| v.as_str()) {
+                    let key = format!("autopilot.roles.{}.skill", role_payload.0);
+                    let _ = runner.run_raw("autopilot", &["config", "set", &key, skill]);
+                }
+            }
+            let topology_key = "autopilot.topology";
+            let _ = runner.run_raw(
+                "autopilot",
+                &[
+                    "config",
+                    "set",
+                    topology_key,
+                    &payload.config_overrides.topology,
+                ],
+            );
+            if let Some(poll_ms) = payload.config_overrides.poll_interval_ms {
+                let poll_key = "autopilot.poll_interval_ms";
+                let poll_str = poll_ms.to_string();
+                let _ = runner.run_raw("autopilot", &["config", "set", poll_key, &poll_str]);
+            }
+            // Build argv WITHOUT a leading "autopilot" — the runner's
+            // first arg is the subcommand, and `ids...` follows.
+            let mut args: Vec<String> = ids;
+            args.push("--detach".to_string());
+            args.push("--format".to_string());
+            args.push("json".to_string());
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &args.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+        }
+        Action::AutopilotOpenReplay => {
+            // F-01: consume `mp autopilot session list` and surface
+            // the first entry as a ReplayShell. Past-session mode
+            // never reads `master-plan/` files directly.
+            let payload = runner
+                .run_raw_allow_failure("autopilot", &["session", "list", "--format", "json"])
+                .unwrap_or_default();
+            let value: serde_json::Value =
+                serde_json::from_slice(&payload).unwrap_or_else(|_| serde_json::json!({}));
+            let first = value
+                .get("sessions")
+                .and_then(|s| s.as_array())
+                .and_then(|arr| arr.first())
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({}));
+            let shell = crate::tui::autopilot::ReplayShell::from_session_list_entry(&first);
+            app.autopilot.open_replay(shell);
+        }
+        Action::AutopilotCloseReplay => {
+            app.autopilot.close_replay();
         }
     }
 

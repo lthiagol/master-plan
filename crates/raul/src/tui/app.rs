@@ -693,6 +693,14 @@ pub struct App {
     /// user-visible stay as-is"); the user-facing lane label is
     /// `Autopilot`.
     pub watch: crate::tui::watch::Watch,
+    /// M215 / F-01: the typed Autopilot lane state — picker +
+    /// override panel + replay shell. The renderer reads
+    /// `autopilot.picker` / `autopilot.panel_open` /
+    /// `autopilot.replay_shell` to draw the lane; the dispatcher
+    /// mutates it through the `Action::Autopilot*` variants. The
+    /// legacy `watch` field above stays intact for the M179
+    /// backcompat surface.
+    pub autopilot: crate::tui::autopilot::AutopilotLaneState,
     /// M179 S7: 2-5s poller state for the Autopilot lane. The
     /// `run_loop`'s `on_idle` closure calls `poll_watch_state`
     /// whenever the Autopilot lane is active; the Poller rate-limits
@@ -813,6 +821,7 @@ impl App {
             keybinds: Keybinds::default(),
             settings: None,
             watch: crate::tui::watch::Watch::empty(),
+            autopilot: crate::tui::autopilot::AutopilotLaneState::empty(),
             watch_poller: crate::tui::watch::Poller::new(),
             plan_dir: std::path::PathBuf::from("."),
             pending_sort_writes: std::collections::BTreeMap::new(),

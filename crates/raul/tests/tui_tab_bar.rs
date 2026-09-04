@@ -1202,7 +1202,16 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::FilterCommit
             | Action::FilterCancel
             | Action::ClearFilters
-            | Action::RemoveFilterChip { .. } => {
+            | Action::RemoveFilterChip { .. }
+            // M215 / F-01: the Autopilot lane's production hot
+            // path actions — picker toggle / cursor, override
+            // panel open, start, replay open/close.
+            | Action::AutopilotToggleSelect
+            | Action::AutopilotMovePicker { .. }
+            | Action::AutopilotTogglePanel
+            | Action::AutopilotStart
+            | Action::AutopilotOpenReplay
+            | Action::AutopilotCloseReplay => {
                 set.insert("OtherM136Action");
             }
         }

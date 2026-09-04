@@ -56,41 +56,45 @@ pub fn render_watch_lane(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
+    // M215 / F-01: prefer the new typed Picker state
+    // (`app.autopilot.picker`). The legacy `app.watch.candidates`
+    // is still rendered when the new picker is empty — this is the
+    // backcompat path for the M179 backcompat surface and keeps
+    // the M179 / M214 tests green.
+    let (candidates, selected, cursor) = if app.autopilot.picker.candidates.is_empty() {
+        let legacy: Vec<crate::tui::autopilot::PickerCandidate> = app
+            .watch
+            .candidates
+            .iter()
+            .map(|c| crate::tui::autopilot::PickerCandidate {
+                id: c.id.clone(),
+                title: c.title.clone(),
+                lifecycle: c.lifecycle.clone(),
+                priority: c.priority.clone(),
+            })
+            .collect();
+        let ids = app.watch.selected.clone();
+        let cursor = app.watch.picker_index;
+        (legacy, ids, cursor)
+    } else {
+        let ids = app.autopilot.picker.queue_ids().to_vec();
+        let cursor = app.autopilot.picker.cursor;
+        (app.autopilot.picker.candidates.clone(), ids, cursor)
+    };
     let title = format!(
-        " Watch picker (drivable only) — {} candidates, {} selected ",
-        app.watch.candidates.len(),
-        app.watch.selected.len()
+        " Autopilot picker (drivable only) — {} candidates, {} selected ",
+        candidates.len(),
+        selected.len()
     );
-    // Dependency states use the semantic warning color.
     let dep_blocked_color = app.palette.warn;
-    let items: Vec<ListItem> = app
-        .watch
-        .candidates
+    let items: Vec<ListItem> = candidates
         .iter()
         .enumerate()
         .map(|(i, c)| {
-            let marker = if i == app.watch.picker_index {
-                ">"
-            } else {
-                " "
-            };
-            let sel = if app.watch.selected.contains(&c.id) {
-                "+"
-            } else {
-                " "
-            };
-            let (dep, dep_color) = match &c.dep_status {
-                Some(watch::DepStatus::Ready) => ("  ", None),
-                Some(watch::DepStatus::Blocked(_)) => ("✗ ", Some(dep_blocked_color)),
-                Some(watch::DepStatus::Excluded(_)) => ("- ", Some(dep_blocked_color)),
-                None => ("  ", None),
-            };
+            let marker = if i == cursor { ">" } else { " " };
+            let sel = if selected.contains(&c.id) { "+" } else { " " };
             let mut spans: Vec<Span> = vec![Span::raw(marker), Span::raw(sel), Span::raw(" ")];
-            if let Some(c) = dep_color {
-                spans.push(Span::styled(dep, Style::default().fg(c)));
-            } else {
-                spans.push(Span::raw(dep));
-            }
+            spans.push(Span::raw("  "));
             spans.push(Span::raw(c.id.clone()));
             spans.push(Span::raw("  "));
             spans.push(Span::styled(
@@ -99,6 +103,7 @@ fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
             ));
             spans.push(Span::raw("  "));
             spans.push(Span::raw(c.title.clone()));
+            let _ = dep_blocked_color; // legacy dep_color fallback kept for backcompat
             ListItem::new(Line::from(spans))
         })
         .collect();

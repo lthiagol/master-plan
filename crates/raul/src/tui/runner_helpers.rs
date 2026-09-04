@@ -178,6 +178,9 @@ pub fn load_watch_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
         let data = &cached["data"];
         if data.is_object() {
             app.watch.refresh_candidates(data);
+            // M215 / F-01: also refresh the typed Picker that the
+            // production render path reads from.
+            app.autopilot.refresh_picker(data);
             let _ = crate::tui::watch::restore_latest_status(runner, app)?;
             return Ok(());
         }
@@ -186,6 +189,7 @@ pub fn load_watch_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
     let cache_value = serde_json::json!({ "data": data });
     app.lane_cache.put(Lane::Autopilot, cache_value);
     app.watch.refresh_candidates(&data);
+    app.autopilot.refresh_picker(&data);
     let _ = crate::tui::watch::restore_latest_status(runner, app)?;
     Ok(())
 }

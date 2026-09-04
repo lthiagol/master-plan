@@ -45,6 +45,16 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
         }
     }
 
+    // M215 / F-01: Autopilot lane keys dispatch BEFORE the global
+    // Esc handler so the panel / replay close path wins over the
+    // generic `Action::Esc`. Other Autopilot keys (Space, j/k, o,
+    // s, P) also fire before the content-canonical lookup.
+    if app.active_lane == Lane::Autopilot {
+        if let Some(actions) = handle_autopilot_lane_key(key, app) {
+            return actions;
+        }
+    }
+
     // Modal menu keys must be handled before content navigation.
     if app.sort_rebind_open() {
         let kb = &app.keybinds;
@@ -178,6 +188,78 @@ fn handle_path_list_key(key: KeyEvent, app: &App, kb: &Keybinds) -> Vec<Action> 
         return vec![Action::RefreshLane];
     }
     handle_event_in_normal(key, app)
+}
+
+/// M215 / F-01: Autopilot lane key dispatch. The handler returns
+/// `Some(actions)` when it consumed a keypress; `None` when the
+/// keypress should fall through to the content-canonical handler
+/// (so `Up` / `Down` still work as escape hatches for legacy
+/// callers).
+///
+/// Default keymap (no overrides — see the comment in `handle_key`):
+/// - Space → toggle picker selection
+/// - j / k → move picker cursor
+/// - `<o>` → toggle override panel
+/// - `<s>` → start (validate + shell out to `mp autopilot start`)
+/// - capital P → open past-session replay
+/// - Esc → close the panel / replay shell if one is open
+fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
+    use crossterm::event::KeyCode;
+
+    // Esc closes the panel or replay shell first; otherwise falls
+    // through to the global Esc handler.
+    if matches!(key.code, KeyCode::Esc) && key.modifiers.is_empty() {
+        if app.autopilot.panel_open {
+            return Some(vec![Action::AutopilotTogglePanel]);
+        }
+        if app.autopilot.replay_open {
+            return Some(vec![Action::AutopilotCloseReplay]);
+        }
+    }
+
+    // Space toggles the highlighted picker's selection.
+    if matches!(key.code, KeyCode::Char(' '))
+        && key.modifiers.is_empty()
+        && !app.autopilot.panel_open
+        && !app.autopilot.replay_open
+    {
+        return Some(vec![Action::AutopilotToggleSelect]);
+    }
+
+    // j / k move the picker cursor (vim-style).
+    if key.modifiers.is_empty() && !app.autopilot.panel_open && !app.autopilot.replay_open {
+        match key.code {
+            KeyCode::Char('j') => {
+                return Some(vec![Action::AutopilotMovePicker { delta: 1 }]);
+            }
+            KeyCode::Char('k') => {
+                return Some(vec![Action::AutopilotMovePicker { delta: -1 }]);
+            }
+            _ => {}
+        }
+    }
+
+    // `<o>` toggles the override panel. On any lane the global
+    // `keybinds.cycle_sort` (default plain `o`) is bound to
+    // `Action::CycleSortNext`; the Autopilot lane's `<o>` wins
+    // because it dispatches first.
+    if matches!(key.code, KeyCode::Char('o')) && key.modifiers.is_empty() {
+        return Some(vec![Action::AutopilotTogglePanel]);
+    }
+
+    // `<s>` starts the run. Validation lives in `apply_action`
+    // (`Action::AutopilotStart`); an empty selection or open
+    // panel / replay is a no-op there.
+    if matches!(key.code, KeyCode::Char('s')) && key.modifiers.is_empty() {
+        return Some(vec![Action::AutopilotStart]);
+    }
+
+    // Capital P opens the past-session replay.
+    if matches!(key.code, KeyCode::Char('P')) && key.modifiers.is_empty() {
+        return Some(vec![Action::AutopilotOpenReplay]);
+    }
+
+    None
 }
 
 /// The (content × action) dispatch. `Keybinds::resolve` gives the

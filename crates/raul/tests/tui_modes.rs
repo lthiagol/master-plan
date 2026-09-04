@@ -244,6 +244,15 @@ fn actions_have_required_variants() {
             | Action::FilterCancel
             | Action::ClearFilters
             | Action::RemoveFilterChip { .. } => "M204Filter",
+            // M215 / F-01: Autopilot lane production hot path —
+            // picker toggle / cursor, override panel open, start,
+            // replay open/close.
+            Action::AutopilotToggleSelect
+            | Action::AutopilotMovePicker { .. }
+            | Action::AutopilotTogglePanel
+            | Action::AutopilotStart
+            | Action::AutopilotOpenReplay
+            | Action::AutopilotCloseReplay => "M215Autopilot",
             // Force exhaustiveness — must compile, must use every variant.
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",
