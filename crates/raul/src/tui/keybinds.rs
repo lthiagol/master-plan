@@ -505,6 +505,36 @@ impl Keybinds {
         }
     }
 
+    /// M222 F-01 fix: production startup loader. Reads BOTH
+    /// the user-level `~/.config/raul/keybinds.toml` (or
+    /// `$XDG_CONFIG_HOME/raul/keybinds.toml`) AND the legacy
+    /// `[keybinds]` JSON section from `mp config show`,
+    /// composes them via [`Self::load_effective`] (precedence:
+    /// user TOML > legacy JSON > defaults), and returns the
+    /// resolved `Keybinds`. A missing user TOML is silent
+    /// (defaults are kept). A missing `mp` binary (legacy
+    /// source unavailable) is also silent — defaults are
+    /// kept. The function emits one migration hint to
+    /// stderr when the legacy `[keybinds]` section is read,
+    /// so operators learn about the newer surface without
+    /// flooding the log.
+    pub fn load_layered(runner: &crate::mp_runner::MpRunner) -> Self {
+        let json_config = runner.run::<serde_json::Value>("config", &["show"]).ok();
+        let toml_text = std::fs::read_to_string(Self::default_path()).ok();
+        let (kb, diags, hint_emitted) =
+            Self::load_effective(json_config.as_ref(), toml_text.as_deref());
+        if hint_emitted {
+            eprintln!(
+                "raul: keybinds loaded from legacy `mp config` [keybinds] section; \
+                 migrate to ~/.config/raul/keybinds.toml for the M222 surface"
+            );
+        }
+        for d in &diags {
+            eprintln!("raul: keybinds load — {} {}", d.field, d.message);
+        }
+        kb
+    }
+
     /// Mutable (config-name, field) pairs, used by `load_from_config` to
     /// apply overrides by name. Keeping this list next to the struct means a
     /// new action is a one-line addition here rather than a scattered edit.

@@ -406,7 +406,15 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     // on `App` so the same code path is unit-testable from
     // `app.rs::tests`.
     app.reconcile_active_lane_with_visible();
-    app.keybinds = crate::tui::keybinds::Keybinds::load(runner);
+    // M222 F-01: load BOTH the user-level keybinds.toml AND
+    // the legacy mp-config `[keybinds]` JSON via the layered
+    // loader (precedence: user TOML > legacy JSON > defaults).
+    // The previous `Keybinds::load(runner)` only read the
+    // legacy JSON, which meant a fresh cold start with
+    // `~/.config/raul/keybinds.toml` present never applied
+    // the user's overrides until the operator SIGHUP'd the
+    // process or triggered `Action::ReloadKeybinds`.
+    app.keybinds = crate::tui::keybinds::Keybinds::load_layered(runner);
 
     // M222: install the SIGHUP handler so `kill -HUP <raul-pid>`
     // requests a keybinds reload. The handler only flips a
