@@ -110,8 +110,8 @@
       "id": "AC-06",
       "description": "Pause stops new dispatch at the next boundary and Resume continues the same session; Cancel is terminal after confirmation and remains replayable; restarting after Cancel creates a new session from an explicitly selected queue; Steer sends a targeted one-off message through `mp autopilot control steer`.",
       "verification": "cargo nextest run -p raul --test autopilot_recovery_controls --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_recovery_controls --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-07",
@@ -261,7 +261,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_recovery_controls --no-fail-fast",
       "done_when": "AC-06 evidence is stamped via `mp milestone criterion pass 216 AC-06 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
