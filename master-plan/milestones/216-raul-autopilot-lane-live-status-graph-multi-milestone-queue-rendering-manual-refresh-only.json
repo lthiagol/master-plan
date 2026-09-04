@@ -3,9 +3,9 @@
     "id": "216",
     "title": "raul Autopilot lane — live status graph + multi-milestone queue rendering (manual refresh only)",
     "slug": "raul-autopilot-lane-live-status-graph-multi-milestone-queue-rendering-manual-refresh-only",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -32,7 +32,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.859401+00:00",
+    "lifecycle_at": "2026-09-04T04:30:00.217631+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -42,9 +42,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.205544+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-04T04:30:00.217633+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.205544+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-04T04:30:00.217633+00:00"
       },
       "specify": {
         "status": "done",
@@ -315,7 +323,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-04",
     "branch": "",
     "evidence": ""
   }
