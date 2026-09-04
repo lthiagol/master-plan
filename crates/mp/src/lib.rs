@@ -6,6 +6,7 @@ pub mod integration_test_map;
 pub use mp_model;
 pub mod backlog;
 pub mod bootstrap;
+pub mod breaking_release;
 pub mod brownfield;
 pub mod challenge;
 pub mod delta;

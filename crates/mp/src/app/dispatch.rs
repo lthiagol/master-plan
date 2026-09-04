@@ -5,6 +5,7 @@ use crate::commands::activity as cmd_activity_mod;
 use crate::commands::annotation as cmd_annotation_mod;
 use crate::commands::autopilot as cmd_autopilot_mod;
 use crate::commands::backlog as cmd_backlog_mod;
+use crate::commands::breaking_release as cmd_breaking_release_mod;
 use crate::commands::brief as cmd_brief_mod;
 use crate::commands::brownfield as cmd_brownfield_mod;
 use crate::commands::changelog as cmd_changelog_mod;
@@ -411,5 +412,9 @@ pub(super) fn run(cli: Cli) -> Result<()> {
             }
         }
         Commands::WatchControl { cmd } => super::watch_control::run(&ctx, cmd, format, fields),
+        Commands::BreakingRelease { cmd } => {
+            ctx.ensure_plan_exists()?;
+            cmd_breaking_release_mod::cmd_breaking_release(&ctx, cmd, format)
+        }
     }
 }

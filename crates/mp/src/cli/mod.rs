@@ -494,12 +494,36 @@ pub enum Commands {
     },
     /// M178 S3: structured watch control-plane subcommands. The
     /// foreground `mp watch <ids...>` invocation stays under
-    /// [`Commands::Watch`] for backcompat; `mp watch status|stop|output`
+    /// [`Commands::Watch`] for backcompat; `mp watch-control status|stop|output`
     /// are the new machine-client read surface.
     WatchControl {
         #[command(subcommand)]
         cmd: WatchControlCmd,
     },
+    /// M229 / AC-01: breaking-release cleanup gate.
+    ///
+    /// `preflight` is a read-only check that returns
+    /// `{ok: bool, blockers: [...], target_version, evidence_releases}`
+    /// describing whether the recorded next-major target version and
+    /// migration-window evidence (M208 + M219 shipped in at least one
+    /// release) are in place. `apply` writes the audit marker; it
+    /// refuses when the preflight does.
+    BreakingRelease {
+        #[command(subcommand)]
+        cmd: BreakingReleaseCmd,
+    },
+}
+
+/// M229 / AC-01: subcommands under `mp breaking-release`.
+#[derive(Subcommand, Debug)]
+pub enum BreakingReleaseCmd {
+    /// AC-01: read-only gate check. Returns `{ok, blockers[], target_version, evidence_releases}`.
+    /// Refuses removal work unless both the next-major target version and the
+    /// migration-window evidence are recorded.
+    Preflight,
+    /// AC-01: write the audit marker (`<plan_dir>/.mp/breaking_release.json`).
+    /// Refuses to apply unless the preflight is green.
+    Apply,
 }
 
 /// Subcommands under `mp migrate`.

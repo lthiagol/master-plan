@@ -4,6 +4,7 @@ pub(crate) mod annotation;
 pub(crate) mod archive;
 pub(crate) mod autopilot;
 pub(crate) mod backlog;
+pub(crate) mod breaking_release;
 pub(crate) mod brief;
 pub(crate) mod brownfield;
 pub(crate) mod challenge;
