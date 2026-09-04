@@ -23,7 +23,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -71,49 +71,49 @@
     {
       "id": "AC-01",
       "description": "A single-flight poller invokes session show plus autopilot status once per interval; slow calls are coalesced and never overlap. Fake-clock tests cover normal and overrun intervals.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poll_intervals --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Display polling pauses when Autopilot is unfocused and resumes when focused; a headless drive continues and accumulates session events while display polling is paused.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poll_focus_gating --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "Manual `r` triggers an immediate refresh; the poll timer is reset so it does not fire again immediately. Manual `p` toggles the poll on/off; the toggle state is visible in the lane footer.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Per-session `refresh_secs` override (set via D2's override panel) is honored; the polish default (2s) applies when no override.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poll_override_respected --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "The poller diffs API snapshots for rendering only and emits local UI StateChanged events with sequence/revision information; it never writes session state or relays progress to the orchestrator.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poll_state_diff --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "All UI refresh data comes from mp autopilot APIs. A fixture proves no `herdr agent prompt` is issued by raul and orchestration outcomes are unchanged when raul is absent.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_poller_observer_only --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
       "description": "Health and heartbeat timestamps returned by `mp autopilot status` are rendered without raul generating pulses. Responsive same-state agents remain healthy; stale status is displayed but escalation remains in mp.",
-      "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_health_rendering --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
