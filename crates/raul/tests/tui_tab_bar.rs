@@ -1220,7 +1220,8 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::AutopilotSteer { .. }
             | Action::AutopilotToggleViolation { .. }
             | Action::AutopilotOpenDetail { .. }
-            | Action::AutopilotCloseDetail => {
+            | Action::AutopilotCloseDetail
+            | Action::AutopilotTogglePoll => {
                 set.insert("OtherM136Action");
             }
             // M222: keybinds-reload action — non-input variant.

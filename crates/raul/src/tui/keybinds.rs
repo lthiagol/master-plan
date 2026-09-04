@@ -228,6 +228,16 @@ pub struct AutopilotLaneKeybinds {
     /// (default `D`, capital so it does not collide with
     /// `d:open_detail`).
     pub close_detail: Vec<KeyCombo>,
+    /// M217 AC-03: toggle the lane's auto-refresh on/off.
+    ///
+    /// Default `Ctrl-p`. The milestone spec names plain `p` for
+    /// this toggle, but M216 already ships `p` as *pause the
+    /// session* on this lane — a far more destructive action to
+    /// hit by accident. Rebinding pause would silently change a
+    /// shipped control, so the poll toggle takes the `Ctrl`
+    /// variant of the same mnemonic and users who want plain `p`
+    /// can set `toggle_poll = "p"` in `keybinds.toml`.
+    pub toggle_poll: Vec<KeyCombo>,
 }
 
 impl Default for AutopilotLaneKeybinds {
@@ -254,6 +264,7 @@ impl Default for AutopilotLaneKeybinds {
             steer: vec![plain(KeyCode::Char('t'))],
             open_detail: vec![plain(KeyCode::Char('d'))],
             close_detail: vec![shift_char('D')],
+            toggle_poll: vec![ctrl(KeyCode::Char('p'))],
         }
     }
 }
@@ -342,6 +353,7 @@ impl Default for Keybinds {
                 steer: vec![plain(KeyCode::Char('t'))],
                 open_detail: vec![plain(KeyCode::Char('d'))],
                 close_detail: vec![shift_char('D')],
+                toggle_poll: vec![ctrl(KeyCode::Char('p'))],
             },
         }
     }

@@ -155,7 +155,16 @@ fn watch_idle_deadline_ticks_without_input_or_end_of_stream() {
     let mut terminal = new_terminal();
     let mut app = App::new();
     app.select_lane(Lane::Autopilot);
-    app.watch_poller.last_poll = Some(Instant::now());
+    // M217 S8: the wait timeout now derives from the one
+    // Autopilot poller's remaining interval. Arm it with a 5s
+    // cadence and record a fire "now", so the loop's idle wait is
+    // the poll deadline (>2s) rather than the 24h input wait.
+    let mut poller = raul::tui::poll::AutopilotPoller::with_refresh_secs(5);
+    poller.set_focused(true);
+    let t = raul::tui::poll::now_ms();
+    poller.begin(t);
+    poller.finish(t);
+    app.autopilot_poller = poller;
     let mut clock = FrameClock::with_interval(Duration::ZERO);
     let mut sync = Vec::new();
     let mut source = IdleSource { waits: vec![] };

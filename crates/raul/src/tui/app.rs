@@ -701,12 +701,16 @@ pub struct App {
     /// legacy `watch` field above stays intact for the M179
     /// backcompat surface.
     pub autopilot: crate::tui::autopilot::AutopilotLaneState,
-    /// M179 S7: 2-5s poller state for the Autopilot lane. The
-    /// `run_loop`'s `on_idle` closure calls `poll_watch_state`
-    /// whenever the Autopilot lane is active; the Poller rate-limits
-    /// the underlying `mp watch-control status` / `output`
-    /// shell-outs.
-    pub watch_poller: crate::tui::watch::Poller,
+    /// M217: the Autopilot lane's display poller. The `run_loop`'s
+    /// `on_idle` closure calls `poll::poll_autopilot_lane` whenever
+    /// the Autopilot lane is focused; the poller owns the cadence
+    /// (session override > config > 2s default), the single-flight
+    /// lock, the focus gate, and the operator's on/off toggle.
+    ///
+    /// M217 AC-08 cutover: this replaces the M179 fixed-interval
+    /// `watch::Poller`. There is exactly one scheduler for the
+    /// lane.
+    pub autopilot_poller: crate::tui::poll::AutopilotPoller,
     /// Plan directory used by the Autopilot poller to refresh its bounded log cache.
     /// Defaults to `.` for tests and callers that do not override it.
     pub plan_dir: std::path::PathBuf,
@@ -829,7 +833,7 @@ impl App {
             settings: None,
             watch: crate::tui::watch::Watch::empty(),
             autopilot: crate::tui::autopilot::AutopilotLaneState::empty(),
-            watch_poller: crate::tui::watch::Poller::new(),
+            autopilot_poller: crate::tui::poll::AutopilotPoller::new(),
             plan_dir: std::path::PathBuf::from("."),
             pending_sort_writes: std::collections::BTreeMap::new(),
             pending_filter_writes: std::collections::BTreeMap::new(),

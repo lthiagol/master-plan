@@ -912,6 +912,11 @@ pub struct AutopilotLaneState {
     /// expanded in the status graph. `None` when no expansion is
     /// open; `Some(pane_id)` when the operator clicked a badge.
     pub expanded_violation: Option<String>,
+    /// M217 / AC-07: liveness + heartbeat as reported by
+    /// `mp autopilot status`, projected for display. `None` until
+    /// the first poll (or manual refresh) lands. raul renders this
+    /// verbatim — it generates no pulses and owns no escalation.
+    pub health: Option<crate::tui::poll::Health>,
 }
 
 impl AutopilotLaneState {
@@ -1059,6 +1064,11 @@ impl AutopilotLaneState {
 
     /// M216: timestamp the last manual refresh ran at.
     /// Empty string when no refresh has run.
+    /// M217 / AC-07: read-only view of the reported health.
+    pub fn health(&self) -> Option<&crate::tui::poll::Health> {
+        self.health.as_ref()
+    }
+
     pub fn last_refresh_at(&self) -> &str {
         &self.last_refresh_at
     }

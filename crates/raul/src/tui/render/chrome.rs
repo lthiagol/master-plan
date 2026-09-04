@@ -128,6 +128,20 @@ pub(super) fn footer_for(app: &App) -> String {
             }
         }
     }
+    // M217 / AC-03: the Autopilot lane carries its auto-refresh
+    // state on the per-tab footer line, so a *paused poll* is
+    // never misread as a *stalled drive*. The label also names
+    // the cadence and which link of the resolution chain supplied
+    // it (`poll: 9s (session)`), which is how AC-04's precedence
+    // becomes visible to the operator rather than only to a test.
+    if app.active_lane == Lane::Autopilot {
+        let indicator = app.autopilot_poller.footer_label();
+        if text.is_empty() {
+            text = format!(" {indicator} ");
+        } else {
+            text.push_str(&format!("  ·  {indicator}"));
+        }
+    }
     text
 }
 

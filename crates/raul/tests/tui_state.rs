@@ -672,68 +672,65 @@ fn render_compact_queue_omitted_when_empty() {
     assert!(q.contains("empty queue"));
 }
 
-// ─── M179 S7: poller ────────────────────────────────────────────
+// ─── M217 S8 cutover: the single Autopilot poller ───────────────
+//
+// M179's `watch::Poller` / `poll_watch_state` / `POLL_INTERVAL_MS`
+// tests lived here. M217 deleted that scheduler; the equivalents
+// now exercise `tui::poll::AutopilotPoller`, whose clock is
+// injected so the cadence assertions no longer depend on real
+// wall-clock time.
 
 #[test]
-fn poller_fires_on_first_call_and_respects_interval() {
-    use raul::tui::watch::Poller;
-    let mut p = Poller::new();
-    assert!(p.is_due(), "first call must always be due");
-    p.mark_fired();
-    // Immediately after firing, the next is_due must be false.
-    assert!(!p.is_due());
+fn poller_fires_on_lane_entry_then_respects_the_interval() {
+    use raul::tui::poll::{AutopilotPoller, PollDecision};
+    let mut p = AutopilotPoller::new();
+    p.set_focused(true);
+    assert_eq!(p.begin(0), PollDecision::Fire, "lane entry must poll");
+    p.finish(0);
+    assert_eq!(p.begin(500), PollDecision::NotDue);
+    assert_eq!(p.begin(2_000), PollDecision::Fire);
 }
 
 #[test]
-fn poller_synthetic_clock_advances_after_interval() {
-    use raul::tui::watch::Poller;
-    // The is_due check uses real wall-clock time. A synthetic
-    // clock test would need a clock injection point. The
-    // production codepath is one is_due() per run-loop tick;
-    // POLL_INTERVAL_MS=3s is verified by the test above + the
-    // constant test below.
-    let mut p = Poller::new();
-    p.mark_fired();
-    assert!(!p.is_due());
-}
-
-#[test]
-fn poll_interval_is_in_2_to_5_second_window() {
-    // M179 AC-06: the poll cadence is 2-5 seconds.
-    use raul::tui::watch::POLL_INTERVAL_MS;
+fn default_poll_cadence_is_in_the_2_to_5_second_window() {
+    use raul::tui::poll::AutopilotPoller;
+    let secs = AutopilotPoller::new().refresh_secs();
     assert!(
-        (2000..=5000).contains(&POLL_INTERVAL_MS),
-        "POLL_INTERVAL_MS must be in [2000, 5000]; got {POLL_INTERVAL_MS}"
+        (2..=5).contains(&secs),
+        "default cadence must be in [2, 5]s; got {secs}"
     );
 }
 
-// F-08 / AC-06: poll_watch_state MUST bump app.version() on every
-// due poll so the run_loop's `needs_render = true` path fires. The
-// previous implementation mutated app.watch.status directly without
-// calling touch(), so the dirty signal never flipped and the screen
-// redrew only on the next keypress — breaking AC-06's "update
-// without a keypress" promise. This test would have caught that
-// (the version stays invariant without the bump). The MpRunner is
-// pointed at a nonexistent binary; the runner's spawn failure is
-// swallowed by `unwrap_or(Value::Null)` inside poll_watch_state,
-// so the function still completes its mutation + touch() path.
+// The dirty-signal contract M179 F-08 pinned, carried forward: a
+// poll that changes state must call `app.touch()` so `run_loop`
+// sets `needs_render`. The runner points at a nonexistent binary,
+// so every payload degrades to `Value::Null` — which is still a
+// *change* on the first poll (None → Some snapshot), so the
+// version must move exactly once and then stay put.
 #[test]
-fn poll_watch_state_bumps_app_version_on_due_poll() {
+fn poll_autopilot_lane_bumps_version_only_when_state_changes() {
     use raul::mp_runner::MpRunner;
-    use raul::tui::watch::{poll_watch_state, Poller};
+    use raul::tui::poll::poll_autopilot_lane;
 
-    let runner = MpRunner::with_mp_bin("/nonexistent/mp/for/f08/test");
+    let runner = MpRunner::with_mp_bin("/nonexistent/mp/for/m217/test");
     let mut app = App::new();
-    let mut poller = Poller::new();
-    let version_before = app.version();
+    app.autopilot_poller.set_focused(true);
+    let before = app.version();
 
-    let _ = poll_watch_state(&runner, &mut app, &mut poller)
-        .expect("poll must not bubble runner spawn failures");
-
+    poll_autopilot_lane(&runner, &mut app, 0);
+    let after_first = app.version();
     assert_ne!(
+        after_first, before,
+        "the first poll establishes a snapshot and must bump the version"
+    );
+
+    // Second poll, one interval later, same (null) payloads → no
+    // redraw. This is the AC-05 diffing guarantee.
+    poll_autopilot_lane(&runner, &mut app, 10_000);
+    assert_eq!(
         app.version(),
-        version_before,
-        "poll_watch_state must call app.touch() so run_loop sets needs_render (F-08 / AC-06)"
+        after_first,
+        "an unchanged snapshot must not bump the version (AC-05)"
     );
 }
 

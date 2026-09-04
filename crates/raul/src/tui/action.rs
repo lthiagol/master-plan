@@ -62,7 +62,9 @@ pub enum Action {
     /// Left / Right on a focused `choice` key — cycle through `allowed`.
     /// `forward = true` moves Right (next), `false` moves Left (prev).
     /// The change is staged; no editor opens.
-    SettingsCycleChoice { forward: bool },
+    SettingsCycleChoice {
+        forward: bool,
+    },
 
     // ---- tab bar focus ------------------------------------------------------
     /// Move to the previous lane in `Lane::ordered()` (Left / h).
@@ -148,7 +150,10 @@ pub enum Action {
     /// is `app.active_lane`. A chip's `x` click is dispatched
     /// through the mouse handler with this action; the lane
     /// is read from the live `App` state.
-    RemoveFilterChip { dim: String, value: String },
+    RemoveFilterChip {
+        dim: String,
+        value: String,
+    },
     /// Move to the next lane in `Lane::ordered()` (Right / l).
     NextLane,
     /// Jump to a specific lane by `Lane::ordered()` index (digit keys 1..=N,
@@ -249,10 +254,14 @@ pub enum Action {
     WatchRefresh,
     /// Move the picker cursor up/down on the Watch lane
     /// (`j` / `k`).
-    WatchMovePicker { delta: i64 },
+    WatchMovePicker {
+        delta: i64,
+    },
     /// Move the queue cursor up/down on the Watch lane
     /// (`J` / `K`).
-    WatchMoveQueue { delta: i64 },
+    WatchMoveQueue {
+        delta: i64,
+    },
     /// Clear all queue selections on the Watch lane (`c`).
     WatchClearQueue,
 
@@ -263,7 +272,9 @@ pub enum Action {
     AutopilotToggleSelect,
     /// Move the picker cursor up/down on the Autopilot lane
     /// (`j` / `k`). Routes through the typed Picker.
-    AutopilotMovePicker { delta: i64 },
+    AutopilotMovePicker {
+        delta: i64,
+    },
     /// Toggle the per-drive override panel open / closed (`o` on
     /// the Autopilot lane). First open constructs a default
     /// [`crate::tui::autopilot::OverridePanel`]; subsequent
@@ -293,6 +304,10 @@ pub enum Action {
     /// detail_panel / ac_detail / telemetry fields. Triggered
     /// by `<r>` on the Autopilot lane. No legacy
     /// `autopilot-control` command, no direct plan-file read.
+    /// M217 / AC-03: toggle the Autopilot lane's auto-refresh
+    /// on/off. Triggered by `ap.toggle_poll` (default `Ctrl-p`).
+    /// Display-only: pausing the poll never pauses the drive.
+    AutopilotTogglePoll,
     AutopilotRefresh,
     /// M216 AC-06: pause the live session. Shells out to
     /// `mp autopilot control pause <session>` and updates the
@@ -314,17 +329,23 @@ pub enum Action {
     /// M216 AC-06: send a one-off steer message to the live
     /// session through `mp autopilot control steer <session>
     /// --message <MSG>`.
-    AutopilotSteer { message: String },
+    AutopilotSteer {
+        message: String,
+    },
     /// M216 AC-04: toggle the violation badge expansion. The
     /// renderer reads `app.autopilot.expanded_violation` to
     /// decide whether to draw the click-to-expand panel under
     /// the badge. Re-toggling with the same pane id closes the
     /// expansion.
-    AutopilotToggleViolation { pane_id: String },
+    AutopilotToggleViolation {
+        pane_id: String,
+    },
     /// M216 AC-05: enter the detail panel for the given
     /// milestone. The renderer consumes the typed
     /// [`crate::tui::autopilot::DetailPanel`] when this is set.
-    AutopilotOpenDetail { milestone_id: String },
+    AutopilotOpenDetail {
+        milestone_id: String,
+    },
     /// M216 AC-05: leave the detail panel.
     AutopilotCloseDetail,
 
@@ -841,13 +862,11 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             crate::tui::watch::stop_watch(runner, app, 30)?;
         }
         Action::WatchRefresh => {
-            // Same `mem::take` pattern as the production on_idle
-            // closure — `poll_watch_state` needs `&mut app` and
-            // `&mut app.watch_poller`, which overlap.
-            let mut poller = std::mem::take(&mut app.watch_poller);
-            let result = crate::tui::watch::poll_watch_state(runner, app, &mut poller);
-            app.watch_poller = poller;
-            result?;
+            // M217 / AC-08: the legacy `poll_watch_state` scheduler is
+            // gone; the M179 `WatchRefresh` alias now routes through
+            // the one coalescing poller's manual path, so there is a
+            // single refresh implementation behind both keys.
+            crate::tui::poll::manual_refresh_lane(runner, app, crate::tui::poll::now_ms());
         }
         Action::WatchMovePicker { delta } => {
             app.watch.move_picker(delta);
@@ -966,7 +985,20 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // DetailPanel / AcDetail / Telemetry fields from the
             // two payloads. No `autopilot-control` command, no
             // direct plan-file read.
-            crate::tui::autopilot::refresh::refresh_lane(app, runner);
+            //
+            // M217 AC-03: the manual path now goes through the
+            // poller so it also *resets the poll timer* — an
+            // operator `r` must not be followed a few milliseconds
+            // later by an automatic poll of the same data.
+            crate::tui::poll::manual_refresh_lane(runner, app, crate::tui::poll::now_ms());
+        }
+        Action::AutopilotTogglePoll => {
+            // M217 AC-03: flip auto-refresh on/off. The state is
+            // rendered in the lane footer so a paused poll is never
+            // mistaken for a stalled drive. Turning the poll back
+            // on arms one immediate request (not a burst).
+            app.autopilot_poller.toggle_enabled();
+            app.touch();
         }
         Action::AutopilotPause => {
             // M216 AC-06: pause via `mp autopilot control pause

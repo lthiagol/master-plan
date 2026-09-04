@@ -471,12 +471,18 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
             }
             app.touch();
         }
-        let autopilot_lane_active = app.active_lane == crate::tui::app::Lane::Autopilot;
-        if autopilot_lane_active {
-            let mut poller = std::mem::take(&mut app.watch_poller);
-            let result = crate::tui::watch::poll_watch_state(runner, app, &mut poller);
-            app.watch_poller = poller;
-            result?;
+        // M217: the Autopilot lane's auto-refresh. The focus gate
+        // lives in the poller (AC-02) rather than in this hook, so
+        // "unfocused" is an observable decision instead of an
+        // early return: `set_focused(false)` pauses display polling
+        // and `set_focused(true)` arms exactly one catch-up-free
+        // request. The poller is observer-only (AC-06) — it issues
+        // `mp autopilot session show` + `mp autopilot status` and
+        // nothing else, so closing raul cannot affect a drive.
+        let autopilot_focused = app.active_lane == crate::tui::app::Lane::Autopilot;
+        app.autopilot_poller.set_focused(autopilot_focused);
+        if autopilot_focused {
+            crate::tui::poll::poll_autopilot_lane(runner, app, crate::tui::poll::now_ms());
         }
         // M204: debounced flush — write pending sort/filter changes
         // through `mp config set` once the 500ms window has elapsed.
@@ -514,11 +520,6 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
         on_idle,
         on_quit,
     )
-}
-
-#[allow(dead_code)]
-pub(crate) fn fire_watch_tick(_app: &mut App, _runner: &MpRunner) -> Result<()> {
-    Ok(())
 }
 
 /// M134: the heart of the smoothness work. Generic over the ratatui backend
@@ -649,7 +650,13 @@ where
         // Autopilot uses its polling deadline; other lanes wait effectively
         // indefinitely for input.
         let timeout = if app.active_lane == Lane::Autopilot {
-            app.watch_poller.time_until_due()
+            // M217 / AC-08: the single scheduler. The wait timeout is
+            // the poller's own remaining interval, so there is no
+            // second fixed-interval clock racing this one.
+            Duration::from_millis(
+                app.autopilot_poller
+                    .time_until_due_ms(crate::tui::poll::now_ms()),
+            )
         } else {
             Duration::from_secs(24 * 60 * 60)
         };
@@ -1569,24 +1576,5 @@ mod tests {
             app.version() > before,
             "scrollbar track click must bump the version (dirty signal)"
         );
-    }
-
-    /// M179: `fire_watch_tick` is now a no-op stub. The M164-era
-    /// tests that drove the deadline re-arm path are gone — manual
-    /// Overview refresh (r/R) is the only refresh path. M179 S7
-    /// will reintroduce polling under a new entry point (the
-    /// Watch-tab `on_idle` hook in `run_loop`).
-    #[test]
-    fn fire_watch_tick_is_a_noop() {
-        let mut app = App::new();
-        let runner = match MpRunner::new() {
-            Ok(r) => r,
-            Err(_) => {
-                eprintln!("skipping: mp binary not resolvable");
-                return;
-            }
-        };
-        super::fire_watch_tick(&mut app, &runner)
-            .expect("fire_watch_tick must remain a no-op post-M179");
     }
 }

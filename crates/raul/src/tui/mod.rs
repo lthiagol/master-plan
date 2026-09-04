@@ -14,6 +14,7 @@ pub mod modes;
 pub mod mouse;
 pub mod palette;
 pub mod path_view;
+pub mod poll;
 pub mod progress;
 pub mod render;
 pub mod runner;

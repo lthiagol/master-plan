@@ -322,6 +322,13 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
         return Some(vec![Action::AutopilotCloseDetail]);
     }
 
+    // M217 AC-03: toggle auto-refresh (default `Ctrl-p`). Checked
+    // after the M216 bindings so a user who rebinds `toggle_poll`
+    // onto an M216 key does not silently shadow it.
+    if any_matches(&ap.toggle_poll, &key) {
+        return Some(vec![Action::AutopilotTogglePoll]);
+    }
+
     None
 }
 

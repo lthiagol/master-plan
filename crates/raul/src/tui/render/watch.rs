@@ -118,7 +118,16 @@ fn render_lifecycle(frame: &mut Frame, app: &App, area: Rect) {
             .and_then(|st| st.get("current_lifecycle"))
             .and_then(|c| c.as_str())
     });
-    let graph = watch::render_lifecycle_graph(current);
+    let mut graph = watch::render_lifecycle_graph(current);
+    // M217 / AC-07: append the liveness + heartbeat badge reported
+    // by `mp autopilot status`. Rendered verbatim — raul emits no
+    // pulses of its own, and a `stale` marker is informational
+    // (the badge says "escalation: mp" so the operator knows raul
+    // is not the component that will act on it).
+    if let Some(health) = app.autopilot.health() {
+        graph.push('\n');
+        graph.push_str(&health.badge());
+    }
     let title = " Lifecycle (M178) ";
     let p = Paragraph::new(graph)
         .block(Block::default().borders(Borders::ALL).title(title))

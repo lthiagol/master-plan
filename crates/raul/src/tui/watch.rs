@@ -964,124 +964,20 @@ pub fn render_compact_queue(app: &App) -> String {
 
 // ─── S7: non-blocking poller ─────────────────────────────────────
 
-/// M179 S7: poll cadence in milliseconds. 3s sits in the
-/// middle of the 2-5s spec window; long enough to avoid
-/// sub-second redraw storms, short enough to feel live.
-pub const POLL_INTERVAL_MS: u64 = 3_000;
-
-/// M179 S7: track the last poll timestamp so the run loop
-/// decides whether to fire a refresh on the next idle tick.
-/// `None` means "poll on the first opportunity".
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Poller {
-    pub last_poll: Option<std::time::Instant>,
-}
-
-impl Poller {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// True when the poller is due (>= POLL_INTERVAL_MS since
-    /// the last poll). On the first call, always true (so the
-    /// initial snapshot lands on lane entry).
-    pub fn is_due(&self) -> bool {
-        match self.last_poll {
-            None => true,
-            Some(t) => t.elapsed().as_millis() as u64 >= POLL_INTERVAL_MS,
-        }
-    }
-
-    /// Mark the poller as just-fired. Called after every
-    /// successful `mp watch-control status` / `output` call.
-    pub fn mark_fired(&mut self) {
-        self.last_poll = Some(std::time::Instant::now());
-    }
-
-    pub fn time_until_due(&self) -> std::time::Duration {
-        match self.last_poll {
-            None => std::time::Duration::ZERO,
-            Some(last) => {
-                std::time::Duration::from_millis(POLL_INTERVAL_MS).saturating_sub(last.elapsed())
-            }
-        }
-    }
-}
-
-/// M179 S7 / AC-06: poll the M178 control surface and update
-/// `app.watch.status` (and `app.watch.output` when the active
-/// role changed). Bounded: a single call does at most one
-/// `mp watch-control status` and (when the active role flipped)
-/// one `mp watch-control output`. Returns the per-poll elapsed
-/// milliseconds so the caller can throttle the run loop.
-///
-/// The poller is intentionally a no-op when no run is attached
-/// (i.e., `status.is_none()`); S9 / S11 wire the "open the
-/// tab with a recorded state" path that pre-populates the
-/// status snapshot.
-///
-/// F-08: every successful poll calls `app.touch()` so the run
-/// loop can detect the version bump and set `needs_render = true`.
-/// Without this, the screen would not refresh until the next
-/// keypress — breaking AC-06's "update without a keypress" promise.
-pub fn poll_watch_state(
-    runner: &crate::mp_runner::MpRunner,
-    app: &mut App,
-    poller: &mut Poller,
-) -> Result<u64> {
-    if !poller.is_due() {
-        return Ok(0);
-    }
-    let start = std::time::Instant::now();
-    let status_before = app.watch.status.clone();
-    let output_before = app.watch.output.clone();
-    let log_before = app.watch.log_tail.clone();
-    // 1) Always refresh the control-plane status (cheap; <50ms).
-    let status_payload = runner
-        .run("watch-control", &["status", "--format", "json"])
-        .unwrap_or(Value::Null);
-    app.watch.status = Some(parse_status(&status_payload));
-    // 2) Refresh the active-role output only if the active role
-    //    changed since the last poll. M179 S8: this is the
-    //    "automatically switch pane output as the active role
-    //    changes" pin.
-    let new_active_role = app
-        .watch
-        .status
-        .as_ref()
-        .and_then(|s| s.raw.get("state"))
-        .and_then(|st| st.get("active_role"))
-        .and_then(|r| r.as_str())
-        .map(String::from);
-    let prev_active_role = app.watch.output.as_ref().map(|o| o.role.clone());
-    let role_changed = new_active_role != prev_active_role;
-    if role_changed {
-        if let Some(role) = &new_active_role {
-            // F-02: previously `runner.run(&args.join(" "), &[])`
-            // passed a space-joined string as the subcommand
-            // (mp rejects it as an unrecognized subcommand).
-            // Mirror `fetch_active_output`: pass the subcommand
-            // ("watch-control") as the first arg and the rest as
-            // `extra_args`.
-            let payload = runner
-                .run(
-                    "watch-control",
-                    &["output", "--format", "json", "--role", role.as_str()],
-                )
-                .unwrap_or(Value::Null);
-            app.watch.output = Some(parse_output(&payload));
-        }
-    }
-    app.watch.log_tail = tail_watch_log(&app.plan_dir, 8);
-    poller.mark_fired();
-    if app.watch.status != status_before
-        || app.watch.output != output_before
-        || app.watch.log_tail != log_before
-    {
-        app.touch();
-    }
-    Ok(start.elapsed().as_millis() as u64)
-}
+// ─── S7 → M217 cutover ───────────────────────────────────────────
+//
+// M179's fixed-interval `Poller` + `poll_watch_state` lived here.
+// M217 replaced them with the single coalescing, focus-gated
+// poller in `crate::tui::poll`, which is the lane's only
+// scheduler: it owns the cadence (session override > config >
+// 2s default), the single-flight lock, and the state diff that
+// suppresses no-op redraws.
+//
+// Deliberately not re-exported under the old names — a second
+// scheduler is the failure mode this cutover exists to prevent,
+// so the legacy entry points are gone rather than deprecated.
+// `tail_watch_log` below survives as a *pull* helper for the
+// renderer's log pane; nothing schedules it.
 
 /// M179 S8: shell out to `mp watch-control output` and update
 /// `app.watch.output`. Bounded: `max_bytes` (default 4096),
