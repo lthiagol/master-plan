@@ -119,7 +119,15 @@ fn corrupt_config_surfaces_doctor_warning() {
     let config_path = env.tmp.path().join("master-plan/config.json");
     fs::write(&config_path, "{[[[ not valid json").unwrap();
 
-    let out = env.run(&["doctor", "--format", "json"]);
+    // CI runners ship without `herdr` on PATH; doctor gates
+    // `report.ok` on the herdr shape check, so without this stub
+    // the test would exit non-zero and `out.status.success()`
+    // would fail even though the W50 warning is correctly
+    // emitted. The stub satisfies `which_herdr` + the
+    // `agent start --help` / `pane split --help` shape probes
+    // (`crates/mp/src/autopilot/drive/herdr_version.rs`).
+    let path = crate::common::fake_herdr::install_fake_herdr_for_doctor(&env);
+    let out = env.run_with_env(&[("PATH", &path)], &["doctor", "--format", "json"]);
     assert!(out.status.success(), "doctor should exit 0 on warnings");
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     let checks = json["checks"].as_array().expect("checks array");
