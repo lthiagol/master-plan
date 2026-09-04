@@ -195,15 +195,7 @@ fn canonical_autopilot_subcommands_are_warning_free() {
     // without exercising real plan state. The deprecation warning
     // must never leak into any of these.
     for sub in [
-        "start",
-        "status",
-        "stop",
-        "output",
-        "result",
-        "session",
-        "note",
-        "config",
-        "migrate",
+        "start", "status", "stop", "output", "result", "session", "note", "config", "migrate",
     ] {
         let out = run_autopilot(&env, &[sub, "--help"]);
         let stderr = String::from_utf8_lossy(&out.stderr);
