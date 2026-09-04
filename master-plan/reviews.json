@@ -2047,6 +2047,14 @@
       "reviewed_at": "2026-09-04",
       "notes": "Cycle 2 re-review (tightened blockers-only). Verified F-01/F-02/F-03/F-04 fixes at the cited commits. F-01 (a42180d): AC-01 + docs/tui/usage.md + suite_mouse_lanes test all aligned — AC-01 now reads 'Milestones, Backlog, Ideas, Overview, and Autopilot ... Path click is detail-open only ... Settings click selection is deferred to a follow-up milestone'; test renamed click_on_settings_row_is_noop_for_selection and now asserts Settings click is a no-op (selected_index + settings.selected_idx unchanged). F-02 (6296c67): 2 new Path double-click tests added — path_double_click_drills_into_next_action_milestone + path_double_click_with_missing_milestone_sets_flash_message — both green. F-03 (a42180d): bundled with F-01; AC text now distinguishes Path click as detail-open only. F-04 (dede151): wheel_on_settings_advances_selected_idx assertion tightened from >= to > with explicit selected_idx=0 seed. Full M221 surface: 40/40 mouse tests pass (5 suites: lanes 7, details 9, scroll 9, disabled 7, coordinate_mapping 8). Full raul suite: 1222/1222 pass. cargo fmt clean. No new findings. Verdict: ok → terminal (lifecycle=complete).",
       "milestone_completed_at": "2026-09-04"
+    },
+    {
+      "milestone_id": "222",
+      "verdict": "ok",
+      "reviewer": "reviewer-222",
+      "reviewed_at": "2026-09-04",
+      "notes": "Cycle 3 final re-review: cold-build verification (cargo nextest -p raul -E 'test(/keybind|m22[12]|startup_load/)') = 41/41 pass (38 base + 3 new F-03 tests). F-03 fix verified at 4977cd2: 3 new tests in m222_f01_startup_loader.rs (1) startup_load_layered_applies_user_level_toml_via_real_runner calls Keybinds::load_layered(&runner) directly with a real MpRunner::new() — production-path; (2) startup_load_layered_with_no_user_toml_returns_defaults fallback pin; (3) runner_rs_417_calls_load_layered_at_startup reads runner.rs and asserts the app.keybinds= line calls load_layered — catches a future revert of runner.rs:417 to Keybinds::load(runner). Mental revert verified: if runner.rs:417 reverted, the source-pin test fails with the regressed line quoted. cargo fmt --check exit 0; cargo clippy -p raul --tests --no-deps -- -D warnings exit 0. F-01 (a82c5fb) and F-02 (e59e84a) fix-in-place verified at cycle 2 (unchanged this cycle). All 3 findings fixed (F-01, F-02, F-03). Verdict: ok — terminal.",
+      "milestone_completed_at": "2026-09-04"
     }
   ],
   "comments": [
