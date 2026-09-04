@@ -284,6 +284,15 @@ pub enum Action {
     /// Close the past-session mode (`Esc` while the replay shell
     /// is open).
     AutopilotCloseReplay,
+
+    // ---- M222: keybinds reload (cross-platform) ---------------------------
+    /// Reload `~/.config/raul/keybinds.toml`. On Unix the same
+    /// effect happens when the process receives SIGHUP — the
+    /// signal handler only flips a flag; the actual parse +
+    /// swap runs on the next event-loop tick. The explicit
+    /// action is reachable on every platform so Windows / macOS
+    /// non-Unix shells can still trigger the reload.
+    ReloadKeybinds,
 }
 
 /// Apply an `Action` to `app`. This is the single place that mutates `App`
@@ -905,6 +914,29 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         }
         Action::AutopilotCloseReplay => {
             app.autopilot.close_replay();
+        }
+        Action::ReloadKeybinds => {
+            // M222: parse the user-level keybinds.toml and swap the
+            // binding map into `app.keybinds` only if the parse
+            // succeeds. A failed load preserves the previous map
+            // (see `Keybinds::try_reload`); we surface the
+            // diagnostic as an `eprintln!` so it lands in the
+            // captured stderr without blocking the dispatcher.
+            let path = crate::tui::keybinds::Keybinds::default_path();
+            let (diags, swapped) = app.keybinds.try_reload(&path);
+            if !swapped {
+                if let Some(d) = diags.first() {
+                    eprintln!(
+                        "raul: keybinds reload rejected — {} {}",
+                        d.field, d.message
+                    );
+                }
+            } else {
+                for d in &diags {
+                    eprintln!("raul: keybinds reload — {} {}", d.field, d.message);
+                }
+            }
+            app.touch();
         }
     }
 

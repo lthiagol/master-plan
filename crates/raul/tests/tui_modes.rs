@@ -257,6 +257,13 @@ fn actions_have_required_variants() {
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",
             Action::PushInputChar(_) => "PushInputChar",
+            // M222: the explicit keybinds-reload action is
+            // exposed through the global lookup but only fired
+            // by the SIGHUP idle tick and the explicit
+            // `Action::ReloadKeybinds` plumbing; the dispatch
+            // surface here is a no-op label so the exhaustive
+            // match doesn't break when the variant lands.
+            Action::ReloadKeybinds => "ReloadKeybinds",
         }
     }
     assert_eq!(exhaustive(Action::Quit), "Quit");

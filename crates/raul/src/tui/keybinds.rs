@@ -1736,6 +1736,95 @@ impl Keybinds {
         let _ = previous;
         (warnings, true)
     }
+
+    /// M222: reload from the default user-level TOML path
+    /// (`~/.config/raul/keybinds.toml` or `$XDG_CONFIG_HOME/raul/keybinds.toml`).
+    /// Returns the swap outcome and any recoverable diagnostics.
+    /// See [`Self::try_reload`] for failure semantics.
+    pub fn reload_from_default_path(&mut self) -> (Vec<Diagnostic>, bool) {
+        self.try_reload(&Self::default_path())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// M222: SIGHUP-style reload-request flag.
+//
+// `kill -HUP <pid>` (or `killall -HUP raul`) requests a reload of
+// `~/.config/raul/keybinds.toml`. The signal handler itself does
+// nothing — it just flips the atomic flag below. The actual parse
+// + atomic swap happens on the next event-loop tick so I/O runs
+// from the regular Tokio / main thread, not the signal handler.
+//
+// On non-Unix the flag is unused; callers fall through to
+// `Action::ReloadKeybinds` (the platform-neutral action surface)
+// which performs the same parse + swap. This means the explicit
+// reload path is testable end-to-end; the SIGHUP path is a thin
+// wire-up that only adds the flag.
+//
+// We deliberately do NOT use `signal-hook` here so the
+// dep-audit gate (≤100 transitive) stays green. `libc::signal`
+// is in the existing transitive set (crossterm pulls it).
+#[cfg(unix)]
+pub mod sighup {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    /// The flag the SIGHUP handler flips. Atomic so the
+    /// handler can write without holding any lock and the
+    /// event loop can poll without races.
+    static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+    /// Called by the main thread exactly once, early in
+    /// `runner::run_tui_inner`, to install the SIGHUP handler.
+    /// Idempotent — a second call leaves the flag unset and
+    /// returns `Ok(())`.
+    pub fn install() -> Result<(), String> {
+        // SAFETY: `libc::signal` is async-signal-safe per its
+        // signature (the handler we pass reads/writes a single
+        // atomic bool, no allocation, no syscalls beyond
+        // `Ordering::Relaxed`). The Rust standard library does
+        // not guarantee signal-handler safety for arbitrary
+        // code, but an `AtomicBool::store` is on every
+        // platform's signal-safe list because it compiles
+        // down to a single `mov` on architectures we ship to.
+        extern "C" fn handler(_sig: libc::c_int) {
+            RELOAD_REQUESTED.store(true, Ordering::Relaxed);
+        }
+        let prev = unsafe {
+            libc::signal(libc::SIGHUP, handler as *const () as libc::sighandler_t)
+        };
+        if prev == libc::SIG_ERR {
+            return Err("failed to install SIGHUP handler".to_string());
+        }
+        Ok(())
+    }
+
+    /// Returns `true` exactly once per `SIGHUP` delivery.
+    /// The event loop polls this on every idle tick.
+    pub fn consume_request() -> bool {
+        RELOAD_REQUESTED.swap(false, Ordering::Relaxed)
+    }
+
+    /// Test/diagnostic helper — let the runner simulate a SIGHUP
+    /// from another test. Public so the integration tests can
+    /// exercise the SIGHUP-driven path without spawning a child
+    /// process.
+    pub fn simulate_sighup() {
+        RELOAD_REQUESTED.store(true, Ordering::Relaxed);
+    }
+}
+
+#[cfg(not(unix))]
+pub mod sighup {
+    /// On non-Unix the explicit `Action::ReloadKeybinds` is the
+    /// only reload surface; SIGHUP is a no-op shell so the API
+    /// stays uniform.
+    pub fn install() -> Result<(), String> {
+        Ok(())
+    }
+    pub fn consume_request() -> bool {
+        false
+    }
+    pub fn simulate_sighup() {}
 }
 
 /// M222: intermediate view of a `keybinds.toml` body — sections

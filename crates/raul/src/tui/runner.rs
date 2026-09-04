@@ -408,6 +408,17 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
     app.reconcile_active_lane_with_visible();
     app.keybinds = crate::tui::keybinds::Keybinds::load(runner);
 
+    // M222: install the SIGHUP handler so `kill -HUP <raul-pid>`
+    // requests a keybinds reload. The handler only flips a
+    // flag; the actual reload happens on the next event-loop
+    // tick in `on_idle` (the I/O runs from the main thread, not
+    // a signal handler). On non-Unix the call is a no-op so
+    // Windows / non-Unix shells fall through to the explicit
+    // `Action::ReloadKeybinds` action.
+    if let Err(e) = crate::tui::keybinds::sighup::install() {
+        eprintln!("raul: keybinds SIGHUP install failed: {e}");
+    }
+
     // M143: prime the LaneCache with the live plan-dir mtime so external
     // writes that bump mtime invalidate cached entries on the next read.
     // The cache starts at mtime=0 (from `App::new`) and would otherwise
@@ -429,6 +440,32 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
 
     // The idle hook drives the rate-limited Autopilot poller.
     let on_idle = move |app: &mut App| -> Result<()> {
+        // M222: SIGHUP-driven keybinds reload. The signal
+        // handler only flips an atomic flag; we do the
+        // file I/O + parse here on the main thread so the
+        // handler stays async-signal-safe. The reload is
+        // itself atomic from `Keybinds::try_reload`'s
+        // perspective — a failing swap keeps the previous
+        // map intact.
+        if crate::tui::keybinds::sighup::consume_request() {
+            let (diags, swapped) = app.keybinds.reload_from_default_path();
+            if !swapped {
+                if let Some(d) = diags.first() {
+                    eprintln!(
+                        "raul: keybinds SIGHUP reload rejected — {} {}",
+                        d.field, d.message
+                    );
+                }
+            } else if !diags.is_empty() {
+                for d in &diags {
+                    eprintln!(
+                        "raul: keybinds SIGHUP reload — {} {}",
+                        d.field, d.message
+                    );
+                }
+            }
+            app.touch();
+        }
         let autopilot_lane_active = app.active_lane == crate::tui::app::Lane::Autopilot;
         if autopilot_lane_active {
             let mut poller = std::mem::take(&mut app.watch_poller);

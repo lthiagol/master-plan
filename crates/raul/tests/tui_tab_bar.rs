@@ -1214,6 +1214,10 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::AutopilotCloseReplay => {
                 set.insert("OtherM136Action");
             }
+            // M222: keybinds-reload action — non-input variant.
+            Action::ReloadKeybinds => {
+                set.insert("OtherM136Action");
+            }
         }
     }
     classify(Action::PageUp, &mut variants);
