@@ -49,7 +49,15 @@ fn plan_relocate_renames_dir_and_updates_location() {
     assert!(!env.tmp.path().join(".mp").is_dir());
 
     // doctor should be green (MP_HOME and project root need pointing)
-    let doctor = lib_api::run(&env, &["doctor", "--format", "json"]);
+    //
+    // CI runners ship without `herdr` on PATH; doctor gates
+    // `report.ok` on the herdr shape check, so a bare doctor call
+    // would exit non-zero under CI even though the plan itself is
+    // healthy. Stub a herdr that satisfies the `which_herdr` +
+    // `agent start --help` / `pane split --help` shape probes so
+    // the test stays self-contained.
+    let path = crate::common::fake_herdr::install_fake_herdr_for_doctor(&env);
+    let doctor = env.run_with_env(&[("PATH", &path)], &["doctor", "--format", "json"]);
     assert!(
         doctor.status.success(),
         "doctor should pass after relocate: {}",
