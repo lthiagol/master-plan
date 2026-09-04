@@ -107,8 +107,8 @@
       "id": "AC-06",
       "description": "All UI refresh data comes from mp autopilot APIs. A fixture proves no `herdr agent prompt` is issued by raul and orchestration outcomes are unchanged when raul is absent.",
       "verification": "cargo nextest run -p raul --test autopilot_poller_observer_only --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poller_observer_only --no-fail-fast exit 0 (12/12 pass)"
     },
     {
       "id": "AC-07",
@@ -258,7 +258,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poller_observer_only --no-fail-fast",
       "done_when": "AC-06 evidence stamped via `mp milestone criterion pass 217 AC-06 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],

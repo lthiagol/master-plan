@@ -44,7 +44,15 @@ pub fn render_watch_lane(frame: &mut Frame, app: &App, area: Rect) {
     let right_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // lifecycle graph (one line + border)
+            // M217 / AC-07: the block grows to 4 rows when a health
+            // badge is present (graph line + badge line + border);
+            // 3 rows otherwise, preserving the pre-M217 layout for
+            // sessions that have not been polled yet.
+            Constraint::Length(if app.autopilot.health().is_some() {
+                4
+            } else {
+                3
+            }),
             Constraint::Length(7), // compact queue (up to 5 rows)
             Constraint::Min(5),    // log + output split
         ])
