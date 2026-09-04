@@ -246,13 +246,25 @@ fn actions_have_required_variants() {
             | Action::RemoveFilterChip { .. } => "M204Filter",
             // M215 / F-01: Autopilot lane production hot path —
             // picker toggle / cursor, override panel open, start,
-            // replay open/close.
+            // replay open/close. M216 adds the live status graph +
+            // refresh + recovery + detail + AC detail + telemetry
+            // actions. The exhaustive-match label bucket is shared
+            // so a future action lands here too.
             Action::AutopilotToggleSelect
             | Action::AutopilotMovePicker { .. }
             | Action::AutopilotTogglePanel
             | Action::AutopilotStart
             | Action::AutopilotOpenReplay
-            | Action::AutopilotCloseReplay => "M215Autopilot",
+            | Action::AutopilotCloseReplay
+            | Action::AutopilotRefresh
+            | Action::AutopilotPause
+            | Action::AutopilotResume
+            | Action::AutopilotCancel
+            | Action::AutopilotRestart
+            | Action::AutopilotSteer { .. }
+            | Action::AutopilotToggleViolation { .. }
+            | Action::AutopilotOpenDetail { .. }
+            | Action::AutopilotCloseDetail => "M215Autopilot",
             // Force exhaustiveness — must compile, must use every variant.
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",

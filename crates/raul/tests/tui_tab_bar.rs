@@ -1211,7 +1211,16 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::AutopilotTogglePanel
             | Action::AutopilotStart
             | Action::AutopilotOpenReplay
-            | Action::AutopilotCloseReplay => {
+            | Action::AutopilotCloseReplay
+            | Action::AutopilotRefresh
+            | Action::AutopilotPause
+            | Action::AutopilotResume
+            | Action::AutopilotCancel
+            | Action::AutopilotRestart
+            | Action::AutopilotSteer { .. }
+            | Action::AutopilotToggleViolation { .. }
+            | Action::AutopilotOpenDetail { .. }
+            | Action::AutopilotCloseDetail => {
                 set.insert("OtherM136Action");
             }
             // M222: keybinds-reload action — non-input variant.

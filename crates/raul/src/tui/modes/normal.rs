@@ -263,6 +263,65 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
         return Some(vec![Action::AutopilotOpenReplay]);
     }
 
+    // M216 AC-03: `ap.refresh` (default `r`) triggers the manual
+    // refresh. The dispatcher shells out to `mp autopilot session
+    // show <id>` + `mp autopilot status` and repopulates the
+    // lane's status_graph / queue_view / violations / detail_panel
+    // / ac_detail / telemetry fields.
+    if any_matches(&ap.refresh, &key) {
+        return Some(vec![Action::AutopilotRefresh]);
+    }
+
+    // M216 AC-06: pause / resume / cancel / restart.
+    if any_matches(&ap.pause, &key) {
+        return Some(vec![Action::AutopilotPause]);
+    }
+    if any_matches(&ap.resume, &key) {
+        return Some(vec![Action::AutopilotResume]);
+    }
+    if any_matches(&ap.cancel, &key) {
+        return Some(vec![Action::AutopilotCancel]);
+    }
+    if any_matches(&ap.restart, &key) {
+        return Some(vec![Action::AutopilotRestart]);
+    }
+
+    // M216 AC-06: steer — send a one-off message through
+    // `mp autopilot control steer`. The handler reads the
+    // buffer's last line as the message body; the buffer is the
+    // picker input (no lane-level input field yet — pre-M217
+    // surface). The keybind is the contract.
+    if any_matches(&ap.steer, &key) {
+        return Some(vec![Action::AutopilotSteer {
+            message: String::new(),
+        }]);
+    }
+
+    // M216 AC-05: open / close the detail pane. `<d>` enters
+    // detail for the picker cursor's milestone (or the active
+    // queue item when a session is loaded); capital `D` closes.
+    if any_matches(&ap.open_detail, &key) {
+        let milestone_id = app
+            .autopilot
+            .picker
+            .cursor_candidate()
+            .map(|c| c.id.clone())
+            .or_else(|| {
+                app.autopilot
+                    .queue_view
+                    .as_ref()
+                    .and_then(|qv| qv.active_milestone_id().map(|s| s.to_string()))
+            })
+            .unwrap_or_default();
+        if milestone_id.is_empty() {
+            return None;
+        }
+        return Some(vec![Action::AutopilotOpenDetail { milestone_id }]);
+    }
+    if any_matches(&ap.close_detail, &key) {
+        return Some(vec![Action::AutopilotCloseDetail]);
+    }
+
     None
 }
 

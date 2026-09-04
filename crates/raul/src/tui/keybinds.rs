@@ -176,9 +176,11 @@ pub struct Keybinds {
 /// M222: per-lane keymap for the Autopilot lane. The six actions
 /// correspond to the hardcoded shapes `handle_autopilot_lane_key`
 /// matched pre-M222 (Space / j / k / o / s / capital P / Esc).
-/// Defaults preserve the pre-M222 behavior exactly so swapping the
-/// dispatcher to consult this struct is no-op for users without a
-/// `keybinds.toml` file.
+/// M216 adds: manual refresh (`r`), pause (`p`), resume (`R`),
+/// steer (`T`), restart (`S` for shift+s), open detail (`d`), and
+/// close detail (`D`). Defaults preserve the pre-M216 behavior
+/// for the legacy bindings and add the M216 bindings so a user
+/// without `keybinds.toml` gets the full M216 surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutopilotLaneKeybinds {
     /// Toggle the highlighted picker's selection (default Space).
@@ -197,14 +199,44 @@ pub struct AutopilotLaneKeybinds {
     /// global `escape` so the per-mode handler can re-use it
     /// without a second field).
     pub close: Vec<KeyCombo>,
+    /// M216 AC-03: manual refresh — re-reads `mp autopilot
+    /// session show <id>` and `mp autopilot status`. Default `r`.
+    /// On the lane this binding shadows the global `r:resolve` /
+    /// `Ctrl-R:refresh` so the operator can refresh without
+    /// taking hands off the home row.
+    pub refresh: Vec<KeyCombo>,
+    /// M216 AC-06: pause the live session (default `p`).
+    pub pause: Vec<KeyCombo>,
+    /// M216 AC-06: resume a paused session (default `R`,
+    /// capital so it does not collide with the resume path
+    /// bound through `mp autopilot start --resume`).
+    pub resume: Vec<KeyCombo>,
+    /// M216 AC-06: cancel the live session (default `c`).
+    pub cancel: Vec<KeyCombo>,
+    /// M216 AC-06: restart from the explicit queue (default
+    /// `S`, capital so it does not collide with `s: start`).
+    pub restart: Vec<KeyCombo>,
+    /// M216 AC-06: steer — send a one-off message through
+    /// `mp autopilot control steer`. Default `t`. The message
+    /// is sourced from the lane's input buffer; the keybind
+    /// opens the input first.
+    pub steer: Vec<KeyCombo>,
+    /// M216 AC-05: open the per-milestone detail pane (default
+    /// `d`).
+    pub open_detail: Vec<KeyCombo>,
+    /// M216 AC-05: close the per-milestone detail pane
+    /// (default `D`, capital so it does not collide with
+    /// `d:open_detail`).
+    pub close_detail: Vec<KeyCombo>,
 }
 
 impl Default for AutopilotLaneKeybinds {
     /// The defaults mirror the pre-M222 hardcoded matches in
-    /// `modes::normal::handle_autopilot_lane_key` exactly. Keeping
-    /// this `impl` (instead of `#[derive(Default)]`) means a
-    /// future field addition gets a default too — otherwise the
-    /// struct silently degenerates to empty Vecs.
+    /// `modes::normal::handle_autopilot_lane_key` exactly, plus
+    /// the M216 recovery + detail bindings. Keeping this `impl`
+    /// (instead of `#[derive(Default)]`) means a future field
+    /// addition gets a default too — otherwise the struct
+    /// silently degenerates to empty Vecs.
     fn default() -> Self {
         Self {
             select: vec![plain(KeyCode::Char(' '))],
@@ -214,6 +246,14 @@ impl Default for AutopilotLaneKeybinds {
             start: vec![plain(KeyCode::Char('s'))],
             replay: vec![plain(KeyCode::Char('P'))],
             close: vec![plain(KeyCode::Esc)],
+            refresh: vec![plain(KeyCode::Char('r'))],
+            pause: vec![plain(KeyCode::Char('p'))],
+            cancel: vec![plain(KeyCode::Char('c'))],
+            resume: vec![shift_char('R')],
+            restart: vec![shift_char('S')],
+            steer: vec![plain(KeyCode::Char('t'))],
+            open_detail: vec![plain(KeyCode::Char('d'))],
+            close_detail: vec![shift_char('D')],
         }
     }
 }
@@ -294,6 +334,14 @@ impl Default for Keybinds {
                 start: vec![plain(KeyCode::Char('s'))],
                 replay: vec![plain(KeyCode::Char('P'))],
                 close: vec![plain(KeyCode::Esc)],
+                refresh: vec![plain(KeyCode::Char('r'))],
+                pause: vec![plain(KeyCode::Char('p'))],
+                cancel: vec![plain(KeyCode::Char('c'))],
+                resume: vec![shift_char('R')],
+                restart: vec![shift_char('S')],
+                steer: vec![plain(KeyCode::Char('t'))],
+                open_detail: vec![plain(KeyCode::Char('d'))],
+                close_detail: vec![shift_char('D')],
             },
         }
     }

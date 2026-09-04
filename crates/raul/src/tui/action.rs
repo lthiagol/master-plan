@@ -285,6 +285,49 @@ pub enum Action {
     /// is open).
     AutopilotCloseReplay,
 
+    // ---- M216: live status graph + queue + refresh + recovery --------
+    /// M216 AC-03: manual refresh. Reads `mp autopilot session
+    /// show <id>` and `mp autopilot status` through the
+    /// [`crate::tui::autopilot`] adapters and repopulates the
+    /// lane's status_graph / queue_view / violations /
+    /// detail_panel / ac_detail / telemetry fields. Triggered
+    /// by `<r>` on the Autopilot lane. No legacy
+    /// `autopilot-control` command, no direct plan-file read.
+    AutopilotRefresh,
+    /// M216 AC-06: pause the live session. Shells out to
+    /// `mp autopilot control pause <session>` and updates the
+    /// lane's last_refresh_at so the renderer reflects the new
+    /// control-plane status.
+    AutopilotPause,
+    /// M216 AC-06: resume a paused session. Shells out to
+    /// `mp autopilot control resume <session>`.
+    AutopilotResume,
+    /// M216 AC-06: cancel the live session. Terminal — once
+    /// cancelled the session is replayable only via the past-
+    /// session mode. Shells out to
+    /// `mp autopilot control cancel <session> --confirm`.
+    AutopilotCancel,
+    /// M216 AC-06: restart a cancelled session from an
+    /// explicitly-selected queue. Builds a new session via
+    /// `mp autopilot start <ids...> --detach`.
+    AutopilotRestart,
+    /// M216 AC-06: send a one-off steer message to the live
+    /// session through `mp autopilot control steer <session>
+    /// --message <MSG>`.
+    AutopilotSteer { message: String },
+    /// M216 AC-04: toggle the violation badge expansion. The
+    /// renderer reads `app.autopilot.expanded_violation` to
+    /// decide whether to draw the click-to-expand panel under
+    /// the badge. Re-toggling with the same pane id closes the
+    /// expansion.
+    AutopilotToggleViolation { pane_id: String },
+    /// M216 AC-05: enter the detail panel for the given
+    /// milestone. The renderer consumes the typed
+    /// [`crate::tui::autopilot::DetailPanel`] when this is set.
+    AutopilotOpenDetail { milestone_id: String },
+    /// M216 AC-05: leave the detail panel.
+    AutopilotCloseDetail,
+
     // ---- M222: keybinds reload (cross-platform) ---------------------------
     /// Reload `~/.config/raul/keybinds.toml`. On Unix the same
     /// effect happens when the process receives SIGHUP — the
@@ -914,6 +957,120 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         }
         Action::AutopilotCloseReplay => {
             app.autopilot.close_replay();
+        }
+        Action::AutopilotRefresh => {
+            // M216 AC-03: route through the typed refresh adapter
+            // that shells out to `mp autopilot session show <id>`
+            // and `mp autopilot status` together. The adapter
+            // builds the StatusGraph / QueueView / violations /
+            // DetailPanel / AcDetail / Telemetry fields from the
+            // two payloads. No `autopilot-control` command, no
+            // direct plan-file read.
+            crate::tui::autopilot::refresh::refresh_lane(app, runner);
+        }
+        Action::AutopilotPause => {
+            // M216 AC-06: pause via `mp autopilot control pause
+            // <session>`. The CLI command is a future surface;
+            // the raul client builds the argv so the wiring is
+            // present the day the command lands.
+            let Some(session_id) = app.autopilot.active_session_id() else {
+                return Ok(());
+            };
+            let argv =
+                crate::tui::autopilot::RecoveryControl::pause_argv(&session_id);
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+        }
+        Action::AutopilotResume => {
+            let Some(session_id) = app.autopilot.active_session_id() else {
+                return Ok(());
+            };
+            let argv =
+                crate::tui::autopilot::RecoveryControl::resume_argv(&session_id);
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+        }
+        Action::AutopilotCancel => {
+            // Terminal action. The cancel command requires
+            // `--confirm` to avoid footguns; the client always
+            // passes it. The lane state is then collapsed to
+            // "replay-only" so a future restart builds a new
+            // session rather than reviving cancelled state.
+            let Some(session_id) = app.autopilot.active_session_id() else {
+                return Ok(());
+            };
+            let argv =
+                crate::tui::autopilot::RecoveryControl::cancel_argv(&session_id);
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+            app.autopilot.mark_session_cancelled();
+        }
+        Action::AutopilotRestart => {
+            // M216 AC-06: restart after a cancel creates a NEW
+            // session from the explicitly-selected picker ids.
+            // The previous session stays terminal + replayable;
+            // the operator lands on the new session in the lane.
+            let ids = app.autopilot.picker.queue_ids();
+            if ids.is_empty() {
+                return Ok(());
+            }
+            let payload = app
+                .autopilot
+                .panel()
+                .cloned()
+                .unwrap_or_default()
+                .to_session_overrides();
+            let argv = crate::tui::autopilot::RecoveryControl::start_argv(
+                ids,
+                &payload,
+            );
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+        }
+        Action::AutopilotSteer { message } => {
+            // M216 AC-06: targeted one-off steer message. The
+            // session id is optional — when the lane has no
+            // active session we no-op rather than guess.
+            let Some(session_id) = app.autopilot.active_session_id() else {
+                return Ok(());
+            };
+            let argv = crate::tui::autopilot::RecoveryControl::steer_argv(
+                &session_id,
+                &message,
+            );
+            let _ = runner.run_raw_allow_failure(
+                "autopilot",
+                &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+        }
+        Action::AutopilotToggleViolation { pane_id } => {
+            // Toggle the expanded violation. The status graph
+            // reads `app.autopilot.expanded_violation` to decide
+            // whether to draw the click-to-expand panel below
+            // the badge.
+            if app.autopilot.expanded_violation.as_deref() == Some(pane_id.as_str())
+            {
+                app.autopilot.expanded_violation = None;
+            } else {
+                app.autopilot.expanded_violation = Some(pane_id);
+            }
+        }
+        Action::AutopilotOpenDetail { milestone_id } => {
+            // M216 AC-05: open the per-milestone detail pane.
+            // The renderer reads `app.autopilot.detail_milestone`
+            // + `detail_panel` together.
+            app.autopilot.detail_milestone = Some(milestone_id);
+        }
+        Action::AutopilotCloseDetail => {
+            app.autopilot.detail_milestone = None;
         }
         Action::ReloadKeybinds => {
             // M222: parse the user-level keybinds.toml and swap the
