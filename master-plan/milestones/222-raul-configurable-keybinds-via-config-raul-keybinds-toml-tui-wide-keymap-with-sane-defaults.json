@@ -20,7 +20,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-03",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -69,49 +69,49 @@
     {
       "id": "AC-01",
       "description": "At startup one shared Keybinds service loads global and per-lane overrides. With no file, every existing default remains unchanged; lanes do not parse the file independently.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "A fixture remaps autopilot.pause to F1, reloads, and proves F1 invokes the canonical pause action while the prior Space binding no longer does; other actions retain defaults.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_override_dispatch --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "Unknown actions warn and are ignored; malformed keys or conflicting bindings reject only the affected section and retain its previous/default map. Diagnostics name section, action, and value without aborting raul.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_invalid_entries --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "Reload parses and validates a complete candidate before atomically swapping it. SIGHUP requests reload on Unix without doing I/O in the signal handler; an explicit reload action works on all platforms. Reload does not wait for user input, and failure preserves the previous map.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_reload --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance.",
-      "verification": "cargo nextest run -p raul --test tui_settings --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test settings_keybind_view --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "The action registry enumerates every configurable global and lane action. Unknown names cannot shadow actions; global recovery actions remain reachable; duplicate key assignments within an active section are rejected with deterministic diagnostics.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_action_registry --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
       "description": "Parser regressions cover the full documented key surface: underscore and dash aliases, double_quote/double-quote, page_up/page-down, BackTab/Backtab/back-tab, mixed case, modifiers, and combinations such as Ctrl+double-quote and Ctrl+page-up.",
-      "verification": "cargo nextest run -p raul --test keybinds_v2 --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test keybind_parser_aliases --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
