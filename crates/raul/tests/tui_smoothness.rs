@@ -625,3 +625,214 @@ fn quit_event_terminates_loop_without_extra_redraw() {
         frame_clock.redraws
     );
 }
+
+// ---------------------------------------------------------------------------
+// M217 / AC-08 — auto-refresh cutover: one scheduler, no jank
+//
+// The M179 fixed-interval Watch Poller and the dead
+// `fire_watch_tick` stub are deleted now that the coalescing
+// poller is wired. Two things must hold afterwards:
+//
+//   * **One scheduler.** No legacy poller type, no second fixed
+//     interval, no scheduled log-tail read. The loop's idle wait
+//     comes from the one poller's remaining interval.
+//   * **No jank.** Auto-refresh must not touch the hot path: the
+//     gate decision is pure and allocation-free-ish, unchanged
+//     snapshots produce zero redraws, and the frame budget is
+//     still enforced by `FrameClock` — the poller never renders
+//     synchronously and never blocks the event loop when it is
+//     not due.
+// ---------------------------------------------------------------------------
+
+fn raul_src_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("tui")
+}
+
+fn read_src(name: &str) -> String {
+    let path = raul_src_dir().join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
+}
+
+#[test]
+fn m217_ac08_legacy_watch_poller_and_fire_watch_tick_are_deleted() {
+    let watch = read_src("watch.rs");
+    for gone in [
+        "pub struct Poller",
+        "POLL_INTERVAL_MS",
+        "pub fn poll_watch_state",
+        "fn mark_fired",
+    ] {
+        assert!(
+            !watch.contains(gone),
+            "watch.rs must no longer define {gone:?} — M217 replaced it with tui::poll"
+        );
+    }
+    let runner = read_src("runner.rs");
+    assert!(
+        !runner.contains("fire_watch_tick"),
+        "the dead fire_watch_tick stub must be gone"
+    );
+    assert!(
+        !runner.contains("watch_poller"),
+        "App::watch_poller is replaced by App::autopilot_poller"
+    );
+}
+
+#[test]
+fn m217_ac08_no_second_scheduler_remains() {
+    // Exactly one module owns a poll cadence, and exactly one call
+    // site drives it from the idle hook.
+    let runner = read_src("runner.rs");
+    assert_eq!(
+        runner.matches("poll_autopilot_lane").count(),
+        1,
+        "the idle hook must drive the poller from a single call site"
+    );
+    assert!(
+        runner.contains("time_until_due_ms"),
+        "the loop's idle wait must derive from the one poller's interval"
+    );
+    let watch = read_src("watch.rs");
+    assert!(
+        !watch.contains("tail_watch_log(&app.plan_dir"),
+        "no scheduled log-tail read may remain — the renderer pulls the tail instead"
+    );
+}
+
+#[test]
+fn m217_ac08_poll_gate_is_pure_and_cheap_on_the_hot_path() {
+    // `decide` is called on every idle iteration. It must be a
+    // pure predicate: no I/O, no allocation, no mutation. Called
+    // a million times it must not change the poller.
+    use raul::tui::poll::{AutopilotPoller, PollDecision};
+    let mut p = AutopilotPoller::with_refresh_secs(5);
+    p.set_focused(true);
+    p.begin(0);
+    p.finish(0);
+    let before = p.clone();
+    let start = Instant::now();
+    for _ in 0..1_000_000 {
+        assert_eq!(p.decide(1_000), PollDecision::NotDue);
+    }
+    let elapsed = start.elapsed();
+    assert_eq!(before, p, "decide() must not mutate the poller");
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "1M gate checks took {elapsed:?} — the gate is on the idle hot path and must stay trivial"
+    );
+}
+
+#[test]
+fn m217_ac08_idle_polling_adds_no_redraws_when_nothing_changes() {
+    // The jank guard that matters: with auto-refresh on and a
+    // session that is not moving, the loop must not redraw. A
+    // poller that dirtied the app on every tick would repaint the
+    // whole screen every 2s forever.
+    use raul::mp_runner::MpRunner;
+    use raul::tui::poll::poll_autopilot_lane;
+
+    let runner = MpRunner::with_mp_bin("/nonexistent/mp/for/m217/ac08");
+    let mut app = App::new();
+    app.select_lane(Lane::Autopilot);
+    app.autopilot_poller.set_focused(true);
+
+    // First poll establishes the snapshot (one legitimate redraw).
+    poll_autopilot_lane(&runner, &mut app, 0);
+    let after_first = app.version();
+
+    let mut redraw_bumps = 0;
+    for now in (2_000..120_000).step_by(2_000) {
+        let before = app.version();
+        poll_autopilot_lane(&runner, &mut app, now);
+        if app.version() != before {
+            redraw_bumps += 1;
+        }
+    }
+    assert_eq!(
+        redraw_bumps, 0,
+        "an unchanged session polled for two simulated minutes must not dirty the app once"
+    );
+    assert_eq!(app.version(), after_first);
+}
+
+#[test]
+fn m217_ac08_frame_budget_still_gates_redraws_with_the_poller_wired() {
+    // The FrameClock is the frame budget. With the poller present,
+    // a burst of input must still be coalesced into far fewer
+    // redraws than events — auto-refresh must not bypass the gate.
+    let events: Vec<CrosstermEvent> = (0..200).map(|_| make_j_key()).collect();
+    let mut source = VecSource::new(events);
+    let mut app = app_with_n_milestones(500);
+    app.select_lane(Lane::Autopilot);
+    app.autopilot_poller.set_focused(true);
+    let mut frame_clock = FrameClock::with_interval(Duration::from_millis(16));
+    let mut terminal = new_terminal();
+    let mut sync_buf = Vec::new();
+
+    run_loop(
+        &mut terminal,
+        &mut app,
+        &mut frame_clock,
+        &mut sync_buf,
+        &mut source,
+        test_dispatch,
+        // The idle hook mirrors production: mirror focus, then poll.
+        // No runner here — the point is that the gate keeps the hook
+        // cheap, so the frame budget is what limits redraws.
+        |app| {
+            app.autopilot_poller
+                .set_focused(app.active_lane == Lane::Autopilot);
+            let _ = app.autopilot_poller.decide(raul::tui::poll::now_ms());
+            Ok(())
+        },
+        |_app| {},
+    )
+    .expect("loop");
+
+    assert!(
+        frame_clock.redraws < 20,
+        "200 events must coalesce into far fewer than 20 redraws even with the poller wired; got {}",
+        frame_clock.redraws
+    );
+}
+
+#[test]
+fn m217_ac08_poll_never_renders_synchronously_from_the_gate() {
+    // A `decide`/`begin` that is not due must perform zero work
+    // beyond the comparison — in particular it must not fetch and
+    // must not touch the app. This is what keeps the idle hook off
+    // the frame budget.
+    use raul::mp_runner::MpRunner;
+    use raul::tui::poll::poll_autopilot_lane;
+
+    let runner = MpRunner::with_mp_bin("/nonexistent/mp/for/m217/ac08");
+    let mut app = App::new();
+    app.autopilot_poller.set_focused(true);
+    poll_autopilot_lane(&runner, &mut app, 0);
+    let fired_after_first = app.autopilot_poller.fired_count();
+    let version_after_first = app.version();
+
+    // Every millisecond inside the first 2s interval — i.e. every
+    // not-due iteration the idle hook performs between two polls.
+    let start = Instant::now();
+    for now in 1..2_000u64 {
+        poll_autopilot_lane(&runner, &mut app, now);
+    }
+    let elapsed = start.elapsed();
+    assert_eq!(
+        app.autopilot_poller.fired_count(),
+        fired_after_first,
+        "not-due iterations must not shell out"
+    );
+    assert_eq!(
+        app.version(),
+        version_after_first,
+        "not-due iterations must not dirty the app"
+    );
+    assert!(
+        elapsed < Duration::from_millis(250),
+        "2k not-due idle iterations took {elapsed:?} — the not-due path must be free"
+    );
+}

@@ -114,8 +114,8 @@
       "id": "AC-07",
       "description": "Health and heartbeat timestamps returned by `mp autopilot status` are rendered without raul generating pulses. Responsive same-state agents remain healthy; stale status is displayed but escalation remains in mp.",
       "verification": "cargo nextest run -p raul --test autopilot_health_rendering --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_health_rendering --no-fail-fast exit 0 (13/13 pass)"
     },
     {
       "id": "AC-08",
@@ -279,7 +279,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_health_rendering --no-fail-fast",
       "done_when": "AC-07 evidence stamped via `mp milestone criterion pass 217 AC-07 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
