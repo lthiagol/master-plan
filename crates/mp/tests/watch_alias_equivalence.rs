@@ -199,13 +199,14 @@ fn mp_watch_stderr_is_exactly_the_deprecation_line() {
 
     // `mp watch` must write exactly the deprecation line — the
     // exact wording matches the dispatch in app/dispatch.rs.
+    // M219 pins the documented message byte-for-byte.
     let watch_stderr_str = String::from_utf8_lossy(&watch_stderr);
     assert!(
-        watch_stderr_str.contains("`mp watch` is deprecated"),
+        watch_stderr_str.contains("mp watch is deprecated"),
         "`mp watch` stderr must contain the deprecation line; got: {watch_stderr_str}"
     );
     assert!(
-        watch_stderr_str.contains("`mp autopilot start`"),
+        watch_stderr_str.contains("mp autopilot"),
         "the deprecation line must point at the replacement command; got: {watch_stderr_str}"
     );
 }

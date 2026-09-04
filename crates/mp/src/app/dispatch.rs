@@ -367,12 +367,15 @@ pub(super) fn run(cli: Cli) -> Result<()> {
             force,
             detach,
         } => {
+            // M219: emit the canonical deprecation notice on stderr
+            // before any other work, so the warning fires for every
+            // legacy `mp watch` invocation regardless of plan state.
+            // The legacy `mp watch` walks the same code path as
+            // `mp autopilot start`, so exit codes and stdout remain
+            // identical; the only difference is the single deprecation
+            // line below. Wording is pinned by AC-03 byte-for-byte.
+            eprintln!("mp watch is deprecated; use 'mp autopilot' instead.");
             ctx.ensure_plan_exists()?;
-            // M208: deprecation notice on stderr. The legacy `mp watch`
-            // walks the same code path as `mp autopilot start` so exit
-            // codes and stdout are identical; the only difference is the
-            // single deprecation line below.
-            eprintln!("warning: `mp watch` is deprecated; use `mp autopilot start` instead");
             cmd_watch_mod::cmd_watch(
                 &ctx,
                 ids,
