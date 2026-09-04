@@ -81,16 +81,20 @@ pub(crate) fn cmd_autopilot_drive(
     detach: bool,
     format: Fmt,
 ) -> Result<()> {
-    // M218 / AC-01 + AC-03: autopilot hard gate — refuse to start
-    // when herdr is missing or below the required version. Fires
-    // BEFORE any plan-state write (lazy auto-set), BEFORE any spawn
-    // operation, and BEFORE the dry-run split so the legacy `mp
-    // watch` and `mp autopilot start` paths share the same gate
-    // behavior. `--force` does NOT bypass (herdr is required by
-    // design; `--force` keeps its M178 double-spawn-guard role).
-    if let Err(err) = crate::autopilot::check_autopilot_herdr_gate_default() {
-        emit(format, &GateReport::from_error(&err))?;
-        return Err(crate::ExitCode(err.exit_code).into());
+    // M218 / AC-01 + AC-03: bare `mp autopilot start` (no milestone
+    // ids) refuses immediately when herdr is missing — the operator
+    // gets the structured `autopilot_herdr_gate` envelope with exit
+    // 78 before any config read or dry-run preview. When ids ARE
+    // present, the gate is deferred: topology preflight and harness
+    // preconditions surface first (M226 F-03, M151 AC-04), and
+    // `--dry-run` with ids emits the log-path preview without
+    // requiring herdr (M229 F-01). The spawn-time gate below covers
+    // the live path once preconditions are green.
+    if ids.is_empty() {
+        if let Err(err) = crate::autopilot::check_autopilot_herdr_gate_default() {
+            emit(format, &GateReport::from_error(&err))?;
+            return Err(crate::ExitCode(err.exit_code).into());
+        }
     }
 
     let mut cfg = store::load_config(ctx);
@@ -195,6 +199,29 @@ pub(crate) fn cmd_autopilot_drive(
 
     if dry_run {
         return cmd_autopilot_drive_dry_run(ctx, &ids, &cfg, &log_path, preconditions, format);
+    }
+
+    // Live path with milestone ids: surface precondition failures
+    // (unknown harness, log-path unwritable, role resolution, …)
+    // before the herdr hard gate so operators see the actionable
+    // check name instead of a generic herdr-missing refusal.
+    if !preconditions.ok {
+        let report = DriveReport {
+            dry_run: false,
+            log_file: log_path.to_string_lossy().to_string(),
+            preconditions,
+            sequencer: None,
+        };
+        emit(format, &report)?;
+        return Err(crate::ExitCode(2).into());
+    }
+
+    // M218 spawn gate: herdr must be present before any subprocess
+    // work. Runs after topology preflight + green preconditions so
+    // typed refusals win over the generic gate envelope.
+    if let Err(err) = crate::autopilot::check_autopilot_herdr_gate_default() {
+        emit(format, &GateReport::from_error(&err))?;
+        return Err(crate::ExitCode(err.exit_code).into());
     }
 
     // M178 S3 / AC-02: detach-safe mode. The starting client exits as
