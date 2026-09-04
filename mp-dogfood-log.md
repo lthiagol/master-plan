@@ -36,6 +36,19 @@ this file actually uses (entries 23+).
 
 <!-- Add newest entries at the top. -->
 
+## Entry 50 — 2026-09-03 — Three pre-existing mp test failures confirmed across multiple milestones (M217, M228, M229)  <!-- points-at: M231 -->
+
+- When:           2026-09-03, autopilot orchestration session driving M217 (auto-refresh), M228 (post-cutover cleanup), and M229 (breaking-release cleanup). mp-herdr-log2.txt documents the sessions.
+- Command:        `NEXTTEST=1 make test` (or `cargo nextest run --profile ci --no-fail-fast --manifest-path Cargo.toml`).
+- Observed:       3 pre-existing test failures confirmed red at c2ebe69 (M217 merge commit), in a separate worktree without the in-flight milestone's diff:
+  1. `mp autopilot::migrate::tests::idempotent_re_run_is_a_no_op` — the migrated session is missing the 'orchestrator' property on the topology. Migration code (added in M208) drops a property on re-run.
+  2. `mp::scenarios_runner run_implemented_scenarios` — env-dependent golden drift. When `herdr` is on PATH, the runner adds extra readiness messages the goldens don't expect. The test only passes in a stripped env.
+  3. `mp-oracle::mini_schema_parity parity_real_schemas_compile_and_reject_empty` — the oracle's expected schema list was never updated when `autopilot-session.schema.json` was added (M207). The test still uses the pre-autopilot schema list.
+- Suspected:      Three independent bugs in the autopilot migration code (added in M208), the scenarios test (env-sensitive), and the oracle test (stale schema list). NOT regressions from M217, M228, or M229 — all three are pre-existing at c2ebe69.
+- Verdict:        **bug** — 3 confirmed bugs. NOT M217/M228/M229 regressions. The runners correctly identified these and documented them; the reviewer correctly accepted as backlog rather than blocking the milestones.
+- One-line:       3 pre-existing mp test failures at c2ebe69: `migrate::idempotent_re_run_is_a_no_op` (M208 regression), `scenarios_runner::run_implemented_scenarios` (env drift), `oracle::mini_schema_parity` (stale schema list).
+- Status:         **bug** — confirmed pre-existing across 3 milestones. The fix is out of scope for the autopilot batch. Either: (a) absorb into a future mp-cleanup milestone, or (b) fix opportunistically during the next autopilot work. Filed here so the audit trail captures the 3 backlog items.
+
 ## Entry 49 — 2026-09-03 — Runner implements autopilot primitives but does not wire them into production hot path (no-production-caller pattern)  <!-- points-at: M228 -->
 
 - When:           2026-09-03, autopilot orchestration session driving M225 (restart + reconciliation) and M226 (end-to-end certification). mp-herdr-log2.txt documents the full session.
