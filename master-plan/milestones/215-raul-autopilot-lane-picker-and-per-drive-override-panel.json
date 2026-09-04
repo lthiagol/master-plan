@@ -3,9 +3,9 @@
     "id": "215",
     "title": "raul Autopilot lane — picker and per-drive override panel",
     "slug": "raul-autopilot-lane-picker-and-per-drive-override-panel",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -21,7 +21,7 @@
     "effort": "L",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-02",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -29,7 +29,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T01:06:39.559020+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-04T01:11:14.577524+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -43,9 +44,17 @@
         "status": "done",
         "at": "2026-09-04T01:06:39.559022+00:00"
       },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T01:11:14.577525+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.176292+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-04T01:11:14.577525+00:00"
       },
       "self-review": {
         "status": "done",
@@ -214,5 +223,20 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "no_production_caller",
+      "description": "M215 ships the typed model (tui::autopilot::{Picker, OverridePanel, ReplayShell}) but does NOT wire it into the Autopilot lane's UI hot path.\n\nEvidence:\n1. Picker has no caller in action.rs/keybinds.rs/render/. The Autopilot lane still renders via render_watch_lane (crates/raul/src/tui/render/lane_lists.rs:43) using app.watch.candidates / app.watch.selected (the M179 legacy picker state). Grep for 'crate::tui::autopilot' across crates/raul/src returns ZERO callers outside the module's own unit tests; grep for 'Picker|OverridePanel|ReplayShell' returns ZERO matches in action.rs, keybinds.rs, or app.rs.\n\n2. Override panel has no keybind. Spec scope says 'Per-drive override panel: a separate buffer (e.g., <o> to open)'. Grep for KeyCode::Char('o') finds ctrl('o') -> open_settings and plain('o') -> cycle_sort; neither opens an override panel.\n\n3. Start keybind <s> does not exist for the new picker. Spec scope says 'Persistence: on Start (<s> from the picker)'. No Action::AutopilotStart exists; no <s> binding hits OverridePanel::to_session_overrides() or calls 'mp autopilot start'.\n\n4. Replay shell has no caller. ReplayShell::from_session_show / from_session_list_entry are pure typed-model constructors with no render code, no keybind, no past-session mode in the lane.\n\nThe module header itself acknowledges this: 'The production hot path (keybinds, lane wiring) lives in action.rs and keybinds.rs; this module is the typed model.' (crates/raul/src/tui/autopilot.rs:16-19).\n\nM225/M226 dogfood lesson (entry 49) applies directly: 'no production caller' pattern — 5 HIGH findings when runner ships a typed library with extensive unit tests but no caller in the production hot path. The 44/44 nextest pass is real but does not prove the milestone's user-visible deliverables (interactive picker, override panel, session replay).\n\nRequired remediation: wire tui::autopilot::Picker into the Autopilot lane picker (replace or augment app.watch candidates), add <o> keybind for OverridePanel, add <s> action that persists the panel via OverridePanel::to_session_overrides() and shells out to 'mp autopilot start', surface ReplayShell from past-session mode. ACs should be tightened to include at least one end-to-end test that exercises the wired path (e.g., simulating a keypress and asserting the action mutates the typed state).",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "summary": "Autopilot picker/panel/replay model has no UI caller (M225/M226 pattern)",
+      "rationale": "M215 ships tui::autopilot::{Picker, OverridePanel, ReplayShell} as a typed model only — zero callers in action.rs/keybinds.rs/render/. The Autopilot lane still renders via render_watch_lane using the M179 app.watch.* state. <o> and <s> keybinds don't exist for the new surface. 44/44 nextest pass but tests only exercise the typed model. Spec scope explicitly says 'Picker surface in the Autopilot lane', 'Per-drive override panel: <o> to open', 'Start (<s> from the picker)'. M225/M226 dogfood entry 49 applies."
+    }
+  ]
 }
