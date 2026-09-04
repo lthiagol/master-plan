@@ -3,9 +3,9 @@
     "id": "222",
     "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
     "slug": "raul-configurable-keybinds-via-config-raul-keybinds-toml-tui-wide-keymap-with-sane-defaults",
-    "lifecycle": "remediation",
+    "lifecycle": "executed",
     "spec_status": "implemented",
-    "execution_status": "in-progress",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,8 +26,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "remediation_pre_state": "executed",
-    "lifecycle_at": "2026-09-04T03:42:00.861339+00:00",
+    "lifecycle_at": "2026-09-04T03:54:26.488337+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -39,7 +38,7 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-04T03:05:24.924590+00:00"
+        "at": "2026-09-04T03:54:37.429642+00:00"
       },
       "external-review": {
         "status": "done",
@@ -51,15 +50,15 @@
       },
       "re-review": {
         "status": "done",
-        "at": "2026-09-04T03:34:46.724214+00:00"
+        "at": "2026-09-04T03:54:26.488338+00:00"
       },
       "remediate": {
         "status": "done",
-        "at": "2026-09-04T03:34:46.724214+00:00"
+        "at": "2026-09-04T03:54:26.488338+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-04T03:05:24.924590+00:00"
+        "at": "2026-09-04T03:54:37.429642+00:00"
       },
       "specify": {
         "status": "done",
@@ -410,11 +409,11 @@
       "severity": "high",
       "category": "test-gap",
       "description": "F-01 regression tests exercise Keybinds::load_effective directly, not the new Keybinds::load_layered that runner.rs:417 wires. They pass for incidental reasons: a revert of runner.rs:417 from load_layered back to load would leave all 3 F-01 tests green. The test header comment ('exercises load_layered directly') is misleading. F-02 is properly production-path tested; F-01 is not.",
-      "status": "open",
+      "status": "fixed",
       "author": "reviewer-222",
-      "fixed_in": "",
+      "fixed_in": "4977cd2",
       "created": "2026-09-04",
-      "resolved": "",
+      "resolved": "2026-09-04",
       "anchor": {
         "path": "crates/raul/tests/m222_f01_startup_loader.rs",
         "new_range": {
