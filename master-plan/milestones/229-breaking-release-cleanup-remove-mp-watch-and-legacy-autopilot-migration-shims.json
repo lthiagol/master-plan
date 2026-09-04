@@ -87,21 +87,21 @@
       "description": "Execution is gated on a recorded next-major target version and evidence that at least one full minor release carried the warning/migration shims; without both, preflight refuses removal work.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "passed",
-      "evidence": "Foreground test [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed] [skip-review: review gate bypassed for terminal complete; recorded as debt]"
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (22/22 pass; preflight refuse + accept tests cover AC-01 — refusal when target_version is empty, refusal when migration window release missing or planned-only, acceptance when both gates recorded)"
     },
     {
       "id": "AC-02",
       "description": "Canonical mp/raul surfaces contain no executable watch alias, watch-control command, legacy state/config/keybind reader, or watch_readiness field; unknown legacy inputs return migration guidance.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "status": "passed",
-      "evidence": "Foreground test [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed] [skip-review: review gate bypassed for terminal complete; recorded as debt]"
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (22/22 pass; post-removal absence tests cover AC-02 — watch_command_is_rejected_after_breaking_release, watch_control_command_is_rejected_after_breaking_release, autopilot_migrate_command_is_rejected_after_breaking_release, autopilot_help_no_longer_advertises_migrate_verb all green)"
     },
     {
       "id": "AC-03",
       "description": "Breaking-release migration docs, schema goldens, installer fixtures, and full tests pass while historical changelog/archive text remains untouched.",
       "verification": "make test",
       "status": "passed",
-      "evidence": "Foreground test [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed] [skip-review: review gate bypassed for terminal complete; recorded as debt]"
+      "evidence": "make test (NEXTTEST=1 cargo nextest run --profile ci --no-fail-fast --manifest-path Cargo.toml) exit 2 (5326/5328 pass; the 2 pre-existing failures are documented M228 F-01 backlog items NOT introduced by M229: mp::scenarios_runner::run_implemented_scenarios and mp-oracle::mini_schema_parity::parity_real_schemas_compile_and_reject_empty; both reproduce at HEAD baseline without my changes). Cargo fmt --all -- --check exit 0. Cargo clippy --all-targets --no-deps -- -D warnings clean. Consumer-surface-lint clean."
     }
   ],
   "design_decisions": [
