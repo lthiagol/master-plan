@@ -3,9 +3,9 @@
     "id": "219",
     "title": "mp watch deprecation — issue a deprecation warning when the legacy alias is invoked",
     "slug": "mp-watch-deprecation-issue-a-deprecation-warning-when-the-legacy-alias-is-invoked",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,7 +25,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.968318+00:00",
+    "lifecycle_at": "2026-09-04T00:46:14.318362+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -35,9 +35,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.308546+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-04T00:46:14.318364+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.308546+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-04T00:46:14.318364+00:00"
       },
       "specify": {
         "status": "done",
@@ -69,22 +77,22 @@
       "id": "AC-01",
       "description": "Each legacy `mp watch` invocation, including help and status, emits exactly one documented warning on stderr while preserving canonical stdout and exit code. Canonical `mp autopilot` invocations never warn and prior alias use has no effect.",
       "verification": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast exit 0 (20/20 pass)"
     },
     {
       "id": "AC-02",
       "description": "`mp autopilot --help` (the canonical name) does NOT print the deprecation warning.",
       "verification": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast exit 0 (20/20 pass)"
     },
     {
       "id": "AC-03",
       "description": "The deprecation message text matches the documented string (`mp watch is deprecated; use 'mp autopilot' instead.`) byte-for-byte.",
       "verification": "cargo nextest run -p mp --test autopilot_deprecation_text --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_deprecation_text --no-fail-fast exit 0 (16/16 pass)"
     }
   ],
   "design_decisions": [
@@ -123,7 +131,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 219 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -143,7 +151,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_deprecation_channels --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 219 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -163,7 +171,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_deprecation_text --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 219 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -175,7 +183,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-04",
     "branch": "",
     "evidence": ""
   }
