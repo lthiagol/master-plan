@@ -29,8 +29,11 @@ jobs:
           COMMIT="${GITHUB_SHA}"
           SHORT_SHA="${COMMIT:0:8}"
           DATE=$(date -u +%Y%m%d)
-          BASE_TAG=$(git describe --tags --abbrev=0)
-          BASE_TAG="${BASE_TAG#v}"
+          # Read the base version from Cargo.toml (workspace.package.version)
+          # rather than `git describe --tags` — the tag may lag behind the
+          # workspace version, and we want the dev formula to track the
+          # single source of truth.
+          BASE_TAG=$(grep -E '^version *= *"' Cargo.toml | head -1 | sed -E 's/^[^"]*"([^"]+)".*/\1/')
           SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz" | sha256sum | cut -d ' ' -f1)
           VERSION="${BASE_TAG}-dev.${DATE}-${SHORT_SHA}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -107,3 +110,13 @@ jobs:
           This PR targets main. CI runs brew audit + style.
           PRBODY
           gh pr create --repo lthiagol/homebrew-tap --base main --head "$BRANCH" --title "master-plan-dev: bump to ${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
+          # Enable auto-merge so the PR lands once CI (brew audit + style on the
+          # homebrew-tap side) passes. This is the single source of truth for
+          # the dev formula on every push to wip.
+          PR_NUMBER=$(gh pr list --repo lthiagol/homebrew-tap --state open --head "$BRANCH" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+            gh pr merge --auto --squash --repo lthiagol/homebrew-tap "$PR_NUMBER" \
+              || echo "auto-merge setup skipped (PR not mergeable yet)"
+          else
+            echo "no open PR found for branch $BRANCH; skipping auto-merge"
+          fi
