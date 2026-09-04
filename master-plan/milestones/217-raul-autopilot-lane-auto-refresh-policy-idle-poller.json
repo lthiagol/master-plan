@@ -72,8 +72,8 @@
       "id": "AC-01",
       "description": "A single-flight poller invokes session show plus autopilot status once per interval; slow calls are coalesced and never overlap. Fake-clock tests cover normal and overrun intervals.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_intervals --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poll_intervals --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-02",
@@ -156,7 +156,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poll_intervals --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 217 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
