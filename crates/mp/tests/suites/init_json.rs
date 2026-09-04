@@ -45,7 +45,13 @@ fn init_creates_json_plan_artifacts() {
     assert!(plan.join("archive/meta.json").exists());
 
     // doctor passes on the scaffolded plan.
-    let doc = env.run(&["doctor", "--format", "json"]);
+    // CI runs ship without `herdr` on PATH, so doctor would
+    // surface the missing-herdr gate and exit non-zero even
+    // though the plan is healthy. Stub a herdr that satisfies
+    // `which_herdr` + the `agent start --help` / `pane split
+    // --help` shape probes so the test stays self-contained.
+    let path = crate::common::fake_herdr::install_fake_herdr_for_doctor(&env);
+    let doc = env.run_with_env(&[("PATH", &path)], &["doctor", "--format", "json"]);
     assert!(
         doc.status.success(),
         "{}",
