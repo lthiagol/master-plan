@@ -3,9 +3,9 @@
     "id": "229",
     "title": "breaking-release cleanup — remove mp watch and legacy autopilot migration shims",
     "slug": "breaking-release-cleanup-remove-mp-watch-and-legacy-autopilot-migration-shims",
-    "lifecycle": "complete",
-    "spec_status": "verified",
-    "execution_status": "done",
+    "lifecycle": "remediation",
+    "spec_status": "implemented",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -19,7 +19,7 @@
     "effort": "L",
     "risk": "high",
     "change_kind": "",
-    "priority": "low",
+    "priority": "high",
     "created": "2026-09-03",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -27,7 +27,8 @@
     "blocked_by": "",
     "target_version": "3.0.0",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T08:18:44.832962+00:00",
+    "remediation_pre_state": "complete",
+    "lifecycle_at": "2026-09-04T08:39:33.766339+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -46,12 +47,16 @@
         "at": "2026-09-04T08:18:44.832965+00:00"
       },
       "external-review": {
-        "status": "in_progress",
-        "at": "2026-09-04T08:18:44.832965+00:00"
+        "status": "done",
+        "at": "2026-09-04T08:39:33.766340+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:16:28.403134+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-04T08:39:33.766340+00:00"
       },
       "self-review": {
         "status": "done",
@@ -198,5 +203,47 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": "Foreground test [verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed] [skip-review: review gate bypassed for terminal complete; recorded as debt]"
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "spec-gap",
+      "description": "AC-02 remains violated in the canonical runtime path. cmd_autopilot_start delegates directly to commands/watch.rs::cmd_watch, whose implementation still owns the legacy watch driver and writes the .mp/watch.state.json state. Canonical autopilot status/stop/output/result delegate to commands/watch_control.rs and WatchRunState over that same legacy file, while execution.rs still exports the forbidden watch_readiness field. Removing only the Clap variants hides the aliases but leaves production autopilot dependent on the removed legacy state/control implementation and exposes the forbidden compatibility field. Refactor the canonical autopilot path onto canonical session/state/readiness surfaces and remove the legacy path.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/src/commands/autopilot.rs",
+        "new_range": {
+          "start_line": 89,
+          "end_line": 89
+        },
+        "side": "new"
+      },
+      "summary": "Canonical autopilot still depends on legacy watch state/control path"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "category": "spec-gap",
+      "description": "AC-02 also leaves the explicitly scoped legacy configuration and role/keybind readers in production. mp ProjectConfig and config commands still expose ui.show_watch_tab; raul UiConfig::from_config_payload falls back from show_autopilot_tab to that legacy key; autopilot role resolution still maps the orchestrator to agent.coordinator through resolve_with_legacy_fallback; and raul still layers the project [keybinds] section. M229 scope explicitly requires removing ui.show_watch_tab, the agent.coordinator role fallback, and the project keybinds fallback, while migration.md claims those surfaces are removed. Remove these readers/fallbacks and make unknown legacy inputs follow the required migration guidance.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/src/config.rs",
+        "new_range": {
+          "start_line": 546,
+          "end_line": 546
+        },
+        "side": "new"
+      },
+      "summary": "Legacy config, role, and keybind fallbacks remain"
+    }
+  ]
 }
