@@ -3,7 +3,7 @@
 //! All herdr interactions (agent start, send, pane read, wait) plus
 //! state-machine transitions are logged to a configurable file with
 //! RFC3339 timestamps, the active milestone id, and the role label.
-//! Default path: `<plan_dir>/.mp/watch.log` (see
+//! Default path: `<plan_dir>/.mp/autopilot.log` (see
 //! [`crate::autopilot::drive::default_log_path`]).
 //!
 //! Shape: one JSON object per line (JSONL / ndjson). Picked over
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn open_creates_parent_dir_if_missing() {
         let env = tempfile::TempDir::new().unwrap();
-        let nested = env.path().join("a/b/c/watch.log");
+        let nested = env.path().join("a/b/c/autopilot.log");
         let logger = DriveLogger::open(&nested).unwrap();
         logger.log(&DriveLogEntry::new("test", "hello")).unwrap();
         assert!(nested.is_file());
@@ -405,7 +405,7 @@ mod tests {
         // Sequential appends from two logger handles should each
         // produce a complete JSONL line.
         let env = tempfile::TempDir::new().unwrap();
-        let path = env.path().join("watch.log");
+        let path = env.path().join("autopilot.log");
         let a = DriveLogger::open(&path).unwrap();
         let b = DriveLogger::open(&path).unwrap();
         a.log(&DriveLogEntry::new("a", "first")).unwrap();
@@ -420,7 +420,7 @@ mod tests {
     #[test]
     fn path_returns_the_opened_path() {
         let env = tempfile::TempDir::new().unwrap();
-        let path = env.path().join("watch.log");
+        let path = env.path().join("autopilot.log");
         let logger = DriveLogger::open(&path).unwrap();
         assert_eq!(logger.path(), path);
     }

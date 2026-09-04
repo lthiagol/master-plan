@@ -1,7 +1,7 @@
 //! M149 S0 / AC-01: `mp watch` startup preconditions.
 //!
 //! Exercises the precondition check via the library entry point
-//! (`commands::watch::watch_preconditions_report`) plus a CLI-level
+//! (`commands::autopilot_drive::watch_preconditions_report`) plus a CLI-level
 //! smoke test that the watch command rejects a fresh project with
 //! clear, aggregated, actionable errors.
 
@@ -24,7 +24,7 @@ fn fresh_project_fails_preconditions_with_all_failures_listed() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     assert!(!report.ok, "fresh project has no herdr/harness config");
@@ -50,7 +50,7 @@ fn precondition_failures_carry_actionable_messages() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     for c in report.failed() {
@@ -78,7 +78,7 @@ fn harnesses_present_pass_role_checks_regardless_of_herdr() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     let runner_ok = report
@@ -110,7 +110,7 @@ fn log_path_under_writable_plan_dir_passes() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     let log_check = report
@@ -135,7 +135,7 @@ fn report_aggregates_all_failures_at_once() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     // At minimum the two role-config failures should both be present
@@ -167,7 +167,7 @@ fn cli_watch_reports_preconditions_as_json() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let report = check_preconditions(&cfg, &log_path);
 
     let serialized: Value = serde_json::to_value(&report).expect("serialize report");

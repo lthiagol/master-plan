@@ -30,7 +30,7 @@ pub struct ExecutionCheckReport {
     /// harness_auto_set) is green. `checks` mirrors the
     /// per-line precondition report for callers that want
     /// the granular answer.
-    pub watch_readiness: WatchReadiness,
+    pub autopilot_readiness: AutopilotReadiness,
 }
 
 /// M197 WP4 / AC-05: a structured view of the
@@ -39,16 +39,17 @@ pub struct ExecutionCheckReport {
 /// carries the same diagnostic operators see from
 /// `mp watch start` and `mp milestone handoff`.
 #[derive(Debug, Serialize)]
-pub struct WatchReadiness {
+pub struct AutopilotReadiness {
     pub ok: bool,
-    pub checks: Vec<WatchReadinessCheck>,
+    pub checks: Vec<AutopilotReadinessCheck>,
 }
 
-/// One line of the `mp watch` precondition report, exposed via
+/// One line of the autopilot precondition report, exposed via
 /// `execution check` so dashboards / CI / the human `raul`
-/// summary can render the same data without re-running watch.
+/// summary can render the same data without re-running autopilot
+/// start.
 #[derive(Debug, Serialize)]
-pub struct WatchReadinessCheck {
+pub struct AutopilotReadinessCheck {
     pub name: String,
     pub ok: bool,
     pub message: String,
@@ -117,12 +118,12 @@ pub fn execution_check_with(
     let cfg = store::load_config(ctx);
     let log_path = crate::autopilot::drive::default_log_path(&ctx.plan_dir);
     let pre = crate::autopilot::drive::check_preconditions(&cfg, &log_path);
-    let watch_readiness = WatchReadiness {
+    let autopilot_readiness = AutopilotReadiness {
         ok: pre.ok,
         checks: pre
             .checks
             .iter()
-            .map(|c| WatchReadinessCheck {
+            .map(|c| AutopilotReadinessCheck {
                 name: c.name.clone(),
                 ok: c.ok,
                 message: c.message.clone(),
@@ -168,7 +169,7 @@ pub fn execution_check_with(
         validate_ok,
         can_handoff,
         warnings,
-        watch_readiness,
+        autopilot_readiness,
     })
 }
 
@@ -273,8 +274,8 @@ pub fn execution_status(ctx: &PlanContext) -> Result<serde_json::Value> {
         // M197 WP4 / AC-05: same `mp watch` readiness the
         // execution-check JSON carries, so `mp execution status`
         // is a one-stop shop for the operator. The shape is
-        // identical to `execution_check.watch_readiness`.
-        "watch_readiness": check.watch_readiness,
+        // identical to `execution_check.autopilot_readiness`..
+        "autopilot_readiness": check.autopilot_readiness,
         "can_handoff": check.can_handoff,
     }))
 }

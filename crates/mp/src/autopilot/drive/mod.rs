@@ -1,38 +1,20 @@
 //! `mp::autopilot::drive` — automated milestone execution via the
 //! herdr agent lifecycle.
 //!
-//! This tree was named `mp::watch` until the autopilot cutover. It is
-//! now the canonical drive engine; `mp watch` is only a CLI verb
-//! implemented by the thin compatibility adapter in
-//! [`crate::commands::watch`], which forwards here.
-//!
-//! ## Compatibility naming that intentionally survives here
-//!
-//! Two kinds of `Watch`-prefixed names remain, and both are
-//! deliberate — they mirror a retained *external* surface, so
-//! renaming the Rust identifier would make the code lie about what it
-//! reads and writes:
-//!
-//! - [`state`] / [`run_state`]: `WatchState`, `WatchRunState`,
-//!   `WatchRunStore`, `WatchTransition`, and their
-//!   `WATCH_*_SCHEMA_VERSION` constants read and write the legacy
-//!   on-disk `.mp/watch.state.json` (v1 and v2 of the same file).
-//!   The path and its schema are the persisted-state compatibility
-//!   contract; the reader stays until the legacy state file is
-//!   retired alongside the CLI alias.
-//! - [`prompts`]: the override rungs resolve `<plan_dir>/watch/` and
-//!   the compiled-in `templates/watch/<stage>.md` defaults — both
-//!   user-visible override locations.
-//!
-//! Everything else in this tree is named for the engine
-//! (`DriveLogger`, `DriveOps`, `drive_milestone`, …).
+//! This tree is the canonical drive engine; `mp autopilot start` is
+//! the only public entry point. The legacy `mp watch` alias was
+//! removed by M229. Production state lives under
+//! `<plan_dir>/.mp/autopilot-run.state.json` (renamed from the
+//! legacy `.mp/watch.state.json`); legacy v1 state still migrates
+//! on load for backward compatibility with autopilot sessions
+//! started before the rename.
 //!
 //! Submodules:
 //! - [`preconditions`] — startup checks (S0).
 //! - [`herdr`] — pane spawn / list / send / wait (S3–S5).
 //! - [`bridge`] — M150 stage-done sentinel: `mp-stage-done` custom-status
 //!   emitted by `mp milestone complete` / `mp reviews pass` and consumed
-//!   by the watch fast-path. Lifecycle poll remains the fallback when
+//!   by the autopilot fast-path. Lifecycle poll remains the fallback when
 //!   the bridge is absent.
 //! - [`prompts`] — lifecycle-stage templates (S6).
 //! - [`state_machine`] — driver loop mapping lifecycle → prompt → wait
@@ -40,25 +22,27 @@
 //! - [`sequencer`] — cross-milestone sequencing with per-role pane
 //!   reuse (S8).
 //! - [`logging`] — structured JSONL drive log (S10).
-//! - [`state`] — M152 crash-safe `.mp/watch.state.json` so a `--resume`
-//!   run can re-attach to live herdr panes instead of double-spawning.
+//! - [`legacy_state`] — M152 v1 `AutopilotLegacyState` (formerly
+//!   `AutopilotLegacyState`) at `<plan_dir>/.mp/autopilot-legacy.state.json`,
+//!   used for `--resume` against runs started before M229.
 //! - [`resume`] — M152 herdr-list reconciliation + double-spawn guard.
 //! - [`shutdown`] — M152 SIGINT/SIGTERM graceful-shutdown handler.
-//! - [`run_state`] — M178 S1 latest-run control-plane state model
+//! - [`run_state_v2`] — M178 S1 latest-run control-plane state model
 //!   (schema_version=2; AC-01 contract fields + v1→v2 migration).
+//!   On-disk path: `<plan_dir>/.mp/autopilot-run.state.json`.
 
 pub mod bridge;
 pub mod classification;
 pub mod herdr;
 pub mod herdr_version;
+pub mod legacy_state;
 pub mod logging;
 pub mod preconditions;
 pub mod prompts;
 pub mod resume;
-pub mod run_state;
+pub mod run_state_v2;
 pub mod sequencer;
 pub mod shutdown;
-pub mod state;
 pub mod state_machine;
 
 pub use bridge::{
@@ -105,17 +89,18 @@ pub use prompts::{
     PromptRenderOptions, PromptStage, RenderedPrompt, TemplateSource, MAX_OVERRIDE_BYTES,
 };
 pub use resume::{reconcile, PaneStatus, Reconciliation};
-pub use run_state::{
-    default_run_state_path, MilestoneRunOutcome, RunOutcome, WatchRunState, WatchRunStore,
-    WatchTransition, WATCH_RUN_STATE_SCHEMA_VERSION,
+pub use run_state_v2::{
+    default_run_state_path, AutopilotRunState, AutopilotRunStore, AutopilotRunTransition,
+    MilestoneRunOutcome, RunOutcome, AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
 };
 pub use sequencer::{run_milestones, MilestoneOutcome, SequencerReport};
 pub use shutdown::{
     clear_shutdown_flag, install_signal_handlers, is_pid_alive, perform_graceful_shutdown,
     request_shutdown, shutdown_requested, write_shutdown_state_for_test,
 };
-pub use state::{
-    default_state_path, MilestoneState, PaneState, WatchState, WATCH_STATE_SCHEMA_VERSION,
+pub use legacy_state::{
+    default_legacy_state_path, AutopilotLegacyState, MilestoneState, PaneState,
+    AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION,
 };
 pub use state_machine::{
     drive_milestone, next_stage, should_skip, DriveOps, DriveOutcome, RoleConfigs, StagePlan,

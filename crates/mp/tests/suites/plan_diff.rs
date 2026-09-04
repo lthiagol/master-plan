@@ -104,7 +104,7 @@ fn create_milestone(env: &TestEnv, title: &str) -> String {
 /// `role_config_present` checks are green. The fake does NOT need to
 /// run `agent start --help` for real — the help text just has to
 /// list `--kind` and `--pane`.
-fn enable_watch_readiness_for_handoff(env: &TestEnv) {
+fn enable_autopilot_readiness_for_handoff(env: &TestEnv) {
     let bin_dir = env.tmp.path().join("fake-bin");
     fs::create_dir_all(&bin_dir).unwrap();
     let fake_herdr = bin_dir.join("herdr");
@@ -160,7 +160,7 @@ esac
 }
 
 fn do_handoff(env: &TestEnv) {
-    enable_watch_readiness_for_handoff(env);
+    enable_autopilot_readiness_for_handoff(env);
     let out = lib_api::run(env, &["execution", "handoff"]);
     assert!(
         out.status.success(),

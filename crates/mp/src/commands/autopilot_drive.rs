@@ -22,7 +22,7 @@
 //!   state machine (S7) + herdr layer (S3–S5). Precondition failures
 //!   halt at startup; the per-role pane cache persists across
 //!   milestones (AC-04). Structured JSONL logs land at
-//!   `<plan_dir>/.mp/watch.log` by default (S10).
+//!   `<plan_dir>/.mp/autopilot.log` by default (S10).
 //! - Non-zero exit on precondition failure (without `--dry-run`),
 //!   skipped milestone, or iteration-cap exhaustion.
 
@@ -69,7 +69,7 @@ const DRY_RUN_PANE_ID_PLACEHOLDER: &str = "%pane-id%";
 /// fields). Bundling them into a struct here would force a
 /// parallel shape across `cli/mod.rs` + `app.rs` for no win.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_watch(
+pub(crate) fn cmd_autopilot_drive(
     ctx: &PlanContext,
     ids: Vec<String>,
     dry_run: bool,
@@ -194,7 +194,7 @@ pub(crate) fn cmd_watch(
     let preconditions = check_preconditions(&cfg, &log_path);
 
     if dry_run {
-        return cmd_watch_dry_run(ctx, &ids, &cfg, &log_path, preconditions, format);
+        return cmd_autopilot_drive_dry_run(ctx, &ids, &cfg, &log_path, preconditions, format);
     }
 
     // M178 S3 / AC-02: detach-safe mode. The starting client exits as
@@ -210,7 +210,7 @@ pub(crate) fn cmd_watch(
     if detach {
         #[cfg(unix)]
         {
-            return crate::commands::watch_detach::cmd_watch_detached(
+            return crate::commands::autopilot_detach::cmd_autopilot_drive_detached(
                 ctx,
                 &ids,
                 &cfg,
@@ -237,7 +237,7 @@ pub(crate) fn cmd_watch(
         }
     }
 
-    cmd_watch_drive(DriveOpts {
+    cmd_autopilot_drive_execute(DriveOpts {
         ctx,
         ids: &ids,
         cfg: &cfg,
@@ -253,7 +253,7 @@ pub(crate) fn cmd_watch(
 /// S2/S9 dry-run: print the execution plan without modifying plan.json
 /// or spawning any agent. Precondition failures surface as JSON
 /// (exit 0 — dry-run is a preview).
-fn cmd_watch_dry_run(
+fn cmd_autopilot_drive_dry_run(
     ctx: &PlanContext,
     ids: &[String],
     cfg: &ProjectConfig,
@@ -299,7 +299,7 @@ struct DriveOpts<'a> {
 /// MaxIterationsExhausted; surface per-milestone outcomes in the
 /// JSON report. Exit non-zero when preconditions failed or any
 /// milestone was skipped/exhausted.
-fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
+fn cmd_autopilot_drive_execute(opts: DriveOpts<'_>) -> Result<()> {
     let DriveOpts {
         ctx,
         ids,
@@ -373,7 +373,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // or absent herdr list is treated as "no live panes" so the
     // check never blocks startup.
     let herdr_list_json = crate::autopilot::drive::list_panes(&herdr_bin).unwrap_or_default();
-    let recorded_state = crate::autopilot::drive::WatchState::load(ctx)
+    let recorded_state = crate::autopilot::drive::AutopilotLegacyState::load(ctx)
         .ok()
         .flatten();
     let reconciliation =
@@ -639,7 +639,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // state (the v2 schema also subsumes the v1 panes/milestones
     // tracking, so `--resume` against this file keeps working
     // through the existing reconciliation path).
-    let mut state = crate::autopilot::drive::WatchRunState::fresh(ids);
+    let mut state = crate::autopilot::drive::AutopilotRunState::fresh(ids);
     // Carry the persisted panes/milestones v1-shape into the v2
     // struct so the legacy `--resume` reconciliation continues to
     // find pane id and last-known-lifecycle records.
@@ -670,7 +670,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
         }
         Err(e) => {
             // State writes are best-effort during a normal run.
-            // A disk error here surfaces in the watch.log for
+            // A disk error here surfaces in the autopilot.log for
             // forensics but does not abort the run — `mp watch`
             // continues; the graceful-shutdown path will retry
             // the save before exit.
@@ -688,7 +688,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
     // M152 S4: if SIGINT/SIGTERM flipped the global shutdown flag
     // mid-run, the drive-loop returned the new
     // `DriveOutcome::Shutdown` variant; the sequencer halted. We
-    // still need to (a) flush `.mp/watch.state.json` and (b)
+    // still need to (a) flush `.mp/autopilot-run.state.json` and (b)
     // record a flash note on the in-flight milestone so a
     // subsequent `mp watch --resume` can pick up where we left
     // off. `perform_graceful_shutdown` does both; it never
@@ -707,11 +707,11 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             .map(|m| m.milestone.lifecycle);
         // M178 S2: build a v2 state to hand to the legacy
         // perform_graceful_shutdown helper (which still takes the
-        // v1 WatchState shape for backwards compatibility). We
+        // v1 AutopilotLegacyState shape for backwards compatibility). We
         // translate by lifting the v2 panes + milestones back into
         // a fresh v1 state. The v2 control-plane state itself is
         // already attached to ops and re-persisted below.
-        let mut legacy_state = crate::autopilot::drive::WatchState::fresh(
+        let mut legacy_state = crate::autopilot::drive::AutopilotLegacyState::fresh(
             &active.clone().into_iter().collect::<Vec<_>>(),
         );
         if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
@@ -761,7 +761,7 @@ fn cmd_watch_drive(opts: DriveOpts<'_>) -> Result<()> {
             .run_state()
             .is_some_and(|state| state.run_outcome.is_none())
         {
-            let _ = ops.transition(crate::autopilot::drive::WatchTransition::RunOutcome(
+            let _ = ops.transition(crate::autopilot::drive::AutopilotRunTransition::RunOutcome(
                 crate::autopilot::drive::RunOutcome::GracefullyStopped,
             ));
         }
@@ -933,7 +933,7 @@ struct WatchPlan {
 }
 
 /// Copy any cached panes from the ops state-machine view into the
-/// supplied v2 [`WatchRunState`](crate::autopilot::drive::WatchRunState)
+/// supplied v2 [`AutopilotRunState`](crate::autopilot::drive::AutopilotRunState)
 /// for persistence. The ops pane cache is the authoritative view at
 /// runtime — populating the state file from it means a crash leaves
 /// the recorded pane ids ready for `--resume` to re-attach to.
@@ -944,7 +944,7 @@ struct WatchPlan {
 /// read path so callers don't have to scan the array. The v1-only
 /// writer this replaced had no callers left.
 fn upsert_panes_from_cache_v2(
-    state: &mut crate::autopilot::drive::WatchRunState,
+    state: &mut crate::autopilot::drive::AutopilotRunState,
     ops: &SystemDriveOps,
 ) {
     if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
@@ -1242,7 +1242,7 @@ mod tests {
     fn plan_serializes_to_json_with_expected_top_level_keys() {
         let plan = WatchPlan {
             dry_run: true,
-            log_file: "/tmp/watch.log".to_string(),
+            log_file: "/tmp/autopilot.log".to_string(),
             preconditions: PreconditionReport {
                 ok: true,
                 checks: vec![],

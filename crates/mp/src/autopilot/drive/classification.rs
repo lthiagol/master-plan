@@ -19,7 +19,7 @@
 
 use serde::Serialize;
 
-use crate::autopilot::drive::WatchRunState;
+use crate::autopilot::drive::AutopilotRunState;
 
 /// Discriminated state of the latest recorded watch run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -44,7 +44,7 @@ pub struct StatusReport {
     pub state_file: String,
     pub schema_version: u32,
     /// The full v2 state. `None` when no state file exists yet.
-    pub state: Option<WatchRunState>,
+    pub state: Option<AutopilotRunState>,
     /// Probe of the recorded PID via `kill(pid, 0)`. False on non-Unix
     /// or when no state is present.
     pub pid_alive: bool,
@@ -58,7 +58,7 @@ pub struct StatusReport {
 /// Classify the latest state into live/stale/terminal. The herdr
 /// list is optional; pass `None` when herdr is unavailable and the
 /// PID probe alone drives the verdict.
-pub fn classify_state(state: Option<&WatchRunState>, herdr_list_json: Option<&str>) -> RunState {
+pub fn classify_state(state: Option<&AutopilotRunState>, herdr_list_json: Option<&str>) -> RunState {
     let Some(state) = state else {
         // No state file → no recorded run. The caller reports this
         // as `null` (or treats it as terminal-idle); we map it to
@@ -130,8 +130,8 @@ mod tests {
     use crate::autopilot::drive::{Role, RunOutcome};
     use std::collections::HashMap;
 
-    fn empty_state() -> WatchRunState {
-        WatchRunState::fresh(&["170".to_string()])
+    fn empty_state() -> AutopilotRunState {
+        AutopilotRunState::fresh(&["170".to_string()])
     }
 
     #[test]

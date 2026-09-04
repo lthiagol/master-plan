@@ -8,7 +8,7 @@
 //! - `output`  — AC-05: bounded, structured output from the active pane.
 //! - `result`  — AC-06: read the latest terminal outcome.
 //!
-//! Each verb is a thin surface over [`crate::autopilot::drive::WatchRunState`]
+//! Each verb is a thin surface over [`crate::autopilot::drive::AutopilotRunState`]
 //! and the existing herdr / shutdown / bridge primitives.
 
 use std::time::{Duration, Instant};
@@ -17,7 +17,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use crate::autopilot::drive::{
-    is_pid_alive, RunOutcome, WatchRunState, WATCH_RUN_STATE_SCHEMA_VERSION,
+    is_pid_alive, RunOutcome, AutopilotRunState, AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
 };
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
@@ -29,7 +29,7 @@ use crate::autopilot::drive::classification::{classify_state, StatusReport};
 /// structured status. The classifier returns `Live` / `Stale` /
 /// `Terminal` from the recorded PID + herdr-list probe; the
 /// remaining v2 fields are surfaced verbatim.
-pub(crate) fn cmd_watch_control_status(
+pub(crate) fn cmd_autopilot_control_status(
     ctx: &PlanContext,
     summary: bool,
     format: Fmt,
@@ -47,15 +47,15 @@ pub(crate) fn cmd_watch_control_status(
 }
 
 fn build_status_report(ctx: &PlanContext) -> Result<StatusReport> {
-    let path = WatchRunState::path_for(&ctx.plan_dir);
-    let state = WatchRunState::load_from(&path)?;
+    let path = AutopilotRunState::path_for(&ctx.plan_dir);
+    let state = AutopilotRunState::load_from(&path)?;
     let herdr_list = read_herdr_list_best_effort();
     let classification = classify_state(state.as_ref(), herdr_list.as_deref());
     let pid_alive = state.as_ref().map(|s| is_pid_alive(s.pid)).unwrap_or(false);
     let report = StatusReport {
         run_state: classification,
         state_file: path.display().to_string(),
-        schema_version: WATCH_RUN_STATE_SCHEMA_VERSION,
+        schema_version: AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
         state,
         pid_alive,
         herdr_listed: herdr_list.is_some(),
@@ -67,15 +67,15 @@ fn build_status_report(ctx: &PlanContext) -> Result<StatusReport> {
 /// argument overrides the recorded PID when supplied (useful when
 /// the state file is stale or missing). Stable non-destructive
 /// response when no live run exists.
-pub(crate) fn cmd_watch_control_stop(
+pub(crate) fn cmd_autopilot_control_stop(
     ctx: &PlanContext,
     pid_override: Option<u32>,
     timeout_secs: u64,
     format: Fmt,
     _fields: &[String],
 ) -> Result<()> {
-    let path = WatchRunState::path_for(&ctx.plan_dir);
-    let state = WatchRunState::load_from(&path)?;
+    let path = AutopilotRunState::path_for(&ctx.plan_dir);
+    let state = AutopilotRunState::load_from(&path)?;
 
     // Resolve the target PID from the override or the state file.
     let target_pid = match pid_override {
@@ -123,13 +123,13 @@ pub(crate) fn cmd_watch_control_stop(
             // here covers the case where the child crashed before
             // it could clean up.
             if exited {
-                match WatchRunState::load_from(&path) {
+                match AutopilotRunState::load_from(&path) {
                     Ok(Some(s)) => {
                         if s.run_outcome.is_none() {
                             let mut store =
-                                crate::autopilot::drive::WatchRunStore::new(path.clone(), s);
+                                crate::autopilot::drive::AutopilotRunStore::new(path.clone(), s);
                             let _ = store.transition(
-                                crate::autopilot::drive::WatchTransition::RunOutcome(
+                                crate::autopilot::drive::AutopilotRunTransition::RunOutcome(
                                     RunOutcome::GracefullyStopped,
                                 ),
                             );
@@ -167,7 +167,7 @@ pub(crate) fn cmd_watch_control_stop(
     // path emitted the canonical one).
     if report.stopped {
         if let Some(pid) = report.pid {
-            let already_terminal = WatchRunState::load_from(&path)
+            let already_terminal = AutopilotRunState::load_from(&path)
                 .ok()
                 .flatten()
                 .map(|s| s.run_outcome.is_some())
@@ -187,7 +187,7 @@ pub(crate) fn cmd_watch_control_stop(
 /// Bounded by max_bytes (read limit) and timeout_ms (subprocess
 /// wall-clock budget). Returns a structured error (not a hang) when
 /// herdr is missing, the pane is dead, or the subprocess times out.
-pub(crate) fn cmd_watch_control_output(
+pub(crate) fn cmd_autopilot_control_output(
     ctx: &PlanContext,
     max_bytes: usize,
     timeout_ms: u64,
@@ -195,8 +195,8 @@ pub(crate) fn cmd_watch_control_output(
     format: Fmt,
     _fields: &[String],
 ) -> Result<()> {
-    let path = WatchRunState::path_for(&ctx.plan_dir);
-    let state = match WatchRunState::load_from(&path)? {
+    let path = AutopilotRunState::path_for(&ctx.plan_dir);
+    let state = match AutopilotRunState::load_from(&path)? {
         Some(s) => s,
         None => {
             emit(
@@ -319,14 +319,14 @@ pub(crate) fn cmd_watch_control_output(
 /// run_outcome). Distinct from `status` in that it never observes
 /// a live run; returns `null` fields when the only run on record
 /// is still in flight.
-pub(crate) fn cmd_watch_control_result(
+pub(crate) fn cmd_autopilot_control_result(
     ctx: &PlanContext,
     _force: bool,
     format: Fmt,
     _fields: &[String],
 ) -> Result<()> {
-    let path = WatchRunState::path_for(&ctx.plan_dir);
-    let state = WatchRunState::load_from(&path)?;
+    let path = AutopilotRunState::path_for(&ctx.plan_dir);
+    let state = AutopilotRunState::load_from(&path)?;
     let report = ResultReport {
         state_file: path.display().to_string(),
         state,
@@ -402,7 +402,7 @@ struct OutputReport {
 #[derive(Debug, Serialize)]
 struct ResultReport {
     state_file: String,
-    state: Option<WatchRunState>,
+    state: Option<AutopilotRunState>,
 }
 
 /// M178 external-review F-11: floor a byte cap to the previous UTF-8

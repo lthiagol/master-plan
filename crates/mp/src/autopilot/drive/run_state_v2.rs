@@ -1,9 +1,10 @@
 //! M178 S1 / AC-01, AC-06: latest-run control-plane state model.
 //!
-//! `WatchRunState` is the structured "what is the latest mp watch run
-//! doing" surface that machine clients (and the upcoming Raul Watch
-//! tab) read from `<plan_dir>/.mp/watch.state.json`. It extends the
-//! M152 v1 `WatchState` with the AC-01 contract fields:
+//! `AutopilotRunState` is the structured "what is the latest autopilot
+//! run doing" surface that machine clients (and the Raul Autopilot
+//! tab) read from `<plan_dir>/.mp/autopilot-run.state.json`. It extends
+//! the M152 v1 [`AutopilotLegacyState`] with the AC-01 contract
+//! fields:
 //!
 //! ```text
 //! {
@@ -19,8 +20,8 @@
 //!   "target_lifecycle":     "self-reviewed",
 //!   "active_role":          "runner",
 //!   "pane_ids":             {"runner": "%5", "coordinator": "%7"},
-//!   "log_path":             "/abs/path/to/.mp/watch.log",
-//!   "state_path":           "/abs/path/to/.mp/watch.state.json",
+//!   "log_path":             "/abs/path/to/.mp/autopilot.log",
+//!   "state_path":           "/abs/path/to/.mp/autopilot-run.state.json",
 //!   "run_outcome":          null,                       // populated on terminal exit
 //!   "milestone_outcomes":   [...],                     // per-milestone outcome log
 //!   "panes":                [...],                     // v1 pane tracking, preserved
@@ -30,8 +31,8 @@
 //!
 //! ## Schema versioning
 //!
-//! [`WATCH_RUN_STATE_SCHEMA_VERSION`] is bumped to 2. A v1 file is
-//! migrated on load (see [`WatchRunState::load_from`]) — the v1
+//! [`AUTOPILOT_RUN_STATE_SCHEMA_VERSION`] is bumped to 2. A v1 file is
+//! migrated on load (see [`AutopilotRunState::load_from`]) — the v1
 //! `panes` and `milestones` arrays are preserved verbatim so existing
 //! `--resume` reconciliation keeps working; the new v2 fields
 //! default to `None` / empty when the source is v1 (the migration
@@ -39,11 +40,15 @@
 //!
 //! ## Why a separate module
 //!
-//! Keeping `WatchState` (v1) and `WatchRunState` (v2) in distinct
-//! modules lets the legacy `--resume` path keep reading its struct
-//! while the new control-plane surface consumes the wider one. The
-//! crate's `mod.rs` re-exports both, and the migration helper in
-//! `WatchRunState::load_from` is the only bridge.
+//! Keeping `AutopilotLegacyState` (v1) and `AutopilotRunState` (v2)
+//! in distinct modules lets the legacy `--resume` path keep reading
+//! its struct while the new control-plane surface consumes the
+//! wider one. The crate's `mod.rs` re-exports both, and the
+//! migration helper in `AutopilotRunState::load_from` is the only
+//! bridge. M229 renamed `AutopilotLegacyState`/`AutopilotRunState` to
+//! `AutopilotLegacyState`/`AutopilotRunState` and the on-disk path
+//! from `.mp/autopilot-run.state.json` to
+//! `.mp/autopilot-{legacy,run}.state.json`.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -51,22 +56,24 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::autopilot::drive::{Role, WatchState};
+use crate::autopilot::drive::{AutopilotLegacyState, Role};
 use crate::paths::PlanContext;
 use crate::store::atomic_write;
 
 use super::prompts::PromptStage;
 
 /// v2 schema marker. The legacy v1 constant
-/// ([`crate::autopilot::drive::WATCH_STATE_SCHEMA_VERSION`]) stays at `1`; a v1
-/// file is migrated on load rather than refused.
-pub const WATCH_RUN_STATE_SCHEMA_VERSION: u32 = 2;
+/// ([`crate::autopilot::drive::AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION`])
+/// stays at `1`; a v1 file is migrated on load rather than refused.
+pub const AUTOPILOT_RUN_STATE_SCHEMA_VERSION: u32 = 2;
 
-/// Default path for the control-plane state file. Same directory and
-/// filename as the v1 file so a v2 driver naturally reads whatever
-/// the previous driver wrote.
+/// Default path for the control-plane state file. Renamed from
+/// `.mp/autopilot-run.state.json` to `.mp/autopilot-run.state.json` by M229;
+/// a v2 driver naturally picks up a prior v1 file at the legacy
+/// path through `AutopilotLegacyState` migration inside
+/// `load_from`.
 pub fn default_run_state_path(plan_dir: &Path) -> PathBuf {
-    plan_dir.join(".mp").join("watch.state.json")
+    plan_dir.join(".mp").join("autopilot-run.state.json")
 }
 
 /// Terminal outcome of a run. `None` means the run is still in flight
@@ -141,7 +148,7 @@ pub struct MilestoneRunOutcome {
 /// (S4) plus the legacy v1 panes/milestones tracking (preserved
 /// for `--resume` reconciliation).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WatchRunState {
+pub struct AutopilotRunState {
     pub schema_version: u32,
     /// Monotonic snapshot generation. Every durable transition increments
     /// this value so concurrent writers can never silently publish an older
@@ -216,7 +223,7 @@ pub struct WatchRunState {
     pub milestones: Vec<crate::autopilot::drive::MilestoneState>,
 }
 
-impl WatchRunState {
+impl AutopilotRunState {
     /// Build a fresh v2 state file with the current process's PID
     /// and "now" timestamps. The `queue` field carries the supplied
     /// milestone ids; everything else defaults to empty.
@@ -233,7 +240,7 @@ impl WatchRunState {
             })
             .collect();
         Self {
-            schema_version: WATCH_RUN_STATE_SCHEMA_VERSION,
+            schema_version: AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
             generation: 0,
             pid: std::process::id(),
             started_at: now.clone(),
@@ -274,7 +281,7 @@ impl WatchRunState {
             .with_context(|| format!("atomic write watch run state {}", path.display()))
     }
 
-    /// Atomic save under the default `.mp/watch.state.json` path for
+    /// Atomic save under the default `.mp/autopilot-run.state.json` path for
     /// a plan context.
     pub fn save_to_plan(&self, ctx: &PlanContext) -> Result<PathBuf> {
         let path = Self::path_for(&ctx.plan_dir);
@@ -305,11 +312,11 @@ impl WatchRunState {
         // Try v2 first. If the file parses as v2 with the current
         // schema_version we're done. Anything else — wrong version,
         // parse failure — falls through to a v1 migration attempt.
-        match serde_json::from_slice::<WatchRunState>(&bytes) {
-            Ok(v) if v.schema_version == WATCH_RUN_STATE_SCHEMA_VERSION => {
+        match serde_json::from_slice::<AutopilotRunState>(&bytes) {
+            Ok(v) if v.schema_version == AUTOPILOT_RUN_STATE_SCHEMA_VERSION => {
                 return Ok(Some(v));
             }
-            Ok(v) if v.schema_version > WATCH_RUN_STATE_SCHEMA_VERSION => {
+            Ok(v) if v.schema_version > AUTOPILOT_RUN_STATE_SCHEMA_VERSION => {
                 // Future-version file. The source of truth has newer
                 // fields than we know about — don't fabricate them.
                 // Treat as absent so the caller spawns fresh.
@@ -318,7 +325,7 @@ impl WatchRunState {
                      known max is {}; treating as absent (forward-compat fallback)",
                     path.display(),
                     v.schema_version,
-                    WATCH_RUN_STATE_SCHEMA_VERSION
+                    AUTOPILOT_RUN_STATE_SCHEMA_VERSION
                 );
                 return Ok(None);
             }
@@ -330,7 +337,7 @@ impl WatchRunState {
         }
 
         // v2 parse failed — try v1 migration.
-        match serde_json::from_slice::<WatchState>(&bytes) {
+        match serde_json::from_slice::<AutopilotLegacyState>(&bytes) {
             Ok(v1) if v1.schema_version == 1 => {
                 eprintln!(
                     "[M178-LOAD] notice: migrating watch state {} from v1 to v2 \
@@ -357,12 +364,12 @@ impl WatchRunState {
         }
     }
 
-    /// Migrate a v1 [`WatchState`] into a v2 [`WatchRunState`].
+    /// Migrate a v1 [`AutopilotLegacyState`] into a v2 [`AutopilotRunState`].
     /// Preserves panes and milestones verbatim; v2 control fields
     /// default to `None` / empty (no live fabrication).
-    fn migrate_from_v1(v1: WatchState) -> Self {
+    fn migrate_from_v1(v1: AutopilotLegacyState) -> Self {
         Self {
-            schema_version: WATCH_RUN_STATE_SCHEMA_VERSION,
+            schema_version: AUTOPILOT_RUN_STATE_SCHEMA_VERSION,
             generation: 0,
             pid: v1.pid,
             started_at: v1.started_at,
@@ -482,7 +489,7 @@ impl WatchRunState {
 /// One externally-observable Watch mutation. Lifecycle values are snapshots
 /// read from the milestone store; this API never transitions a milestone.
 #[derive(Debug, Clone)]
-pub enum WatchTransition {
+pub enum AutopilotRunTransition {
     ActiveMilestone {
         index: usize,
         id: String,
@@ -501,28 +508,28 @@ pub enum WatchTransition {
     Pid(u32),
 }
 
-/// Durable transition store for `.mp/watch.state.json`.
+/// Durable transition store for `.mp/autopilot-run.state.json`.
 ///
 /// A short-lived sibling lock serializes read/modify/write updates. Each
 /// transition reloads the latest snapshot while holding that lock, applies
 /// exactly one event, increments `generation`, and atomically publishes it.
 /// The in-memory snapshot changes only after a successful write.
 #[derive(Debug, Clone)]
-pub struct WatchRunStore {
+pub struct AutopilotRunStore {
     path: PathBuf,
-    state: WatchRunState,
+    state: AutopilotRunState,
 }
 
-impl WatchRunStore {
-    pub fn new(path: PathBuf, state: WatchRunState) -> Self {
+impl AutopilotRunStore {
+    pub fn new(path: PathBuf, state: AutopilotRunState) -> Self {
         Self { path, state }
     }
 
-    pub fn state(&self) -> &WatchRunState {
+    pub fn state(&self) -> &AutopilotRunState {
         &self.state
     }
 
-    pub fn transition(&mut self, event: WatchTransition) -> Result<&WatchRunState> {
+    pub fn transition(&mut self, event: AutopilotRunTransition) -> Result<&AutopilotRunState> {
         let lock_path = self.path.with_extension("json.lock");
         if let Some(parent) = lock_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -566,7 +573,7 @@ impl WatchRunStore {
             }
         };
 
-        let mut next = match WatchRunState::load_from(&self.path)? {
+        let mut next = match AutopilotRunState::load_from(&self.path)? {
             Some(state) => state,
             None if self.path.exists() => {
                 anyhow::bail!(
@@ -579,7 +586,7 @@ impl WatchRunStore {
         // CAS: RunOutcome is write-once under the lock. A concurrent stop
         // that reloads after Completed/PartialFailure must leave the newer
         // terminal snapshot untouched (no generation bump, no rewrite).
-        if matches!(event, WatchTransition::RunOutcome(_)) && next.run_outcome.is_some() {
+        if matches!(event, AutopilotRunTransition::RunOutcome(_)) && next.run_outcome.is_some() {
             drop(lock);
             self.state = next;
             return Ok(&self.state);
@@ -606,22 +613,22 @@ impl Drop for StateLock {
     }
 }
 
-fn apply_transition(state: &mut WatchRunState, event: WatchTransition) {
+fn apply_transition(state: &mut AutopilotRunState, event: AutopilotRunTransition) {
     match event {
-        WatchTransition::ActiveMilestone { index, id } => state.set_active_milestone(index, id),
-        WatchTransition::ActiveStage { stage, target } => state.set_active_stage(stage, target),
-        WatchTransition::LifecycleObserved(value) => state.set_current_lifecycle(value),
-        WatchTransition::PaneObserved { role, pane_id } => state.record_pane(role, pane_id),
-        WatchTransition::MilestoneOutcome(outcome) => state.push_milestone_outcome(outcome),
+        AutopilotRunTransition::ActiveMilestone { index, id } => state.set_active_milestone(index, id),
+        AutopilotRunTransition::ActiveStage { stage, target } => state.set_active_stage(stage, target),
+        AutopilotRunTransition::LifecycleObserved(value) => state.set_current_lifecycle(value),
+        AutopilotRunTransition::PaneObserved { role, pane_id } => state.record_pane(role, pane_id),
+        AutopilotRunTransition::MilestoneOutcome(outcome) => state.push_milestone_outcome(outcome),
         // Terminal outcomes are write-once under the store lock: a late
         // GracefullyStopped (e.g. watch-control stop racing a Completed
         // flush) must not overwrite a newer terminal snapshot.
-        WatchTransition::RunOutcome(outcome) => {
+        AutopilotRunTransition::RunOutcome(outcome) => {
             if state.run_outcome.is_none() {
                 state.set_run_outcome(outcome);
             }
         }
-        WatchTransition::Pid(pid) => {
+        AutopilotRunTransition::Pid(pid) => {
             state.pid = pid;
             state.touch();
         }
@@ -633,14 +640,14 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn fresh_state(ids: &[&str]) -> WatchRunState {
-        WatchRunState::fresh(&ids.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+    fn fresh_state(ids: &[&str]) -> AutopilotRunState {
+        AutopilotRunState::fresh(&ids.iter().map(|s| s.to_string()).collect::<Vec<_>>())
     }
 
     #[test]
     fn fresh_state_is_schema_v2_with_empty_control_fields() {
         let s = fresh_state(&["M170"]);
-        assert_eq!(s.schema_version, WATCH_RUN_STATE_SCHEMA_VERSION);
+        assert_eq!(s.schema_version, AUTOPILOT_RUN_STATE_SCHEMA_VERSION);
         assert_eq!(s.schema_version, 2);
         assert_eq!(s.pid, std::process::id());
         assert_eq!(s.queue, vec!["M170"]);
@@ -657,7 +664,7 @@ mod tests {
     #[test]
     fn round_trip_preserves_v2_contract_fields() {
         let dir = TempDir::new().unwrap();
-        let path = WatchRunState::path_for(dir.path());
+        let path = AutopilotRunState::path_for(dir.path());
         let mut s = fresh_state(&["M170", "M171"]);
         s.set_active_milestone(0, "M170");
         s.set_current_lifecycle("in-progress");
@@ -667,7 +674,7 @@ mod tests {
         );
         s.record_pane(Role::Runner, "%5");
         s.record_pane(Role::Coordinator, "%7");
-        s.log_path = Some(dir.path().join("watch.log").display().to_string());
+        s.log_path = Some(dir.path().join("autopilot.log").display().to_string());
         s.state_path = Some(path.display().to_string());
         s.push_milestone_outcome(MilestoneRunOutcome {
             id: "M170".into(),
@@ -676,7 +683,7 @@ mod tests {
         s.set_run_outcome(RunOutcome::GracefullyStopped);
 
         s.save(&path).unwrap();
-        let loaded = WatchRunState::load_from(&path).unwrap().unwrap();
+        let loaded = AutopilotRunState::load_from(&path).unwrap().unwrap();
         assert_eq!(loaded.schema_version, 2);
         assert_eq!(loaded.queue, vec!["M170", "M171"]);
         assert!(loaded.active_queue_index.is_none());
@@ -757,7 +764,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_vec_pretty(&v1_json).unwrap()).unwrap();
 
-        let loaded = WatchRunState::load_from(&path).unwrap().unwrap();
+        let loaded = AutopilotRunState::load_from(&path).unwrap().unwrap();
         assert_eq!(loaded.schema_version, 2);
         assert_eq!(loaded.pid, 99999);
         // queue derived from the v1 milestones list
@@ -785,7 +792,7 @@ mod tests {
         let path = default_run_state_path(dir.path());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, b"this is not json {").unwrap();
-        let loaded = WatchRunState::load_from(&path).unwrap();
+        let loaded = AutopilotRunState::load_from(&path).unwrap();
         assert!(loaded.is_none());
     }
 
@@ -801,7 +808,7 @@ mod tests {
             "last_updated_at": "2026-07-01T00:00:00+00:00",
         });
         std::fs::write(&path, serde_json::to_vec_pretty(&future).unwrap()).unwrap();
-        let loaded = WatchRunState::load_from(&path).unwrap();
+        let loaded = AutopilotRunState::load_from(&path).unwrap();
         assert!(loaded.is_none());
     }
 

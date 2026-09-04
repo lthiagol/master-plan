@@ -149,7 +149,7 @@ pub fn build_start_args(label: &str, kind: &str, pane_id: &str, extras: &[String
 /// (opencode / pi / cursor). A hand-edited config can still smuggle
 /// an unknown id past the precondition gate, in which case the spawn
 /// will proceed WITHOUT the model / thinking flag — the operator
-/// would see `--kind <unknown>` in watch.log and the harness binary
+/// would see `--kind <unknown>` in autopilot.log and the harness binary
 /// would run with its own defaults. The dry-run preview surfaces the
 /// same wire shape, so the mismatch is visible in the JSON output
 /// before a live spawn.

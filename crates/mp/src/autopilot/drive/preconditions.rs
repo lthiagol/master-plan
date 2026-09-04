@@ -11,7 +11,7 @@
 //!    presence so a freshly-initialized project gets an actionable
 //!    error rather than a silent no-op.
 //! 3. The configured log file path is writable. The default is
-//!    `<plan_dir>/.mp/watch.log`; if the user overrides it to an
+//!    `<plan_dir>/.mp/autopilot.log`; if the user overrides it to an
 //!    unwritable location we want to fail fast at startup, not 30
 //!    minutes into a run.
 //!
@@ -47,13 +47,13 @@ impl PreconditionReport {
     }
 }
 
-/// Default log file path for `mp watch`: `<plan_dir>/.mp/watch.log`.
+/// Default log file path for `mp watch`: `<plan_dir>/.mp/autopilot.log`.
 /// The `.mp/` dir is the standard mp-internal scratch location (also
 /// used for session.json, etc.) and is the right default — it lives
 /// alongside the plan, is gitignored by `mp init`, and is writable in
 /// every profile.
 pub fn default_log_path(plan_dir: &Path) -> std::path::PathBuf {
-    plan_dir.join(".mp").join("watch.log")
+    plan_dir.join(".mp").join("autopilot.log")
 }
 
 /// Run all `mp watch` startup preconditions. Pure function over the
@@ -173,7 +173,7 @@ fn check_harness_auto_set(cfg: &ProjectConfig) -> PreconditionCheck {
 /// [`crate::store::write_config`] after a successful fallback).
 ///
 /// Returns the decision so the caller can log it (e.g. a
-/// `harness_auto_set` entry in `watch.log`) and surface it in
+/// `harness_auto_set` entry in `autopilot.log`) and surface it in
 /// stdout / JSON output.
 ///
 /// F-09: the apply step routes through
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn missing_harnesses_fail_with_actionable_messages() {
         let tmp = TempDir::new().unwrap();
-        let log = tmp.path().join("watch.log");
+        let log = tmp.path().join("autopilot.log");
         let report = check_preconditions(&empty_config(), &log);
 
         assert!(!report.ok, "empty config must fail preconditions");
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn harnesses_present_pass_role_checks() {
         let tmp = TempDir::new().unwrap();
-        let log = tmp.path().join("watch.log");
+        let log = tmp.path().join("autopilot.log");
         let report = check_preconditions(&config_with_harnesses("opencode", "pi"), &log);
 
         let role_checks: Vec<_> = report
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn log_path_writable_when_parent_creatable() {
         let tmp = TempDir::new().unwrap();
-        let log = tmp.path().join(".mp").join("watch.log");
+        let log = tmp.path().join(".mp").join("autopilot.log");
         let report = check_preconditions(&config_with_harnesses("opencode", "opencode"), &log);
         let log_check = report
             .checks
@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn invalid_harness_value_in_hand_edited_config_is_surfaced() {
         let tmp = TempDir::new().unwrap();
-        let log = tmp.path().join("watch.log");
+        let log = tmp.path().join("autopilot.log");
         let mut cfg = empty_config();
         // config_set rejects this, but a hand-edit could still produce
         // it — precondition check should not silently accept it.
@@ -451,6 +451,6 @@ mod tests {
     fn default_log_path_is_under_mp_subdir_of_plan_dir() {
         let plan_dir = Path::new("/tmp/some-plan");
         let log = default_log_path(plan_dir);
-        assert!(log.ends_with(".mp/watch.log"), "got {}", log.display());
+        assert!(log.ends_with(".mp/autopilot.log"), "got {}", log.display());
     }
 }

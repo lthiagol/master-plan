@@ -23,7 +23,7 @@ use crate::autopilot::drive::{
     clear_stage_done_sentinel, ensure_pane, lifecycle_advanced_past, pane_label_for,
     read_agent_status, read_custom_status_bounded, read_lifecycle_via_mp, send_prompt,
     sentinel_matches, LifecycleTarget, PaneHandle, PromptStage, ReadinessOptions, Role, RunOutcome,
-    WaitOptions, WaitOutcome, WatchRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS, DEFAULT_PANE_N,
+    WaitOptions, WaitOutcome, AutopilotRunState, DEFAULT_BRIDGE_POLL_TIMEOUT_MS, DEFAULT_PANE_N,
 };
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
@@ -130,7 +130,7 @@ pub fn should_skip(m: &MilestoneFile) -> Option<String> {
     // A milestone at lifecycle=approved that does not satisfy the
     // AC-02 readiness contract is skipped — mp watch only drives
     // ready milestones (Q-01 resolved: grooming stays manual).
-    if ms.lifecycle == "approved" && !crate::commands::watch::is_ready(m) {
+    if ms.lifecycle == "approved" && !crate::commands::autopilot_drive::is_ready(m) {
         let mut reasons = Vec::new();
         if ms.spec_status != "ready" {
             reasons.push(format!("spec_status={}", ms.spec_status));
@@ -352,7 +352,7 @@ pub struct SystemDriveOps {
     /// M152 ext-review F-02 (2026-07-14): the lifecycle target the
     /// current iteration is waiting for. Used by graceful-shutdown
     /// to persist the *actual* `target_lifecycle` to
-    /// `watch.state.json` instead of a hardcoded placeholder.
+    /// `autopilot-run.state.json` instead of a hardcoded placeholder.
     /// Set by [`Self::wait_for_lifecycle`] on every entry; cleared
     /// on milestone switch via [`Self::set_active_milestone`].
     pub(crate) current_target: Option<crate::autopilot::drive::LifecycleTarget>,
@@ -362,14 +362,14 @@ pub struct SystemDriveOps {
     pub(crate) logger: Option<crate::autopilot::drive::DriveLogger>,
     /// M178 S2: latest-run control-plane state. Updated on every
     /// pane spawn, prompt dispatch, lifecycle wait, and handoff.
-    /// Persisted to `.mp/watch.state.json` via `persist_state`
+    /// Persisted to `.mp/autopilot-run.state.json` via `persist_state`
     /// so the `mp watch status / stop / output` subcommands can read
     /// the v2 contract fields (`active_milestone`, `watch_stage`,
     /// `target_lifecycle`, `pane_ids`, `run_outcome`, …). The struct
     /// is `Option` so legacy callers (tests that build
     /// `SystemDriveOps::new(...)` directly) keep compiling without
     /// a state file — they just get `None` for the live status.
-    pub(crate) run_store: Option<crate::autopilot::drive::WatchRunStore>,
+    pub(crate) run_store: Option<crate::autopilot::drive::AutopilotRunStore>,
     /// M226 F-01 wiring: autopilot session id used to consult the
     /// session event log for prior `AssignmentDispatched` events
     /// before spawning. Set via [`Self::set_session_id`] by the
@@ -414,26 +414,26 @@ impl SystemDriveOps {
 
     /// M178 S2: attach the v2 control-plane state to the ops. Called
     /// by `cmd_watch_drive` once at startup with a freshly-built
-    /// [`WatchRunState`] carrying the supplied queue. From this
+    /// [`AutopilotRunState`] carrying the supplied queue. From this
     /// point on, every pane spawn, prompt dispatch, lifecycle
     /// wait, and handoff updates the state, and callers can
     /// `persist_state` at any time to flush to disk.
-    pub fn attach_run_state(&mut self, state: WatchRunState) {
+    pub fn attach_run_state(&mut self, state: AutopilotRunState) {
         let path = crate::autopilot::drive::default_run_state_path(&self.plan_dir);
-        self.run_store = Some(crate::autopilot::drive::WatchRunStore::new(path, state));
+        self.run_store = Some(crate::autopilot::drive::AutopilotRunStore::new(path, state));
     }
 
     /// Borrow the attached v2 state (if any). `None` for legacy
     /// callers that haven't called [`Self::attach_run_state`].
-    pub fn run_state(&self) -> Option<&WatchRunState> {
+    pub fn run_state(&self) -> Option<&AutopilotRunState> {
         self.run_store.as_ref().map(|store| store.state())
     }
 
     /// Borrow the attached v2 state mutably.
     pub fn transition(
         &mut self,
-        event: crate::autopilot::drive::WatchTransition,
-    ) -> anyhow::Result<Option<&WatchRunState>> {
+        event: crate::autopilot::drive::AutopilotRunTransition,
+    ) -> anyhow::Result<Option<&AutopilotRunState>> {
         match self.run_store.as_mut() {
             Some(store) => Ok(Some(store.transition(event)?)),
             None => Ok(None),
@@ -464,7 +464,7 @@ impl SystemDriveOps {
             .run_state()
             .and_then(|state| state.queue.iter().position(|q| q == &id))
             .unwrap_or(0);
-        self.transition(crate::autopilot::drive::WatchTransition::ActiveMilestone {
+        self.transition(crate::autopilot::drive::AutopilotRunTransition::ActiveMilestone {
             index: idx,
             id,
         })?;
@@ -543,7 +543,7 @@ impl SystemDriveOps {
     /// M152 ext-review F-02 (2026-07-14): the lifecycle target the
     /// current iteration is waiting for. Used by graceful-shutdown
     /// to persist the correct `target_lifecycle` to
-    /// `watch.state.json`. `None` before any `wait_for_lifecycle`
+    /// `autopilot-run.state.json`. `None` before any `wait_for_lifecycle`
     /// has run for the active milestone.
     pub fn current_target(&self) -> Option<LifecycleTarget> {
         self.current_target
@@ -911,7 +911,7 @@ impl DriveOps for SystemDriveOps {
                 // M178 S2: record the pane id in the v2 control-plane state
                 // so `mp watch output` (S7) can address it without scanning
                 // the legacy v1 panes array.
-                self.transition(crate::autopilot::drive::WatchTransition::PaneObserved {
+                self.transition(crate::autopilot::drive::AutopilotRunTransition::PaneObserved {
                     role,
                     pane_id: handle.pane_id.clone(),
                 })?;
@@ -973,7 +973,7 @@ impl DriveOps for SystemDriveOps {
         });
         let pane_id = pane.pane_id.clone();
         if let Some(role) = pane_role {
-            self.transition(crate::autopilot::drive::WatchTransition::PaneObserved {
+            self.transition(crate::autopilot::drive::AutopilotRunTransition::PaneObserved {
                 role,
                 pane_id,
             })?;
@@ -1016,7 +1016,7 @@ impl DriveOps for SystemDriveOps {
             _ => None,
         };
         if let Some(lc) = new_lifecycle {
-            self.transition(crate::autopilot::drive::WatchTransition::LifecycleObserved(
+            self.transition(crate::autopilot::drive::AutopilotRunTransition::LifecycleObserved(
                 lc,
             ))?;
         }
@@ -1031,7 +1031,7 @@ impl DriveOps for SystemDriveOps {
         // M178 external-review F-01: update the v2 control-plane
         // state with the active stage + target so `mp watch-control
         // status` reads them during a live run.
-        self.transition(crate::autopilot::drive::WatchTransition::ActiveStage { stage, target })?;
+        self.transition(crate::autopilot::drive::AutopilotRunTransition::ActiveStage { stage, target })?;
         Ok(())
     }
 }
@@ -1041,7 +1041,7 @@ impl SystemDriveOps {
     /// mark the run terminal if `outcome` is terminal. Used by the
     /// sequencer on every milestone boundary. Lives on the
     /// inherent impl (not the [`DriveOps`] trait) so callers don't
-    /// have to thread `WatchRunState` through the trait surface.
+    /// have to thread `AutopilotRunState` through the trait surface.
     pub(crate) fn record_milestone_outcome(
         &mut self,
         milestone_id: impl Into<String>,
@@ -1049,7 +1049,7 @@ impl SystemDriveOps {
     ) -> Result<()> {
         let milestone_id = milestone_id.into();
         use crate::autopilot::drive::MilestoneRunOutcome;
-        self.transition(crate::autopilot::drive::WatchTransition::MilestoneOutcome(
+        self.transition(crate::autopilot::drive::AutopilotRunTransition::MilestoneOutcome(
             MilestoneRunOutcome {
                 id: milestone_id.clone(),
                 outcome: outcome.clone(),

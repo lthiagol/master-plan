@@ -7,7 +7,7 @@
 //!   a 30-minute autonomous run ends cleanly within milliseconds
 //!   of a Ctrl-C.
 //! - [`perform_graceful_shutdown`] — the cleanup routine: flushes
-//!   `WatchState` to `<plan_dir>/.mp/watch.state.json` and
+//!   `AutopilotLegacyState` to `<plan_dir>/.mp/autopilot-run.state.json` and
 //!   records a flash note on the in-flight milestone via
 //!   `mp reviews comment add`.
 //!
@@ -104,13 +104,13 @@ pub use platform::install_signal_handlers;
 /// fails (we never block exit on best-effort cleanup).
 ///
 /// Steps:
-/// 1. Flush the in-memory `WatchState` to disk (atomic write).
+/// 1. Flush the in-memory `AutopilotLegacyState` to disk (atomic write).
 /// 2. Add a flash note to the in-flight milestone via
 ///    `mp reviews comment add` (author "mp watch", body
 ///    "graceful shutdown: last lifecycle was `<last>`").
 pub fn perform_graceful_shutdown(
     ctx: &crate::paths::PlanContext,
-    state: &crate::autopilot::drive::WatchState,
+    state: &crate::autopilot::drive::AutopilotLegacyState,
     active_milestone: Option<&str>,
     last_lifecycle: Option<&str>,
     logger: Option<&crate::autopilot::drive::DriveLogger>,
@@ -123,7 +123,7 @@ pub fn perform_graceful_shutdown(
         if let Some(l) = logger {
             let _ = l.log(&crate::autopilot::drive::DriveLogEntry::new(
                 "shutdown_flush_failed",
-                format!("watch.state.json flush failed: {e:#}"),
+                format!("autopilot-run.state.json flush failed: {e:#}"),
             ));
         }
     }
@@ -198,7 +198,7 @@ pub fn is_pid_alive(_pid: u32) -> bool {
 }
 
 /// Test / ops helper: write the canonical state file at
-/// `<ctx.plan_dir>/.mp/watch.state.json` for the supplied
+/// `<ctx.plan_dir>/.mp/autopilot-run.state.json` for the supplied
 /// milestone + lifecycle. Used by the signal-flush integration
 /// test to write a known state, send SIGINT, and verify the
 /// on-disk content matches.
@@ -207,8 +207,8 @@ pub fn write_shutdown_state_for_test(
     milestone_id: &str,
     last_lifecycle: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
-    use crate::autopilot::drive::{MilestoneState, WatchState};
-    let mut state = WatchState::fresh(&[milestone_id.to_string()]);
+    use crate::autopilot::drive::{MilestoneState, AutopilotLegacyState};
+    let mut state = AutopilotLegacyState::fresh(&[milestone_id.to_string()]);
     state.upsert_milestone(MilestoneState {
         id: milestone_id.to_string(),
         last_lifecycle: last_lifecycle.to_string(),

@@ -4,7 +4,7 @@
 //! that flips an atomic the drive loop polls between iterations.
 //! When the run trips on the shutdown flag, the cli layer
 //! performs cleanup before exiting:
-//! 1. Flush `.mp/watch.state.json` so a subsequent
+//! 1. Flush `.mp/autopilot-run.state.json` so a subsequent
 //!    `mp watch --resume` can re-attach to the panes the run
 //!    owned.
 //! 2. Record a flash note on the in-flight milestone via
@@ -19,7 +19,7 @@ mod common;
 use crate::common::TestEnv;
 use mp::autopilot::drive::{
     install_signal_handlers, perform_graceful_shutdown, request_shutdown, shutdown_requested,
-    write_shutdown_state_for_test, PaneState, Role, WatchState,
+    write_shutdown_state_for_test, PaneState, Role, AutopilotLegacyState,
 };
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -119,7 +119,7 @@ fn seed_approved_milestone(env: &TestEnv, title: &str) -> String {
 }
 
 fn state_path(env: &TestEnv) -> PathBuf {
-    WatchState::path_for(&env.tmp.path().join("master-plan"))
+    AutopilotLegacyState::path_for(&env.tmp.path().join("master-plan"))
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn signal_handlers_install_lazily_and_flip_shutdown_flag() {
 #[test]
 fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
     // Black-box: the cleanup routine called by `cmd_watch_drive`
-    // does both halves of AC-04 — writes `.mp/watch.state.json`
+    // does both halves of AC-04 — writes `.mp/autopilot-run.state.json`
     // AND records a review comment (flash note) on the in-flight
     // milestone. The state file is absent before, present after.
     let env = TestEnv::new();
@@ -158,7 +158,7 @@ fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
     // would have. `perform_graceful_shutdown` flushes whatever
     // state the caller hands it — the test pins that contract.
     let ctx_dir = env.tmp.path().join("master-plan");
-    let mut state = WatchState::fresh(std::slice::from_ref(&id));
+    let mut state = AutopilotLegacyState::fresh(std::slice::from_ref(&id));
     state.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -181,7 +181,7 @@ fn perform_graceful_shutdown_writes_state_and_adds_flash_note() {
 
     // Step 1: state file exists.
     assert!(path.is_file(), "state file must be flushed");
-    let loaded = WatchState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
     assert_eq!(loaded.milestone(&id).unwrap().last_lifecycle, "in-progress");
     assert_eq!(loaded.pane_for(Role::Runner).unwrap().pane_id, "%5");
 
@@ -216,7 +216,7 @@ fn perform_graceful_shutdown_is_resilient_when_milestone_load_fails() {
     mp::autopilot::drive::clear_shutdown_flag();
 
     let path = state_path(&env);
-    let state = WatchState::fresh(&[]);
+    let state = AutopilotLegacyState::fresh(&[]);
     let plan_ctx = mp::paths::PlanContext {
         plan_dir: env.tmp.path().join("master-plan"),
         project_root: env.tmp.path().to_path_buf(),
@@ -239,7 +239,7 @@ fn write_shutdown_state_for_test_seeds_state_file() {
     };
     let path = write_shutdown_state_for_test(&plan_ctx, "M-test", "in-progress").unwrap();
     assert!(path.is_file());
-    let loaded = WatchState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
     assert_eq!(
         loaded.milestone("M-test").unwrap().last_lifecycle,
         "in-progress"
@@ -250,7 +250,7 @@ fn write_shutdown_state_for_test_seeds_state_file() {
 fn real_sigint_during_autopilot_run_exits_zero_and_flushes_state() {
     // Drive the headline M152 S4 / AC-04 contract: a real
     // SIGINT during `mp watch` causes exit code 0 (not the
-    // usual failure 2) AND flushes `.mp/watch.state.json` so
+    // usual failure 2) AND flushes `.mp/autopilot-run.state.json` so
     // `--resume` can re-attach.
     //
     // Strategy:
@@ -324,7 +324,7 @@ fn real_sigint_during_autopilot_run_exits_zero_and_flushes_state() {
         .path()
         .join("master-plan")
         .join(".mp")
-        .join("watch.log");
+        .join("autopilot.log");
     let ready_deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         if log_file
@@ -405,9 +405,9 @@ fn real_sigint_during_autopilot_run_exits_zero_and_flushes_state() {
     let path = state_path(&env);
     assert!(
         path.is_file(),
-        "graceful shutdown must leave .mp/watch.state.json flushed"
+        "graceful shutdown must leave .mp/autopilot-run.state.json flushed"
     );
-    let loaded = WatchState::load_from(&path).unwrap().expect("loads");
+    let loaded = AutopilotLegacyState::load_from(&path).unwrap().expect("loads");
     let tracked = loaded
         .milestone(&id)
         .expect("in-flight milestone must appear in flushed state");

@@ -48,10 +48,10 @@ pub(crate) fn cmd_autopilot(
     match cmd {
         AutopilotCmd::Start(args) => cmd_autopilot_start(ctx, args, format),
         AutopilotCmd::Status { summary } => {
-            crate::commands::watch_control::cmd_watch_control_status(ctx, summary, format, fields)
+            crate::commands::autopilot_control::cmd_autopilot_control_status(ctx, summary, format, fields)
         }
         AutopilotCmd::Stop { pid, timeout_secs } => {
-            crate::commands::watch_control::cmd_watch_control_stop(
+            crate::commands::autopilot_control::cmd_autopilot_control_stop(
                 ctx,
                 pid,
                 timeout_secs,
@@ -63,11 +63,11 @@ pub(crate) fn cmd_autopilot(
             max_bytes,
             timeout_ms,
             role,
-        } => crate::commands::watch_control::cmd_watch_control_output(
+        } => crate::commands::autopilot_control::cmd_autopilot_control_output(
             ctx, max_bytes, timeout_ms, role, format, fields,
         ),
         AutopilotCmd::Result { force } => {
-            crate::commands::watch_control::cmd_watch_control_result(ctx, force, format, fields)
+            crate::commands::autopilot_control::cmd_autopilot_control_result(ctx, force, format, fields)
         }
         AutopilotCmd::Session { cmd } => cmd_autopilot_session(ctx, cmd, format, fields),
         AutopilotCmd::Note { cmd } => match cmd {
@@ -86,7 +86,7 @@ pub(crate) fn cmd_autopilot_start(
     args: AutopilotStartArgs,
     format: crate::cli::OutputFormat,
 ) -> Result<()> {
-    crate::commands::watch::cmd_watch(
+    crate::commands::autopilot_drive::cmd_autopilot_drive(
         ctx,
         args.ids,
         args.dry_run,

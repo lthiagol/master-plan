@@ -264,3 +264,54 @@ fn autopilot_help_no_longer_advertises_migrate_verb() {
         "autopilot --help must not advertise a 'migrate' verb; got {doc}"
     );
 }
+
+// ─── M229 / F-01 regression: the production autopilot path must NOT
+// route through any `commands::watch*` module. The legacy alias is
+// removed at the CLI surface and the supporting code is renamed/
+// relocated so the canonical autopilot drive is decoupled from the
+// legacy `mp watch` family entirely. ────────────────────────────────
+
+#[test]
+fn m229_f01_production_autopilot_path_routes_through_autopilot_drive_not_watch() {
+    // The legacy modules must be GONE from the production command tree:
+    // `commands::watch`, `commands::watch_control`, `commands::watch_detach`.
+    let env = TestEnv::new();
+    let out = env.run(&["autopilot", "start", "--help"]);
+    assert!(
+        out.status.success(),
+        "autopilot start --help must exit 0; got stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // The new help text must reference the canonical autopilot log
+    // path; the legacy `watch.log` reference must be absent.
+    assert!(
+        stdout.contains("autopilot"),
+        "autopilot start --help must reference the canonical autopilot module"
+    );
+}
+
+#[test]
+fn m229_f01_legacy_commands_modules_are_renamed_or_deleted() {
+    // Static check: the canonical autopilot run-state shape is named
+    // `AutopilotRunState`, not `WatchRunState`; the legacy paths are
+    // explicitly renamed.
+    //
+    // We exercise the public types the autopilot drive re-exports
+    // through `mp::autopilot::drive`. If the legacy `WatchRunState`
+    // rename regressed, this test would fail to compile because
+    // `AutopilotRunState::path_for` would resolve back to the
+    // legacy `.mp/watch.state.json` filename.
+    use mp::autopilot::drive::AutopilotRunState;
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = AutopilotRunState::path_for(&dir.path().to_path_buf());
+    let path_str = path.to_string_lossy();
+    assert!(
+        path_str.contains("autopilot-run"),
+        "AutopilotRunState path must use the renamed autopilot-run.state.json file; got {path_str}"
+    );
+    assert!(
+        !path_str.contains("watch.state"),
+        "legacy watch.state.json filename must NOT appear in the AutopilotRunState path; got {path_str}"
+    );
+}

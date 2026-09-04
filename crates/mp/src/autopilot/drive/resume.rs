@@ -27,7 +27,7 @@
 use serde::Serialize;
 
 use crate::autopilot::drive::herdr::{find_existing_pane, pane_label_for, Role, DEFAULT_PANE_N};
-use crate::autopilot::drive::state::WatchState;
+use crate::autopilot::drive::AutopilotLegacyState;
 
 /// Per-role classification of the pane state at resume time.
 ///
@@ -46,7 +46,7 @@ pub enum PaneStatus {
         pane_id: String,
         status: Option<String>,
     },
-    /// Pane was tracked in `watch.state.json` but does not appear
+    /// Pane was tracked in `autopilot-run.state.json` but does not appear
     /// in the live herdr list. Resume must re-spawn. Carries the
     /// stable label so the spawn path doesn't have to recompute it.
     Dead { label: String },
@@ -97,7 +97,7 @@ impl Reconciliation {
 /// `find_existing_pane` already handles both `{"agents": [...]}` and
 /// bare `[...]` envelopes from herdr, so the resume path stays
 /// resilient across herdr versions.
-pub fn reconcile(state: Option<&WatchState>, herdr_list_json: &str) -> Reconciliation {
+pub fn reconcile(state: Option<&AutopilotLegacyState>, herdr_list_json: &str) -> Reconciliation {
     Reconciliation {
         runner: classify_role(
             state,
@@ -115,7 +115,7 @@ pub fn reconcile(state: Option<&WatchState>, herdr_list_json: &str) -> Reconcili
 }
 
 fn classify_role(
-    state: Option<&WatchState>,
+    state: Option<&AutopilotLegacyState>,
     herdr_list_json: &str,
     role: Role,
     label: String,
@@ -140,7 +140,7 @@ fn classify_role(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::autopilot::drive::state::{PaneState, WatchState};
+    use crate::autopilot::drive::legacy_state::{AutopilotLegacyState, PaneState};
 
     fn env(label: &str, pane_id: &str) -> String {
         format!(r#"{{"agents":[{{"name":"{label}","pane_id":"{pane_id}"}}]}}"#)
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn recorded_pane_absent_from_herdr_list_is_dead() {
-        let mut s = WatchState::fresh(&[]);
+        let mut s = AutopilotLegacyState::fresh(&[]);
         s.upsert_pane(PaneState {
             role: Role::Runner,
             label: "role-runner-1".into(),
@@ -220,7 +220,7 @@ mod tests {
         // When both the state and herdr list are populated, herdr is
         // authoritative (the pane may have been recreated with a
         // fresh id since the state was written).
-        let mut s = WatchState::fresh(&[]);
+        let mut s = AutopilotLegacyState::fresh(&[]);
         s.upsert_pane(PaneState {
             role: Role::Runner,
             label: "role-runner-1".into(),
@@ -262,7 +262,7 @@ mod tests {
         // The spawn path should not need to recompute the label;
         // Dead carries it explicitly so callers can rely on a
         // single source of truth (pane_label_for).
-        let mut s = WatchState::fresh(&[]);
+        let mut s = AutopilotLegacyState::fresh(&[]);
         s.upsert_pane(PaneState {
             role: Role::Coordinator,
             label: "role-coordinator-1".into(),

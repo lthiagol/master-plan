@@ -9,7 +9,7 @@
 //! Black-box coverage:
 //! - Reconciler classifies a role pane as Live / Dead / Missing
 //!   from fixture JSON inputs (no subprocess).
-//! - `mp watch --resume` reads `.mp/watch.state.json`, lists herdr
+//! - `mp watch --resume` reads `.mp/autopilot-run.state.json`, lists herdr
 //!   panes, and exits cleanly with a structured JSON report that
 //!   names which roles were re-attached vs. spawned.
 //!
@@ -76,10 +76,10 @@ fn reconcile_classifies_both_panes_as_live_when_herdr_listing_matches() {
 
 #[test]
 fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
     let _ = env;
-    let mut s = WatchState::fresh(&[]);
+    let mut s = AutopilotLegacyState::fresh(&[]);
     s.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -100,10 +100,10 @@ fn reconcile_classifies_dead_pane_when_state_says_alive_but_herdr_doesnt() {
 
 #[test]
 fn reconcile_prefers_herdr_pane_id_over_recorded_state() {
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
     let _ = env;
-    let mut s = WatchState::fresh(&[]);
+    let mut s = AutopilotLegacyState::fresh(&[]);
     s.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -147,11 +147,11 @@ fn reconcile_does_not_panic_on_corrupt_herdr_list() {
 fn state_file_persists_across_save_load_resume_cycle() {
     // Black-box check: a state file written, then read back, then
     // passed through reconcile, must classify live panes correctly.
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
-    let path = WatchState::path_for(&env.tmp.path().join("master-plan"));
+    let path = AutopilotLegacyState::path_for(&env.tmp.path().join("master-plan"));
 
-    let mut s = WatchState::fresh(&["M152".into()]);
+    let mut s = AutopilotLegacyState::fresh(&["M152".into()]);
     s.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -160,7 +160,7 @@ fn state_file_persists_across_save_load_resume_cycle() {
         last_status: Some("working".into()),
     });
     s.save(&path).unwrap();
-    let restored: Option<WatchState> = mp::autopilot::drive::WatchState::load_from(&path).unwrap();
+    let restored: Option<mp::autopilot::drive::AutopilotLegacyState> = mp::autopilot::drive::AutopilotLegacyState::load_from(&path).unwrap();
     let r = reconcile(restored.as_ref(), &both_panes_alive());
     // Both panes show up in the herdr list — Live overrides any
     // prior state-of-the-world ambiguity.
@@ -171,10 +171,10 @@ fn state_file_persists_across_save_load_resume_cycle() {
 
 #[test]
 fn runner_only_in_state_is_dead_when_herdr_omits_it() {
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
     let _ = env;
-    let mut s = WatchState::fresh(&[]);
+    let mut s = AutopilotLegacyState::fresh(&[]);
     s.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -192,7 +192,7 @@ fn runner_only_in_state_is_dead_when_herdr_omits_it() {
 
 #[test]
 fn any_needs_spawn_aggregates_per_role() {
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
     let _ = env;
     // Neither pane recorded, neither pane alive.
@@ -200,7 +200,7 @@ fn any_needs_spawn_aggregates_per_role() {
     assert!(r0.any_needs_spawn());
 
     // Both alive.
-    let mut s = WatchState::fresh(&[]);
+    let mut s = AutopilotLegacyState::fresh(&[]);
     for (role, label, id) in [
         (Role::Runner, "role-runner-1", "%5"),
         (Role::Coordinator, "role-coordinator-1", "%7"),
@@ -266,10 +266,10 @@ fn seed_state_roundtrips_through_reconcile() {
     // End-to-end pin: write a state file, load it back, classify
     // panes. The reconcile output is what `mp watch --resume` uses
     // to re-attach.
-    use mp::autopilot::drive::{MilestoneState, PaneState, Role, WatchState};
+    use mp::autopilot::drive::{MilestoneState, PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
-    let path = WatchState::path_for(&env.tmp.path().join("master-plan"));
-    let mut s = WatchState::fresh(&["M152".into()]);
+    let path = AutopilotLegacyState::path_for(&env.tmp.path().join("master-plan"));
+    let mut s = AutopilotLegacyState::fresh(&["M152".into()]);
     s.upsert_pane(PaneState {
         role: Role::Runner,
         label: "role-runner-1".into(),
@@ -285,7 +285,7 @@ fn seed_state_roundtrips_through_reconcile() {
     });
     s.save(&path).unwrap();
 
-    let restored = WatchState::load_from(&path).unwrap().expect("state");
+    let restored = AutopilotLegacyState::load_from(&path).unwrap().expect("state");
     let r = reconcile(Some(&restored), &both_panes_alive());
     // herdr is authoritative over pane_id, but restored state still
     // tells the resume path "this role had a pane that may or may
@@ -303,10 +303,10 @@ fn reconcile_with_empty_herdr_and_recorded_state_marks_dead() {
     // (the panes were killed when the parent process died). The
     // reconciler must mark every recorded pane as Dead so `--resume`
     // re-spawns them.
-    use mp::autopilot::drive::{PaneState, Role, WatchState};
+    use mp::autopilot::drive::{PaneState, Role, AutopilotLegacyState};
     let env = TestEnv::new();
     let _ = env;
-    let mut s = WatchState::fresh(&[]);
+    let mut s = AutopilotLegacyState::fresh(&[]);
     for role in [Role::Runner, Role::Coordinator] {
         s.upsert_pane(PaneState {
             role,

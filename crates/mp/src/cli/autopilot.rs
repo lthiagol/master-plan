@@ -107,7 +107,7 @@ pub struct AutopilotStartArgs {
     #[arg(long)]
     pub dry_run: bool,
     /// Override the structured-log path (default:
-    /// `<plan_dir>/.mp/watch.log`).
+    /// `<plan_dir>/.mp/autopilot.log`).
     #[arg(long)]
     pub log_file: Option<std::path::PathBuf>,
     /// Max milliseconds the lifecycle poll waits before flagging

@@ -129,7 +129,7 @@ pub fn default_path(plan_dir: &Path) -> PathBuf {
 
 /// Read the journal at the default plan location. Absent file → empty
 /// log. Schema-incompatible file → empty log + warning (same shape
-/// contract as `WatchState::load_from`).
+/// contract as `AutopilotLegacyState::load_from`).
 pub fn load(ctx: &PlanContext) -> Result<ActivityLog> {
     load_from(&ctx.activity_path())
 }

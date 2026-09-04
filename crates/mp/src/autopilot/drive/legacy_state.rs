@@ -1,4 +1,12 @@
-//! M152 S1: crash-safe `watch.state.json` for `mp watch`.
+//! M229: crash-safe `autopilot-legacy.state.json`.
+//!
+//! M152 S1 introduced `watch.state.json` for `mp watch`. M229 renamed
+//! the on-disk path to `autopilot-legacy.state.json` (and the Rust
+//! type to `AutopilotLegacyState`) as part of the breaking-release
+//! cleanup. New autopilot runs land at
+//! `<plan_dir>/.mp/autopilot-run.state.json` (the v2
+//! [`AutopilotRunState`]) and never write here; the v1 file is
+//! read-only on `--resume` against runs started before M229.
 //!
 //! Persistent operational scratch the running watch process
 //! maintains so a subsequent `mp watch --resume` (or even an
@@ -56,18 +64,18 @@ use crate::paths::PlanContext;
 use crate::store::atomic_write;
 
 /// Current state-file schema. Bumped when an incompatible change
-/// lands; [`WatchState::load`] surfaces a warning when reading a
+/// lands; [`AutopilotLegacyState::load`] surfaces a warning when reading a
 /// newer-than-known schema (forward compatibility) and refuses an
 /// older-than-known schema (backward compat is not promised; older
 /// state files are ignored, the runner re-spawns).
-pub const WATCH_STATE_SCHEMA_VERSION: u32 = 1;
+pub const AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION: u32 = 1;
 
-/// Default path for the state file: `<plan_dir>/.mp/watch.state.json`.
+/// Default path for the state file: `<plan_dir>/.mp/autopilot-legacy.state.json`.
 /// The `.mp` directory is the canonical mp-internal scratch location
-/// (also hosts `session.json`, `watch.log`); keeping the state file
+/// (also hosts `session.json`, `autopilot.log`); keeping the state file
 /// next to them mirrors the same convention.
-pub fn default_state_path(plan_dir: &Path) -> PathBuf {
-    plan_dir.join(".mp").join("watch.state.json")
+pub fn default_legacy_state_path(plan_dir: &Path) -> PathBuf {
+    plan_dir.join(".mp").join("autopilot-legacy.state.json")
 }
 
 /// Snapshot of a single pane's tracked state. One entry per pane the
@@ -112,9 +120,9 @@ pub struct MilestoneState {
 }
 
 /// Crash-safe `mp watch` state file shape. Serialized to
-/// `<plan_dir>/.mp/watch.state.json` through [`Self::save`].
+/// `<plan_dir>/.mp/autopilot-legacy.state.json` through [`Self::save`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WatchState {
+pub struct AutopilotLegacyState {
     pub schema_version: u32,
     pub pid: u32,
     pub started_at: String,
@@ -125,13 +133,13 @@ pub struct WatchState {
     pub milestones: Vec<MilestoneState>,
 }
 
-impl WatchState {
+impl AutopilotLegacyState {
     /// Build a fresh state file with the current process's PID and
     /// "now" timestamps. The caller owns mutation from here.
     pub fn fresh(active_milestones: &[String]) -> Self {
         let now = crate::store::now_rfc3339();
         Self {
-            schema_version: WATCH_STATE_SCHEMA_VERSION,
+            schema_version: AUTOPILOT_LEGACY_STATE_SCHEMA_VERSION,
             pid: std::process::id(),
             started_at: now.clone(),
             last_updated_at: now,
@@ -150,7 +158,7 @@ impl WatchState {
 
     /// Compute the default state-file path for a plan directory.
     pub fn path_for(plan_dir: &Path) -> PathBuf {
-        default_state_path(plan_dir)
+        default_legacy_state_path(plan_dir)
     }
 
     /// Atomically write the state file. Uses `atomic_write` so a
@@ -169,7 +177,7 @@ impl WatchState {
             .with_context(|| format!("atomic write watch state {}", path.display()))
     }
 
-    /// Atomic save under the default `.mp/watch.state.json` path.
+    /// Atomic save under the default `.mp/autopilot-legacy.state.json` path.
     pub fn save_to_plan(&self, ctx: &PlanContext) -> Result<PathBuf> {
         let path = Self::path_for(&ctx.plan_dir);
         self.save(&path)?;
@@ -206,7 +214,7 @@ impl WatchState {
         }
         let bytes =
             std::fs::read(path).with_context(|| format!("read watch state {}", path.display()))?;
-        let parsed: WatchState = match serde_json::from_slice(&bytes) {
+        let parsed: AutopilotLegacyState = match serde_json::from_slice(&bytes) {
             Ok(v) => v,
             Err(e) => {
                 // A torn or corrupt state file never blocks a fresh
@@ -221,9 +229,9 @@ impl WatchState {
         };
         // M178 S1: the v2 control-plane file is a strict superset of
         // v1 (same legacy fields + extras). v2 readers will prefer
-        // `WatchRunState::load_from`; this legacy loader accepts v2
+        // `AutopilotRunState::load_from`; this legacy loader accepts v2
         // for the `--resume` reconciliation path so the M152 test
-        // suite (which calls `WatchState::load_from` directly) keeps
+        // suite (which calls `AutopilotRunState::load_from` directly) keeps
         // working through the v2 era.
         if parsed.schema_version > 2 {
             eprintln!(
@@ -292,8 +300,8 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn fresh_empty() -> WatchState {
-        WatchState::fresh(&[])
+    fn fresh_empty() -> AutopilotLegacyState {
+        AutopilotLegacyState::fresh(&[])
     }
 
     #[test]
@@ -309,7 +317,7 @@ mod tests {
 
     #[test]
     fn fresh_state_seeds_active_milestones() {
-        let s = WatchState::fresh(&["M152".to_string(), "M153".to_string()]);
+        let s = AutopilotLegacyState::fresh(&["M152".to_string(), "M153".to_string()]);
         let ids: Vec<&str> = s.milestones.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids, vec!["M152", "M153"]);
         // Defaults match the entry-point lifecycle target on approval.
@@ -376,7 +384,7 @@ mod tests {
     #[test]
     fn save_then_load_round_trips_losslessly() {
         let dir = TempDir::new().unwrap();
-        let mut s = WatchState::fresh(&["M152".to_string()]);
+        let mut s = AutopilotLegacyState::fresh(&["M152".to_string()]);
         s.upsert_pane(PaneState {
             role: Role::Runner,
             label: "role-runner-1".into(),
@@ -391,24 +399,24 @@ mod tests {
             last_action_at: "2026-01-01T00:00:01Z".into(),
         });
 
-        let path = WatchState::path_for(dir.path());
+        let path = AutopilotLegacyState::path_for(dir.path());
         s.save(&path).unwrap();
         assert!(path.is_file(), "save must persist the file");
 
-        let loaded = WatchState::load_from(&path).unwrap().unwrap();
+        let loaded = AutopilotLegacyState::load_from(&path).unwrap().unwrap();
         assert_eq!(loaded, s);
     }
 
     #[test]
     fn save_is_atomic_via_temp_then_rename() {
-        // `atomic_write` is exercised here through `WatchState::save`.
+        // `atomic_write` is exercised here through `AutopilotLegacyState::save`.
         // We can't easily observe the temp-file race from a single-
         // threaded test, so we pin the contract indirectly: the
         // destination file must exist with the final content once
         // save returns, and a torn intermediate path must NOT be
         // visible at the destination.
         let dir = TempDir::new().unwrap();
-        let path = WatchState::path_for(dir.path());
+        let path = AutopilotLegacyState::path_for(dir.path());
         let s = fresh_empty();
         s.save(&path).unwrap();
         let written = std::fs::read(&path).unwrap();
@@ -423,23 +431,23 @@ mod tests {
     #[test]
     fn load_returns_none_when_missing() {
         let dir = TempDir::new().unwrap();
-        let path = WatchState::path_for(dir.path());
+        let path = AutopilotLegacyState::path_for(dir.path());
         assert!(!path.exists());
-        let loaded = WatchState::load_from(&path).unwrap();
+        let loaded = AutopilotLegacyState::load_from(&path).unwrap();
         assert!(loaded.is_none());
     }
 
     #[test]
     fn load_returns_none_when_corrupt() {
         let dir = TempDir::new().unwrap();
-        let path = WatchState::path_for(dir.path());
+        let path = AutopilotLegacyState::path_for(dir.path());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, b"not json {{{").unwrap();
         // A torn file must not crash the resume; --resume falls
         // through to spawn normally. The `[M152-LOAD]` warning
         // (F-03) is emitted to stderr; operators + tests can
         // filter on the prefix.
-        let loaded = WatchState::load_from(&path).unwrap();
+        let loaded = AutopilotLegacyState::load_from(&path).unwrap();
         assert!(loaded.is_none());
         // File is left in place for forensics (corruption is
         // pinned: corrupt files are not deleted; they are skipped).
@@ -449,7 +457,7 @@ mod tests {
     #[test]
     fn load_returns_none_on_schema_mismatch() {
         let dir = TempDir::new().unwrap();
-        let path = WatchState::path_for(dir.path());
+        let path = AutopilotLegacyState::path_for(dir.path());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let raw = r#"{
             "schema_version": 99,
@@ -460,7 +468,7 @@ mod tests {
             "milestones": []
         }"#;
         std::fs::write(&path, raw).unwrap();
-        let loaded = WatchState::load_from(&path).unwrap();
+        let loaded = AutopilotLegacyState::load_from(&path).unwrap();
         assert!(loaded.is_none(), "schema-incompatible file must be ignored");
     }
 
@@ -472,11 +480,11 @@ mod tests {
     }
 
     #[test]
-    fn default_state_path_is_under_mp_subdir() {
+    fn default_legacy_state_path_is_under_mp_subdir() {
         let plan = Path::new("/tmp/plan");
         assert_eq!(
-            default_state_path(plan),
-            PathBuf::from("/tmp/plan/.mp/watch.state.json")
+            default_legacy_state_path(plan),
+            PathBuf::from("/tmp/plan/.mp/autopilot-legacy.state.json")
         );
     }
 

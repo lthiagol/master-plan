@@ -63,7 +63,7 @@ pub struct StepRollup {
 /// Build health / totals / lifecycle / step rollups from the
 /// milestone snapshot. Reuses `validate::validate_plan_with_milestones`
 /// to share the existing gate-aware validate pass; reuses
-/// `drive::WatchRunState::load_from` for the watch-state derivation
+/// `drive::AutopilotRunState::load_from` for the watch-state derivation
 /// (M178 S1 v2 control-plane shape).
 pub fn build_health(ctx: &PlanContext) -> Result<OverviewHealthBundle> {
     let plan = store::load_plan(ctx).unwrap_or_default();
@@ -182,7 +182,7 @@ fn rollup_milestones(
 ///   [`drive::RunOutcome::GracefullyStopped`].
 fn derive_watch_state(ctx: &PlanContext) -> &'static str {
     let path = drive::default_run_state_path(&ctx.plan_dir);
-    let Some(state) = drive::WatchRunState::load_from(&path).ok().flatten() else {
+    let Some(state) = drive::AutopilotRunState::load_from(&path).ok().flatten() else {
         return "idle";
     };
     if let Some(outcome) = state.run_outcome.as_ref() {

@@ -11,7 +11,7 @@
 //! single blocking call so the existing CLI behavior is unchanged.
 //! Detach adds a fork/exec/wait dance that doesn't belong in the
 //! hot foreground loop. The persisted-state contract (AC-01, AC-06)
-//! is shared via [`crate::autopilot::drive::WatchRunState`].
+//! is shared via [`crate::autopilot::drive::AutopilotRunState`].
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -19,14 +19,14 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use serde::Serialize;
 
-use crate::autopilot::drive::{PreconditionReport, WatchRunState};
+use crate::autopilot::drive::{PreconditionReport, AutopilotRunState};
 use crate::cli::OutputFormat as Fmt;
 use crate::commands::common::emit;
 use crate::config::ProjectConfig;
 use crate::paths::PlanContext;
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_watch_detached(
+pub(crate) fn cmd_autopilot_drive_detached(
     ctx: &PlanContext,
     ids: &[String],
     cfg: &ProjectConfig,
@@ -57,7 +57,7 @@ pub(crate) fn cmd_watch_detached(
     // expected log/state paths so the child process inherits the
     // same surface the client would see if it polled
     // `mp watch-control status`.
-    let mut state = WatchRunState::fresh(ids);
+    let mut state = AutopilotRunState::fresh(ids);
     state.log_path = Some(log_path.to_string_lossy().into_owned());
     state.state_path = Some(
         crate::autopilot::drive::default_run_state_path(&ctx.plan_dir)
@@ -159,11 +159,11 @@ pub(crate) fn cmd_watch_detached(
     // Patch the persisted state with the child's PID so a subsequent
     // `mp watch-control status` and `mp watch-control stop` can find
     // it without scanning the system process table.
-    let state_after = WatchRunState::load_from(&WatchRunState::path_for(&ctx.plan_dir))?
-        .unwrap_or_else(|| WatchRunState::fresh(ids));
-    let path = WatchRunState::path_for(&ctx.plan_dir);
-    let mut store = crate::autopilot::drive::WatchRunStore::new(path, state_after);
-    store.transition(crate::autopilot::drive::WatchTransition::Pid(child_pid))?;
+    let state_after = AutopilotRunState::load_from(&AutopilotRunState::path_for(&ctx.plan_dir))?
+        .unwrap_or_else(|| AutopilotRunState::fresh(ids));
+    let path = AutopilotRunState::path_for(&ctx.plan_dir);
+    let mut store = crate::autopilot::drive::AutopilotRunStore::new(path, state_after);
+    store.transition(crate::autopilot::drive::AutopilotRunTransition::Pid(child_pid))?;
 
     let _ = cfg; // keep cfg referenced for symmetry with cmd_watch_drive
     let report = DetachReport {
@@ -171,7 +171,7 @@ pub(crate) fn cmd_watch_detached(
         detach: true,
         detached_pid: child_pid,
         log_file: log_path.display().to_string(),
-        state_file: WatchRunState::path_for(&ctx.plan_dir).display().to_string(),
+        state_file: AutopilotRunState::path_for(&ctx.plan_dir).display().to_string(),
         preconditions,
         message: format!(
             "detached watch started; pid={child_pid}; poll with `mp watch-control status`"

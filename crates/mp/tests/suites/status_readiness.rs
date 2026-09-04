@@ -87,7 +87,7 @@ fn configure_harness(env: &TestEnv) {
 /// milestone ready to hand off. This pins the gate parity contract
 /// the new `execution_handoff` path relies on.
 #[test]
-fn execution_check_can_handoff_false_when_watch_readiness_red() {
+fn execution_check_can_handoff_false_when_autopilot_readiness_red() {
     let env = TestEnv::blank();
     assert!(env.run(&["init", "--format", "json"]).status.success());
 
@@ -137,7 +137,7 @@ fn execution_check_can_handoff_false_when_watch_readiness_red() {
     let out = env.run(&["execution", "check", "--format", "json"]);
     assert!(out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let watch_ok = json["watch_readiness"]["ok"].as_bool().unwrap_or(true);
+    let watch_ok = json["autopilot_readiness"]["ok"].as_bool().unwrap_or(true);
     assert!(
         !watch_ok,
         "watch readiness should be red without fake herdr: {json}"
@@ -210,7 +210,7 @@ fn execution_check_can_handoff_with_decomposed() {
     );
     assert!(out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let watch_ok = json["watch_readiness"]["ok"].as_bool().unwrap_or(false);
+    let watch_ok = json["autopilot_readiness"]["ok"].as_bool().unwrap_or(false);
     assert!(
         watch_ok,
         "watch readiness should be green with fake herdr + harness config: {json}"

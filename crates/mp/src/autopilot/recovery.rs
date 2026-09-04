@@ -149,7 +149,7 @@ impl StartupRecoveryReport {
 /// [`crate::autopilot::reconcile::recover_event_tail`] for the
 /// contract).
 ///
-/// This is the single entry point the `cmd_watch` / `mp
+/// This is the single entry point the `cmd_autopilot_drive` / `mp
 /// autopilot` hot path uses to "resume from the last valid
 /// event sequence after a crash" (M225 intent). Calling it on a
 /// clean session is a no-op (cursor matches events; no write
@@ -235,7 +235,7 @@ pub fn list_session_ids(ctx: &PlanContext) -> Result<Vec<String>> {
 }
 
 /// Recover every session under the plan dir. The F-01 wiring
-/// calls this on every `cmd_watch` / `cmd_autopilot start`
+/// calls this on every `cmd_autopilot_drive` / `cmd_autopilot start`
 /// invocation. Returns one report per session. The caller
 /// (the `cmd_watch_drive` entry point) decides what to do
 /// with `Rejected` reports — currently it logs them and
@@ -419,7 +419,7 @@ mod tests {
     // primitives were dead code as shipped. The fix is
     // `run_startup_recovery` / `run_startup_recovery_all` —
     // production entry points that exercise the AC-03 cursor
-    // bump on every `cmd_watch` / `cmd_autopilot_start`. The
+    // bump on every `cmd_autopilot_drive` / `cmd_autopilot_start`. The
     // tests below pin the wiring contract: a torn write (cursor
     // below events) is bumped on load; a Rejected outcome
     // (incompatible schema) is surfaced, not swallowed.

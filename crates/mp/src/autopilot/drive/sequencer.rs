@@ -213,7 +213,7 @@ pub fn run_milestones(
                 .unwrap_or_else(|| "queue did not complete".to_string());
             RunOutcome::Skipped { reason }
         };
-        ops.transition(crate::autopilot::drive::WatchTransition::RunOutcome(
+        ops.transition(crate::autopilot::drive::AutopilotRunTransition::RunOutcome(
             aggregate.clone(),
         ))?;
         let queue: Vec<String> = ops.run_state().map(|s| s.queue.clone()).unwrap_or_default();
