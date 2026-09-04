@@ -260,7 +260,10 @@ fn load_from_missing_path_returns_defaults_with_no_diagnostics() {
 fn action_registry_globals_first_then_autopilot() {
     let reg = Keybinds::action_registry();
     let first_autopilot = reg.iter().position(|(s, _, _)| *s == "autopilot");
-    let last_global = reg.iter().rposition(|(s, _, _)| *s == "global").unwrap_or(0);
+    let last_global = reg
+        .iter()
+        .rposition(|(s, _, _)| *s == "global")
+        .unwrap_or(0);
     assert!(
         last_global < first_autopilot.unwrap_or(0),
         "global actions must come before autopilot; got order: {reg:?}"
@@ -298,9 +301,18 @@ fn registry_default_key_strings_all_parse() {
 fn autopilot_lane_default_preserves_pre_m222_hardcoded_matches() {
     let ap = AutopilotLaneKeybinds::default();
     assert_eq!(ap.select, vec![(KeyCode::Char(' '), KeyModifiers::empty())]);
-    assert_eq!(ap.move_picker_up, vec![(KeyCode::Char('k'), KeyModifiers::empty())]);
-    assert_eq!(ap.move_picker_down, vec![(KeyCode::Char('j'), KeyModifiers::empty())]);
-    assert_eq!(ap.toggle_panel, vec![(KeyCode::Char('o'), KeyModifiers::empty())]);
+    assert_eq!(
+        ap.move_picker_up,
+        vec![(KeyCode::Char('k'), KeyModifiers::empty())]
+    );
+    assert_eq!(
+        ap.move_picker_down,
+        vec![(KeyCode::Char('j'), KeyModifiers::empty())]
+    );
+    assert_eq!(
+        ap.toggle_panel,
+        vec![(KeyCode::Char('o'), KeyModifiers::empty())]
+    );
     assert_eq!(ap.start, vec![(KeyCode::Char('s'), KeyModifiers::empty())]);
     assert_eq!(ap.replay, vec![(KeyCode::Char('P'), KeyModifiers::empty())]);
     assert_eq!(ap.close, vec![(KeyCode::Esc, KeyModifiers::empty())]);

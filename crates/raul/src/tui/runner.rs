@@ -458,10 +458,7 @@ fn run_tui_inner(runner: &MpRunner, _options: TuiOptions) -> Result<()> {
                 }
             } else if !diags.is_empty() {
                 for d in &diags {
-                    eprintln!(
-                        "raul: keybinds SIGHUP reload — {} {}",
-                        d.field, d.message
-                    );
+                    eprintln!("raul: keybinds SIGHUP reload — {} {}", d.field, d.message);
                 }
             }
             app.touch();

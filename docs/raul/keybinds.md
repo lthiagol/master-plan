@@ -134,3 +134,29 @@ reported as warnings on startup; the affected field falls back to its default,
 so a fat-fingered config never crashes the TUI.
 
 See [`settings.md`](./settings.md) for the full UI preference surface.
+
+## User-level `keybinds.toml` (override surface)
+
+In addition to the project-config route above, raul reads
+`~/.config/raul/keybinds.toml` (or `$XDG_CONFIG_HOME/raul/keybinds.toml`) at
+startup. The file uses TOML sections per scope:
+
+```toml
+# Optional — only include overrides; defaults always live in code.
+[global]
+quit = "ctrl+x"
+page_down = ["PageDown", "pagedown"]
+
+[autopilot]
+select = "f1"          # was Space
+move_picker_up = "k"
+```
+
+Reload the file without restarting: on Unix, `kill -HUP <raul-pid>` requests
+a reload (the signal handler only flips a flag — parse + swap run on the
+next event-loop tick). On every platform the explicit reload action (see
+the Settings lane) does the same swap.
+
+Precedence: user-level `keybinds.toml` > legacy mp-config `[keybinds]` JSON
+> hardcoded defaults. Reads never write either source; use of the legacy
+JSON emits one migration hint per load.

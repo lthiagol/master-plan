@@ -926,10 +926,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             let (diags, swapped) = app.keybinds.try_reload(&path);
             if !swapped {
                 if let Some(d) = diags.first() {
-                    eprintln!(
-                        "raul: keybinds reload rejected — {} {}",
-                        d.field, d.message
-                    );
+                    eprintln!("raul: keybinds reload rejected — {} {}", d.field, d.message);
                 }
             } else {
                 for d in &diags {

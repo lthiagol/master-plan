@@ -88,9 +88,7 @@ move_picker_up = "completely-unparseable"
 "#;
     let (diags, kb) = Keybinds::load_from_keybinds_toml(text);
     // Verify the bad row reports a diagnostic.
-    let bad_diag = diags
-        .iter()
-        .find(|d| d.field == "autopilot.move_picker_up");
+    let bad_diag = diags.iter().find(|d| d.field == "autopilot.move_picker_up");
     assert!(
         bad_diag.is_some(),
         "missing diagnostic for the malformed combo; got: {diags:?}"
@@ -240,8 +238,7 @@ select = ["f1", "unbalanced]
     // No panic, and the field falls back rather than crashing.
     assert!(
         kb.lane_autopilot.select.is_empty()
-            || kb.lane_autopilot.select
-                == vec![pair(KeyCode::Char(' '), KeyModifiers::empty())],
+            || kb.lane_autopilot.select == vec![pair(KeyCode::Char(' '), KeyModifiers::empty())],
         "unbalanced-array value must not crash; got select={:?}",
         kb.lane_autopilot.select
     );
@@ -287,10 +284,7 @@ impl KeybindsEventExt for Keybinds {
         let _ = parsed;
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         let (code, mods) = match chord {
-            "ctrl+x" => (
-                KeyCode::Char('x'),
-                KeyModifiers::CONTROL,
-            ),
+            "ctrl+x" => (KeyCode::Char('x'), KeyModifiers::CONTROL),
             other => panic!("only `ctrl+x` is wired here for the conflict test; got {other:?}"),
         };
         let key = KeyEvent::new(code, mods);

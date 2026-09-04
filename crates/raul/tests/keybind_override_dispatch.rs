@@ -21,10 +21,7 @@ fn autopilot_with_f1_select() -> Keybinds {
 select = "f1"
 "#;
     let (diags, kb) = Keybinds::load_from_keybinds_toml(text);
-    assert!(
-        diags.is_empty(),
-        "clean TOML must not warn; got: {diags:?}"
-    );
+    assert!(diags.is_empty(), "clean TOML must not warn; got: {diags:?}");
     kb
 }
 

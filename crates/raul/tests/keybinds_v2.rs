@@ -323,7 +323,6 @@ fn help_lists_all_bindings_for_multi_binding_action() {
     );
 }
 
-
 // ---------------------------------------------------------------------------
 // M222 S7: layered loader. New tests below pin the precedence
 // contract that user-level keybinds.toml > legacy mp-config
@@ -410,21 +409,34 @@ fn load_effective_legacy_json_overrides_default() {
 #[test]
 fn load_effective_hint_emitted_only_when_legacy_section_is_present() {
     // No legacy section: hint = false.
-    let (_no_legacy, diags1, hint1) = Keybinds::load_effective(None, Some("[global]\nquit = \"x\"\n"));
+    let (_no_legacy, diags1, hint1) =
+        Keybinds::load_effective(None, Some("[global]\nquit = \"x\"\n"));
     assert!(!hint1, "without legacy JSON the hint must NOT fire");
     assert!(diags1.is_empty(), "clean TOML must not warn");
 
     // Legacy section present but no user-level TOML: hint = true.
     let legacy = json!({ "config": { "keybinds": { "quit": "x" } } });
     let (legacy_only, _, hint2) = Keybinds::load_effective(Some(&legacy), None);
-    assert!(hint2, "legacy source presence must fire the hint exactly once");
-    assert_eq!(legacy_only.quit, vec![pair(KeyCode::Char('x'), KeyModifiers::empty())]);
+    assert!(
+        hint2,
+        "legacy source presence must fire the hint exactly once"
+    );
+    assert_eq!(
+        legacy_only.quit,
+        vec![pair(KeyCode::Char('x'), KeyModifiers::empty())]
+    );
 
     // Both sources present: hint = true (legacy still consulted).
     let (both, _, hint3) =
         Keybinds::load_effective(Some(&legacy), Some("[global]\nquit = \"y\"\n"));
-    assert!(hint3, "legacy source use must fire the hint exactly once per load");
-    assert_eq!(both.quit, vec![pair(KeyCode::Char('y'), KeyModifiers::empty())]);
+    assert!(
+        hint3,
+        "legacy source use must fire the hint exactly once per load"
+    );
+    assert_eq!(
+        both.quit,
+        vec![pair(KeyCode::Char('y'), KeyModifiers::empty())]
+    );
 }
 
 /// AC-08 (per-lane precedence): the user-level TOML also wins

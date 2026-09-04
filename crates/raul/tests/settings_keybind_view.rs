@@ -23,11 +23,8 @@ fn view_lists_every_global_and_autopilot_action() {
     // registries. We pin the count rather than the literal
     // contents so a future addition to either side surfaces
     // here instead of silently shrinking the legend.
-    let names: HashSet<(&'static str, &'static str)> = view
-        .rows
-        .iter()
-        .map(|r| (r.section, r.action))
-        .collect();
+    let names: HashSet<(&'static str, &'static str)> =
+        view.rows.iter().map(|r| (r.section, r.action)).collect();
     let expected_global: HashSet<&'static str> =
         Keybinds::global_action_names().iter().copied().collect();
     let expected_autopilot: HashSet<&'static str> =
@@ -59,7 +56,8 @@ fn view_with_defaults_marks_nothing_overridden() {
     assert_eq!(view.overridden_count(), 0);
     for row in &view.rows {
         assert_eq!(
-            row.effective_combo, row.default_combo,
+            row.effective_combo,
+            row.default_combo,
             "default config must not mark anything overridden (row {section}.{action})",
             section = row.section,
             action = row.action

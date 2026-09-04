@@ -24,11 +24,7 @@ fn key(code: KeyCode) -> KeyEvent {
 fn try_reload_swaps_atomically_when_candidate_is_valid() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("keybinds.toml");
-    fs::write(
-        &path,
-        "[autopilot]\nselect = \"f1\"\n",
-    )
-    .expect("write");
+    fs::write(&path, "[autopilot]\nselect = \"f1\"\n").expect("write");
 
     let mut kb = Keybinds::default();
     let (_, swapped) = kb.try_reload(&path);
@@ -99,9 +95,9 @@ fn try_reload_rejects_partial_candidate_with_bad_combo() {
     // post-load shape). The M222 invariant: a *fatal* error
     // preserves the previous map; a recoverable error applies
     // partial overrides and emits the diagnostic.
-    let f1_in_diags = diags
-        .iter()
-        .any(|d| d.field.contains("autopilot.move_picker_up") || d.field.contains("move_picker_up"));
+    let f1_in_diags = diags.iter().any(|d| {
+        d.field.contains("autopilot.move_picker_up") || d.field.contains("move_picker_up")
+    });
     assert!(
         f1_in_diags,
         "the malformed combo must surface a diagnostic; got: {diags:?}"
@@ -115,7 +111,10 @@ fn try_reload_rejects_partial_candidate_with_bad_combo() {
     // Note: a successful partial reload is the documented
     // behavior for recoverable errors. `swapped == true` is
     // therefore expected here.
-    assert!(swapped, "recoverable per-binding errors do not veto the swap");
+    assert!(
+        swapped,
+        "recoverable per-binding errors do not veto the swap"
+    );
 }
 
 /// AC-04: atomic swap is observable from the dispatcher.
@@ -202,7 +201,10 @@ fn sighup_flag_drains_once_per_signal_and_triggers_reload() {
     fs::write(&path, "[autopilot]\nselect = \"f1\"\n").expect("write");
     let mut kb = Keybinds::default();
     let (_, swapped) = kb.try_reload(&path);
-    assert!(swapped, "the SIGHUP-triggered reload must swap on a valid file");
+    assert!(
+        swapped,
+        "the SIGHUP-triggered reload must swap on a valid file"
+    );
 }
 
 /// Non-Unix shell: SIGHUP is a no-op. The handler is wired

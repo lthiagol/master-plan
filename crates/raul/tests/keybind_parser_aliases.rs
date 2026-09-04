@@ -131,8 +131,16 @@ fn modifier_plus_dash_alias_combos_parse_via_toml() {
         // Match the docs: the `+page_down` spelling is also
         // underscore-compatible (the spec calls them aliases).
         ("ctrl+page_down", KeyCode::PageDown, KeyModifiers::CONTROL),
-        ("ctrl+double-quote", KeyCode::Char('"'), KeyModifiers::CONTROL),
-        ("ctrl+double_quote", KeyCode::Char('"'), KeyModifiers::CONTROL),
+        (
+            "ctrl+double-quote",
+            KeyCode::Char('"'),
+            KeyModifiers::CONTROL,
+        ),
+        (
+            "ctrl+double_quote",
+            KeyCode::Char('"'),
+            KeyModifiers::CONTROL,
+        ),
         // back-tab: SHIFT is consumed by `shift+tab` -> BackTab
         // normalization, so the final modifiers are CONTROL
         // only.
@@ -195,7 +203,11 @@ fn parser_accepts_mixed_case_modifiers_and_keys_via_toml() {
         ),
         ("shift+TAB", KeyCode::BackTab, KeyModifiers::empty()),
         // Modifier-prefix mixed case.
-        ("shift+ctrl+z", KeyCode::Char('z'), KeyModifiers::CONTROL | KeyModifiers::SHIFT),
+        (
+            "shift+ctrl+z",
+            KeyCode::Char('z'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        ),
     ];
     for (spelling, expected_code, expected_mods) in cases {
         let text = format!(
@@ -239,7 +251,9 @@ page_up = "{}"
         );
         let (diags, kb) = Keybinds::load_from_keybinds_toml(&text);
         assert!(
-            diags.iter().any(|d| d.field == "global.page_up" || d.field == "page_up"),
+            diags
+                .iter()
+                .any(|d| d.field == "global.page_up" || d.field == "page_up"),
             "spelling `{spelling}` must surface a diagnostic; got: {diags:?}"
         );
         // The field falls back to the default PageUp binding
@@ -288,8 +302,5 @@ help = "ctrl+page_up"
         kb.next_lane,
         vec![pair(KeyCode::Char('"'), KeyModifiers::CONTROL)]
     );
-    assert_eq!(
-        kb.help,
-        vec![pair(KeyCode::PageUp, KeyModifiers::CONTROL)]
-    );
+    assert_eq!(kb.help, vec![pair(KeyCode::PageUp, KeyModifiers::CONTROL)]);
 }

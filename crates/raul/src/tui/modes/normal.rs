@@ -226,10 +226,7 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
 
     // Toggle picker selection. The picker is only reachable when
     // no panel / replay is open.
-    if any_matches(&ap.select, &key)
-        && !app.autopilot.panel_open
-        && !app.autopilot.replay_open
-    {
+    if any_matches(&ap.select, &key) && !app.autopilot.panel_open && !app.autopilot.replay_open {
         return Some(vec![Action::AutopilotToggleSelect]);
     }
 
