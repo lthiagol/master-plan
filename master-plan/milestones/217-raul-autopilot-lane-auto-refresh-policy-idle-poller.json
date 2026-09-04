@@ -3,9 +3,9 @@
     "id": "217",
     "title": "raul Autopilot lane — auto-refresh policy + idle poller",
     "slug": "raul-autopilot-lane-auto-refresh-policy-idle-poller",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -29,7 +29,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-02T21:25:02.898004+00:00",
+    "lifecycle_at": "2026-09-04T05:14:30.856818+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -39,9 +39,17 @@
         "status": "done",
         "at": "2026-09-02T21:24:29.239450+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-04T05:14:30.856821+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-02T21:24:29.239450+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-04T05:14:30.856821+00:00"
       },
       "specify": {
         "status": "done",
@@ -121,8 +129,8 @@
       "id": "AC-08",
       "description": "The M217 cutover deletes the fixed-interval Watch Poller and dead `fire_watch_tick` stub after the coalescing poller is wired; no second scheduler or legacy log-tail polling path remains.",
       "verification": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast exit 0 (15/15 pass)"
     }
   ],
   "design_decisions": [
@@ -301,7 +309,7 @@
       ],
       "tests": "cargo nextest run -p raul --test tui_smoothness --no-fail-fast",
       "done_when": "AC-08 proves only one UI scheduler remains.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -313,7 +321,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-04",
     "branch": "",
     "evidence": ""
   }
