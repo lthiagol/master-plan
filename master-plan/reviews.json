@@ -2055,6 +2055,14 @@
       "reviewed_at": "2026-09-04",
       "notes": "Cycle 3 final re-review: cold-build verification (cargo nextest -p raul -E 'test(/keybind|m22[12]|startup_load/)') = 41/41 pass (38 base + 3 new F-03 tests). F-03 fix verified at 4977cd2: 3 new tests in m222_f01_startup_loader.rs (1) startup_load_layered_applies_user_level_toml_via_real_runner calls Keybinds::load_layered(&runner) directly with a real MpRunner::new() — production-path; (2) startup_load_layered_with_no_user_toml_returns_defaults fallback pin; (3) runner_rs_417_calls_load_layered_at_startup reads runner.rs and asserts the app.keybinds= line calls load_layered — catches a future revert of runner.rs:417 to Keybinds::load(runner). Mental revert verified: if runner.rs:417 reverted, the source-pin test fails with the regressed line quoted. cargo fmt --check exit 0; cargo clippy -p raul --tests --no-deps -- -D warnings exit 0. F-01 (a82c5fb) and F-02 (e59e84a) fix-in-place verified at cycle 2 (unchanged this cycle). All 3 findings fixed (F-01, F-02, F-03). Verdict: ok — terminal.",
       "milestone_completed_at": "2026-09-04"
+    },
+    {
+      "milestone_id": "216",
+      "verdict": "ok",
+      "reviewer": "reviewer-216",
+      "reviewed_at": "2026-09-04",
+      "notes": "",
+      "milestone_completed_at": "2026-09-04"
     }
   ],
   "comments": [
