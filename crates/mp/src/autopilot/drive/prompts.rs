@@ -9,27 +9,24 @@
 //! lifecycle stage. Detailed instructions live in the skills, not
 //! duplicated here.
 //!
-//! M153: the **bodies** of the five extracted templates live as files
-//! under `templates/watch/<stage>.md` so users can override them
+//! The **bodies** of the templates live as files under
+//! `templates/watch/<stage>.md` so users can override them
 //! per-project without recompiling. The compiled-in defaults are
 //! `include_str!`-loaded from those same files (build-time read), so
 //! the on-disk source and the binary are byte-equivalent by
-//! construction. At runtime, `resolve_template` looks up an
+//! construction. At runtime, `resolve_template_full` looks up an
 //! override file under `master-plan/watch/<stage>.md` before falling
 //! back to the embedded content (see `load_override` /
 //! [`build_prompt_with`]).
 //!
 //! Stage mapping:
 //! - `execute`        — Execute
-//! - `self-review`    — SelfReview
-//! - `external-review`— ExternalReview
 //! - `remediate`      — Remediate
-//! - `approve`        — Approve
 //!
-//! ReReview is **not** externalized under M153 S1; it remains a
-//! hardcoded template (mirrors the M149 design — under M148 Option A
-//! the re-review loop coalesces into the same body shape and only
-//! differs in the lifecycle target).
+//! Every stage is externalized: there is exactly one template file
+//! per [`PromptStage`], so template resolution always terminates at
+//! a file (override rung or compiled default) and never at a Rust
+//! string.
 //!
 //! Backed by property tests in `tests/autopilot_drive_prompts.rs` (interpolation),
 //! `tests/watch_template_files.rs` (file presence + byte equivalence),
@@ -58,62 +55,44 @@
 use crate::model::MilestoneFile;
 use anyhow::Result;
 
-/// The lifecycle stages mp watch drives prompts for. One template
-/// per stage; the state machine (S7) maps lifecycle transitions to
-/// [`PromptStage`]s.
+/// The lifecycle stages the drive loop renders prompts for. One
+/// template per stage; the state machine (S7) maps lifecycle
+/// transitions to [`PromptStage`]s.
+///
+/// Only the two stages [`next_stage`](crate::autopilot::drive::next_stage)
+/// can produce are modelled. The pre-cutover enum also carried
+/// `SelfReview`, `ExternalReview`, `ReReview`, and `Approve`; those
+/// were never reachable from the drive loop (`next_stage` maps
+/// `approved`/`in-progress` → `Execute` and `remediation` →
+/// `Remediate` and returns `None` for every other lifecycle), and the
+/// review/approve orchestration they were written for is now owned by
+/// the autopilot cycle + per-role spawn prompts
+/// ([`crate::autopilot::cycle`], [`crate::autopilot::prompts`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptStage {
     /// Runner claims & executes the milestone (approved → in-progress).
     Execute,
-    /// Runner self-reviews. Under M148 Option A there is no separate
-    /// `self-reviewed` lifecycle state — self-review is bundled into
-    /// the runner's flow before `mp milestone complete`.
-    SelfReview,
-    /// Coordinator reads self-findings, files external findings.
-    /// Under M148 Option A the milestone is already at `complete` by
-    /// the time this fires; the coordinator's job is the ceremonial
-    /// `mp reviews pass`.
-    ExternalReview,
-    /// Runner remediates the coordinator's findings and re-runs
-    /// `mp milestone complete` (no separate `self-reviewed` re-entry).
+    /// Runner remediates the reviewer's findings and re-runs
+    /// `mp milestone complete`.
     Remediate,
-    /// Coordinator re-reviews remediated work (distinct session from
-    /// the first external review per the L5 session-boundary rule).
-    ReReview,
-    /// Coordinator / human approves the milestone for completion.
-    /// Under M145 this is idempotent at `complete`; `mp reviews pass`
-    /// is the ceremonial confirm.
-    Approve,
 }
 
 impl PromptStage {
     pub fn label(self) -> &'static str {
         match self {
             PromptStage::Execute => "execute",
-            PromptStage::SelfReview => "self-review",
-            PromptStage::ExternalReview => "external-review",
             PromptStage::Remediate => "remediate",
-            PromptStage::ReReview => "re-review",
-            PromptStage::Approve => "approve",
         }
     }
 
-    /// The five extracted stages (`templates/watch/<label>.md`).
-    /// `ReReview` is excluded — see module docs. Mirrors the M153
-    /// S1 file list.
-    pub fn is_externalized(self) -> bool {
-        !matches!(self, PromptStage::ReReview)
-    }
-
-    /// Which role's pane this stage targets.
+    /// Which role's pane this stage targets. Both drivable stages are
+    /// runner work — the reviewer/coordinator lane is dispatched by
+    /// the autopilot cycle, not by a drive-loop prompt stage. The
+    /// method is retained (rather than inlined at the call sites) so
+    /// a future drivable stage has one place to declare its role.
     pub fn role(self) -> crate::autopilot::drive::Role {
         match self {
-            PromptStage::Execute | PromptStage::SelfReview | PromptStage::Remediate => {
-                crate::autopilot::drive::Role::Runner
-            }
-            PromptStage::ExternalReview | PromptStage::ReReview | PromptStage::Approve => {
-                crate::autopilot::drive::Role::Coordinator
-            }
+            PromptStage::Execute | PromptStage::Remediate => crate::autopilot::drive::Role::Runner,
         }
     }
 }
@@ -148,10 +127,6 @@ pub enum TemplateSource {
     ProjectOverride(PathBuf),
     /// `templates/watch/<stage>.md` (compiled in via `include_str!`).
     CompiledDefault,
-    /// A stage that was not externalized under M153 S1 (only
-    /// `ReReview` produces this today). The body is a Rust string
-    /// in this file, not a file on disk.
-    Hardcoded(&'static str),
 }
 
 impl TemplateSource {
@@ -159,7 +134,6 @@ impl TemplateSource {
         match self {
             TemplateSource::ProjectOverride(_) => "override",
             TemplateSource::CompiledDefault => "default",
-            TemplateSource::Hardcoded(name) => name,
         }
     }
 
@@ -248,13 +222,6 @@ enum OverrideReadResult {
     NotFound,
     /// File exists but refused for a structured reason.
     Refused(OverrideDiagnostic),
-}
-
-impl OverrideReadResult {
-    #[allow(dead_code)]
-    fn is_ok(&self) -> bool {
-        matches!(self, OverrideReadResult::Ok(_))
-    }
 }
 
 fn read_override_at(path: &Path, rung: OverrideRung, max_bytes: u64) -> OverrideReadResult {
@@ -438,14 +405,7 @@ pub fn build_prompt_full(req: &BuildPromptRequest<'_>, max_bytes: u64) -> Render
     let ctx = render_context(req.stage, req.milestone, req.options);
     let (template, source, diagnostics) =
         resolve_template_full(req.stage, req.override_dir, req.plan_dir, max_bytes);
-    let text = if let Some(t) = template {
-        render_body(&t, &ctx)
-    } else {
-        // ReReview / future non-extracted stages use the hardcoded
-        // fallback below. Tests assert this matches the M149
-        // baseline to the byte.
-        render_hardcoded_fallback(req.stage, &ctx)
-    };
+    let text = render_body(&template, &ctx);
     RenderedPrompt {
         text,
         source,
@@ -476,9 +436,6 @@ fn project_override_path(plan_dir: &Path, stage: PromptStage) -> PathBuf {
 /// 2. `<plan_dir>/watch/<stage>.md` (project-local)
 /// 3. Compiled-in default (`include_str!`)
 ///
-/// For non-extracted stages (ReReview), returns `None` and lets the
-/// caller fall through to the hardcoded Rust template.
-///
 /// **Override safety (M153 S2 HIGH-4):** a project override that
 /// does NOT contain the `{header}` placeholder is dropped and the
 /// loader falls through to the compiled default. Without this guard
@@ -486,22 +443,9 @@ fn project_override_path(plan_dir: &Path, stage: PromptStage) -> PathBuf {
 /// `{header}` would render a prompt that lacks the SAFETY preamble,
 /// the `<title>`/`<milestone-id>` trust boundary, and the lifecycle-
 /// target hint — a security regression. Detection happens BEFORE the
-/// file reaches `render_body`. Refusals are silent at this layer
-/// because `resolve_template` is the legacy entry point; new callers
-/// (state machine, dry-run) use [`resolve_template_full`] which
-/// surfaces the diagnostic.
-#[allow(dead_code)]
-fn resolve_template(
-    stage: PromptStage,
-    override_dir: Option<&Path>,
-    plan_dir: Option<&Path>,
-) -> (Option<String>, TemplateSource) {
-    let (text, source, _diagnostics) =
-        resolve_template_full(stage, override_dir, plan_dir, MAX_OVERRIDE_BYTES);
-    (text, source)
-}
-
-/// Diagnostics-aware variant. Used by:
+/// file reaches `render_body`.
+///
+/// Used by:
 ///   * the watch state machine, which logs `override_refused` events
 ///     for each refusal so operators see *why* their project-local
 ///     override did not take effect;
@@ -517,10 +461,7 @@ pub fn resolve_template_full(
     override_dir: Option<&Path>,
     plan_dir: Option<&Path>,
     max_bytes: u64,
-) -> (Option<String>, TemplateSource, Vec<OverrideDiagnostic>) {
-    if !stage.is_externalized() {
-        return (None, TemplateSource::Hardcoded("re-review"), Vec::new());
-    }
+) -> (String, TemplateSource, Vec<OverrideDiagnostic>) {
     let filename = format!("{}.md", stage.label());
     let mut diagnostics = Vec::new();
 
@@ -528,11 +469,7 @@ pub fn resolve_template_full(
         let path = dir.join(&filename);
         match read_override_at(&path, OverrideRung::OverrideDir, max_bytes) {
             OverrideReadResult::Ok(text) => {
-                return (
-                    Some(text),
-                    TemplateSource::ProjectOverride(path),
-                    diagnostics,
-                );
+                return (text, TemplateSource::ProjectOverride(path), diagnostics);
             }
             OverrideReadResult::NotFound => {}
             OverrideReadResult::Refused(d) => diagnostics.push(d),
@@ -543,20 +480,15 @@ pub fn resolve_template_full(
         let path = project_override_path(plan, stage);
         match read_override_at(&path, OverrideRung::PlanDir, max_bytes) {
             OverrideReadResult::Ok(text) => {
-                return (
-                    Some(text),
-                    TemplateSource::ProjectOverride(path),
-                    diagnostics,
-                );
+                return (text, TemplateSource::ProjectOverride(path), diagnostics);
             }
             OverrideReadResult::NotFound => {}
             OverrideReadResult::Refused(d) => diagnostics.push(d),
         }
     }
 
-    let default = compiled_default(stage);
     (
-        Some(default.to_string()),
+        compiled_default(stage).to_string(),
         TemplateSource::CompiledDefault,
         diagnostics,
     )
@@ -565,15 +497,7 @@ pub fn resolve_template_full(
 fn compiled_default(stage: PromptStage) -> &'static str {
     match stage {
         PromptStage::Execute => include_str!("../../../../../templates/watch/execute.md"),
-        PromptStage::SelfReview => {
-            include_str!("../../../../../templates/watch/self-review.md")
-        }
-        PromptStage::ExternalReview => {
-            include_str!("../../../../../templates/watch/external-review.md")
-        }
         PromptStage::Remediate => include_str!("../../../../../templates/watch/remediate.md"),
-        PromptStage::Approve => include_str!("../../../../../templates/watch/approve.md"),
-        PromptStage::ReReview => unreachable!("ReReview is not externalized"),
     }
 }
 
@@ -616,17 +540,9 @@ pub fn load_override(
     let (text, source, _diagnostics) =
         resolve_template_full(stage, override_dir, plan_dir, MAX_OVERRIDE_BYTES);
     match (text, source) {
-        (Some(body), TemplateSource::ProjectOverride(path)) => {
+        (body, TemplateSource::ProjectOverride(path)) => {
             Ok((body, TemplateSource::ProjectOverride(path)))
         }
-        // Hardcoded ReReview is not reachable from this API at the
-        // moment — `is_externalized` excludes ReReview. If a future
-        // stage gains a hardcoded fallback, treat it like the
-        // canonical renderer: only override files are a success.
-        (None, _) | (Some(_), TemplateSource::Hardcoded(_)) => Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("no override file for stage {}", stage.label()),
-        )),
         // Reached the compiled-default rung. Either no file existed
         // at any rung (silent fallback) or every rung was refused.
         // Map to NotFound so existing callers see the same error
@@ -635,7 +551,7 @@ pub fn load_override(
         // signature. New callers should use
         // [`resolve_template_full`] or [`build_prompt_with_request`]
         // to obtain structured refusal reasons.
-        (Some(_default), TemplateSource::CompiledDefault) => Err(std::io::Error::new(
+        (_default, TemplateSource::CompiledDefault) => Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!(
                 "no usable override for stage {} (rungs refused or absent)",
@@ -733,47 +649,6 @@ fn render_body(template: &str, ctx: &PromptCtx) -> String {
         .replace("{step_list}", &ctx.step_list)
 }
 
-/// Hardcoded fallback for stages that were not externalized under
-/// M153 S1 (`ReReview`). Kept byte-equivalent to the M149 baseline
-/// so the property tests at `tests/autopilot_drive_prompts.rs` (which pin
-/// every stage's render against a fixture milestone) continue to
-/// pass without modification.
-fn render_hardcoded_fallback(stage: PromptStage, ctx: &PromptCtx) -> String {
-    let id = &ctx.id;
-    let header = &ctx.header;
-    // ReReview does not surface ACs or steps inline (the re-review
-    // loop inspects the remediation report, not the original list);
-    // the variables are unused for that stage but kept in `ctx` so
-    // the four-placeholder set is uniform.
-    let _ac_list = &ctx.ac_list;
-    let _step_list = &ctx.step_list;
-
-    match stage {
-        PromptStage::ReReview => format!(
-            "{header}\
-             You are the **coordinator**, in a **fresh session** (per L5: the session\n\
-             that wrote or remediated the work cannot be the sole reviewer).\n\
-             Re-review round (mp-flow stage 10).\n\n\
-             Read the runner's remediation:\n\
-             - `mp reviews finding list {id}` — confirm every prior finding is resolved.\n\
-             - `mp execution report {id}` — re-verify the diff + test output.\n\n\
-             When satisfied:\n\
-             - `mp reviews pass {id} --verdict ok --reviewer coordinator` transitions\n\
-               lifecycle → complete.\n\
-             - Or file new findings → another remediation round.\n",
-        ),
-        // The other five are externalized; if we reach here the
-        // match is symmetric with `is_externalized` above.
-        PromptStage::Execute
-        | PromptStage::SelfReview
-        | PromptStage::ExternalReview
-        | PromptStage::Remediate
-        | PromptStage::Approve => {
-            unreachable!("non-ReReview stages must resolve to a file template")
-        }
-    }
-}
-
 /// The lifecycle state the watch loop expects to see after this stage
 /// completes. Used in the prompt header so the agent knows the target.
 ///
@@ -784,9 +659,6 @@ fn render_hardcoded_fallback(stage: PromptStage, ctx: &PromptCtx) -> String {
 fn target_lifecycle_for(stage: PromptStage) -> &'static str {
     match stage {
         PromptStage::Execute | PromptStage::Remediate => "in-progress → complete",
-        PromptStage::SelfReview => "complete (no separate self-reviewed rung)",
-        PromptStage::ExternalReview => "complete (M148 Option A)",
-        PromptStage::ReReview | PromptStage::Approve => "complete",
     }
 }
 
@@ -844,18 +716,11 @@ fn render_steps(steps: &[crate::model::Step], max_inline: usize) -> String {
     lines.join("\n")
 }
 
-/// The list of stages the watch loop drives, in canonical order.
+/// The list of stages the drive loop drives, in canonical order.
 /// Useful for the property test that asserts every stage has a
 /// non-empty template.
-pub fn all_stages() -> [PromptStage; 6] {
-    [
-        PromptStage::Execute,
-        PromptStage::SelfReview,
-        PromptStage::ExternalReview,
-        PromptStage::Remediate,
-        PromptStage::ReReview,
-        PromptStage::Approve,
-    ]
+pub fn all_stages() -> [PromptStage; 2] {
+    [PromptStage::Execute, PromptStage::Remediate]
 }
 
 #[cfg(test)]
@@ -916,23 +781,6 @@ mod tests {
     }
 
     #[test]
-    fn self_review_prompt_references_finding_add_phase_self() {
-        let m = fixture_milestone();
-        let (p, _) = build_prompt(PromptStage::SelfReview, &m);
-        assert!(p.contains("mp reviews finding add 149 --phase self"));
-        assert!(p.contains("mp execution report 149"));
-    }
-
-    #[test]
-    fn external_review_prompt_references_coordinator_role_and_readonly_review() {
-        let m = fixture_milestone();
-        let (p, _) = build_prompt(PromptStage::ExternalReview, &m);
-        assert!(p.contains("coordinator"));
-        assert!(p.contains("mp reviews finding list 149"));
-        assert!(p.contains("mp reviews pass 149"));
-    }
-
-    #[test]
     fn remediate_prompt_warns_against_self_pass() {
         let m = fixture_milestone();
         let (p, _) = build_prompt(PromptStage::Remediate, &m);
@@ -941,47 +789,16 @@ mod tests {
     }
 
     #[test]
-    fn re_review_prompt_calls_out_fresh_session() {
-        let m = fixture_milestone();
-        let (p, _) = build_prompt(PromptStage::ReReview, &m);
-        assert!(p.contains("fresh session"));
-        assert!(p.contains("L5"));
-    }
-
-    #[test]
-    fn approve_prompt_targets_complete_lifecycle() {
-        let m = fixture_milestone();
-        let (p, _) = build_prompt(PromptStage::Approve, &m);
-        assert!(p.contains("complete"));
-        assert!(p.contains("mp reviews pass 149"));
-    }
-
-    #[test]
     fn role_routing_matches_design() {
-        assert_eq!(
-            PromptStage::Execute.role(),
-            crate::autopilot::drive::Role::Runner
-        );
-        assert_eq!(
-            PromptStage::SelfReview.role(),
-            crate::autopilot::drive::Role::Runner
-        );
-        assert_eq!(
-            PromptStage::Remediate.role(),
-            crate::autopilot::drive::Role::Runner
-        );
-        assert_eq!(
-            PromptStage::ExternalReview.role(),
-            crate::autopilot::drive::Role::Coordinator
-        );
-        assert_eq!(
-            PromptStage::ReReview.role(),
-            crate::autopilot::drive::Role::Coordinator
-        );
-        assert_eq!(
-            PromptStage::Approve.role(),
-            crate::autopilot::drive::Role::Coordinator
-        );
+        // Both drivable stages are runner work; the reviewer lane is
+        // dispatched by the autopilot cycle, not by a prompt stage.
+        for stage in all_stages() {
+            assert_eq!(
+                stage.role(),
+                crate::autopilot::drive::Role::Runner,
+                "stage {stage:?} must route to the runner pane"
+            );
+        }
     }
 
     #[test]
@@ -1069,42 +886,26 @@ mod tests {
     #[test]
     fn execute_prompt_claims_complete_not_self_reviewed() {
         let m = fixture_milestone();
-        for stage in [
-            PromptStage::Execute,
-            PromptStage::SelfReview,
-            PromptStage::Remediate,
-        ] {
+        for stage in all_stages() {
             let (p, _) = build_prompt(stage, &m);
             assert!(
                 p.contains("complete"),
                 "stage {:?} should reference terminal complete: {p}",
                 stage
             );
+            assert!(
+                !p.contains("transitions lifecycle to `self-reviewed`"),
+                "M149 ext-review F-09: {stage:?} prompt must NOT claim self-reviewed transition: {p}"
+            );
         }
-        let (p, _) = build_prompt(PromptStage::Execute, &m);
-        assert!(
-            !p.contains("transitions lifecycle to `self-reviewed`"),
-            "M149 ext-review F-09: Execute prompt must NOT claim self-reviewed transition: {p}"
-        );
-        let (p, _) = build_prompt(PromptStage::SelfReview, &m);
-        assert!(
-            !p.contains("transitions lifecycle to `self-reviewed`"),
-            "M149 ext-review F-09: SelfReview prompt must NOT claim self-reviewed transition: {p}"
-        );
     }
 
     // ─── M153: source attribution ─────────────────────────────────────
 
     #[test]
-    fn build_prompt_reports_compiled_default_for_externalized_stages() {
+    fn build_prompt_reports_compiled_default_for_every_stage() {
         let m = fixture_milestone();
-        for stage in [
-            PromptStage::Execute,
-            PromptStage::SelfReview,
-            PromptStage::ExternalReview,
-            PromptStage::Remediate,
-            PromptStage::Approve,
-        ] {
+        for stage in all_stages() {
             let (_text, src) = build_prompt(stage, &m);
             assert_eq!(
                 src,
@@ -1114,27 +915,16 @@ mod tests {
         }
     }
 
+    /// Every stage resolves to a template *file*, so there is no
+    /// hardcoded-Rust rung left to attribute. Pinning the file list
+    /// here keeps a future stage from being added without a template.
     #[test]
-    fn build_prompt_reports_hardcoded_for_re_review() {
-        let m = fixture_milestone();
-        let (_text, src) = build_prompt(PromptStage::ReReview, &m);
-        assert_eq!(
-            src,
-            TemplateSource::Hardcoded("re-review"),
-            "ReReview stage is not externalized under M153 S1"
-        );
-    }
-
-    #[test]
-    fn is_externalized_matches_the_m153_s1_file_list() {
-        assert!(PromptStage::Execute.is_externalized());
-        assert!(PromptStage::SelfReview.is_externalized());
-        assert!(PromptStage::ExternalReview.is_externalized());
-        assert!(PromptStage::Remediate.is_externalized());
-        assert!(PromptStage::Approve.is_externalized());
-        assert!(
-            !PromptStage::ReReview.is_externalized(),
-            "S1 ships five files; re-review stays hardcoded"
-        );
+    fn every_stage_has_a_compiled_template_file() {
+        for stage in all_stages() {
+            assert!(
+                !compiled_default(stage).trim().is_empty(),
+                "stage {stage:?} must ship a non-empty templates/watch/<stage>.md"
+            );
+        }
     }
 }

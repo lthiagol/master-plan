@@ -153,20 +153,16 @@ fn override_dir_is_used_even_when_plan_dir_would_also_resolve() {
     std::fs::create_dir_all(&override_dir).unwrap();
 
     std::fs::write(
-        plan_dir.join("watch/external-review.md"),
+        plan_dir.join("watch/remediate.md"),
         "{header}proj-only-fallback\n",
     )
     .unwrap();
-    std::fs::write(
-        override_dir.join("external-review.md"),
-        "{header}cli-wins\n",
-    )
-    .unwrap();
+    std::fs::write(override_dir.join("remediate.md"), "{header}cli-wins\n").unwrap();
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
     let (_text, source) = build_prompt_with(
-        PromptStage::ExternalReview,
+        PromptStage::Remediate,
         &m,
         &opts,
         Some(&override_dir),
@@ -174,8 +170,8 @@ fn override_dir_is_used_even_when_plan_dir_would_also_resolve() {
     );
 
     assert!(
-        matches!(source, TemplateSource::ProjectOverride(ref p) if p == &override_dir.join("external-review.md")),
-        "external-review override_dir must be used; got {source:?}"
+        matches!(source, TemplateSource::ProjectOverride(ref p) if p == &override_dir.join("remediate.md")),
+        "remediate override_dir must be used; got {source:?}"
     );
 }
 
@@ -185,15 +181,15 @@ fn override_dir_resolves_when_plan_dir_is_absent() {
     let override_dir = tmp.path().join("cli");
     std::fs::create_dir_all(&override_dir).unwrap();
     std::fs::write(
-        override_dir.join("approve.md"),
-        "{header}approve override (no plan_dir)\n",
+        override_dir.join("execute.md"),
+        "{header}execute override (no plan_dir)\n",
     )
     .unwrap();
 
     let m = fixture_milestone();
     let opts = PromptRenderOptions::default();
     let (_text, source) =
-        build_prompt_with(PromptStage::Approve, &m, &opts, Some(&override_dir), None);
+        build_prompt_with(PromptStage::Execute, &m, &opts, Some(&override_dir), None);
 
     assert!(
         matches!(source, TemplateSource::ProjectOverride(_)),
@@ -203,9 +199,9 @@ fn override_dir_resolves_when_plan_dir_is_absent() {
 
 // ─── Stage-by-stage override coverage ─────────────────────────────────────
 
-/// For every externalized stage, the loader honors an override file.
-/// One test, many checkpoints — cheaper than five near-identical
-/// tests and the assertion is the same: the override renders.
+/// For every stage, the loader honors an override file. One test,
+/// many checkpoints — cheaper than near-identical per-stage tests and
+/// the assertion is the same: the override renders.
 #[test]
 fn overrides_resolve_for_every_externalized_stage() {
     let tmp = tempfile::TempDir::new().unwrap();
@@ -214,18 +210,7 @@ fn overrides_resolve_for_every_externalized_stage() {
 
     let stages = [
         (PromptStage::Execute, "execute", "EXEC-SENTINEL"),
-        (
-            PromptStage::SelfReview,
-            "self-review",
-            "SELFREVIEW-SENTINEL",
-        ),
-        (
-            PromptStage::ExternalReview,
-            "external-review",
-            "EXTREVIEW-SENTINEL",
-        ),
         (PromptStage::Remediate, "remediate", "REMEDIATE-SENTINEL"),
-        (PromptStage::Approve, "approve", "APPROVE-SENTINEL"),
     ];
     for (_stage, label, sentinel) in stages {
         std::fs::write(
@@ -317,10 +302,6 @@ fn template_source_label_distinguishes_override_from_default() {
     let (_text, source_default) = build_prompt_with(PromptStage::Remediate, &m, &opts, None, None);
     assert_eq!(source_default.label(), "default");
     assert!(!source_default.is_override());
-
-    // ReReview stays hardcoded (M153 S1 ships 5 files).
-    let (_text, source_hardcoded) = build_prompt_with(PromptStage::ReReview, &m, &opts, None, None);
-    assert_eq!(source_hardcoded.label(), "re-review");
 }
 
 // ─── Pickup parity: override does not lose the header ──────────────────────

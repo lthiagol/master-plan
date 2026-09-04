@@ -250,9 +250,9 @@ impl WatchState {
         if let Some(existing) = self.panes.iter_mut().find(|p| p.role == pane.role) {
             let mut next = pane;
             // Preserve the original `spawned_at` if we already
-            // recorded one (callers like `upsert_panes_from_cache`
-            // do not track the original spawn time and would
-            // otherwise rewrite it to "now" on every save).
+            // recorded one (callers that copy panes out of the ops
+            // pane cache do not track the original spawn time and
+            // would otherwise rewrite it to "now" on every save).
             if !existing.spawned_at.is_empty() {
                 next.spawned_at = existing.spawned_at.clone();
             }

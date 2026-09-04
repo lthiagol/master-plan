@@ -297,8 +297,6 @@ pub fn drive_milestone<O: DriveOps>(ops: &mut O, max_iterations: usize) -> Resul
                             format!("override ({})", p.display()),
                         crate::autopilot::drive::TemplateSource::CompiledDefault =>
                             "default".to_string(),
-                        crate::autopilot::drive::TemplateSource::Hardcoded(name) =>
-                            format!("hardcoded ({name})"),
                     }
                 ),
             );

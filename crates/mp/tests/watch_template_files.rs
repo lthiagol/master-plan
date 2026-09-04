@@ -1,6 +1,7 @@
-//! M153 S1 (AC-01) + byte-equivalence contract:
+//! Template-file + byte-equivalence contract:
 //!
-//! 1. The five extracted templates live at `templates/watch/<stage>.md`.
+//! 1. One template per drivable stage lives at
+//!    `templates/watch/<stage>.md`.
 //! 2. The Rust compiled-in defaults are byte-equal to the file content.
 //!    `include_str!` reads the file at build time, so the binary
 //!    cannot drift from the on-disk source — but we pin it here as a
@@ -9,13 +10,7 @@
 
 use std::path::PathBuf;
 
-const EXPECTED_FILES: &[(&str, &str)] = &[
-    ("execute", "execute.md"),
-    ("self-review", "self-review.md"),
-    ("external-review", "external-review.md"),
-    ("remediate", "remediate.md"),
-    ("approve", "approve.md"),
-];
+const EXPECTED_FILES: &[(&str, &str)] = &[("execute", "execute.md"), ("remediate", "remediate.md")];
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -32,8 +27,8 @@ fn watch_template(stage: &str) -> PathBuf {
         .join(format!("{stage}.md"))
 }
 
-/// S1 done_when: "five template files exist". Pin the list explicitly
-/// so adding a sixth file later is a deliberate decision (and the test
+/// One template file per drivable stage. Pin the list explicitly so
+/// adding another file later is a deliberate decision (and the test
 /// reminds the implementer to update the milestone JSON alongside).
 #[test]
 fn watch_template_files_for_the_five_extracted_stages_exist() {
@@ -41,7 +36,7 @@ fn watch_template_files_for_the_five_extracted_stages_exist() {
         let path = watch_template(label);
         assert!(
             path.exists(),
-            "missing template file: `{}` (expected at {}); was M153 S1 applied?",
+            "missing template file: `{}` (expected at {})",
             filename,
             path.display()
         );
@@ -102,10 +97,7 @@ fn compiled_default_placeholders_match_disk_file_substitution_set() {
     for (label, _filename) in EXPECTED_FILES {
         let stage = match *label {
             "execute" => PromptStage::Execute,
-            "self-review" => PromptStage::SelfReview,
-            "external-review" => PromptStage::ExternalReview,
             "remediate" => PromptStage::Remediate,
-            "approve" => PromptStage::Approve,
             other => panic!("unexpected stage label {other}"),
         };
 
@@ -120,11 +112,11 @@ fn compiled_default_placeholders_match_disk_file_substitution_set() {
         );
 
         // The four-place substitution set: every file must carry at
-        // least the placeholders it actually uses. Execute/SelfReview/
-        // ExternalReview/Remediate/Approve use {id} for every
-        // subcommand; some also use {header}, {ac_list}, {step_list}.
-        // We assert the file contains at least the substitution it
-        // uses most (subcommand references), since `id` is universal.
+        // least the placeholders it actually uses. Both stages use
+        // {id} for every subcommand; they also use {header}, and may
+        // use {ac_list} / {step_list}. We assert the file contains at
+        // least the substitution it uses most (subcommand
+        // references), since `id` is universal.
         for placeholder in ["{id}", "{header}"] {
             assert!(
                 disk.contains(placeholder),
@@ -136,7 +128,7 @@ fn compiled_default_placeholders_match_disk_file_substitution_set() {
     }
 }
 
-/// S1 done_when: "compiled defaults diff-equal the files". Pin the
+/// "Compiled defaults diff-equal the files". Pin the
 /// include_str! content by reading the on-disk file *and* a known-
 /// unique sentinel from each stage. The sentinel is a substring
 /// unique to the file (e.g., the closing sentence or the role tag).
@@ -149,10 +141,7 @@ fn compiled_default_contains_unique_file_sentinels() {
     // preambles, or other stages.
     let sentinels = [
         ("execute", "mp agent role runner"),
-        ("self-review", "File self-detected findings BEFORE"),
-        ("external-review", "verify diff + test output"),
         ("remediate", "Do NOT run `mp reviews pass`"),
-        ("approve", "ceremonial `mp reviews pass`"),
     ];
     for (label, sentinel) in sentinels {
         let path = watch_template(label);

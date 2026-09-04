@@ -30,7 +30,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use serde_json::json;
 
 use crate::autopilot::drive::{
     build_pane_split_args, build_start_args, check_preconditions, default_log_path,
@@ -934,40 +933,16 @@ struct WatchPlan {
 }
 
 /// Copy any cached panes from the ops state-machine view into the
-/// supplied `WatchState` for persistence. The ops pane cache is the
-/// authoritative view at runtime — populating the state file from
-/// it means a crash leaves the recorded pane ids ready for
-/// `--resume` to re-attach to.
-#[allow(dead_code)]
-fn upsert_panes_from_cache(state: &mut crate::autopilot::drive::WatchState, ops: &SystemDriveOps) {
-    if let Some(pane) = ops.pane_cache.get(&crate::autopilot::drive::Role::Runner) {
-        state.upsert_pane(crate::autopilot::drive::PaneState {
-            role: crate::autopilot::drive::Role::Runner,
-            label: pane.label.clone(),
-            pane_id: pane.pane_id.clone(),
-            spawned_at: crate::store::now_rfc3339(),
-            last_status: None,
-        });
-    }
-    if let Some(pane) = ops
-        .pane_cache
-        .get(&crate::autopilot::drive::Role::Coordinator)
-    {
-        state.upsert_pane(crate::autopilot::drive::PaneState {
-            role: crate::autopilot::drive::Role::Coordinator,
-            label: pane.label.clone(),
-            pane_id: pane.pane_id.clone(),
-            spawned_at: crate::store::now_rfc3339(),
-            last_status: None,
-        });
-    }
-}
-
-/// M178 S1+S2: v2 counterpart of [`upsert_panes_from_cache`]. The v2
-/// state preserves the legacy `panes` array verbatim AND populates the
-/// flat `pane_ids` map keyed by role. Both are read by `--resume` /
-/// `mp watch output`; the flat map is the new authoritative read
-/// path so callers don't have to scan the array.
+/// supplied v2 [`WatchRunState`](crate::autopilot::drive::WatchRunState)
+/// for persistence. The ops pane cache is the authoritative view at
+/// runtime — populating the state file from it means a crash leaves
+/// the recorded pane ids ready for `--resume` to re-attach to.
+///
+/// The v2 state preserves the legacy `panes` array verbatim AND
+/// populates the flat `pane_ids` map keyed by role. Both are read by
+/// `--resume` / `mp watch output`; the flat map is the authoritative
+/// read path so callers don't have to scan the array. The v1-only
+/// writer this replaced had no callers left.
 fn upsert_panes_from_cache_v2(
     state: &mut crate::autopilot::drive::WatchRunState,
     ops: &SystemDriveOps,
@@ -1186,16 +1161,6 @@ fn next_action(m: &MilestoneFile, ready: bool) -> &'static str {
         "complete" => "skip_done",
         _ => "skip_unknown_lifecycle",
     }
-}
-
-/// Convenience helper kept for S0 callers / library users that want
-/// the precondition report without the watch plan envelope.
-#[allow(dead_code)]
-pub(crate) fn cmd_watch_preconditions(ctx: &PlanContext, format: Fmt) -> Result<()> {
-    let cfg = store::load_config(ctx);
-    let log_path = default_log_path(&ctx.plan_dir);
-    let report = check_preconditions(&cfg, &log_path);
-    emit(format, &json!({ "preconditions": report }))
 }
 
 #[cfg(test)]

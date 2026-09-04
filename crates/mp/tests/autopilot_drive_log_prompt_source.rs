@@ -263,54 +263,41 @@ fn prompt_source_events_have_parseable_jsonl_shape() {
     }
 }
 
-// ─── MEDIUM-2: ReReview override file is silently ignored ───────────────────
+// ─── Unknown-stage override files are inert ─────────────────────────────────
 
-/// M153 S1 ships 5 .md files; ReReview (a 6th stage) stays hardcoded.
-/// An operator writing `<plan_dir>/watch/re-review.md` must see the
-/// hardcoded body — NOT the file's contents. This is intentional
-/// (S1 ships 5 files) but operators need a clear signal that their
-/// override is being ignored. The README documents this; the test
-/// pins the behavior at the rendering layer.
+/// Every drivable stage now ships a template file, so an override
+/// only takes effect when its filename matches a stage label. A file
+/// named after a stage that no longer exists (`re-review.md` was one
+/// of the pre-cutover stage names) must not influence any rendered
+/// prompt — the resolver keys on `PromptStage::label()`, so there is
+/// no lookup that can reach it.
 #[test]
-fn rereview_override_file_is_silently_ignored_at_render_time() {
+fn override_file_for_a_non_stage_name_is_never_rendered() {
     let tmp = tempfile::TempDir::new().unwrap();
     let plan_dir = tmp.path().join("plan");
     std::fs::create_dir_all(plan_dir.join("watch")).unwrap();
 
-    // Custom body — if this leaks into the rendered prompt, the
-    // silent-ignore contract is broken.
     std::fs::write(
         plan_dir.join("watch/re-review.md"),
-        "{header}OPERATOR WROTE CUSTOM RE-REVIEW BODY (must NOT leak)\n",
+        "{header}OPERATOR WROTE A BODY FOR A STAGE THAT DOES NOT EXIST (must NOT leak)\n",
     )
     .unwrap();
 
-    // Use the production build_prompt_with directly rather than
-    // driving a full script (ReReview isn't reached by execute-
-    // prompt iterations in the canned milestone sequence).
     let m = ms("1", "complete");
     let opts = mp::autopilot::drive::PromptRenderOptions::default();
-    let (text, source) = mp::autopilot::drive::build_prompt_with(
-        PromptStage::ReReview,
-        &m,
-        &opts,
-        None,
-        Some(&plan_dir),
-    );
-
-    assert_eq!(
-        source,
-        mp::autopilot::drive::TemplateSource::Hardcoded("re-review"),
-        "ReReview source must be Hardcoded; got {source:?}"
-    );
-    assert!(
-        !text.contains("OPERATOR WROTE CUSTOM"),
-        "ReReview prompt must NOT include the override file's body; got:\n{text}"
-    );
-    // Sanity: the canonical hardcoded body is loaded (fresh session
-    // boundary + L5 mention are M149 invariants).
-    assert!(text.contains("fresh session"));
-    assert!(text.contains("L5"));
+    for stage in mp::autopilot::drive::all_stages() {
+        let (text, source) =
+            mp::autopilot::drive::build_prompt_with(stage, &m, &opts, None, Some(&plan_dir));
+        assert_eq!(
+            source,
+            mp::autopilot::drive::TemplateSource::CompiledDefault,
+            "stage {stage:?} must fall through to the compiled default; got {source:?}"
+        );
+        assert!(
+            !text.contains("OPERATOR WROTE A BODY"),
+            "stage {stage:?} prompt must not include the stray file's body; got:\n{text}"
+        );
+    }
 }
 
 // ─── BuildPromptRequest struct refactor (LOW-4) ─────────────────────────────

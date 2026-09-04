@@ -21,7 +21,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-03",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -69,13 +69,13 @@
       "id": "AC-01",
       "description": "Canonical production implementation and non-compatibility tests use autopilot module/type names; remaining watch-named code is isolated under documented compatibility adapters.",
       "verification": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test watch_cli --no-fail-fast exit 0 (23/23 pass)"
     },
     {
       "id": "AC-02",
       "description": "Unreachable legacy prompt stages, orphan coordinator-only state, superseded bridge wake-up code, and dead template runtime paths are removed only after coverage proves the M207-M226 replacements.",
-      "verification": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "verification": "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
@@ -121,7 +121,7 @@
       ],
       "tests": "cargo nextest run -p mp --test watch_cli --no-fail-fast",
       "done_when": "AC-01 leaves watch naming only in compatibility adapters.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -141,7 +141,7 @@
         "templates/watch/**",
         "crates/mp/tests/watch_execution.rs"
       ],
-      "tests": "cargo nextest run -p mp --test watch_execution --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test autopilot_drive_execution --no-fail-fast",
       "done_when": "AC-02 proves replacements before each deletion.",
       "status": "pending",
       "covers_ac": [

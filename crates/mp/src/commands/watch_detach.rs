@@ -181,19 +181,6 @@ pub(crate) fn cmd_watch_detached(
     Ok(())
 }
 
-#[allow(dead_code)]
-fn redirect_log(_log_path: &Path) -> std::process::Stdio {
-    // M178 external-review F-05: the helper is currently unused
-    // (the detach path routes stdio to /dev/null directly via
-    // `Stdio::null()`). Kept as a stub so a future caller that
-    // wants to redirect to `log_path` (e.g. to capture child
-    // stderr into the watch log) has a documented entry point.
-    // Suppresses clippy because the parameter is intentionally
-    // unused for now.
-    let _ = _log_path;
-    std::process::Stdio::null()
-}
-
 #[derive(Debug, Serialize)]
 struct DetachReport {
     dry_run: bool,

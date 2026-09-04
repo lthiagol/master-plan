@@ -698,12 +698,12 @@ mod tests {
     fn set_active_stage_records_stage_target_and_role_in_sync() {
         let mut s = fresh_state(&["M170"]);
         s.set_active_stage(
-            PromptStage::ExternalReview,
+            PromptStage::Remediate,
             crate::autopilot::drive::LifecycleTarget::Reviewed,
         );
-        assert_eq!(s.watch_stage.as_deref(), Some("external-review"));
+        assert_eq!(s.watch_stage.as_deref(), Some("remediate"));
         assert_eq!(s.target_lifecycle.as_deref(), Some("reviewed"));
-        assert_eq!(s.active_role, Some(Role::Coordinator));
+        assert_eq!(s.active_role, Some(Role::Runner));
     }
 
     #[test]

@@ -218,15 +218,6 @@ pub fn write_shutdown_state_for_test(
     state.save_to_plan(ctx)
 }
 
-/// Convenience: ensure the canonical `.mp/watch.state.json`
-/// exists for the supplied `ctx.plan_dir`. Used by the test
-/// fixture to seed a state file before sending SIGINT.
-#[cfg(test)]
-pub fn ensure_state_dir_exists(ctx: &crate::paths::PlanContext) -> std::io::Result<()> {
-    let dir = std::path::Path::new(&ctx.plan_dir).join(".mp");
-    std::fs::create_dir_all(dir)
-}
-
 #[cfg(test)]
 mod is_pid_alive_tests {
     //! M178 external-review F-04: pin the three behavioral branches

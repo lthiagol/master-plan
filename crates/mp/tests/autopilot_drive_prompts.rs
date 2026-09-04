@@ -76,15 +76,12 @@ fn every_stage_prompt_names_a_role() {
     let m = fixture("42", "x");
     for stage in all_stages() {
         let (p, _) = build_prompt(stage, &m);
-        let role_ok = match stage {
-            PromptStage::Execute | PromptStage::SelfReview | PromptStage::Remediate => {
-                p.contains("runner")
-            }
-            PromptStage::ExternalReview | PromptStage::ReReview | PromptStage::Approve => {
-                p.contains("coordinator")
-            }
-        };
-        assert!(role_ok, "stage {:?} should name its role", stage);
+        // Both drivable stages are runner work.
+        assert!(
+            p.contains("runner"),
+            "stage {:?} should name its role",
+            stage
+        );
     }
 }
 
@@ -115,66 +112,11 @@ fn execute_prompt_references_runner_workflow_subcommands() {
 }
 
 #[test]
-fn self_review_prompt_references_self_finding_subcommands() {
-    let m = fixture("12", "x");
-    let (p, _) = build_prompt(PromptStage::SelfReview, &m);
-    assert!(p.contains("mp reviews finding add 12 --phase self"));
-    // M153 rev HIGH-1/2: severity must be `low|medium|high` (CLI rejects
-    // `info|minor|major`) and `--category` is REQUIRED.
-    assert!(
-        p.contains("--severity <low|medium|high>"),
-        "self-review prompt must mention valid severity set; got: {p}"
-    );
-    assert!(
-        p.contains("--category"),
-        "self-review prompt must mention the required --category argument"
-    );
-    assert!(p.contains("mp execution report 12"));
-    assert!(p.contains("mp milestone complete 12"));
-}
-
-#[test]
-fn external_review_prompt_references_coordinator_review_subcommands() {
-    let m = fixture("13", "x");
-    let (p, _) = build_prompt(PromptStage::ExternalReview, &m);
-    assert!(p.contains("mp agent role coordinator"));
-    assert!(p.contains("mp reviews finding list 13"));
-    assert!(p.contains("mp execution report 13"));
-    assert!(p.contains("mp reviews pass 13"));
-    // M153 rev HIGH-1/2: severity must be `low|medium|high` and
-    // `--category` is REQUIRED when filing an external finding.
-    assert!(
-        p.contains("--severity <low|medium|high>"),
-        "external-review prompt must mention valid severity set; got: {p}"
-    );
-    assert!(
-        p.contains("--category"),
-        "external-review prompt must mention the required --category argument"
-    );
-}
-
-#[test]
 fn remediate_prompt_references_resolve_subcommands_and_warns_against_self_pass() {
     let m = fixture("14", "x");
     let (p, _) = build_prompt(PromptStage::Remediate, &m);
     assert!(p.contains("mp reviews finding resolve"));
     assert!(p.contains("Do NOT run `mp reviews pass`"));
-}
-
-#[test]
-fn re_review_prompt_calls_out_session_boundary_and_l5() {
-    let m = fixture("15", "x");
-    let (p, _) = build_prompt(PromptStage::ReReview, &m);
-    assert!(p.contains("fresh session"));
-    assert!(p.contains("L5"));
-}
-
-#[test]
-fn approve_prompt_targets_complete_lifecycle() {
-    let m = fixture("16", "x");
-    let (p, _) = build_prompt(PromptStage::Approve, &m);
-    assert!(p.contains("complete"));
-    assert!(p.contains("mp reviews pass 16"));
 }
 
 // ─── Truncation behavior ──────────────────────────────────────────────────
@@ -215,21 +157,14 @@ fn empty_acs_and_steps_render_placeholder_text() {
 
 // ─── Stage → role routing ─────────────────────────────────────────────────
 
-// ─── Stage → role routing ─────────────────────────────────────────────────
-
+/// Every drivable stage routes to the runner pane. The reviewer lane
+/// is dispatched by the autopilot cycle, not by a drive prompt stage,
+/// so there is no coordinator-routed stage left to assert.
 #[test]
 fn stage_role_routing_is_total_and_matches_design() {
     use mp::autopilot::drive::Role;
-    let cases = [
-        (PromptStage::Execute, Role::Runner),
-        (PromptStage::SelfReview, Role::Runner),
-        (PromptStage::Remediate, Role::Runner),
-        (PromptStage::ExternalReview, Role::Coordinator),
-        (PromptStage::ReReview, Role::Coordinator),
-        (PromptStage::Approve, Role::Coordinator),
-    ];
-    for (stage, expected) in cases {
-        assert_eq!(stage.role(), expected, "stage {stage:?} routed wrong");
+    for stage in all_stages() {
+        assert_eq!(stage.role(), Role::Runner, "stage {stage:?} routed wrong");
     }
 }
 
@@ -354,32 +289,6 @@ fn template_interpolates_a_real_cli_created_milestone() {
 
 // ─── M153 ext-review F-08: prompt contract regression ─────────────────────
 
-/// M153 ext-review F-08: `templates/watch/external-review.md` must
-/// file findings with `--phase external`. An empty `--phase` is
-/// treated as `--phase self` (M125 convention), which would wedge
-/// the watch state machine at the `Reviewed` transition. Pin the
-/// template body so a future edit can't silently drop the flag.
-#[test]
-fn external_review_prompt_files_findings_with_phase_external() {
-    let template_path = repo_root()
-        .join("templates")
-        .join("watch")
-        .join("external-review.md");
-    let body = std::fs::read_to_string(&template_path).expect("read template");
-    assert!(
-        body.contains("--phase external"),
-        "external-review template must file findings with `--phase external`; got: {body}"
-    );
-    // Sanity: the prompt rendered via the compiler agrees with the
-    // on-disk file (byte-equivalence contract from M153 S1).
-    let m = fixture("200", "phase probe");
-    let (p, _) = build_prompt(PromptStage::ExternalReview, &m);
-    assert!(
-        p.contains("--phase external"),
-        "rendered external-review prompt must include `--phase external`; got: {p}"
-    );
-}
-
 /// M153 ext-review F-08 lifecycle regression: when the CLI is
 /// invoked exactly as the external-review template instructs, the
 /// stored finding has `phase == "external"` rather than the default
@@ -443,12 +352,4 @@ fn external_review_finding_add_records_phase_external_end_to_end() {
         Some("external"),
         "stored finding phase must equal `external`; got: {found:?}"
     );
-}
-
-fn repo_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("repo root")
-        .to_path_buf()
 }

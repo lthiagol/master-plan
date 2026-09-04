@@ -1,8 +1,8 @@
-# M153 — `templates/watch/<stage>.md`
+# `templates/watch/<stage>.md`
 
-The five extracted prompt templates that `mp watch` sends to agent
-panes. Override resolution (S2) lets users ship per-project
-replacements without recompiling:
+The prompt templates the drive loop sends to agent panes — one file
+per drivable stage (`execute`, `remediate`). Override resolution lets
+users ship per-project replacements without recompiling:
 
 | Override path | Wins over |
 |---------------|-----------|
@@ -11,7 +11,7 @@ replacements without recompiling:
 | `templates/watch/<stage>.md` (compiled in via `include_str!`) | nothing — final rung |
 
 `mp watch` logs a `prompt_source` event per stage whose value
-distinguishes `override`, `default`, and `hardcoded (re-review)`
+distinguishes `override` from `default`
 (see `crates/mp/src/autopilot/drive/prompts.rs::TemplateSource::label`).
 
 ## Placeholders
@@ -72,35 +72,35 @@ is what the dry-run preview renders against.
 
 ## Caveats
 
-- The 5 files in this directory correspond to stages
-  `[Execute, SelfReview, ExternalReview, Remediate, Approve]`.
-  `ReReview` is **NOT** extracted — it remains a hardcoded Rust
-  template (see `crates/mp/src/autopilot/drive/prompts.rs::render_hardcoded_fallback`).
-  Operators writing `<plan_dir>/watch/re-review.md` will see the
-  hardcoded body; the override file is silently ignored. This is
-  intentional and matches S1's 5-file scope.
+- The files in this directory correspond to the stages the drive
+  loop can actually reach: `[Execute, Remediate]`. Every stage is
+  backed by a file, so template resolution always terminates at a
+  file rung — there is no hardcoded-Rust fallback. A file named
+  after anything else (for example a pre-cutover
+  `<plan_dir>/watch/re-review.md`) is never looked up and has no
+  effect.
 - Severity values in the templates are `low|medium|high`. The
   older `info|minor|major` (and `minor|major|blocker`) sets are
   no longer accepted by `mp reviews finding add --severity`; the
   CLI rejects them.
-- `mp reviews finding add` requires `--category`. Templates that
-  use it (self-review, external-review) call this out explicitly.
-- `mp reviews finding add` **must** carry `--phase external` in
-  the external-review template and `--phase self` in the
-  self-review template. An empty `--phase` is treated as
-  `--phase self` (M125 convention); the coordinator template
-  documents this explicitly so a future agent following the
-  shipped prompt does not silently file findings as self-phase.
+- `mp reviews finding add` requires `--category`; templates that
+  reference it call this out explicitly. An empty `--phase` is
+  treated as `--phase self`, so any template that files a finding
+  must pass `--phase` explicitly.
 - The AC-pass command is `mp milestone ac pass <id> <ac-id>` (or
   the long form `mp milestone criterion pass`). The legacy
   `mp milestone ac criterion pass` form does not exist.
 
 ## Adding a new stage
 
-When M-nnn adds a 6th externalized stage, update all of:
-1. The new `<stage>.md` file (placeholders documented above).
-2. `crates/mp/src/autopilot/drive/prompts.rs::resolve_template` match arm.
-3. `PromptStage::is_externalized` (currently `!ReReview`).
-4. `crates/mp/tests/watch_template_files.rs::EXPECTED_FILES`.
-5. The sentinels in `watch_template_files.rs::compiled_default_contains_unique_file_sentinels`.
-6. The stages array in `watch_template_override.rs::overrides_resolve_for_every_externalized_stage`.
+A new stage is only reachable once
+`crates/mp/src/autopilot/drive/state_machine.rs::next_stage` maps a
+lifecycle to it. Adding one means updating all of:
+1. `next_stage` — otherwise the stage is unreachable dead code.
+2. `PromptStage` + `PromptStage::label` / `role`.
+3. The new `<stage>.md` file (placeholders documented above).
+4. `crates/mp/src/autopilot/drive/prompts.rs::compiled_default` match arm.
+5. `crates/mp/src/autopilot/drive/prompts.rs::all_stages`.
+6. `crates/mp/tests/watch_template_files.rs::EXPECTED_FILES`.
+7. The sentinels in `watch_template_files.rs::compiled_default_contains_unique_file_sentinels`.
+8. The stages array in `watch_template_override.rs::overrides_resolve_for_every_externalized_stage`.
