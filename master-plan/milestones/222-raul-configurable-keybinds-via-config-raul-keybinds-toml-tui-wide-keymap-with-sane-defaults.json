@@ -3,9 +3,9 @@
     "id": "222",
     "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
     "slug": "raul-configurable-keybinds-via-config-raul-keybinds-toml-tui-wide-keymap-with-sane-defaults",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,7 +26,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T03:34:46.724213+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-04T03:42:00.861339+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -42,7 +43,7 @@
       },
       "external-review": {
         "status": "done",
-        "at": "2026-09-04T03:11:28.903527+00:00"
+        "at": "2026-09-04T03:42:00.861339+00:00"
       },
       "groom": {
         "status": "done",
@@ -402,6 +403,34 @@
         "wiring",
         "m225/m226",
         "production"
+      ]
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "test-gap",
+      "description": "F-01 regression tests exercise Keybinds::load_effective directly, not the new Keybinds::load_layered that runner.rs:417 wires. They pass for incidental reasons: a revert of runner.rs:417 from load_layered back to load would leave all 3 F-01 tests green. The test header comment ('exercises load_layered directly') is misleading. F-02 is properly production-path tested; F-01 is not.",
+      "status": "open",
+      "author": "reviewer-222",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/tests/m222_f01_startup_loader.rs",
+        "new_range": {
+          "start_line": 57,
+          "end_line": 57
+        },
+        "side": "new"
+      },
+      "summary": "F-01 regression tests pass for incidental reasons (test load_effective, not load_layered)",
+      "rationale": "Cycle 2 F-01 fix added Keybinds::load_layered (keybinds.rs:521) and wired it at runner.rs:417. The wiring is real and unconditional. But m222_f01_startup_loader.rs (3 tests) does not actually exercise load_layered -- every test calls Keybinds::load_effective(None, Some(&toml_text)) or Keybinds::load_effective(Some(&legacy_json), Some(&toml_text)) directly. The test header comment claims 'This suite exercises load_layered directly with a custom in-process runner' but the code reads the TOML itself via fs::read_to_string(&resolved) and a parallel resolve_default_path_under helper (not Keybinds::default_path()). Mental revert: if runner.rs:417 reverted to Keybinds::load(runner), all 3 F-01 tests still pass because they never go through runner.rs:417 or load_layered. The M225/M226 lesson recurs: the fix is at the source level but the test does not pin the production wiring. Contrast with F-02 (m222_f02_settings_keybinds_view.rs): the 5 tests render through the production renderer (terminal.draw -> compute_view -> render -> render_settings_lane -> render_keybinds_view); a revert of the render_settings_lane wiring would cause all 5 to fail. F-02 is production-path tested; F-01 is library-only. Fix: add a test that constructs an in-process MpRunner (or mocks runner.run to return a synthetic JSON), calls Keybinds::load_layered(&runner) directly, and asserts the resulting app.keybinds reflects both the TOML override and the JSON legacy layer. Also assert Keybinds::default_path() is the path load_layered actually reads (so a future regression in default_path resolution is caught).",
+      "confidence": "high",
+      "tags": [
+        "test-gap",
+        "wiring",
+        "m225/m226",
+        "cycle2"
       ]
     }
   ]
