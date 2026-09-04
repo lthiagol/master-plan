@@ -13,6 +13,7 @@ use crate::model::{AnnotationFile, BriefFile, ChallengeFile, IdeasFile, Mileston
 /// Canonical set of schemas shipped and checked by validation/oracle coverage.
 pub const ACTIVE_SCHEMA_FILENAMES: &[&str] = &[
     "annotation.schema.json",
+    "autopilot-session.schema.json",
     "brief.schema.json",
     "challenge.schema.json",
     "idea.schema.json",
