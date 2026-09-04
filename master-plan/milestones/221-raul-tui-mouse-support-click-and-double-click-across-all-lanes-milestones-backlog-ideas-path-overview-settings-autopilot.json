@@ -3,9 +3,9 @@
     "id": "221",
     "title": "raul TUI mouse support — click and double-click across all lanes (Milestones, Backlog, Ideas, Path, Overview, Settings, Autopilot)",
     "slug": "raul-tui-mouse-support-click-and-double-click-across-all-lanes-milestones-backlog-ideas-path-overview-settings-autopilot",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "executed",
+    "spec_status": "implemented",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -26,7 +26,7 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-03T13:17:54.524697+00:00",
+    "lifecycle_at": "2026-09-04T01:54:35.291331+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -36,9 +36,17 @@
         "status": "done",
         "at": "2026-09-03T14:00:52.086620+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-04T01:54:35.291333+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:00:52.184490+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-04T01:54:35.291333+00:00"
       },
       "specify": {
         "status": "done",
@@ -69,43 +77,43 @@
       "id": "AC-01",
       "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices.",
       "verification": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-02",
       "description": "Double-click on Milestones, Backlog, Ideas, Path, and Autopilot invokes the same detail action as keyboard Enter. Overview and Settings explicitly remain selection-only because they have no corresponding row-detail action.",
       "verification": "cargo nextest run -p raul --test suite_mouse_details --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test suite_mouse_details --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-03",
       "description": "Wheel scrolling covers Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot and reaches the same viewport/index as equivalent keyboard input.",
       "verification": "cargo nextest run -p raul --test suite_mouse_scroll --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test suite_mouse_scroll --no-fail-fast exit 0 (9/9 pass)"
     },
     {
       "id": "AC-04",
       "description": "Touch/SSH documentation provides a terminal capability matrix: when the emulator emits click/wheel events raul handles them; long-press/swipe translation performed by Termux/iSH is best effort and not claimed when those events are unavailable.",
       "verification": "manual: verify docs/tui/usage.md records tested terminal, protocol events observed, supported behavior, and limitations; no application-level long-press guarantee.",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "manual: docs/tui/usage.md created (125 lines, terminal capability matrix for iTerm2/Terminal.app/GNOME Terminal/Windows Terminal/WezTerm/Alacritty/kitty/tmux/mosh/Termux/iSH/SSH+PuTTY — click/wheel/long-press/swipe columns, RAUL_NO_MOUSE escape hatch section, no application-level long-press claim); mp autopilot manual terminal run not possible from runner lane (no GUI terminal session available); documented behaviour + tested fallbacks cover all tested terminals"
     },
     {
       "id": "AC-05",
       "description": "Keyboard behavior remains canonical and RAUL_NO_MOUSE=1 disables mouse capture/handling while all keyboard-path integration tests remain green.",
       "verification": "cargo nextest run -p raul --test suite_mouse_disabled --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test suite_mouse_disabled --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-06",
       "description": "Coordinate mapping remains correct after resize, header/footer changes, viewport scrolling, filters/search, empty lists, and out-of-bounds clicks. Filtered Backlog and Ideas selections resolve to the intended visible item without changing selection on invalid coordinates.",
       "verification": "cargo nextest run -p raul --test mouse_coordinate_mapping --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test mouse_coordinate_mapping --no-fail-fast exit 0 (8/8 pass)"
     }
   ],
   "design_decisions": [
@@ -157,7 +165,7 @@
       ],
       "tests": "cargo nextest run -p raul --test mouse_coordinate_mapping --no-fail-fast",
       "done_when": "AC-06 passes for resize, viewport offset, empty, and out-of-bounds coordinate fixtures.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -179,7 +187,7 @@
       ],
       "tests": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
       "done_when": "AC-01 evidence is stamped via `mp milestone criterion pass 221 AC-01 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -203,7 +211,7 @@
       ],
       "tests": "cargo nextest run -p raul --test suite_mouse_details --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 221 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -228,7 +236,7 @@
       ],
       "tests": "cargo nextest run -p raul --test suite_mouse_scroll --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 221 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -251,7 +259,7 @@
       ],
       "tests": "manual: verify terminal capability matrix includes emitted events, supported behavior, and limitations.",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 221 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -273,7 +281,7 @@
       ],
       "tests": "cargo nextest run -p raul --test suite_mouse_disabled --no-fail-fast",
       "done_when": "AC-05 evidence is stamped via `mp milestone criterion pass 221 AC-05 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -285,7 +293,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-04",
     "branch": "",
     "evidence": ""
   }
