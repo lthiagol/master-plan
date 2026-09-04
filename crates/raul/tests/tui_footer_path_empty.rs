@@ -77,20 +77,17 @@ fn non_path_lane_footer_is_two_rows_tall() {
         app.select_lane(lane);
         let area = ratatui::layout::Rect::new(0, 0, 80, 24);
         let view = view_state::compute_view(&app, area);
-        // Watch is a 1-row footer in v1 because it has no
-        // per-tab keys (per D-07 / `footer_per_tab` returns
-        // empty for Watch). The other non-Path lanes are 2-row.
-        if lane == Lane::Autopilot {
-            assert_eq!(
-                view.footer_area.height, 1,
-                "{lane:?} (Watch) must reserve a 1-row footer_area"
-            );
-        } else {
-            assert_eq!(
-                view.footer_area.height, 2,
-                "{lane:?} must reserve a 2-row footer_area"
-            );
-        }
+        // M217: the Autopilot lane still has no per-tab *keybind*
+        // glyphs, but it now carries the auto-refresh indicator
+        // (`poll: 2s (default)`) on the per-tab line, so its
+        // footer is 2 rows like every other non-Path lane. The
+        // height comes from `view_state::footer_per_tab_text`
+        // (glyphs + indicators) rather than from
+        // `Keybinds::footer_per_tab` alone.
+        assert_eq!(
+            view.footer_area.height, 2,
+            "{lane:?} must reserve a 2-row footer_area"
+        );
     }
 }
 

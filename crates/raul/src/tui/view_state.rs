@@ -553,6 +553,85 @@ pub struct ViewState {
 ///
 /// The function mirrors the layout decisions in `render::render` so
 /// every rect matches what the renderer actually drew. Diverging here
+/// M217: the per-tab footer line's full text — the
+/// per-(lane, content_state) keybind glyphs from
+/// `Keybinds::footer_per_tab` plus the trailing lane indicators
+/// (M205's `sort:`, M204's `<N> filters`, M217's `poll:`).
+///
+/// Single source of truth for two callers that must agree:
+/// [`compute_view`] sizes `footer_area` from whether this string
+/// is empty, and `render::chrome::footer_for` paints it. Before
+/// M217 the height was derived from `footer_per_tab` alone, so a
+/// lane whose only per-tab content was an indicator (exactly the
+/// Autopilot lane's situation) reserved no row and the indicator
+/// was silently dropped.
+pub fn footer_per_tab_text(app: &App) -> String {
+    let settings_staged = app.settings.as_ref().is_some_and(|s| s.has_staged_edits());
+    let mut text =
+        app.keybinds
+            .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged);
+    // M205 AC-06: the per-tab footer carries a trailing
+    // `sort: <key> ▼` indicator on the three sort-bearing lanes
+    // (Milestones / Backlog / Ideas), showing the active sort
+    // key. The arrow matches the column-header arrow glyph used
+    // in `header_cell`, so the operator sees the same visual
+    // affordance on the column header and the footer.
+    //
+    // M204 / AC-09: the footer also surfaces the active
+    // filter count as `<N> filters` when at least one filter
+    // chip is active. Both indicators sit on the per-tab line
+    // (right of the lane-key affordances) so the operator
+    // sees sort + filter state in one glance. Hidden when
+    // no filters and the default sort.
+    if matches!(
+        app.active_lane,
+        Lane::Milestones | Lane::Backlog | Lane::Ideas
+    ) && app.content == ContentState::List
+    {
+        let key = app.lane_sort_key(app.active_lane);
+        let indicator = format!("sort: {} ▼", key.label());
+        if text.is_empty() {
+            text = format!(" {indicator} ");
+        } else {
+            // Append after the existing per-tab text — separator
+            // matches the existing `·` between affordances.
+            text.push_str(&format!("  ·  {indicator}"));
+        }
+        // M204 / AC-09: filter count indicator. The count is
+        // the total number of (dim, value) chips across the
+        // active lane (not the number of dimensions — a
+        // multi-select dim with two values counts as 2).
+        let filter_count = app
+            .lane_filters
+            .get(&app.active_lane)
+            .map(|d| d.values().map(|s| s.len()).sum::<usize>())
+            .unwrap_or(0);
+        if filter_count > 0 {
+            let f = format!("{filter_count} filters");
+            if text.is_empty() {
+                text = format!(" {f} ");
+            } else {
+                text.push_str(&format!("  ·  {f}"));
+            }
+        }
+    }
+    // M217 / AC-03: the Autopilot lane carries its auto-refresh
+    // state on the per-tab footer line, so a *paused poll* is
+    // never misread as a *stalled drive*. The label also names
+    // the cadence and which link of the resolution chain supplied
+    // it (`poll: 9s (session)`), which is how AC-04's precedence
+    // becomes visible to the operator rather than only to a test.
+    if app.active_lane == Lane::Autopilot {
+        let indicator = app.autopilot_poller.footer_label();
+        if text.is_empty() {
+            text = format!(" {indicator} ");
+        } else {
+            text.push_str(&format!("  ·  {indicator}"));
+        }
+    }
+    text
+}
+
 /// is the bug M135 closes — keep the two in sync.
 pub fn compute_view(app: &App, area: Rect) -> ViewState {
     let mut view = ViewState::default();
@@ -576,10 +655,10 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
     // `compute_view` is the single source of truth for
     // `footer_area.height`; `render_footer` reads it back without
     // re-deriving the count.
-    let settings_staged = app.settings.as_ref().is_some_and(|s| s.has_staged_edits());
-    let per_tab_text =
-        app.keybinds
-            .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged);
+    // M217: size the footer from the *composed* per-tab text
+    // (glyphs + indicators), not from `footer_per_tab` alone —
+    // otherwise an indicator-only lane reserves no row.
+    let per_tab_text = footer_per_tab_text(app);
     let footer_height = if per_tab_text.is_empty() { 1u16 } else { 2u16 };
     let outer = Layout::vertical([
         Constraint::Length(1),

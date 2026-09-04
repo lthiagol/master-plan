@@ -23,10 +23,23 @@ fn footer_is_generated_from_keybinds() {
     // `footer_settings`) into a single per-(lane, content_state)
     // table: `Keybinds::footer_per_tab`. The renderer now routes
     // every non-modal footer through that single source of truth.
+    // M217: the composition moved one level down —
+    // `chrome::footer_for` delegates to
+    // `view_state::footer_per_tab_text`, which is the single
+    // source of truth for both the footer text and the footer
+    // height. The `footer_per_tab` call it wraps now lives in
+    // view_state.rs, so the delegation is asserted across both
+    // files.
     let content = fs::read_to_string(render_dir().join("chrome.rs")).unwrap();
     assert!(
-        content.contains("footer_per_tab("),
-        "footer_for must build its per-tab text from app.keybinds.footer_per_tab()"
+        content.contains("footer_per_tab_text(app)"),
+        "footer_for must build its per-tab text from view_state::footer_per_tab_text()"
+    );
+    let view_state_src =
+        fs::read_to_string(render_dir().parent().unwrap().join("view_state.rs")).unwrap();
+    assert!(
+        view_state_src.contains("footer_per_tab("),
+        "footer_per_tab_text must build its per-tab text from app.keybinds.footer_per_tab()"
     );
 
     // No hardcoded key-legend fragment should survive in the renderer.

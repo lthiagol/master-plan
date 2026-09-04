@@ -79,70 +79,12 @@ pub(super) fn footer_for(app: &App) -> String {
     // through the per-(lane, content_state) table — both have
     // their own entries (`_:annotate · _:resolve · _:reopen` and
     // `_:approve · _:menu` respectively).
-    let settings_staged = app.settings.as_ref().is_some_and(|s| s.has_staged_edits());
-    let mut text =
-        app.keybinds
-            .footer_per_tab(app.active_lane, app.content, app.open_only, settings_staged);
-    // M205 AC-06: the per-tab footer carries a trailing
-    // `sort: <key> ▼` indicator on the three sort-bearing lanes
-    // (Milestones / Backlog / Ideas), showing the active sort
-    // key. The arrow matches the column-header arrow glyph used
-    // in `header_cell`, so the operator sees the same visual
-    // affordance on the column header and the footer.
-    //
-    // M204 / AC-09: the footer also surfaces the active
-    // filter count as `<N> filters` when at least one filter
-    // chip is active. Both indicators sit on the per-tab line
-    // (right of the lane-key affordances) so the operator
-    // sees sort + filter state in one glance. Hidden when
-    // no filters and the default sort.
-    if matches!(
-        app.active_lane,
-        Lane::Milestones | Lane::Backlog | Lane::Ideas
-    ) && app.content == ContentState::List
-    {
-        let key = app.lane_sort_key(app.active_lane);
-        let indicator = format!("sort: {} ▼", key.label());
-        if text.is_empty() {
-            text = format!(" {indicator} ");
-        } else {
-            // Append after the existing per-tab text — separator
-            // matches the existing `·` between affordances.
-            text.push_str(&format!("  ·  {indicator}"));
-        }
-        // M204 / AC-09: filter count indicator. The count is
-        // the total number of (dim, value) chips across the
-        // active lane (not the number of dimensions — a
-        // multi-select dim with two values counts as 2).
-        let filter_count = app
-            .lane_filters
-            .get(&app.active_lane)
-            .map(|d| d.values().map(|s| s.len()).sum::<usize>())
-            .unwrap_or(0);
-        if filter_count > 0 {
-            let f = format!("{filter_count} filters");
-            if text.is_empty() {
-                text = format!(" {f} ");
-            } else {
-                text.push_str(&format!("  ·  {f}"));
-            }
-        }
-    }
-    // M217 / AC-03: the Autopilot lane carries its auto-refresh
-    // state on the per-tab footer line, so a *paused poll* is
-    // never misread as a *stalled drive*. The label also names
-    // the cadence and which link of the resolution chain supplied
-    // it (`poll: 9s (session)`), which is how AC-04's precedence
-    // becomes visible to the operator rather than only to a test.
-    if app.active_lane == Lane::Autopilot {
-        let indicator = app.autopilot_poller.footer_label();
-        if text.is_empty() {
-            text = format!(" {indicator} ");
-        } else {
-            text.push_str(&format!("  ·  {indicator}"));
-        }
-    }
-    text
+    // M217: the per-tab composition (keybind glyphs + the
+    // sort / filter / poll indicators) lives in `view_state` so
+    // `compute_view` can size `footer_area` from the same string
+    // this function paints. A lane that gains an indicator gains
+    // its footer row automatically.
+    crate::tui::view_state::footer_per_tab_text(app)
 }
 
 /// M183: first key glyph for a binding slot (width-constrained footer).

@@ -79,8 +79,8 @@
       "id": "AC-02",
       "description": "Display polling pauses when Autopilot is unfocused and resumes when focused; a headless drive continues and accumulates session events while display polling is paused.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_focus_gating --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poll_focus_gating --no-fail-fast exit 0 (7/7 pass)"
     },
     {
       "id": "AC-03",
@@ -176,7 +176,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poll_focus_gating --no-fail-fast",
       "done_when": "AC-02 evidence is stamped via `mp milestone criterion pass 217 AC-02 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],

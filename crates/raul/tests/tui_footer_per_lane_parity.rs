@@ -80,6 +80,18 @@ fn per_tab_line_matches_footer_per_tab_on_all_lanes() {
             .collect();
         // Lanes with an empty per-tab string (Path, Watch) skip
         // the per-tab row entirely.
+        // M217: the Autopilot lane has no per-tab *keybind* glyphs
+        // but does carry the auto-refresh indicator, so its footer
+        // is now 2 rows with `poll: …` on the per-tab line. The
+        // height is derived from `view_state::footer_per_tab_text`
+        // (glyphs + indicators), which is what the renderer paints.
+        if lane == Lane::Autopilot {
+            assert!(
+                per_tab.contains("poll:"),
+                "lane Autopilot: per-tab row must carry the poll indicator; got={per_tab:?}"
+            );
+            continue;
+        }
         if expected.is_empty() {
             assert!(
                 per_tab.trim().is_empty(),
