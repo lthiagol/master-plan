@@ -1,5 +1,19 @@
 ## Unreleased — WIP CI hardening
 
+- **Breaking release cleanup (M229).** The legacy `mp watch` and
+  `mp watch-control` aliases plus the `mp autopilot migrate` shim
+  were removed. The canonical surface is `mp autopilot start`,
+  `mp autopilot status|stop|output|result`, and the per-verb
+  subtrees. The `ui.show_watch_tab` config key was dropped; `mp
+  doctor` no longer reports a `ui_show_watch_tab` row. The
+  `.mp/watch.state.json` migration path is gone — autopilot
+  sessions live exclusively under
+  `<plan_dir>/autopilot/<id>/session.json`. New gate: `mp
+  breaking-release preflight` records the explicit next-major
+  target version and migration-window evidence before any further
+  compatibility removals ship. See `docs/autopilot/migration.md`
+  for the full migration timeline and the closed deprecation
+  window.
 - **raul keybind deconflict.** `keybinds.refresh` now defaults to
   `Ctrl-R` (was `r`); `keybinds.previous_lane` dropped the `h` alias
   (use `Left` or `BackTab`); `keybinds.focus_content` is no longer a

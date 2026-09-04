@@ -1,43 +1,48 @@
 # Autopilot migration guide
 
 `mp autopilot` is the canonical command tree for driving milestones
-through their lifecycle. The legacy `mp watch` spelling is preserved
-as a deprecation alias and will be removed in a future release.
+through their lifecycle. The legacy `mp watch` spelling was
+preserved through `1.x` as a deprecation alias and was removed in
+the next-major release.
 
-This guide covers the move from `mp watch` to `mp autopilot` and
-the deprecation timeline.
+This guide covers the move from `mp watch` to `mp autopilot`.
 
 ## Background
 
-`mp autopilot` is the umbrella command for everything that used to
-live under the `mp watch` and `mp watch-control` surfaces:
+`mp autopilot` is the umbrella command for everything that
+historically lived under the `mp watch` and `mp watch-control`
+surfaces:
 
-| Legacy spelling       | Canonical spelling                              |
-|-----------------------|-------------------------------------------------|
-| `mp watch <ids...>`   | `mp autopilot start [IDS]...`                   |
-| `mp watch-control status` | `mp autopilot status [--summary]`           |
-| `mp watch-control stop`   | `mp autopilot stop [--pid N]`              |
-| `mp watch-control output` | `mp autopilot output [--max-bytes N] ...` |
-| `mp watch-control result` | `mp autopilot result [--force]`            |
+| Legacy spelling            | Canonical spelling                    |
+|----------------------------|---------------------------------------|
+| `mp watch <ids...>`        | `mp autopilot start [IDS]...`         |
+| `mp watch-control status`  | `mp autopilot status [--summary]`     |
+| `mp watch-control stop`    | `mp autopilot stop [--pid N]`         |
+| `mp watch-control output`  | `mp autopilot output [--max-bytes N]` |
+| `mp watch-control result`  | `mp autopilot result [--force]`       |
 
-The two trees accept identical arguments, return identical exit
-codes, and emit byte-identical JSON on stdout.
+The canonical tree accepts identical arguments, returns identical
+exit codes, and emits byte-identical JSON on stdout (compared to
+the legacy alias that used to be available).
 
-## Deprecation timeline
+## Deprecation timeline (closed)
 
-1. **Now (deprecation notice active).** Every `mp watch` invocation
-   prints one deprecation line on stderr:
+1. **1.x (deprecation notice active, REMOVED).** During the `1.x`
+   release line, every `mp watch` invocation printed one deprecation
+   line on stderr:
 
    ```
    mp watch is deprecated; use 'mp autopilot' instead.
    ```
 
-   The warning fires once per invocation, regardless of plan state.
-   Canonical `mp autopilot` invocations never print this line.
+   The warning fired once per invocation, regardless of plan state.
+   Canonical `mp autopilot` invocations never printed this line.
 
-2. **Future release (removal).** The `mp watch` command will be
-   removed entirely. Scripts and muscle memory should switch to the
-   `mp autopilot` spelling before that release ships.
+2. **Next major release (cut).** The `mp watch` and
+   `mp watch-control` commands and the `mp autopilot migrate`
+   shim were removed. The breaking-release cleanup
+   (`mp breaking-release preflight`) was the gate
+   for the cut.
 
 ## Migration steps
 
@@ -45,32 +50,30 @@ codes, and emit byte-identical JSON on stdout.
    pipelines, aliases, and documentation. The argument shape is
    identical.
 2. Replace `mp watch-control status|stop|output|result` with the
-   matching `mp autopilot status|stop|output|result` command. The
-   flag set is identical.
-3. Update any tooling that scrapes the deprecation line on stderr
-   to expect the new wording:
-
-   - Old: `` `mp watch` is deprecated; use `mp autopilot start` instead ``
-   - New: `mp watch is deprecated; use 'mp autopilot' instead.`
-
-4. If your environment splits stderr from stdout (e.g. CI log
-   scrapers, alerting, structured log collectors), the deprecation
-   line is the only output `mp autopilot start` and the legacy
-   `mp watch` write to stderr for the dry-run path. Stdout remains
-   clean JSON.
+   matching `mp autopilot status|stop|output|result` command.
+3. The `mp autopilot migrate` subcommand was removed; the
+   `.mp/watch.state.json` migration path was consumed during the
+   compatibility window. Autopilot sessions now live exclusively
+   under `<plan_dir>/autopilot/<id>/session.json`.
+4. The `ui.show_watch_tab` config key was removed; `mp doctor` no
+   longer surfaces a `ui_show_watch_tab` row. Update raul config
+   files that referenced the legacy key.
 
 ## What's unchanged
 
-- Exit codes for every command in both trees.
-- JSON output on stdout (identical bytes for the same arguments).
+- Exit codes for every command in the canonical tree.
+- JSON output on stdout (same shape as the legacy alias used to
+  emit).
 - The `--dry-run`, `--log-file`, `--stall-timeout-ms`,
-  `--poll-interval-ms`, `--resume`, `--force`, and `--detach` flag
-  set on `start`.
-- The legacy `.mp/watch.state.json` migration path. The
-  `mp autopilot migrate` command is idempotent and safe to run on
-  projects that have already migrated.
+  `--poll-interval-ms`, `--resume`, `--force`, and `--detach`
+  flag set on `start`.
+- The autopilot session schema under `<plan_dir>/autopilot/<id>/`.
+  Existing autopilot sessions are unchanged by the cleanup.
 
 ## See also
 
 - `docs/mp/commands.md` — full command reference.
 - `docs/autopilot/session-format.md` — autopilot session schema.
+- `mp breaking-release preflight` — record the next-major target
+  version and migration-window evidence before further
+  compatibility removals.
