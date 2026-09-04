@@ -449,9 +449,6 @@ fn m229_f02_legacy_show_watch_tab_config_key_is_removed() {
 }
 
 #[test]
-
-
-#[test]
 fn m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness() {
     // F-05 / cycle 3 strengthened: exercise the production
     // `execution_check` serialization end-to-end and assert the
