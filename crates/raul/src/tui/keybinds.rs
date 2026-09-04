@@ -166,6 +166,56 @@ pub struct Keybinds {
     /// Watch lane the same key is shadowed by the per-lane
     /// `WatchClearQueue` action (dispatcher in `modes/normal`).
     pub clear_filters: Vec<KeyCombo>,
+    /// M222: per-lane Autopilot keymap. The handler in
+    /// `modes::normal::handle_autopilot_lane_key` consults these
+    /// instead of its pre-M222 hardcoded matches so a user can
+    /// rebind the Autopilot lane through `~/.config/raul/keybinds.toml`.
+    pub lane_autopilot: AutopilotLaneKeybinds,
+}
+
+/// M222: per-lane keymap for the Autopilot lane. The six actions
+/// correspond to the hardcoded shapes `handle_autopilot_lane_key`
+/// matched pre-M222 (Space / j / k / o / s / capital P / Esc).
+/// Defaults preserve the pre-M222 behavior exactly so swapping the
+/// dispatcher to consult this struct is no-op for users without a
+/// `keybinds.toml` file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutopilotLaneKeybinds {
+    /// Toggle the highlighted picker's selection (default Space).
+    pub select: Vec<KeyCombo>,
+    /// Move the picker cursor up (default `k`).
+    pub move_picker_up: Vec<KeyCombo>,
+    /// Move the picker cursor down (default `j`).
+    pub move_picker_down: Vec<KeyCombo>,
+    /// Toggle the override panel (default `o`).
+    pub toggle_panel: Vec<KeyCombo>,
+    /// Start the autopilot session (default `s`).
+    pub start: Vec<KeyCombo>,
+    /// Open the past-session replay (default capital `P`).
+    pub replay: Vec<KeyCombo>,
+    /// Close the panel or replay shell (default `Esc`, mirrors the
+    /// global `escape` so the per-mode handler can re-use it
+    /// without a second field).
+    pub close: Vec<KeyCombo>,
+}
+
+impl Default for AutopilotLaneKeybinds {
+    /// The defaults mirror the pre-M222 hardcoded matches in
+    /// `modes::normal::handle_autopilot_lane_key` exactly. Keeping
+    /// this `impl` (instead of `#[derive(Default)]`) means a
+    /// future field addition gets a default too — otherwise the
+    /// struct silently degenerates to empty Vecs.
+    fn default() -> Self {
+        Self {
+            select: vec![plain(KeyCode::Char(' '))],
+            move_picker_up: vec![plain(KeyCode::Char('k'))],
+            move_picker_down: vec![plain(KeyCode::Char('j'))],
+            toggle_panel: vec![plain(KeyCode::Char('o'))],
+            start: vec![plain(KeyCode::Char('s'))],
+            replay: vec![plain(KeyCode::Char('P'))],
+            close: vec![plain(KeyCode::Esc)],
+        }
+    }
 }
 
 impl Default for Keybinds {
@@ -230,6 +280,21 @@ impl Default for Keybinds {
             search: vec![plain(KeyCode::Char('/'))],
             cycle_sort: vec![plain(KeyCode::Char('o'))],
             clear_filters: vec![plain(KeyCode::Char('c'))],
+            // M222: defaults reproduce the pre-M222 hardcoded
+            // `handle_autopilot_lane_key` matches so swapping the
+            // dispatcher to consult this struct is no-op for users
+            // without a `keybinds.toml` file. `close` mirrors the
+            // global `escape` so the lane can close panel/replay
+            // without a parallel field.
+            lane_autopilot: AutopilotLaneKeybinds {
+                select: vec![plain(KeyCode::Char(' '))],
+                move_picker_up: vec![plain(KeyCode::Char('k'))],
+                move_picker_down: vec![plain(KeyCode::Char('j'))],
+                toggle_panel: vec![plain(KeyCode::Char('o'))],
+                start: vec![plain(KeyCode::Char('s'))],
+                replay: vec![plain(KeyCode::Char('P'))],
+                close: vec![plain(KeyCode::Esc)],
+            },
         }
     }
 }
@@ -509,6 +574,14 @@ impl Keybinds {
             ("grooming_preset", &self.grooming_preset),
             ("search", &self.search),
             ("cycle_sort", &self.cycle_sort),
+            // M204 (post-slots-mut addition): kept here so the
+            // profile export emits `clear_filters` for users who
+            // rebind it. The M200 era split slots/slots_mut — the
+            // drift was a real bug in `local_keybindings_profile_toml`.
+            // Pinned together with `slots_mut` so adding a new
+            // global action can't accidentally leave the export
+            // stale.
+            ("clear_filters", &self.clear_filters),
         ]
     }
 
@@ -1259,6 +1332,483 @@ impl Keybinds {
         }
         entries
     }
+
+    // ---- M222: user-level keybinds.toml surface ---------------------
+    //
+    // The TOML shape is:
+    //
+    // ```toml
+    // [global]
+    // quit = "ctrl+x"
+    // page_down = ["PageDown", "pagedown"]
+    //
+    // [autopilot]
+    // select = "f1"
+    // move_picker_up = "k"
+    // ```
+    //
+    // Both keys and values share the same grammar as the v1
+    // profile TOML parser; section per lane keeps the override
+    // file scoped and the unknowns easy to ignore.
+
+    /// Mutable `(section, name, field)` triples used by the TOML
+    /// loader. `name` is the dotted key in the file (`quit`, or
+    /// `autopilot.select`) — the same form the registry surface
+    /// names.
+    ///
+    /// *Not* a single iterator: Rust's borrow checker prevents
+    /// holding simultaneous mutable borrows of `self.quit` (via
+    /// `slots_mut`) and `self.lane_autopilot.select`. Helpers
+    /// `set_global_slot` / `set_autopilot_slot` instead route one
+    /// field at a time.
+    fn set_global_slot(&mut self, name: &str, value: Vec<KeyCombo>) {
+        for (slot_name, slot) in self.slots_mut() {
+            if slot_name == name {
+                *slot = value;
+                return;
+            }
+        }
+    }
+
+    fn set_autopilot_slot(&mut self, name: &str, value: Vec<KeyCombo>) {
+        match name {
+            "select" => self.lane_autopilot.select = value,
+            "move_picker_up" => self.lane_autopilot.move_picker_up = value,
+            "move_picker_down" => self.lane_autopilot.move_picker_down = value,
+            "toggle_panel" => self.lane_autopilot.toggle_panel = value,
+            "start" => self.lane_autopilot.start = value,
+            "replay" => self.lane_autopilot.replay = value,
+            "close" => self.lane_autopilot.close = value,
+            _ => {}
+        }
+    }
+
+    /// The registry names of every configurable global action.
+    /// Mirrors `slots_mut()` so a new action is a one-line
+    /// addition in both lists.
+    pub fn global_action_names() -> &'static [&'static str] {
+        const NAMES: &[&str] = &[
+            "quit",
+            "up",
+            "down",
+            "page_up",
+            "page_down",
+            "enter",
+            "escape",
+            "help",
+            "filter",
+            "hide_done",
+            "create_annotation",
+            "resolve",
+            "reopen",
+            "approve",
+            "review_menu",
+            "open_settings",
+            "previous_lane",
+            "next_lane",
+            "focus_content",
+            "refresh",
+            "next_section",
+            "prev_section",
+            "next_item",
+            "prev_item",
+            "lifecycle_filter",
+            "grooming_preset",
+            "search",
+            "cycle_sort",
+            "clear_filters",
+        ];
+        NAMES
+    }
+
+    /// The registry names of every configurable Autopilot-lane
+    /// action. Mirrors `AutopilotLaneKeybinds` so a new action is a
+    /// one-line addition in both lists.
+    pub fn autopilot_action_names() -> &'static [&'static str] {
+        const NAMES: &[&str] = &[
+            "select",
+            "move_picker_up",
+            "move_picker_down",
+            "toggle_panel",
+            "start",
+            "replay",
+            "close",
+        ];
+        NAMES
+    }
+
+    /// Full registry of `(section, action_name, default_combo_string)`
+    /// triples — the single source of truth used by the Settings
+    /// keymap view, the conflict diagnostics, and the documentation
+    /// export. Order: globals first (resolution order), then the
+    /// Autopilot lane actions in declaration order.
+    pub fn action_registry() -> Vec<(&'static str, &'static str, String)> {
+        let defaults = Self::default();
+        let mut out: Vec<(&'static str, &'static str, String)> = Vec::new();
+        for (name, combos) in defaults.slots() {
+            out.push((
+                "global",
+                name,
+                combos
+                    .iter()
+                    .map(|c| combo_to_toml_string(*c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+        let ap = [
+            (
+                "select",
+                defaults.lane_autopilot.select.as_slice(),
+            ),
+            (
+                "move_picker_up",
+                defaults.lane_autopilot.move_picker_up.as_slice(),
+            ),
+            (
+                "move_picker_down",
+                defaults.lane_autopilot.move_picker_down.as_slice(),
+            ),
+            (
+                "toggle_panel",
+                defaults.lane_autopilot.toggle_panel.as_slice(),
+            ),
+            ("start", defaults.lane_autopilot.start.as_slice()),
+            ("replay", defaults.lane_autopilot.replay.as_slice()),
+            ("close", defaults.lane_autopilot.close.as_slice()),
+        ];
+        for (name, combos) in ap {
+            out.push((
+                "autopilot",
+                name,
+                combos
+                    .iter()
+                    .map(|c| combo_to_toml_string(*c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+        out
+    }
+
+    /// Is `action` a known global or per-lane configurable action?
+    /// Returns the section name (`"global"` or `"autopilot"`) so the
+    /// caller can route the override to the right slot.
+    pub fn lookup_action(action: &str) -> Option<&'static str> {
+        if Self::global_action_names().contains(&action) {
+            return Some("global");
+        }
+        if Self::autopilot_action_names().contains(&action) {
+            return Some("autopilot");
+        }
+        None
+    }
+
+    /// Parse a `keybinds.toml` body into a [`Keybinds`] plus any
+    /// diagnostics. Falls back per-field on bad combos (one bad
+    /// binding never discards the others), per-section on
+    /// unparseable structure: each section parses independently so
+    /// a malformed `[autopilot]` table never loses `[global]`
+    /// overrides (and vice versa).
+    ///
+    /// Lenient behavior:
+    ///
+    ///   * Unknown action names (`foo = "x"`) are reported but
+    ///     skipped — they cannot shadow an existing action.
+    ///   * Wrong-typed values (e.g. `quit = 42`) are reported with
+    ///     the line context and the affected field keeps its
+    ///     default binding.
+    ///   * A bad key combo inside a multi-binding list reports the
+    ///     bad combo(s) and the affected field keeps its default —
+    ///     we never ship a partial binding.
+    ///   * Duplicate bindings within the same section are rejected
+    ///     (see [`Self::conflict_diagnostics`]); the conflicting
+    ///     entry keeps the default and the rest of the section is
+    ///     preserved.
+    ///   * Reserved recovery actions (`escape`, `quit`) cannot be
+    ///     nullified — an empty binding is restored to the default
+    ///     with a diagnostic, so the user always has a working
+    ///     exit path.
+    pub fn load_from_keybinds_toml(text: &str) -> (Vec<Diagnostic>, Self) {
+        let mut kb = Self::default();
+        let mut diags = Vec::new();
+
+        // First pass: tokenize into per-section line lists.
+        let sections = parse_keybinds_toml_sections(text);
+        for section_diag in &sections.diagnostics {
+            diags.push(section_diag.clone());
+        }
+
+        // For each section, build a per-section diagnostic context.
+        // `current_section` is used by per-binding diagnostics to
+        // name the section.
+        let known_global: std::collections::HashSet<&'static str> =
+            Self::global_action_names().iter().copied().collect();
+        let known_autopilot: std::collections::HashSet<&'static str> =
+            Self::autopilot_action_names().iter().copied().collect();
+
+        let reserved_recovery: std::collections::HashSet<&'static str> = [
+            "escape",
+            "quit",
+        ]
+        .into_iter()
+        .collect();
+
+        for (section, lines) in sections.sections {
+            // A malformed section header (`[bad`) was already
+            // pushed as a diagnostic during tokenization; skip the
+            // body of unknown sections to keep the parser
+            // crash-free.
+            let known = match section.as_str() {
+                "global" => Some(&known_global),
+                "autopilot" => Some(&known_autopilot),
+                _ => None,
+            };
+            let Some(known) = known else {
+                // Unknown section header — emit a diagnostic.
+                diags.push(Diagnostic {
+                    field: format!("[{}]", section),
+                    message: format!("unknown section; valid sections: [global], [autopilot]"),
+                });
+                continue;
+            };
+
+            for (lineno, raw_line) in lines.iter().enumerate() {
+                let raw = raw_line.trim();
+                if raw.is_empty() || raw.starts_with('#') {
+                    continue;
+                }
+                let Some((name, value)) = raw.split_once('=') else {
+                    diags.push(Diagnostic {
+                        field: format!("{}.{}", section, lineno + 1),
+                        message: format!("expected `key = value`; got {raw:?}"),
+                    });
+                    continue;
+                };
+                let name = name.trim();
+                if !known.contains(name) {
+                    diags.push(Diagnostic {
+                        field: format!("{}.{}", section, name),
+                        message: format!("unknown action; cannot shadow existing actions"),
+                    });
+                    continue;
+                }
+
+                // Parse the value into a list of combo strings. We
+                // hand-roll the array form (`["a", "b"]`) instead
+                // of pulling in a TOML crate; the existing
+                // `parse_profile_value` helper already handles it
+                // for the v1 profile TOML loader.
+                let value = value.trim();
+                let strings = match parse_profile_value(value) {
+                    Some(v) => v,
+                    None => {
+                        diags.push(Diagnostic {
+                            field: format!("{}.{}", section, name),
+                            message: format!("invalid value: {value:?} (expected string or array of strings)"),
+                        });
+                        continue;
+                    }
+                };
+
+                let mut combos = Vec::new();
+                let mut bad = Vec::new();
+                for s in &strings {
+                    if s.is_empty() {
+                        continue;
+                    }
+                    match parse_key_combo(s) {
+                        Some(c) => combos.push(c),
+                        None => bad.push(s.clone()),
+                    }
+                }
+                if !bad.is_empty() {
+                    diags.push(Diagnostic {
+                        field: format!("{}.{}", section, name),
+                        message: format!(
+                            "invalid combo(s) {bad:?}; using default binding for this field"
+                        ),
+                    });
+                    // Per-field fallback — a malformed combo in the
+                    // list resets the entire field to default.
+                    continue;
+                }
+
+                // Reserved-recovery guard: `escape` and `quit` must
+                // never be disabled; an empty list is restored to
+                // default with a diagnostic.
+                if combos.is_empty() && reserved_recovery.contains(name) {
+                    diags.push(Diagnostic {
+                        field: format!("{}.{}", section, name),
+                        message: format!(
+                            "`{name}` is a reserved recovery action; empty binding ignored"
+                        ),
+                    });
+                    continue;
+                }
+
+                // Apply the binding to the slot. Route through the
+                // section-aware setter so we don't re-encode the
+                // field list (and don't fall foul of the borrow
+                // checker by mixing mutable borrows of different
+                // substructures).
+                match section.as_str() {
+                    "global" => kb.set_global_slot(name, combos),
+                    "autopilot" => kb.set_autopilot_slot(name, combos),
+                    _ => {}
+                }
+            }
+        }
+
+        diags.extend(kb.conflict_diagnostics());
+        (diags, kb)
+    }
+
+    /// Load `~/.config/raul/keybinds.toml` (or
+    /// `$XDG_CONFIG_HOME/raul/keybinds.toml`), tolerating a
+    /// missing file: returns the built-in defaults with no
+    /// diagnostics. File I/O errors are surfaced as one
+    /// diagnostic; a successful empty file is silently accepted.
+    pub fn load_from_path(path: &std::path::Path) -> (Vec<Diagnostic>, Self) {
+        match std::fs::read_to_string(path) {
+            Ok(text) => Self::load_from_keybinds_toml(&text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                (Vec::new(), Self::default())
+            }
+            Err(e) => {
+                let mut diags = Vec::new();
+                diags.push(Diagnostic {
+                    field: format!("path:{}", path.display()),
+                    message: format!("failed to read keybinds.toml: {e}"),
+                });
+                (diags, Self::default())
+            }
+        }
+    }
+
+    /// The canonical user-level TOML path. `$XDG_CONFIG_HOME` is
+    /// honored when set, falling back to `$HOME/.config/raul`. The
+    /// path is informational — the Settings view states it so the
+    /// user knows where to place overrides.
+    pub fn default_path() -> std::path::PathBuf {
+        if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+            if !xdg.is_empty() {
+                return std::path::PathBuf::from(xdg).join("raul").join("keybinds.toml");
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            if !home.is_empty() {
+                return std::path::PathBuf::from(home)
+                    .join(".config")
+                    .join("raul")
+                    .join("keybinds.toml");
+            }
+        }
+        std::path::PathBuf::from(".config/raul/keybinds.toml")
+    }
+
+    /// Atomic reload: parse `path` into a candidate, and only swap
+    /// it in if the candidate has no fatal diagnostics. Fatal =
+    /// any `field` that names `path:<…>` (read errors) or any
+    /// malformed-value diagnostic that doesn't name a specific
+    /// recoverable field. Recoverable per-field diagnostics are
+    /// kept — they degrade the override, not the load.
+    ///
+    /// Returns the new effective `Keybinds`, the diagnostics
+    /// observed, and a `bool` indicating whether a swap occurred.
+    /// `false` means the previous map is preserved unchanged.
+    pub fn try_reload(&mut self, path: &std::path::Path) -> (Vec<Diagnostic>, bool) {
+        let (diags, candidate) = Self::load_from_path(path);
+        let fatal = diags
+            .iter()
+            .any(|d| d.field.starts_with("path:") || d.message.contains("unknown section"));
+        if fatal {
+            return (diags, false);
+        }
+        let previous = std::mem::replace(self, candidate);
+        // Re-emit recoverable diagnostics as warnings so the
+        // operator sees them on reload (they were silently
+        // accepted at file-load time).
+        let warnings: Vec<Diagnostic> = diags
+            .into_iter()
+            .filter(|d| !(d.field.starts_with("path:") || d.message.contains("unknown section")))
+            .collect();
+        let _ = previous;
+        (warnings, true)
+    }
+}
+
+/// M222: intermediate view of a `keybinds.toml` body — sections
+/// in declaration order, each with its raw lines. Per-section
+/// diagnostics (e.g. a malformed section header) are surfaced at
+/// tokenize time so `load_from_keybinds_toml` can stay focused on
+/// per-binding parsing.
+#[derive(Default, Debug)]
+struct KeybindsTomlSections {
+    sections: Vec<(String, Vec<String>)>,
+    diagnostics: Vec<Diagnostic>,
+}
+
+fn parse_keybinds_toml_sections(text: &str) -> KeybindsTomlSections {
+    let mut out = KeybindsTomlSections::default();
+    let mut current: Option<String> = None;
+    let mut current_lines: Vec<String> = Vec::new();
+    let mut flush_section = |out: &mut KeybindsTomlSections,
+                             current: &mut Option<String>,
+                             current_lines: &mut Vec<String>| {
+        if let Some(name) = current.take() {
+            out.sections.push((name, std::mem::take(current_lines)));
+        }
+    };
+    // Touch the closure type so it stays the same — it's a
+    // generic helper we invoke twice. The `mut` is required for
+    // the inner `take()` calls.
+    let _ = &mut flush_section;
+    for (lineno, raw) in text.lines().enumerate() {
+        let line = strip_toml_comment(raw).trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix('[') {
+            // Section header — flush the previous section first.
+            flush_section(&mut out, &mut current, &mut current_lines);
+            let (name, trailer) = match rest.find(']') {
+                Some(idx) => (&rest[..idx], rest[idx + 1..].trim()),
+                None => {
+                    out.diagnostics.push(Diagnostic {
+                        field: format!("section:{}", lineno + 1),
+                        message: format!("malformed section header: {raw:?}"),
+                    });
+                    current = None;
+                    current_lines.clear();
+                    continue;
+                }
+            };
+            if !trailer.is_empty() && !trailer.starts_with('#') {
+                out.diagnostics.push(Diagnostic {
+                    field: format!("section:{}", lineno + 1),
+                    message: format!("unexpected content after `]` in section header: {raw:?}"),
+                });
+            }
+            current = Some(name.trim().to_string());
+            current_lines.clear();
+            continue;
+        }
+        // Body line — accumulates into the current section. Lines
+        // before any section header are surfaced as a top-level
+        // diagnostic; they are not silently dropped.
+        match current.as_ref() {
+            None => {
+                out.diagnostics.push(Diagnostic {
+                    field: format!("line:{}", lineno + 1),
+                    message: format!("line outside any [section]: {raw:?}"),
+                });
+            }
+            Some(_) => current_lines.push(raw.to_string()),
+        }
+    }
+    flush_section(&mut out, &mut current, &mut current_lines);
+    out
 }
 
 /// One row of the help overlay / footer: a human label plus the formatted
