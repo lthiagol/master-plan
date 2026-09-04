@@ -3,9 +3,9 @@
     "id": "222",
     "title": "raul configurable keybinds via ~/.config/raul/keybinds.toml — TUI-wide keymap with sane defaults",
     "slug": "raul-configurable-keybinds-via-config-raul-keybinds-toml-tui-wide-keymap-with-sane-defaults",
-    "lifecycle": "executed",
+    "lifecycle": "remediation",
     "spec_status": "implemented",
-    "execution_status": "done",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -18,7 +18,7 @@
     "effort": "M",
     "risk": "medium",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-03",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -26,7 +26,8 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T03:05:24.924588+00:00",
+    "remediation_pre_state": "executed",
+    "lifecycle_at": "2026-09-04T03:11:28.903526+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -40,9 +41,17 @@
         "status": "done",
         "at": "2026-09-04T03:05:24.924590+00:00"
       },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T03:11:28.903527+00:00"
+      },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:01:32.350971+00:00"
+      },
+      "remediate": {
+        "status": "in_progress",
+        "at": "2026-09-04T03:11:28.903527+00:00"
       },
       "self-review": {
         "status": "done",
@@ -334,5 +343,63 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": ""
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "category": "production-wiring",
+      "description": "Production startup does not load the user-level keybinds.toml. runner.rs:409 calls Keybinds::load(runner), which reads only the legacy [keybinds] JSON via load_from_config. The M222 layered loader Keybinds::load_effective (keybinds.rs:1890) is library-only — no production caller. TOML applies only on SIGHUP (runner.rs:451) or Action::ReloadKeybinds (action.rs:926). Violates AC-01 ('At startup one shared Keybinds service loads global and per-lane overrides'), AC-08 ('user-level keybinds.toml overrides legacy project bindings'), and docs/raul/keybinds.md ('raul reads ~/.config/raul/keybinds.toml ... at startup').",
+      "status": "open",
+      "author": "reviewer-222",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/src/tui/runner.rs",
+        "new_range": {
+          "start_line": 409,
+          "end_line": 409
+        },
+        "side": "new"
+      },
+      "summary": "User-level ~/.config/raul/keybinds.toml is not loaded at startup",
+      "rationale": "AC-01 says 'At startup one shared Keybinds service loads global and per-lane overrides'; docs/raul/keybinds.md (lines 138-141) says 'raul reads ~/.config/raul/keybinds.toml ... at startup'; AC-08 says 'user-level keybinds.toml overrides legacy project bindings'. But the production startup path is runner.rs:409 -> Keybinds::load(runner), which only reads the legacy [keybinds] JSON section via load_from_config. The user-level TOML is loaded only inside the on_idle hook at runner.rs:450 when SIGHUP flips the flag, or via Action::ReloadKeybinds at action.rs:926. The M222 layered loader Keybinds::load_effective (keybinds.rs:1890) composes the three layers and IS unit-tested in tests/keybinds_v2.rs, but is never called from any production code path. Concretely: a fresh  then  works (SIGHUP loads TOML), but a cold start with ~/.config/raul/keybinds.toml present does NOT apply the override until the user SIGHUPs or triggers the explicit reload action. M225/M226 lesson applies: the override is unit-tested in isolation (10/10 keybind_action_registry, 21/21 keybinds_v2) but not wired into production startup. Fix: change Keybinds::load to read the TOML from Self::default_path() after the JSON step (or wrap with load_effective), then assign the layered result to app.keybinds at runner.rs:409. Add an integration test that writes ~/.config/raul/keybinds.toml, calls Keybinds::load (or runs the startup sequence), and asserts the override applies.",
+      "confidence": "high",
+      "tags": [
+        "spec-gap",
+        "wiring",
+        "m225/m226",
+        "production"
+      ]
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "category": "production-wiring",
+      "description": "Settings lane does not render the new KeybindsView. Keybinds::view() and KeybindsView are defined (keybinds.rs:1356, 2248) but never called from any renderer. render_settings_lane (render/overlays.rs:358) renders only the legacy [keybinds] JSON config surface. AC-05 ('Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance') is library-tested only.",
+      "status": "open",
+      "author": "reviewer-222",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/raul/src/tui/keybinds.rs",
+        "new_range": {
+          "start_line": 1356,
+          "end_line": 1356
+        },
+        "side": "new"
+      },
+      "summary": "Settings view does not render the effective keymap / TOML path",
+      "rationale": "AC-05 says 'Settings renders the effective global and per-lane map, marks overridden versus default bindings, and states the external TOML path; it provides no in-app editing affordance.' But Keybinds::view() and KeybindsView (keybinds.rs:1356, 2248) are library-only — no renderer calls them. The production Settings lane is render_settings_lane (render/overlays.rs:358), which renders the legacy [keybinds] JSON config surface via state.schema + flat_key (modes/settings.rs:16) + keybind_default_label (modes/settings.rs:208). No row shows 'effective vs default', no override marker, no TOML path string. The Autopilot lane's [autopilot] actions are not in SETTINGS_KEYS at all. The 7/7 settings_keybind_view tests pass at the library level (Keybinds::view() returns correct rows) but the renderer never invokes view(). M225/M226 lesson applies. Fix: thread app.keybinds.view() into render_settings_lane (or a sibling renderer) so the operator sees the effective map with override markers and the TOML path; remove the [keybinds] JSON rows from SETTINGS_KEYS (or keep both — but the TOML view must be reachable). Add an integration test that renders the Settings lane after a keybinds.toml override and asserts the F1 row is marked overridden and the TOML path is visible.",
+      "confidence": "high",
+      "tags": [
+        "spec-gap",
+        "wiring",
+        "m225/m226",
+        "production"
+      ]
+    }
+  ]
 }
