@@ -1333,6 +1333,130 @@ impl Keybinds {
         entries
     }
 
+    /// M222: produce the read-only Settings keymap view.
+    ///
+    /// Each row carries:
+    ///   * `section` — `"global"` or `"autopilot"` (per-lane
+    ///     sections come when more lanes land)
+    ///   * `action` — the canonical action name (matching
+    ///     `Keybinds::global_action_names()` /
+    ///     `Keybinds::autopilot_action_names()`)
+    ///   * `default_combo` — the hardcoded default (always
+    ///     populated; an empty default would be a hole)
+    ///   * `effective_combo` — the current binding (which may be
+    ///     user-overridden)
+    ///   * `overridden` — `true` iff `effective != default`
+    ///
+    /// The view also surfaces the canonical user-level TOML path
+    /// so the Settings UI can tell the operator where to place
+    /// overrides. The view is intentionally read-only: no
+    /// in-app editing surface here, the operator edits the
+    /// TOML file outside raul and reloads (SIGHUP or
+    /// `Action::ReloadKeybinds`).
+    pub fn view(&self) -> KeybindsView {
+        let defaults = Self::default();
+        let mut rows = Vec::new();
+        // Globals first — matches the resolution order of
+        // `Keybinds::resolve`.
+        for name in Self::global_action_names() {
+            let effective = Self::extract_global(&self, name)
+                .cloned()
+                .unwrap_or_default();
+            let default = Self::extract_global(&defaults, name)
+                .cloned()
+                .unwrap_or_default();
+            rows.push(KeybindsViewRow {
+                section: "global",
+                action: name,
+                default_combo: combos_to_string(&default),
+                effective_combo: combos_to_string(&effective),
+                overridden: effective != default,
+            });
+        }
+        for name in Self::autopilot_action_names() {
+            let (eff, def) = match *name {
+                "select" => (
+                    self.lane_autopilot.select.clone(),
+                    defaults.lane_autopilot.select.clone(),
+                ),
+                "move_picker_up" => (
+                    self.lane_autopilot.move_picker_up.clone(),
+                    defaults.lane_autopilot.move_picker_up.clone(),
+                ),
+                "move_picker_down" => (
+                    self.lane_autopilot.move_picker_down.clone(),
+                    defaults.lane_autopilot.move_picker_down.clone(),
+                ),
+                "toggle_panel" => (
+                    self.lane_autopilot.toggle_panel.clone(),
+                    defaults.lane_autopilot.toggle_panel.clone(),
+                ),
+                "start" => (
+                    self.lane_autopilot.start.clone(),
+                    defaults.lane_autopilot.start.clone(),
+                ),
+                "replay" => (
+                    self.lane_autopilot.replay.clone(),
+                    defaults.lane_autopilot.replay.clone(),
+                ),
+                "close" => (
+                    self.lane_autopilot.close.clone(),
+                    defaults.lane_autopilot.close.clone(),
+                ),
+                _ => (Vec::new(), Vec::new()),
+            };
+            rows.push(KeybindsViewRow {
+                section: "autopilot",
+                action: name,
+                default_combo: combos_to_string(&def),
+                effective_combo: combos_to_string(&eff),
+                overridden: eff != def,
+            });
+        }
+        KeybindsView {
+            rows,
+            toml_path: Self::default_path(),
+        }
+    }
+
+    /// Helper for `view`: fetch the global slot by name. Returns
+    /// `None` for unknown names so the caller can no-op instead
+    /// of crashing.
+    fn extract_global<'a>(kb: &'a Keybinds, name: &str) -> Option<&'a Vec<KeyCombo>> {
+        match name {
+            "quit" => Some(&kb.quit),
+            "up" => Some(&kb.up),
+            "down" => Some(&kb.down),
+            "page_up" => Some(&kb.page_up),
+            "page_down" => Some(&kb.page_down),
+            "enter" => Some(&kb.enter),
+            "escape" => Some(&kb.escape),
+            "help" => Some(&kb.help),
+            "filter" => Some(&kb.filter),
+            "hide_done" => Some(&kb.hide_done),
+            "create_annotation" => Some(&kb.create_annotation),
+            "resolve" => Some(&kb.resolve),
+            "reopen" => Some(&kb.reopen),
+            "approve" => Some(&kb.approve),
+            "review_menu" => Some(&kb.review_menu),
+            "open_settings" => Some(&kb.open_settings),
+            "previous_lane" => Some(&kb.previous_lane),
+            "next_lane" => Some(&kb.next_lane),
+            "focus_content" => Some(&kb.focus_content),
+            "refresh" => Some(&kb.refresh),
+            "next_section" => Some(&kb.next_section),
+            "prev_section" => Some(&kb.prev_section),
+            "next_item" => Some(&kb.next_item),
+            "prev_item" => Some(&kb.prev_item),
+            "lifecycle_filter" => Some(&kb.lifecycle_filter),
+            "grooming_preset" => Some(&kb.grooming_preset),
+            "search" => Some(&kb.search),
+            "cycle_sort" => Some(&kb.cycle_sort),
+            "clear_filters" => Some(&kb.clear_filters),
+            _ => None,
+        }
+    }
+
     // ---- M222: user-level keybinds.toml surface ---------------------
     //
     // The TOML shape is:
@@ -1898,6 +2022,47 @@ fn parse_keybinds_toml_sections(text: &str) -> KeybindsTomlSections {
     }
     flush_section(&mut out, &mut current, &mut current_lines);
     out
+}
+
+/// M222: read-only Settings keymap view. Built by
+/// [`Keybinds::view`]. The Settings UI iterates `rows` to draw
+/// the binding map; `toml_path` is surfaced as the external
+/// file the operator edits to change overrides.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindsView {
+    pub rows: Vec<KeybindsViewRow>,
+    pub toml_path: std::path::PathBuf,
+}
+
+impl KeybindsView {
+    /// Number of bindings currently overridden versus their
+    /// hardcoded default.
+    pub fn overridden_count(&self) -> usize {
+        self.rows.iter().filter(|r| r.overridden).count()
+    }
+}
+
+/// M222: a single row in the [`KeybindsView`]. `effective` may
+/// differ from `default` if the operator has set a TOML
+/// override.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindsViewRow {
+    pub section: &'static str,
+    pub action: &'static str,
+    pub default_combo: String,
+    pub effective_combo: String,
+    pub overridden: bool,
+}
+
+/// Format a slice of combo tuples as a human-readable string
+/// like `Ctrl+x, Tab`. Used by [`Keybinds::view`] so the
+/// Settings keymap never produces an unreachable glyph.
+fn combos_to_string(combos: &[KeyCombo]) -> String {
+    combos
+        .iter()
+        .map(|c| format_key_combo(*c))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// One row of the help overlay / footer: a human label plus the formatted
