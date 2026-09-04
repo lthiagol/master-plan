@@ -407,60 +407,6 @@ pub enum Commands {
         #[command(subcommand)]
         cmd: ScratchCmd,
     },
-    /// M149: drive one or more milestones through their lifecycle
-    /// automatically by spawning runner/coordinator agents via herdr.
-    /// Processes milestones sequentially; same runner and coordinator
-    /// panes are reused across milestones. Use `--dry-run` to preview
-    /// the execution plan without spawning agents or modifying
-    /// `plan.json`.
-    Watch {
-        /// One or more milestone IDs to process (e.g. `135` or `M135`).
-        /// Processed sequentially in the order given.
-        ids: Vec<String>,
-        /// Print the execution plan (milestone states, next actions,
-        /// herdr commands) without modifying `plan.json` or spawning
-        /// any agents.
-        #[arg(long)]
-        dry_run: bool,
-        /// Override the structured-log path (default:
-        /// `<plan_dir>/.mp/watch.log`).
-        #[arg(long)]
-        log_file: Option<std::path::PathBuf>,
-        /// Max milliseconds the lifecycle poll waits before flagging
-        /// the agent as hung. Default: 1_800_000 (30 min). Lower in
-        /// tests to bail fast when a fake agent can't advance the
-        /// milestone.
-        #[arg(long)]
-        stall_timeout_ms: Option<u64>,
-        /// Lifecycle poll interval in milliseconds. Default: 1000.
-        #[arg(long)]
-        poll_interval_ms: Option<u64>,
-        /// M152 / AC-02: re-attach to any herdr role panes that
-        /// already exist for the active milestones. The crash /
-        /// SIGINT recovery path: a previous `mp watch` was
-        /// interrupted, the panes are still alive in herdr, this
-        /// resume run picks them up instead of double-spawning.
-        #[arg(long, conflicts_with = "force")]
-        resume: bool,
-        /// M152 / AC-03: bypass the double-spawn guard. The default
-        /// (`mp watch` without `--resume` or `--force`) refuses to
-        /// run when role panes already exist for the active
-        /// milestones; `--force` opts in to ignoring that check.
-        /// Once past the gate, `--force` behaves identically to
-        /// `--resume` — the existing panes are reused, not killed
-        /// and re-spawned. To start with fresh panes, kill them
-        /// manually first (e.g. via the herdr CLI) and re-run
-        /// without `--resume` / `--force`.
-        #[arg(long, conflicts_with = "resume")]
-        force: bool,
-        /// M178 S3 / AC-02: detach-safe mode. The starting client
-        /// exits as soon as the state file is persisted; the actual
-        /// driver runs detached and is re-discoverable through
-        /// `mp watch-control status`. Default: foreground (blocks
-        /// until the run terminates).
-        #[arg(long)]
-        detach: bool,
-    },
     /// M173 S3: walk the clap Command tree and emit markdown tables for
     /// each command group under `docs/concepts/06 - Reference/generated/`.
     /// The generator covers description, usage, options, and
@@ -491,14 +437,6 @@ pub enum Commands {
     Review {
         #[command(subcommand)]
         cmd: ReviewCmd,
-    },
-    /// M178 S3: structured watch control-plane subcommands. The
-    /// foreground `mp watch <ids...>` invocation stays under
-    /// [`Commands::Watch`] for backcompat; `mp watch-control status|stop|output`
-    /// are the new machine-client read surface.
-    WatchControl {
-        #[command(subcommand)]
-        cmd: WatchControlCmd,
     },
     /// M229 / AC-01: breaking-release cleanup gate.
     ///
@@ -559,73 +497,6 @@ pub enum ReviewCmd {
         /// Path to write the sidecar JSON to. Required.
         #[arg(long)]
         output: std::path::PathBuf,
-    },
-}
-
-/// M178 S3 / S4 / S5 / S7 / S8: subcommands under `mp watch-control`.
-///
-/// `mp watch <ids...>` keeps being the foreground driver (and the new
-/// `--detach` flag makes it survive the starting client exiting); the
-/// `mp watch-control *` verbs are the structured control-plane surface
-/// clients use to inspect and stop the latest run.
-///
-/// Verb ownership:
-/// - `status`  — AC-01, AC-03: classify latest-run state, read the
-///   v2 control-plane fields (live / stale / terminal).
-/// - `stop`    — AC-04: graceful stop via SIGINT to the recorded PID.
-/// - `output`  — AC-05: bounded structured output from the active pane.
-/// - `result`  — AC-06: read the latest terminal outcome (per-milestone
-///   log + run_outcome).
-#[derive(Subcommand, Debug)]
-pub enum WatchControlCmd {
-    /// AC-01: read the latest-run control-plane state (queue, active
-    /// milestone, lifecycle, stage, target, role, pane ids, log path,
-    /// timestamps, run outcome, milestone outcomes).
-    Status {
-        /// Run classification only (live/stale/terminal + pid_alive).
-        /// Suppresses the full v2 state payload. Default false.
-        #[arg(long)]
-        summary: bool,
-    },
-    /// AC-04: gracefully stop the recorded live watch by signaling
-    /// its PID. No-op (stable response) when no live run exists.
-    Stop {
-        /// Override the recorded PID; useful when the state file is
-        /// missing but a known PID should still be signaled. Defaults
-        /// to the recorded PID from the latest state file.
-        #[arg(long)]
-        pid: Option<u32>,
-        /// Max seconds to wait for the process to exit before giving
-        /// up. Default 30s.
-        #[arg(long, default_value_t = 30)]
-        timeout_secs: u64,
-    },
-    /// AC-05: read bounded, structured output from the active herdr
-    /// pane (current stage's role).
-    Output {
-        /// Max bytes to read from the pane. Default 4096.
-        #[arg(long, default_value_t = 4096)]
-        max_bytes: usize,
-        /// Max milliseconds to wait for the herdr subprocess to
-        /// produce output. Default 5000ms.
-        #[arg(long, default_value_t = 5_000)]
-        timeout_ms: u64,
-        /// Override the role to read from; default is the recorded
-        /// `active_role` from the state file (the current stage's
-        /// role). Accepts `runner` or `coordinator`.
-        #[arg(long)]
-        role: Option<String>,
-    },
-    /// AC-06: read the latest terminal outcome (run_outcome + per
-    /// milestone outcome log). Distinct from `status` in that it
-    /// never observes a live run — it returns the most-recent
-    /// terminal result and `null` when the only run on record is
-    /// still in flight.
-    Result {
-        /// Always read the on-disk file; do not consult any cached
-        /// state from this process. Default false.
-        #[arg(long)]
-        force: bool,
     },
 }
 

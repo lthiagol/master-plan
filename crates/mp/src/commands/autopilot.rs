@@ -74,91 +74,13 @@ pub(crate) fn cmd_autopilot(
             AutopilotNoteCmd::Add(args) => cmd_autopilot_note_add(ctx, args, format, fields),
         },
         AutopilotCmd::Config { cmd } => cmd_autopilot_config(ctx, cmd, format, fields),
-        AutopilotCmd::Migrate { dry_run } => cmd_autopilot_migrate(ctx, dry_run, format),
     }
 }
 
-/// M208 / S4: dispatch for `mp autopilot migrate [--dry-run]`.
-/// Surface the typed migration outcome as JSON. The dry-run variant
-/// inspects the legacy file and reports counts without writing; the
-/// real run applies the migration idempotently.
-fn cmd_autopilot_migrate(
-    ctx: &PlanContext,
-    dry_run: bool,
-    format: crate::cli::OutputFormat,
-) -> Result<()> {
-    use crate::autopilot::migrate;
-    let source_path = crate::autopilot::drive::default_state_path(&ctx.plan_dir);
-    if dry_run {
-        if !source_path.exists() {
-            return emit(
-                format,
-                &json!({
-                    "ok": true,
-                    "dry_run": true,
-                    "outcome": crate::autopilot::MigrationOutcome::NoLegacyState { source_path },
-                }),
-            );
-        }
-        // Inspect the legacy file without writing.
-        let raw = std::fs::read(&source_path)
-            .with_context(|| format!("read legacy watch state at {}", source_path.display()))?;
-        let state: crate::autopilot::drive::state::WatchState = serde_json::from_slice(&raw)
-            .with_context(|| format!("parse legacy watch state at {}", source_path.display()))?;
-        return emit(
-            format,
-            &json!({
-                "ok": true,
-                "dry_run": true,
-                "outcome": {
-                    "kind": "would_migrate",
-                    "source_path": source_path,
-                    "milestones": state.milestones.len(),
-                    "panes": state.panes.len(),
-                    "schema_version": state.schema_version,
-                },
-            }),
-        );
-    }
-
-    let outcome = match migrate::migrate_legacy_watch_state(ctx) {
-        Ok(o) => o,
-        Err(migrate::MigrationError::CorruptSource { path, reason }) => {
-            bail!(
-                "legacy watch state at {} is corrupt: {}",
-                path.display(),
-                reason
-            )
-        }
-        Err(migrate::MigrationError::UnknownLegacySchema {
-            path,
-            found,
-            expected,
-        }) => bail!(
-            "unknown legacy schema version {found} in {} (expected {expected})",
-            path.display()
-        ),
-        Err(migrate::MigrationError::MigratedSessionInvalid(s)) => {
-            bail!("migration produced an invalid session: {s}")
-        }
-        Err(migrate::MigrationError::Refused(s)) => bail!("migration refused: {s}"),
-    };
-    emit(
-        format,
-        &json!({
-            "ok": true,
-            "dry_run": false,
-            "outcome": outcome,
-        }),
-    )
-}
-
-/// M208: `mp autopilot start [IDS]...` dispatches to the same internal
-/// `cmd_watch` that powers `mp watch`. The legacy `mp watch` alias is
-/// a thin wrapper around this function (with a deprecation notice on
-/// stderr). AC-02 contract: identical exit codes + stdout; the only
-/// permitted difference between `mp watch` and `mp autopilot start`
-/// is the single legacy deprecation line on `mp watch` stderr.
+/// M208: `mp autopilot start [IDS]...` is the canonical entry point for
+/// driving milestones. M229 removed the legacy `mp watch` alias and
+/// the `mp autopilot migrate` shim; this verb is the only path to the
+/// autopilot drive engine.
 pub(crate) fn cmd_autopilot_start(
     ctx: &PlanContext,
     args: AutopilotStartArgs,
@@ -184,18 +106,6 @@ fn cmd_autopilot_session(
     format: crate::cli::OutputFormat,
     fields: &[String],
 ) -> Result<()> {
-    // M208 / S3: before answering, attempt the legacy watch-state
-    // migration if it has not already happened. The migration is
-    // idempotent and best-effort — a failure here surfaces as an
-    // empty session list, not a hard error, so a user who has no
-    // legacy state (the common case) sees a clean response. Once
-    // an autopilot session exists, the migration is a no-op.
-    //
-    // The migration error type intentionally does not propagate so a
-    // corrupt legacy file does not block the session list view; the
-    // operator can run `mp autopilot migrate` to see the typed
-    // diagnostic. S4 makes that command visible.
-    drop(autopilot::migrate_legacy_watch_state(ctx));
     match cmd {
         AutopilotSessionCmd::List => {
             let list = autopilot::list_sessions(ctx)?;

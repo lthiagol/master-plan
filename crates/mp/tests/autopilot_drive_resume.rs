@@ -239,21 +239,25 @@ fn M152_watch_resume_test_file_pins_invariants() {
 }
 
 #[test]
-fn watch_help_lists_resume_and_force_flags() {
-    // The new CLI flags must surface in `mp watch --help`. This is
-    // the user-facing contract: a user who types `mp watch --help`
-    // must learn that `--resume` and `--force` exist.
+fn autopilot_start_help_lists_resume_and_force_flags() {
+    // M229: the canonical surface is `mp autopilot start`. The new
+    // CLI flags must surface in `mp autopilot start --help`. This
+    // is the user-facing contract: a user who types `mp autopilot
+    // start --help` must learn that `--resume` and `--force` exist.
     let env = TestEnv::new();
-    let out = env.run(&["watch", "--help"]);
-    assert!(out.status.success(), "mp watch --help must succeed");
+    let out = env.run(&["autopilot", "start", "--help"]);
+    assert!(
+        out.status.success(),
+        "mp autopilot start --help must succeed"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("--resume"),
-        "--resume flag missing from mp watch --help: {stdout}"
+        "--resume flag missing from mp autopilot start --help: {stdout}"
     );
     assert!(
         stdout.contains("--force"),
-        "--force flag missing from mp watch --help: {stdout}"
+        "--force flag missing from mp autopilot start --help: {stdout}"
     );
 }
 

@@ -247,7 +247,7 @@ fn write_shutdown_state_for_test_seeds_state_file() {
 }
 
 #[test]
-fn real_sigint_during_watch_run_exits_zero_and_flushes_state() {
+fn real_sigint_during_autopilot_run_exits_zero_and_flushes_state() {
     // Drive the headline M152 S4 / AC-04 contract: a real
     // SIGINT during `mp watch` causes exit code 0 (not the
     // usual failure 2) AND flushes `.mp/watch.state.json` so
@@ -285,7 +285,8 @@ fn real_sigint_during_watch_run_exits_zero_and_flushes_state() {
         .env("MP_HOME", common::repo_root())
         .env("MP_INSTALL_DIR", env.tmp.path().join("install-target"))
         .args([
-            "watch",
+            "autopilot",
+            "start",
             &id,
             "--format",
             "json",

@@ -102,13 +102,17 @@ fn autopilot_start_refuses_when_herdr_absent_with_install_hint_and_exit_78() {
 
 #[test]
 fn watch_legacy_alias_refuses_when_herdr_absent() {
-    // AC-03 parity: the legacy `mp watch` command shares the same
-    // gate as `mp autopilot start`. This test pins the shared-path
-    // contract from the autopilot-side entry; the parity is also
-    // exercised by `autopilot_gate_shared_with_watch`.
+    // M229: the legacy `mp watch` alias was removed by the
+    // breaking-release cleanup. This test now exercises the
+    // canonical autopilot path; the parity contract that used to
+    // span the legacy alias now lives in the surrounding tests
+    // (`autopilot_start_refuses_when_herdr_absent_*`).
     let env = TestEnv::new();
     let path = path_without_herdr();
-    let out = env.run_with_env(&[("PATH", &path)], &["watch", "--format", "json"]);
+    let out = env.run_with_env(
+        &[("PATH", &path)],
+        &["autopilot", "start", "--format", "json"],
+    );
 
     assert_eq!(
         out.status.code(),

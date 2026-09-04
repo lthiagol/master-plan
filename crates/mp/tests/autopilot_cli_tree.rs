@@ -55,26 +55,42 @@ fn autopilot_help_describes_start_as_replacement_for_watch() {
 }
 
 #[test]
-fn autopilot_help_status_replaces_watch_control_status() {
+fn autopilot_help_status_describes_control_plane() {
+    // M229: the legacy `mp watch-control status` was removed by the
+    // breaking-release cleanup. The canonical `mp autopilot status`
+    // verb must describe its control-plane read contract without
+    // referencing the removed alias.
     let env = TestEnv::new();
     let help = help_stdout(&env, &["autopilot", "--help"]);
     let status_idx = help.find("status").expect("status verb listed");
     let snippet = &help[status_idx..];
     assert!(
-        snippet.contains("watch") || snippet.contains("control"),
-        "status verb description should advertise itself as the replacement for `mp watch-control status`"
+        snippet.contains("control")
+            || snippet.contains("queue")
+            || snippet.contains("lifecycle")
+            || snippet.contains("state"),
+        "status verb description should advertise its control-plane read contract: {snippet}"
     );
 }
 
 #[test]
-fn autopilot_help_stop_replaces_watch_control_stop() {
+fn autopilot_help_stop_describes_graceful_signal() {
+    // M229: the legacy `mp watch-control stop` was removed by the
+    // breaking-release cleanup. The canonical `mp autopilot stop`
+    // verb must still describe its graceful-signal contract — a
+    // SIGINT to the recorded PID. The pre-M229 wording referenced
+    // the removed alias; the canonical surface is described here
+    // without it.
     let env = TestEnv::new();
     let help = help_stdout(&env, &["autopilot", "--help"]);
     let stop_idx = help.find("stop").expect("stop verb listed");
     let snippet = &help[stop_idx..];
     assert!(
-        snippet.contains("watch") || snippet.contains("control"),
-        "stop verb description should advertise itself as the replacement for `mp watch-control stop`"
+        snippet.contains("graceful")
+            || snippet.contains("signal")
+            || snippet.contains("PID")
+            || snippet.contains("pid"),
+        "stop verb description should advertise the graceful-signal contract: {snippet}"
     );
 }
 

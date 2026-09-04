@@ -37,7 +37,7 @@ fn inject_unknown_harness(env: &TestEnv, role: &str, name: &str) {
 }
 
 #[test]
-fn watch_with_unknown_runner_harness_exits_non_zero_with_install_hint() {
+fn autopilot_start_with_unknown_runner_harness_exits_non_zero_with_install_hint() {
     let env = TestEnv::new();
     // Seed a valid coordinator so the runner check is the only
     // failure mode; a future regression that accidentally
@@ -47,7 +47,7 @@ fn watch_with_unknown_runner_harness_exits_non_zero_with_install_hint() {
 
     inject_unknown_harness(&env, "runner", "claude");
 
-    let out = env.run(&["watch", "151", "--format", "json"]);
+    let out = env.run(&["autopilot", "start", "151", "--format", "json"]);
     assert!(
         !out.status.success(),
         "watch with unknown harness must exit non-zero: stdout={}",
@@ -93,13 +93,13 @@ fn watch_with_unknown_runner_harness_exits_non_zero_with_install_hint() {
 }
 
 #[test]
-fn watch_with_unknown_coordinator_harness_surfaces_install_hint() {
+fn autopilot_start_with_unknown_coordinator_harness_surfaces_install_hint() {
     let env = TestEnv::new();
     env.run(&["config", "set", "agent.runner.harness", "opencode"]);
     env.run(&["config", "set", "agent.coordinator.harness", "opencode"]);
     inject_unknown_harness(&env, "coordinator", "aider");
 
-    let out = env.run(&["watch", "151", "--format", "json"]);
+    let out = env.run(&["autopilot", "start", "151", "--format", "json"]);
     assert!(
         !out.status.success(),
         "watch with bad coordinator harness must exit non-zero"
@@ -116,7 +116,7 @@ fn watch_with_unknown_coordinator_harness_surfaces_install_hint() {
 }
 
 #[test]
-fn watch_with_unknown_harness_never_panics_or_hangs() {
+fn autopilot_start_with_unknown_harness_never_panics_or_hangs() {
     // A truly pathological harness value — empty string — must
     // still produce a structured precondition failure, not a
     // panic or stack overflow. This guards the registry's
@@ -126,7 +126,7 @@ fn watch_with_unknown_harness_never_panics_or_hangs() {
     env.run(&["config", "set", "agent.coordinator.harness", "opencode"]);
     inject_unknown_harness(&env, "runner", "");
 
-    let out = env.run(&["watch", "151", "--format", "json"]);
+    let out = env.run(&["autopilot", "start", "151", "--format", "json"]);
     assert!(
         !out.status.success(),
         "watch with empty harness string must fail gracefully"

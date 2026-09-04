@@ -17,21 +17,24 @@
 //! mp autopilot config set <key> <value> [--dry-run]
 //! ```
 //!
-//! M208: `start` is the new home of `mp watch <ids...>`; the legacy
-//! `mp watch` command is kept as a deprecation alias that prints a
-//! single notice on stderr and walks the same code path.
+//! M229: the legacy `mp watch` and `mp watch-control` aliases plus
+//! the `mp autopilot migrate` shim were removed by the breaking-
+//! release cleanup. `mp autopilot start` is the canonical entry
+//! point for driving milestones; `mp autopilot status|stop|output|
+//! result` replace `mp watch-control *`.
 
 use clap::{Args, Subcommand};
 
 #[derive(Subcommand, Debug)]
 pub enum AutopilotCmd {
     /// M208: drive one or more milestones through their lifecycle.
-    /// Replaces `mp watch <ids...>` — same args, same exit codes, same
-    /// JSON output. Use `--dry-run` to preview without spawning agents.
+    /// Replaces the removed `mp watch <ids...>` — same args, same exit codes,
+    /// same JSON output. Use `--dry-run` to preview without spawning agents.
     Start(AutopilotStartArgs),
     /// M208: read the latest autopilot run's control-plane state
     /// (queue, active milestone, lifecycle, stage, target, role, pane
-    /// ids, log path, run outcome). Replaces `mp watch-control status`.
+    /// ids, log path, run outcome). Replaces the removed
+    /// `mp watch-control status`.
     Status {
         /// Summary only (classification + pid_alive). Default false.
         #[arg(long)]
@@ -86,15 +89,6 @@ pub enum AutopilotCmd {
     Config {
         #[command(subcommand)]
         cmd: AutopilotConfigCmd,
-    },
-    /// M208 / S4: migrate the legacy `mp watch` state file
-    /// (`.mp/watch.state.json`) into the autopilot session schema.
-    /// Idempotent — re-running on a project that already has the
-    /// migrated session is a no-op.
-    Migrate {
-        /// Preview without writing. Default false.
-        #[arg(long)]
-        dry_run: bool,
     },
 }
 

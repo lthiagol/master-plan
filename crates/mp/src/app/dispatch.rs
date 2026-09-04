@@ -40,7 +40,6 @@ use crate::commands::status as cmd_status_mod;
 use crate::commands::sync as cmd_sync_mod;
 use crate::commands::track as cmd_track_mod;
 use crate::commands::validate as cmd_validate_mod;
-use crate::commands::watch as cmd_watch_mod;
 use crate::digest::DigestOptions;
 use crate::hygiene;
 use crate::inbox;
@@ -358,38 +357,6 @@ pub(super) fn run(cli: Cli) -> Result<()> {
             cmd_git_mod::cmd_git(&ctx, cmd, format)
         }
         Commands::Scratch { cmd } => cmd_scratch_mod::cmd_scratch(&ctx, cmd, format, fields),
-        Commands::Watch {
-            ids,
-            dry_run,
-            log_file,
-            stall_timeout_ms,
-            poll_interval_ms,
-            resume,
-            force,
-            detach,
-        } => {
-            // M219: emit the canonical deprecation notice on stderr
-            // before any other work, so the warning fires for every
-            // legacy `mp watch` invocation regardless of plan state.
-            // The legacy `mp watch` walks the same code path as
-            // `mp autopilot start`, so exit codes and stdout remain
-            // identical; the only difference is the single deprecation
-            // line below. Wording is pinned by AC-03 byte-for-byte.
-            eprintln!("mp watch is deprecated; use 'mp autopilot' instead.");
-            ctx.ensure_plan_exists()?;
-            cmd_watch_mod::cmd_watch(
-                &ctx,
-                ids,
-                dry_run,
-                log_file,
-                stall_timeout_ms,
-                poll_interval_ms,
-                resume,
-                force,
-                detach,
-                format,
-            )
-        }
         Commands::Docgen { out, group } => {
             // docgen doesn't need a plan; it's a CLI-shape tool.
             cmd_docgen_mod::cmd_docgen(&ctx, out.as_deref(), group.as_deref(), format, fields)
@@ -411,7 +378,6 @@ pub(super) fn run(cli: Cli) -> Result<()> {
                 ),
             }
         }
-        Commands::WatchControl { cmd } => super::watch_control::run(&ctx, cmd, format, fields),
         Commands::BreakingRelease { cmd } => {
             ctx.ensure_plan_exists()?;
             cmd_breaking_release_mod::cmd_breaking_release(&ctx, cmd, format)

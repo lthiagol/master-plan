@@ -73,7 +73,6 @@ pub mod events;
 pub mod gate;
 pub mod lifecycle;
 pub mod list;
-pub mod migrate;
 pub mod notes;
 pub mod prompts;
 pub mod reconcile;
@@ -116,10 +115,6 @@ pub use lifecycle::{
     LIFECYCLE_TRANSITION_ORDER,
 };
 pub use list::{list_sessions, SessionListEntry};
-pub use migrate::{
-    migrate_legacy_watch_state, write_legacy_for_tests, MigrationError, MigrationOutcome,
-    MIGRATED_SESSION_ID,
-};
 pub use notes::{build_note, derive_cycle, NoteError, NoteKind, RunnerNote};
 pub use reconcile::{
     classify_pane_loss, cross_check_canonical, last_durable_seq, recover_event_tail,
