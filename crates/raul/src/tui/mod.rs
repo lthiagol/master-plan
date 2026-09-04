@@ -1,5 +1,6 @@
 pub mod action;
 pub mod app;
+pub mod autopilot;
 pub mod dashboard;
 pub mod flash_message;
 pub mod humanize;
