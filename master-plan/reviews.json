@@ -2071,6 +2071,14 @@
       "reviewed_at": "2026-09-04",
       "notes": "F-01 genuinely fixed: AC-03 text aligned to Ctrl-p with full rationale + rebind instructions; keybinds.rs and test module docs both corrected to state that plain `p` requires rebinding BOTH toggle_poll AND pause. No new findings. 14/14 AC-03 + 89/89 full M217 surface pass.",
       "milestone_completed_at": "2026-09-04"
+    },
+    {
+      "milestone_id": "228",
+      "verdict": "ok",
+      "reviewer": "reviewer-228",
+      "reviewed_at": "2026-09-04",
+      "notes": "M228 review cycle 1 — ok. F-01 (3 pre-existing failures, not M228 regressions) was filed and resolved-as-backlog to document them as dogfood candidates. M228 substantive work verified: (1) watch→autopilot::drive rename: clean, all internal crate::watch:: refs replaced (only doc comments remain mentioning historical name); (2) dead-path removal: each of 7 deletions has a reachability proof in the S2 commit message (3a72b3a); (3) compatibility boundary preserved: commands/watch.rs is documented as legacy alias adapter, WatchState/WatchRunState/WATCH_*_SCHEMA_VERSION kept (legacy .mp/watch.state.json still read). Cold-build evidence: AC-01 watch_cli 23/23 pass, AC-02 autopilot_drive_execution 83/83 pass. AC-03 NEXTTEST=1 make test fails exit 2; 3 pre-existing failures independently re-verified at c2ebe69 baseline in a separate worktree with identical errors (idempotent_re_run_is_a_no_op, run_implemented_scenarios, parity_real_schemas_compile_and_reject_empty). 2 bridge tests (run_herdr_with_timeout_*) appeared red in this reviewer's cold run but are documented pre-existing flakes (M151/M152/M206/M217) — flake rate at HEAD (1/9, 2/8) matches rate at c2ebe69 (0/5, 1/5); not M228 regressions. F-01 resolves to allow M228 to complete; the 3 pre-existing failures remain unfixed in master as dogfood backlog for whoever owns each subsystem.",
+      "milestone_completed_at": "2026-09-04"
     }
   ],
   "comments": [

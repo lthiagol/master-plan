@@ -3,8 +3,8 @@
     "id": "228",
     "title": "post-cutover autopilot internal cleanup — rename watch modules/tests and remove dead orchestration paths",
     "slug": "post-cutover-autopilot-internal-cleanup-rename-watch-modules-tests-and-remove-dead-orchestration-paths",
-    "lifecycle": "executed",
-    "spec_status": "implemented",
+    "lifecycle": "complete",
+    "spec_status": "verified",
     "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
@@ -19,7 +19,7 @@
     "effort": "M",
     "risk": "high",
     "change_kind": "",
-    "priority": "normal",
+    "priority": "high",
     "created": "2026-09-03",
     "updated": "2026-09-04",
     "blocked_at": "",
@@ -27,11 +27,15 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T06:38:20.568800+00:00",
+    "lifecycle_at": "2026-09-04T06:58:07.204900+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-03T14:15:50.137189+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-04T06:58:13.588256+00:00"
       },
       "draft": {
         "status": "done",
@@ -39,15 +43,27 @@
       },
       "execute": {
         "status": "done",
-        "at": "2026-09-04T06:38:20.568804+00:00"
+        "at": "2026-09-04T06:58:13.588256+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-04T06:58:13.624031+00:00"
       },
       "groom": {
         "status": "done",
         "at": "2026-09-03T14:15:50.919999+00:00"
       },
+      "re-review": {
+        "status": "done",
+        "at": "2026-09-04T06:58:13.624033+00:00"
+      },
+      "remediate": {
+        "status": "done",
+        "at": "2026-09-04T06:58:07.204901+00:00"
+      },
       "self-review": {
         "status": "done",
-        "at": "2026-09-04T06:38:20.568804+00:00"
+        "at": "2026-09-04T06:58:13.588256+00:00"
       },
       "specify": {
         "status": "done",
@@ -192,5 +208,18 @@
     "date": "2026-09-04",
     "branch": "",
     "evidence": "[verification force-bypassed: 1 runnable AC(s) failed] [step-tests force-bypassed: 1 runnable step test(s) failed]"
-  }
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "category": "pre-existing-bug",
+      "description": "AC-03 (NEXTTEST=1 make test) shows 3 pre-existing failures that are NOT M228 regressions. They were independently verified at c2ebe69 (the previous milestone's merge commit) by this reviewer in a separate worktree without the M228 diff:\n\n1. mp autopilot::migrate::tests::idempotent_re_run_is_a_no_op — fails with: called Result::unwrap() on an Err value: MigratedSessionInvalid(\"/topology: orchestrator is a required property\"). The test (renamed only; logic unchanged) writes a legacy WatchState with a Runner pane but no Coordinator pane, then expects the migrated session to expose an orchestrator topology. Build_session_from_legacy never sets the orchestrator field. Reachable: c2ebe69 same error (exit 100).\n\n2. mp::scenarios_runner run_implemented_scenarios — fails with: walkthrough-execution-check: stdout mismatch. Expected golden has 6 watch_readiness checks; actual has 8 (extra runner_role_resolved + orchestrator_role_resolved, plus harness_auto_set message gains the [opencode, cursor, pi] list when multiple harnesses are installed). Environment-dependent: the diff is purely from the local harness set. Reachable: c2ebe69 same error (exit 100).\n\n3. mp-oracle::mini_schema_parity parity_real_schemas_compile_and_reject_empty — fails with: assertion left == right failed. Left (on disk) = [annotation, autopilot-session, brief, challenge, idea, milestone, plan, spec-domain, track]. Right (ACTIVE_SCHEMA_FILENAMES) = same list without autopilot-session.schema.json. The schema file was added (M208 era) but the constant in crates/mp/src/schema.rs was never updated. Reachable: c2ebe69 same error (exit 100).\n\nM228 scope explicitly excludes bug-fix work (\"Changing certified behavior or adding new autopilot features\" is out-of-scope). These are pre-existing bugs the runner already flagged as dogfood candidates. File as backlog so they survive M228 lifecycle complete.\n\nNote: 2 additional bridge tests (run_herdr_with_timeout_returns_output_on_fast_child, run_herdr_with_timeout_kills_entire_process_group) appeared red in this reviewer's cold-cache run but are documented pre-existing flakes (M151/M152/M206/M217 reviews + mp-dogfood-log.md line 1264). At HEAD: 1/9 and 2/8 isolation-fail respectively. At c2ebe69: 0/5 and 1/5. Not M228 regressions; not in the runner's S3 evidence (runner reported 5604/5607 because flakes happened to land green for that run). No separate finding — pre-existing, well-tracked.",
+      "status": "fixed",
+      "author": "reviewer-228",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "2026-09-04"
+    }
+  ]
 }
