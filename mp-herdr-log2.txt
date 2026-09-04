@@ -1358,3 +1358,109 @@ Beyond autopilot, the user's plan is just regular milestones. With the autopilot
 ### Going idle
 
 8/8 batch done. The autopilot follow-on work is complete. Going to file a final closeout entry in the log and report to the user.
+
+---
+
+## 2026-09-04 ~14:00 — SESSION 4: CI FIX ARC — 11 failures → green via herdr-orc skill
+
+### Context
+
+Pushed session-3 work (8 autopilot milestones M219/M215/M221/M222/M216/M217/M228/M229) to origin/wip. CI run #33879874100 FAILED with **11 test failures** in `make ci`. The autopilot batch was done, but the cleanup introduced regressions plus surfaced pre-existing flakes.
+
+### Failures (categorized)
+
+**5 M229 regressions** (introduced by cleanup):
+1. `m229_f01_autopilot_log_path` (dry-run path) — log path wasn't renamed
+2-4. 3× `agent_harness_unknown` (coordinator / runner / unspecified harness) — install hint path broken
+5. `m226_f03_topology_preflight_refuses_one_pane_full` (production path) — F-01 wiring changed test surface
+
+**2 dogfood-50 backlog** (pre-existing):
+- `scenarios_runner::run_implemented_scenarios` (env-dependent golden drift)
+- `mini_schema_parity` (stale schema list)
+
+**4 pre-existing suite_* failures** (not in dogfood-50, surfaced only by `make ci`):
+- `suite_config::corrupt_config_surfaces_doctor_warning`
+- `suite_init::init_creates_json_plan_artifacts`
+- `suite_phase::brownfield_scan_and_doctor_detected`
+- `suite_plan::plan_relocate_renames_dir_and_updates_location`
+
+### Iteration 1: M229 fix workflow via herdr-orc skill (1 cycle, 0 findings)
+
+**Setup**: Built a fresh tab in w12 (herdr-orc skill mode=implement), spawned runner + reviewer (opencode harness), sent contracts, dispatched focused task to runner.
+
+**Runner output** (3 commits, all in-scope + 4 transitively-fixed):
+- `03d55c2` M229 fix: defer herdr gate so preflight and dry-run paths surface first (fixes 4 tests: M229 F-01 + 3× agent_harness_unknown)
+- `f1f09b7` M229 fix: add autopilot-session.schema.json to ACTIVE_SCHEMA_FILENAMES (fixes oracle)
+- `2acc4d5` M229 fix: refresh scenario goldens for autopilot rename drift (fixes scenarios_runner + transitively the 4 suite_*)
+
+**Reviewer**: 0 findings, verdict=ok. All 5 ACs pass, goldens/schema "test for the test" confirmed, herdr gate deferral architecturally sound.
+
+**Result**: Pushed (4 commits including review). Local verification: 23 tests pass across 7 in-scope fixes.
+
+**Outcome**: 7 of 11 CI failures fixed. Remaining 4 are the pre-existing `suite_*` (initially marked "out of scope").
+
+### Iteration 2: CI flake fix via herdr-orc skill (1 cycle, 0 findings)
+
+**Push triggered new CI run** (#33883041295) — `make ci` still failed, but ONLY the 4 pre-existing `suite_*` remained red.
+
+**User direction**: "lets fix old issues too, not only the parts we indroduced. let's avoid setting as wont fix." — explicitly rejected the wontfix framing.
+
+**Runner diagnosis** (the most important finding of this session):
+> "Root cause: `mp doctor` gates report.ok on herdr_cli_shape, which flips to ok=false whenever which herdr returns None. CI runners ship without herdr installed (macOS dev installs it via brew). The 4 tests asserted out.status.success() / v["ok"] == true and panicked on the gate collapse."
+
+**Translation**: the "CI-only flake" framing was wrong — it was a real environment **assumption** baked into the tests, not a flake. CI runners don't have herdr in PATH; macOS dev machines do. The fix is **per-test isolation** (a stub herdr), not a flake exemption.
+
+**Runner output** (6 commits, test-only):
+- `18577fc` fix(test): add `install_fake_herdr_for_doctor` helper in `crates/mp/tests/common/fake_herdr.rs` — per-test stub herdr at `<env.tmp>/fake-bin/herdr`, responds to `--version` / `agent start --help` / `pane split --help` with the gate-accepting shape
+- `94a79af` fix(test): `corrupt_config_surfaces_doctor_warning` — call helper, pass PATH via `env.run_with_env`
+- `4bd9b20` fix(test): `init_creates_json_plan_artifacts` — same pattern
+- `2e1d724` fix(test): `brownfield_scan_and_doctor_detected` — same pattern
+- `b290049` fix(test): `plan_relocate_renames_dir_and_updates_location` — switched doctor from `lib_api::run` (in-process) to `env.run_with_env` (subprocess) so PATH propagates
+- `60e0a1c` dogfood: entry 52 — supersedes entry 51 (which incorrectly framed as "CI-only flakes" + wontfix)
+
+**Reviewer**: 0 findings, verdict=ok. AC-01 4/4 release PASS, AC-02 158/158 both herdr-on/off-PATH variants PASS, AC-03 5/5 stress iterations PASS, full mp suite 3776/3776 PASS.
+
+**Minor doc nit** (not a finding, not blocking): the `env -i PATH='/tmp/no-herdr-bin:/opt/homebrew/bin:/usr/bin:/bin'` example in the AC-04 "test for the test" doesn't actually reproduce the failure on a dev machine (because /opt/homebrew/bin contains both herdr and mp via brew on macOS). The repro works in CI (ubuntu-latest) but is misleading locally. Real fix is correct; the env -i example is just imprecise documentation.
+
+### Final state
+
+**Push triggered CI run #33892561432** — `make ci` PASSED in 10m37s. **CI is GREEN.**
+
+Branch in sync with origin/wip. No remaining red tests.
+
+### What we accomplished
+
+| Iteration | Fixes | Commits | Cycles | Result |
+|---|---|---|---|---|
+| 1 (M229 regressions) | 7 (5 M229 + 2 dogfood-50) | 3 fixes + 1 review = 4 | 1 (no reject) | 7 of 11 CI failures fixed |
+| 2 (CI flakes) | 4 (suite_* pre-existing) | 4 fixes + 1 helper + 1 dogfood = 6 | 1 (no reject) | 11 of 11 fixed |
+| **Total** | **11/11** | **10 commits** | **2 cycles** | **CI GREEN** |
+
+### Key lessons from session 4
+
+1. **The "CI-only flake" framing was wrong.** CI runners not having herdr in PATH is a real environment assumption, not a flake. The fix is per-test isolation (a stub herdr), not a flake exemption. Lesson: when a test "flaky only in CI," investigate the environment difference first — it might be a real assumption.
+
+2. **`env.run_with_env` vs `lib_api::run` for doctor calls.** `lib_api::run` is in-process; it doesn't propagate PATH from the test environment. `env.run_with_env` spawns a subprocess with the test's env vars. For any test that calls a doctor (or any subprocess that needs PATH), use the subprocess path. `plan_relocate` was a great example of the fix.
+
+3. **Stub binaries for environment assumptions.** The `install_fake_herdr_for_doctor` helper is a reusable pattern: when a test depends on a specific CLI tool, install a stub at runtime via tempdir. This pattern generalizes beyond herdr (e.g., stub `mp`, stub `git`, stub any other CLI).
+
+4. **Per-flake "test for the test" with `env -i` is sound, but the env must actually strip the right thing.** On a dev machine, `/opt/homebrew/bin` might already contain the tool. The repro command must use a path that ACTUALLY excludes the tool, not just "looks plausible." Lesson: when crafting repro commands, verify them on the failure surface (CI in this case), not on the dev machine.
+
+5. **herdr-orc skill worked end-to-end for both iterations.** 1 cycle each, no rejects, clean verification. The 8 enhancements (mode field, no-amend rule, "test for the test" guidance, format-as-LAST-command, manual-intervention section, reviewer-only mode, cycle 2 example, CI audit mode) were all validated in production.
+
+### Forward-looking
+
+- **CI is now fully green.** No more work on these 11 failures.
+- **M229 was the last milestone of the autopilot batch** (M207-M229 all done, all complete/verified). With CI green, the autopilot system is production-ready.
+- **Next batches** would be downstream consumers — real milestones that USE `mp autopilot start`. The CI pipeline is now ready for them.
+
+### dogfood log entries (this session)
+
+- **Entry 49** (earlier in session 2): runner "no production caller" pattern
+- **Entry 50** (session 3): 3 pre-existing mp test failures (migrate idempotent, scenarios_runner, oracle)
+- **Entry 51** (session 4): 4 pre-existing mp CI flakes (superseded by 52)
+- **Entry 52** (session 4): supersedes 51 — 4 doctor-touching CI flakes are environment assumptions, fixed by stubbing herdr
+
+### Going idle
+
+10 commits pushed. CI green. Session 4 complete.
