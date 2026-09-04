@@ -87,7 +87,7 @@
       "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Overview, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices. Path click is detail-open only (no selection row exists). Settings click selection is deferred to a follow-up milestone.",
       "verification": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast exit 0 (7/7 pass)"
+      "evidence": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast exit 0 (7/7 pass) — cycle 2: AC-01 description + docs/tui/usage.md updated to drop Settings/Path from selection claim (F-01); Settings click renamed to click_on_settings_row_is_noop_for_selection to reflect M221 scope; Path click is detail-open only per spec"
     },
     {
       "id": "AC-02",
