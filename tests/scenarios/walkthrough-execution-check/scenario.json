@@ -5,7 +5,8 @@
   "fixture": "projects/walkthrough-oauth",
   "command": ["execution", "check", "--format", "json"],
   "env": {
-    "MP_HOME": "{{repo_root}}"
+    "MP_HOME": "{{repo_root}}",
+    "PATH": "{{repo_root}}/target/release:/usr/bin:/bin"
   },
   "assert": {
     "exit_code": 0,

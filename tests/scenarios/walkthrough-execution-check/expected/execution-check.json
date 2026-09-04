@@ -8,18 +8,18 @@
   "validate_ok": true,
   "can_handoff": false,
   "warnings": [
-    "watch readiness not green: [runner_config_present, coordinator_config_present] — fix before handing off to autonomous execution"
+    "watch readiness not green: [herdr_on_path, herdr_cli_shape, runner_config_present, coordinator_config_present] — fix before handing off to autonomous execution"
   ],
-  "watch_readiness": {
+  "autopilot_readiness": {
     "ok": false,
     "checks": [
       {
         "name": "herdr_on_path",
-        "ok": true
+        "ok": false
       },
       {
         "name": "herdr_cli_shape",
-        "ok": true
+        "ok": false
       },
       {
         "name": "runner_config_present",
@@ -37,6 +37,14 @@
       },
       {
         "name": "harness_auto_set",
+        "ok": true
+      },
+      {
+        "name": "runner_role_resolved",
+        "ok": true
+      },
+      {
+        "name": "orchestrator_role_resolved",
         "ok": true
       }
     ]
