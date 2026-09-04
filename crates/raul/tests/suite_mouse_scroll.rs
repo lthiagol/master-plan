@@ -235,6 +235,12 @@ fn wheel_on_settings_advances_selected_idx() {
     let mut app = App::new();
     app.active_lane = Lane::Settings;
     app.settings = Some(SettingsState::new(serde_json::json!({})));
+    // Pin selected_idx = 0 before the wheel dispatch so the
+    // post-condition `> before` is meaningful (a no-op wheel would
+    // leave selected_idx at 0, failing this assertion). M169-rev
+    // settings flat-list cap is `SETTINGS_KEYS.len().saturating_sub(1)`
+    // — far above 0 — so the wheel has headroom to advance.
+    app.settings.as_mut().unwrap().selected_idx = 0;
     let runner = mp_runner();
 
     let before = app.settings.as_ref().map(|s| s.selected_idx).unwrap_or(0);
@@ -245,16 +251,10 @@ fn wheel_on_settings_advances_selected_idx() {
         (100, 30),
     )
     .unwrap();
-    // Either the wheel advanced selected_idx, or it was capped at
-    // the bottom of the settings list. We only assert no panic
-    // here — Settings wheel support is a forward-looking nicety;
-    // the keyboard j/k path remains canonical.
+    let after = app.settings.as_ref().map(|s| s.selected_idx).unwrap_or(0);
     assert!(
-        app.settings
-            .as_ref()
-            .map(|s| s.selected_idx >= before)
-            .unwrap_or(false),
-        "wheel on Settings must not regress selected_idx"
+        after > before,
+        "wheel on Settings must advance selected_idx (was {before}, now {after}); the j/k keyboard path remains canonical"
     );
 }
 
