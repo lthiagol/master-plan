@@ -3,9 +3,9 @@
     "id": "229",
     "title": "breaking-release cleanup — remove mp watch and legacy autopilot migration shims",
     "slug": "breaking-release-cleanup-remove-mp-watch-and-legacy-autopilot-migration-shims",
-    "lifecycle": "complete",
-    "spec_status": "verified",
-    "execution_status": "done",
+    "lifecycle": "remediation",
+    "spec_status": "implemented",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -27,7 +27,8 @@
     "blocked_by": "",
     "target_version": "3.0.0",
     "executed_by": "",
-    "lifecycle_at": "2026-09-04T09:32:07.909925+00:00",
+    "remediation_pre_state": "complete",
+    "lifecycle_at": "2026-09-04T09:53:13.214058+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
@@ -51,7 +52,7 @@
       },
       "external-review": {
         "status": "done",
-        "at": "2026-09-04T08:39:33.766340+00:00"
+        "at": "2026-09-04T09:53:13.214059+00:00"
       },
       "groom": {
         "status": "done",
@@ -251,6 +252,66 @@
         "side": "new"
       },
       "summary": "Legacy config, role, and keybind fallbacks remain"
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "category": "test-gap",
+      "description": "Cycle-2 blocker: the F-01 regression test does not exercise the production dispatch it claims to cover. m229_f01_production_autopilot_path_routes_through_autopilot_drive_not_watch only invokes autopilot start --help and asserts stdout contains autopilot; Clap exits during help handling before cmd_autopilot_start or cmd_autopilot_drive runs. Reintroducing cmd_autopilot_start -> commands::watch::cmd_watch would still pass this test. The companion test checks only AutopilotRunState::path_for. Add a behavior or static assertion that fails if the command dispatch or legacy-module reference regresses.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/tests/watch_cli.rs",
+        "new_range": {
+          "start_line": 275,
+          "end_line": 275
+        },
+        "side": "new"
+      },
+      "summary": "F-01 regression test does not exercise production dispatch"
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "category": "test-gap",
+      "description": "Cycle-2 blocker: the F-01 regression coverage does not prove the production command wiring. m229_f01_production_autopilot_path_routes_through_autopilot_drive_not_watch invokes only autopilot start --help and checks that the help text contains autopilot; Clap handles --help before cmd_autopilot_start or cmd_autopilot_drive executes. Reintroducing a cmd_autopilot_start -> legacy command implementation would still pass. m229_f01_legacy_commands_modules_are_renamed_or_deleted only checks the renamed state path. Make the test exercise a non-help command path or add a reliable static production-source assertion.",
+      "status": "fixed",
+      "author": "",
+      "fixed_in": "duplicate-of-F-03",
+      "created": "2026-09-04",
+      "resolved": "2026-09-04",
+      "anchor": {
+        "path": "crates/mp/tests/watch_cli.rs",
+        "new_range": {
+          "start_line": 275,
+          "end_line": 275
+        },
+        "side": "new"
+      },
+      "summary": "F-01 regression test does not verify command wiring"
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "category": "test-gap",
+      "description": "Cycle-2 blocker: the F-02 readiness regression test does not verify the serialized production contract. m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness only constructs a value of the AutopilotReadiness type and never invokes execution_check or serializes ExecutionCheckReport. Reintroducing a watch_readiness JSON field alongside autopilot_readiness, or reverting the runtime output while retaining the type name, would still pass. Add a fixture that runs execution_check and asserts autopilot_readiness is present and watch_readiness is absent.",
+      "status": "open",
+      "author": "",
+      "fixed_in": "",
+      "created": "2026-09-04",
+      "resolved": "",
+      "anchor": {
+        "path": "crates/mp/tests/watch_cli.rs",
+        "new_range": {
+          "start_line": 358,
+          "end_line": 358
+        },
+        "side": "new"
+      },
+      "summary": "F-02 regression test does not verify readiness JSON"
     }
   ]
 }
