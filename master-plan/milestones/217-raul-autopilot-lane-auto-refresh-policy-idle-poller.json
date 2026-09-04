@@ -86,8 +86,8 @@
       "id": "AC-03",
       "description": "Manual `r` triggers an immediate refresh; the poll timer is reset so it does not fire again immediately. Manual `p` toggles the poll on/off; the toggle state is visible in the lane footer.",
       "verification": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast exit 0 (14/14 pass)"
     },
     {
       "id": "AC-04",
@@ -196,7 +196,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_poll_manual_controls --no-fail-fast",
       "done_when": "AC-03 evidence is stamped via `mp milestone criterion pass 217 AC-03 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
