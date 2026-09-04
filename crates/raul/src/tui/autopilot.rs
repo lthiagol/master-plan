@@ -33,7 +33,7 @@ pub fn picker_drivable_lifecycles() -> &'static [&'static str] {
 
 /// True when a lifecycle string is one the picker should surface.
 pub fn is_picker_eligible(lifecycle: &str) -> bool {
-    DRIVABLE_LIFECYCLES.iter().any(|l| *l == lifecycle)
+    DRIVABLE_LIFECYCLES.contains(&lifecycle)
 }
 
 // ─── S01: milestone picker ───────────────────────────────────────────
@@ -272,8 +272,10 @@ mod tests {
 
     #[test]
     fn override_panel_rejects_unknown_topology() {
-        let mut panel = OverridePanel::default();
-        panel.topology = "four-agent".to_string();
+        let panel = OverridePanel {
+            topology: "four-agent".to_string(),
+            ..OverridePanel::default()
+        };
         let err = panel.validate().unwrap_err();
         assert!(matches!(err, OverrideError::UnknownTopology(_)));
     }
@@ -281,11 +283,8 @@ mod tests {
     #[test]
     fn override_panel_rejects_unknown_harness() {
         let mut panel = OverridePanel::default();
-        panel
-            .roles
-            .entry("runner".to_string())
-            .or_default()
-            .harness = Some("claude-code".to_string());
+        panel.roles.entry("runner".to_string()).or_default().harness =
+            Some("claude-code".to_string());
         let err = panel.validate().unwrap_err();
         match err {
             OverrideError::UnknownHarness { role, harness } => {
@@ -299,11 +298,7 @@ mod tests {
     #[test]
     fn override_panel_accepts_empty_harness_as_inherit() {
         let mut panel = OverridePanel::default();
-        panel
-            .roles
-            .entry("runner".to_string())
-            .or_default()
-            .harness = Some(String::new());
+        panel.roles.entry("runner".to_string()).or_default().harness = Some(String::new());
         assert!(panel.validate().is_ok());
     }
 
@@ -345,8 +340,10 @@ mod tests {
 
     #[test]
     fn override_panel_rejects_non_positive_refresh() {
-        let mut panel = OverridePanel::default();
-        panel.refresh_secs = 0;
+        let panel = OverridePanel {
+            refresh_secs: 0,
+            ..OverridePanel::default()
+        };
         let err = panel.validate().unwrap_err();
         assert!(matches!(err, OverrideError::NonPositiveRefresh(0)));
     }
@@ -356,16 +353,9 @@ mod tests {
         let mut panel = OverridePanel::default();
         // Only the runner gets an override; orchestrator/reviewer
         // stay inherited.
-        panel
-            .roles
-            .entry("runner".to_string())
-            .or_default()
-            .model = Some("anthropic/claude-opus-4-1".to_string());
-        panel
-            .roles
-            .entry("runner".to_string())
-            .or_default()
-            .harness = Some("opencode".to_string());
+        panel.roles.entry("runner".to_string()).or_default().model =
+            Some("anthropic/claude-opus-4-1".to_string());
+        panel.roles.entry("runner".to_string()).or_default().harness = Some("opencode".to_string());
         let payload = panel.to_session_overrides();
         assert_eq!(payload.config_overrides.topology, "three-agent");
         assert_eq!(payload.config_overrides.poll_interval_ms, Some(2000));
@@ -390,11 +380,8 @@ mod tests {
     #[test]
     fn override_panel_extras_round_trip_through_session_payload() {
         let mut panel = OverridePanel::default();
-        panel
-            .roles
-            .entry("runner".to_string())
-            .or_default()
-            .extras = Some(r#"{"max_retries":3,"label":"r-1"}"#.to_string());
+        panel.roles.entry("runner".to_string()).or_default().extras =
+            Some(r#"{"max_retries":3,"label":"r-1"}"#.to_string());
         let payload = panel.to_session_overrides();
         let extras = &payload.roles["runner"]["extras"];
         assert_eq!(extras["max_retries"], 3);
@@ -531,12 +518,12 @@ impl OverridePanel {
     /// harness / extras, then refresh_secs last. The first error
     /// wins (the panel renders one inline error at a time).
     pub fn validate(&self) -> Result<(), OverrideError> {
-        if !ALLOWED_TOPOLOGIES.iter().any(|t| *t == self.topology) {
+        if !ALLOWED_TOPOLOGIES.contains(&self.topology.as_str()) {
             return Err(OverrideError::UnknownTopology(self.topology.clone()));
         }
         for (role, ovr) in &self.roles {
             if let Some(h) = ovr.harness.as_deref() {
-                if !h.is_empty() && !ALLOWED_HARNESSES.iter().any(|x| *x == h) {
+                if !h.is_empty() && !ALLOWED_HARNESSES.contains(&h) {
                     return Err(OverrideError::UnknownHarness {
                         role: role.clone(),
                         harness: h.to_string(),
@@ -593,8 +580,7 @@ impl OverridePanel {
             if let Some(extras) = ovr.extras.as_deref() {
                 if !extras.is_empty() {
                     // Already validated — round-trips cleanly.
-                    let parsed: Value =
-                        serde_json::from_str(extras).unwrap_or(Value::Null);
+                    let parsed: Value = serde_json::from_str(extras).unwrap_or(Value::Null);
                     entry.insert("extras".into(), parsed);
                 }
             }
@@ -649,8 +635,7 @@ pub fn validate_extras_json(extras: &str) -> Result<(), String> {
     if extras.is_empty() {
         return Ok(());
     }
-    let value: Value = serde_json::from_str(extras)
-        .map_err(|e| format!("not valid JSON: {e}"))?;
+    let value: Value = serde_json::from_str(extras).map_err(|e| format!("not valid JSON: {e}"))?;
     if !value.is_object() {
         return Err("extras must be a JSON object".to_string());
     }

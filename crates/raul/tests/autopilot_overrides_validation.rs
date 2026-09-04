@@ -5,6 +5,8 @@
 //! inherit; unknown harness, invalid topology, malformed extras,
 //! and non-positive refresh values are rejected before persistence.
 
+#![allow(clippy::field_reassign_with_default)]
+
 use std::collections::BTreeMap;
 
 use raul::tui::autopilot::{
@@ -170,10 +172,7 @@ fn override_panel_rejects_non_positive_refresh() {
     panel.refresh_secs = 0;
     let err = panel.validate().unwrap_err();
     let msg = format!("{err}");
-    assert!(
-        msg.contains("refresh") || msg.contains("> 0"),
-        "msg: {msg}"
-    );
+    assert!(msg.contains("refresh") || msg.contains("> 0"), "msg: {msg}");
 
     // Positive refresh_secs always passes — including the boundary
     // value of 1 (the smallest valid cadence).
@@ -205,8 +204,7 @@ fn to_session_overrides_drops_empty_roles() {
     // Only `runner` survives — empty role envelopes drop out.
     let mut expected_keys = std::collections::BTreeSet::new();
     expected_keys.insert("runner".to_string());
-    let actual_keys: std::collections::BTreeSet<_> =
-        payload.roles.keys().cloned().collect();
+    let actual_keys: std::collections::BTreeSet<_> = payload.roles.keys().cloned().collect();
     assert_eq!(actual_keys, expected_keys);
 
     let runner = &payload.roles["runner"];
@@ -322,10 +320,7 @@ fn every_well_known_harness_is_in_the_allow_list() {
                 ..raul::tui::autopilot::RoleOverride::empty()
             },
         );
-        assert!(
-            panel.validate().is_ok(),
-            "{h} must be in the allow-list"
-        );
+        assert!(panel.validate().is_ok(), "{h} must be in the allow-list");
     }
 }
 
@@ -337,10 +332,7 @@ fn every_well_known_topology_is_in_the_allow_list() {
     for t in ["one-agent", "two-agent", "three-agent"] {
         let mut panel = OverridePanel::default();
         panel.topology = t.to_string();
-        assert!(
-            panel.validate().is_ok(),
-            "{t} must be in the allow-list"
-        );
+        assert!(panel.validate().is_ok(), "{t} must be in the allow-list");
     }
 }
 
@@ -351,8 +343,7 @@ fn every_well_known_topology_is_in_the_allow_list() {
 /// test binary.
 #[test]
 fn btreemap_is_a_reusable_type_for_constructing_the_panel() {
-    let mut roles: BTreeMap<String, raul::tui::autopilot::RoleOverride> =
-        BTreeMap::new();
+    let mut roles: BTreeMap<String, raul::tui::autopilot::RoleOverride> = BTreeMap::new();
     roles.insert(
         "orchestrator".to_string(),
         raul::tui::autopilot::RoleOverride::empty(),

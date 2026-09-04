@@ -19,6 +19,8 @@
 //! to `to_session_overrides()` cannot silently flip the precedence
 //! rules.
 
+#![allow(clippy::field_reassign_with_default)]
+
 use std::collections::BTreeMap;
 
 use raul::tui::autopilot::{
