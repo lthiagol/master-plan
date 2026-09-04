@@ -20,6 +20,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 use crate::tui::watch::DRIVABLE_LIFECYCLES;
 
@@ -258,4 +259,400 @@ mod tests {
         picker.refresh_candidates(&sample_list_payload());
         assert_eq!(picker.queue_ids(), vec!["207"]);
     }
+
+    // ─── override panel ─────────────────────────────────────────────
+
+    #[test]
+    fn override_panel_default_validates() {
+        let panel = OverridePanel::default();
+        assert!(panel.validate().is_ok(), "default panel must validate");
+        assert_eq!(panel.topology, "three-agent");
+        assert_eq!(panel.refresh_secs, 2);
+    }
+
+    #[test]
+    fn override_panel_rejects_unknown_topology() {
+        let mut panel = OverridePanel::default();
+        panel.topology = "four-agent".to_string();
+        let err = panel.validate().unwrap_err();
+        assert!(matches!(err, OverrideError::UnknownTopology(_)));
+    }
+
+    #[test]
+    fn override_panel_rejects_unknown_harness() {
+        let mut panel = OverridePanel::default();
+        panel
+            .roles
+            .entry("runner".to_string())
+            .or_default()
+            .harness = Some("claude-code".to_string());
+        let err = panel.validate().unwrap_err();
+        match err {
+            OverrideError::UnknownHarness { role, harness } => {
+                assert_eq!(role, "runner");
+                assert_eq!(harness, "claude-code");
+            }
+            other => panic!("expected UnknownHarness, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn override_panel_accepts_empty_harness_as_inherit() {
+        let mut panel = OverridePanel::default();
+        panel
+            .roles
+            .entry("runner".to_string())
+            .or_default()
+            .harness = Some(String::new());
+        assert!(panel.validate().is_ok());
+    }
+
+    #[test]
+    fn override_panel_rejects_malformed_extras() {
+        let mut panel = OverridePanel::default();
+        panel
+            .roles
+            .entry("orchestrator".to_string())
+            .or_default()
+            .extras = Some("{ not json".to_string());
+        let err = panel.validate().unwrap_err();
+        match err {
+            OverrideError::MalformedExtras { role, reason } => {
+                assert_eq!(role, "orchestrator");
+                assert!(reason.contains("JSON"), "reason: {reason}");
+            }
+            other => panic!("expected MalformedExtras, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn override_panel_rejects_non_object_extras() {
+        let mut panel = OverridePanel::default();
+        panel
+            .roles
+            .entry("reviewer".to_string())
+            .or_default()
+            .extras = Some(r#""a plain string""#.to_string());
+        let err = panel.validate().unwrap_err();
+        match err {
+            OverrideError::MalformedExtras { role, reason } => {
+                assert_eq!(role, "reviewer");
+                assert!(reason.contains("object"), "reason: {reason}");
+            }
+            other => panic!("expected MalformedExtras, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn override_panel_rejects_non_positive_refresh() {
+        let mut panel = OverridePanel::default();
+        panel.refresh_secs = 0;
+        let err = panel.validate().unwrap_err();
+        assert!(matches!(err, OverrideError::NonPositiveRefresh(0)));
+    }
+
+    #[test]
+    fn override_panel_to_session_overrides_drops_empty_roles() {
+        let mut panel = OverridePanel::default();
+        // Only the runner gets an override; orchestrator/reviewer
+        // stay inherited.
+        panel
+            .roles
+            .entry("runner".to_string())
+            .or_default()
+            .model = Some("anthropic/claude-opus-4-1".to_string());
+        panel
+            .roles
+            .entry("runner".to_string())
+            .or_default()
+            .harness = Some("opencode".to_string());
+        let payload = panel.to_session_overrides();
+        assert_eq!(payload.config_overrides.topology, "three-agent");
+        assert_eq!(payload.config_overrides.poll_interval_ms, Some(2000));
+        // Only `runner` survives — the empty orchestrator /
+        // reviewer envelopes drop out.
+        let roles = payload.roles.keys().cloned().collect::<Vec<_>>();
+        assert_eq!(roles, vec!["runner".to_string()]);
+        let runner = &payload.roles["runner"];
+        assert_eq!(runner["model"], "anthropic/claude-opus-4-1");
+        assert_eq!(runner["harness"], "opencode");
+    }
+
+    #[test]
+    fn override_panel_to_session_overrides_empty_roles_paylod_is_minimal() {
+        let panel = OverridePanel::default();
+        let payload = panel.to_session_overrides();
+        assert!(payload.roles.is_empty());
+        assert_eq!(payload.config_overrides.topology, "three-agent");
+        assert_eq!(payload.config_overrides.poll_interval_ms, Some(2000));
+    }
+
+    #[test]
+    fn override_panel_extras_round_trip_through_session_payload() {
+        let mut panel = OverridePanel::default();
+        panel
+            .roles
+            .entry("runner".to_string())
+            .or_default()
+            .extras = Some(r#"{"max_retries":3,"label":"r-1"}"#.to_string());
+        let payload = panel.to_session_overrides();
+        let extras = &payload.roles["runner"]["extras"];
+        assert_eq!(extras["max_retries"], 3);
+        assert_eq!(extras["label"], "r-1");
+    }
+}
+
+// ─── S02: per-drive override panel ────────────────────────────────────
+
+/// Allowed harness identifiers. Mirrors the
+/// `mp autopilot config set autopilot.roles.<role>.harness` allow-list
+/// (see `crates/mp/src/autopilot/prompts/spawn.rs::SUPPORTED_AUTOPILOT_HARNESSES`).
+pub const ALLOWED_HARNESSES: &[&str] = &["opencode", "cursor", "pi"];
+
+/// Allowed topology identifiers. Mirrors
+/// `crates/mp/src/autopilot/role::Topology` (`one-agent`,
+/// `two-agent`, `three-agent`).
+pub const ALLOWED_TOPOLOGIES: &[&str] = &["one-agent", "two-agent", "three-agent"];
+
+/// Default refresh interval in seconds. Matches the M179 picker
+/// behavior so users see the same cadence as the legacy Watch
+/// surface.
+pub const DEFAULT_REFRESH_SECS: u64 = 2;
+
+/// Default topology for the override panel. Matches the canonical
+/// 3-pane topology used elsewhere in the autopilot stack.
+pub const DEFAULT_TOPOLOGY: &str = "three-agent";
+
+/// Per-role override envelope on the override panel. Mirrors the
+/// `roles.<role>` session.json block (M207 / M209). Empty
+/// `model` / `skill` values mean "inherit from the project default"
+/// — the serializer drops the field rather than persisting an
+/// empty string so the dry-run stays a no-op for inherited values.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoleOverride {
+    /// Empty = inherit from project default. The serializer
+    /// skips the field when blank.
+    pub model: Option<String>,
+    /// Empty = inherit. Stored as a plain string so unknown
+    /// harness values can be caught by the validator rather than
+    /// by serde.
+    pub harness: Option<String>,
+    /// Empty = inherit. The serializer skips the field when blank.
+    pub skill: Option<String>,
+    /// Free-form bag. Malformed JSON is rejected by the validator
+    /// (see `validate_extras`).
+    pub extras: Option<String>,
+}
+
+impl RoleOverride {
+    /// Empty override envelope — every field inherits from the
+    /// project default.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// True when the override has no explicit fields set. Inherited
+    /// roles don't add to the persisted payload.
+    pub fn is_empty(&self) -> bool {
+        self.model.as_deref().map(str::is_empty).unwrap_or(true)
+            && self.harness.as_deref().map(str::is_empty).unwrap_or(true)
+            && self.skill.as_deref().map(str::is_empty).unwrap_or(true)
+            && self.extras.as_deref().map(str::is_empty).unwrap_or(true)
+    }
+}
+
+/// Validation outcome for the override panel. `Ok(())` means the
+/// panel may persist; `Err(reason)` is the field-level error that
+/// the panel surfaces inline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OverrideError {
+    UnknownTopology(String),
+    UnknownHarness { role: String, harness: String },
+    MalformedExtras { role: String, reason: String },
+    NonPositiveRefresh(u64),
+}
+
+impl std::fmt::Display for OverrideError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OverrideError::UnknownTopology(s) => {
+                write!(f, "unknown topology {s:?}; allowed: {ALLOWED_TOPOLOGIES:?}")
+            }
+            OverrideError::UnknownHarness { role, harness } => write!(
+                f,
+                "unknown harness {harness:?} for role {role}; allowed: {ALLOWED_HARNESSES:?}"
+            ),
+            OverrideError::MalformedExtras { role, reason } => {
+                write!(f, "malformed extras JSON for role {role}: {reason}")
+            }
+            OverrideError::NonPositiveRefresh(n) => {
+                write!(f, "refresh_secs must be > 0; got {n}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for OverrideError {}
+
+/// The full override panel. One struct for the form state plus
+/// validation helpers. Defaults match the spec: 3-agent topology,
+/// 2-second refresh, every role's override empty (inherit).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OverridePanel {
+    /// Topology slug (`one-agent` / `two-agent` / `three-agent`).
+    pub topology: String,
+    /// Per-role override envelope. The map key is the role slug
+    /// (`orchestrator` / `runner` / `reviewer`).
+    pub roles: BTreeMap<String, RoleOverride>,
+    /// Refresh interval in seconds. Must be > 0.
+    pub refresh_secs: u64,
+}
+
+impl Default for OverridePanel {
+    fn default() -> Self {
+        Self {
+            topology: DEFAULT_TOPOLOGY.to_string(),
+            roles: BTreeMap::new(),
+            refresh_secs: DEFAULT_REFRESH_SECS,
+        }
+    }
+}
+
+impl OverridePanel {
+    /// Build the canonical default panel (3-agent, 2s refresh,
+    /// every role empty). Tests start here; users can override.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Validate the panel end-to-end. `Ok(())` means every field
+    /// is shaped correctly and the panel may persist. Errors are
+    /// reported in field order: topology first, then per-role
+    /// harness / extras, then refresh_secs last. The first error
+    /// wins (the panel renders one inline error at a time).
+    pub fn validate(&self) -> Result<(), OverrideError> {
+        if !ALLOWED_TOPOLOGIES.iter().any(|t| *t == self.topology) {
+            return Err(OverrideError::UnknownTopology(self.topology.clone()));
+        }
+        for (role, ovr) in &self.roles {
+            if let Some(h) = ovr.harness.as_deref() {
+                if !h.is_empty() && !ALLOWED_HARNESSES.iter().any(|x| *x == h) {
+                    return Err(OverrideError::UnknownHarness {
+                        role: role.clone(),
+                        harness: h.to_string(),
+                    });
+                }
+            }
+            if let Some(extras) = ovr.extras.as_deref() {
+                if !extras.is_empty() {
+                    if let Err(reason) = validate_extras_json(extras) {
+                        return Err(OverrideError::MalformedExtras {
+                            role: role.clone(),
+                            reason,
+                        });
+                    }
+                }
+            }
+        }
+        if self.refresh_secs == 0 {
+            return Err(OverrideError::NonPositiveRefresh(self.refresh_secs));
+        }
+        Ok(())
+    }
+
+    /// Build the `config_overrides` + `roles.<role>` blocks that
+    /// land on the new session.json. Mirrors the shape M207 / M209
+    /// established; the dry-run preflight honors these values for
+    /// the lifetime of the session.
+    ///
+    /// Empty role envelopes drop out of the map so the persisted
+    /// payload is minimal — an "empty override" leaves the session
+    /// free to inherit from `mp config.json`.
+    pub fn to_session_overrides(&self) -> SessionOverridesPayload {
+        let mut roles = BTreeMap::new();
+        for (role, ovr) in &self.roles {
+            if ovr.is_empty() {
+                continue;
+            }
+            let mut entry = serde_json::Map::new();
+            if let Some(model) = ovr.model.as_deref() {
+                if !model.is_empty() {
+                    entry.insert("model".into(), Value::String(model.to_string()));
+                }
+            }
+            if let Some(harness) = ovr.harness.as_deref() {
+                if !harness.is_empty() {
+                    entry.insert("harness".into(), Value::String(harness.to_string()));
+                }
+            }
+            if let Some(skill) = ovr.skill.as_deref() {
+                if !skill.is_empty() {
+                    entry.insert("skill".into(), Value::String(skill.to_string()));
+                }
+            }
+            if let Some(extras) = ovr.extras.as_deref() {
+                if !extras.is_empty() {
+                    // Already validated — round-trips cleanly.
+                    let parsed: Value =
+                        serde_json::from_str(extras).unwrap_or(Value::Null);
+                    entry.insert("extras".into(), parsed);
+                }
+            }
+            roles.insert(role.clone(), Value::Object(entry));
+        }
+        SessionOverridesPayload {
+            config_overrides: SessionConfigOverrides {
+                topology: self.topology.clone(),
+                poll_interval_ms: Some(self.refresh_secs * 1000),
+            },
+            roles,
+        }
+    }
+}
+
+/// Persisted payload that lands on `session.json.config_overrides`
+/// and `session.json.roles`. The struct exists so the panel can
+/// shape its own output without reaching into the `mp` autopilot
+/// types directly — `SessionOverridesPayload::into_value()`
+/// produces the JSON shape the session.json schema expects.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionOverridesPayload {
+    pub config_overrides: SessionConfigOverrides,
+    pub roles: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionConfigOverrides {
+    pub topology: String,
+    pub poll_interval_ms: Option<u64>,
+}
+
+impl SessionOverridesPayload {
+    /// Empty payload — every field inherits from `mp config.json`.
+    /// Tests assert that the empty case drops to defaults.
+    pub fn empty() -> Self {
+        Self {
+            config_overrides: SessionConfigOverrides {
+                topology: DEFAULT_TOPOLOGY.to_string(),
+                poll_interval_ms: Some(DEFAULT_REFRESH_SECS * 1000),
+            },
+            roles: BTreeMap::new(),
+        }
+    }
+}
+
+/// Validate `extras` as a JSON object. The override panel accepts
+/// arbitrary JSON for the `extras` field (mirrors M207's
+/// `RoleConfig::extras` semantics); an empty string is the
+/// inherit sentinel and short-circuits.
+pub fn validate_extras_json(extras: &str) -> Result<(), String> {
+    if extras.is_empty() {
+        return Ok(());
+    }
+    let value: Value = serde_json::from_str(extras)
+        .map_err(|e| format!("not valid JSON: {e}"))?;
+    if !value.is_object() {
+        return Err("extras must be a JSON object".to_string());
+    }
+    Ok(())
 }
