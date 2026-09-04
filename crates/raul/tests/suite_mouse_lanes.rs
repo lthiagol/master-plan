@@ -6,10 +6,9 @@
 //!   * Backlog     → update `selected_index` + `selected_backlog_id`
 //!   * Ideas       → update `selected_index` (same shape as Backlog)
 //!   * Path        → Path has no list rects; selection lives on
-//!                    `dashboard.next_action`; a click in the content
-//!                    area is currently a no-op for selection (the
-//!                    spec scopes Path click to detail-open, not
-//!                    selection — see S3).
+//!     `dashboard.next_action`; a click in the content area is
+//!     currently a no-op for selection (the spec scopes Path
+//!     click to detail-open, not selection — see S3).
 //!   * Overview    → update `selected_index` (inbox item)
 //!   * Settings    → update `state.selected_idx`
 //!   * Autopilot   → move picker cursor to clicked candidate
@@ -62,7 +61,11 @@ fn mk_milestone(id: &str) -> raul::tui::app::MilestoneSummary {
 fn click_on_milestone_row_updates_selected_index() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
-    app.load_milestones(vec![mk_milestone("01"), mk_milestone("02"), mk_milestone("03")]);
+    app.load_milestones(vec![
+        mk_milestone("01"),
+        mk_milestone("02"),
+        mk_milestone("03"),
+    ]);
     let runner = mp_runner();
     let view = raul::tui::view_state::compute_view(&app, Rect::new(0, 0, 100, 30));
     let target = &view.list_item_rects[2]; // third row
@@ -73,7 +76,10 @@ fn click_on_milestone_row_updates_selected_index() {
         (100, 30),
     )
     .unwrap();
-    assert_eq!(app.selected_index, 2, "click on row 03 sets selected_index=2");
+    assert_eq!(
+        app.selected_index, 2,
+        "click on row 03 sets selected_index=2"
+    );
 }
 
 // ─── Backlog ───────────────────────────────────────────────────────
@@ -108,7 +114,10 @@ fn click_on_backlog_row_updates_selected_index_and_backlog_id() {
         (100, 30),
     )
     .unwrap();
-    assert_eq!(app.selected_index, 1, "click on BL-02 sets selected_index=1");
+    assert_eq!(
+        app.selected_index, 1,
+        "click on BL-02 sets selected_index=1"
+    );
 }
 
 // ─── Ideas (M184: same shape as Backlog) ───────────────────────────
@@ -143,7 +152,10 @@ fn click_on_ideas_row_updates_selected_index() {
         (100, 30),
     )
     .unwrap();
-    assert_eq!(app.selected_index, 0, "click on ID-01 sets selected_index=0");
+    assert_eq!(
+        app.selected_index, 0,
+        "click on ID-01 sets selected_index=0"
+    );
 }
 
 // ─── Overview ──────────────────────────────────────────────────────
@@ -173,7 +185,10 @@ fn click_on_overview_inbox_row_updates_selected_index() {
     };
     let runner = mp_runner();
     let view = raul::tui::view_state::compute_view(&app, Rect::new(0, 0, 100, 50));
-    assert!(!view.list_item_rects.is_empty(), "Overview inbox must emit hit areas");
+    assert!(
+        !view.list_item_rects.is_empty(),
+        "Overview inbox must emit hit areas"
+    );
     // Click the FIRST visible inbox rect — the Overview inbox groups
     // items by kind, so a 100×50 frame typically emits one rect per
     // kind group; we click whichever rect shows up.
@@ -238,13 +253,7 @@ fn click_on_path_lane_does_not_change_selection_when_no_next_action() {
     // The Path lane has no list rects; click at a content row.
     let cy = view.content_area.y + 5;
     let before_dash = app.dashboard.next_action.clone();
-    handle_mouse(
-        &mut app,
-        &runner,
-        click(40, cy),
-        (120, 30),
-    )
-    .unwrap();
+    handle_mouse(&mut app, &runner, click(40, cy), (120, 30)).unwrap();
     assert_eq!(
         app.selected_index, before,
         "click on Path lane with empty next_action must not change selected_index"

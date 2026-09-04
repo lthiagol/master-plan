@@ -409,10 +409,7 @@ mod tests {
             left_down(&mk(MouseEventKind::Down(MouseButton::Right))),
             None
         );
-        assert_eq!(
-            left_down(&mk(MouseEventKind::Up(MouseButton::Left))),
-            None
-        );
+        assert_eq!(left_down(&mk(MouseEventKind::Up(MouseButton::Left))), None);
         assert_eq!(left_down(&mk(MouseEventKind::ScrollUp)), None);
     }
 }

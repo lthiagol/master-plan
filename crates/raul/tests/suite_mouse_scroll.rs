@@ -237,11 +237,7 @@ fn wheel_on_settings_advances_selected_idx() {
     app.settings = Some(SettingsState::new(serde_json::json!({})));
     let runner = mp_runner();
 
-    let before = app
-        .settings
-        .as_ref()
-        .map(|s| s.selected_idx)
-        .unwrap_or(0);
+    let before = app.settings.as_ref().map(|s| s.selected_idx).unwrap_or(0);
     handle_mouse(
         &mut app,
         &runner,

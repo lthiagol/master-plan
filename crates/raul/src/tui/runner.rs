@@ -939,11 +939,7 @@ pub fn handle_mouse(
                         .position(|c| c.id == id)
                     {
                         app.autopilot.picker.cursor = pos;
-                        action::apply_action(
-                            app,
-                            runner,
-                            action::Action::AutopilotToggleSelect,
-                        )?;
+                        action::apply_action(app, runner, action::Action::AutopilotToggleSelect)?;
                     }
                     return Ok(());
                 }

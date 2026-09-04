@@ -223,7 +223,7 @@ fn mouse_disabled_does_not_open_milestone_detail() {
             .collect(),
     );
     app.content = ContentState::List;
-    let before_content = app.content.clone();
+    let before_content = app.content;
     let runner = mp_runner();
 
     if mouse::mouse_disabled() {
@@ -262,7 +262,7 @@ fn mouse_disabled_does_not_touch_backlog_detail() {
             ..Default::default()
         },
     ];
-    let before_content = app.content.clone();
+    let before_content = app.content;
     let runner = mp_runner();
 
     if mouse::mouse_disabled() {

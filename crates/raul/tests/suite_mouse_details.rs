@@ -64,7 +64,11 @@ fn send_double_click(app: &mut App, runner: &MpRunner, x: u16, y: u16, term_size
 fn double_click_on_milestone_opens_milestone_detail() {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
-    app.load_milestones(vec![mk_milestone("01"), mk_milestone("02"), mk_milestone("03")]);
+    app.load_milestones(vec![
+        mk_milestone("01"),
+        mk_milestone("02"),
+        mk_milestone("03"),
+    ]);
     let runner = mp_runner();
     let view = raul::tui::view_state::compute_view(&app, Rect::new(0, 0, 100, 30));
     let target = &view.list_item_rects[1];
@@ -244,7 +248,7 @@ fn double_click_on_settings_does_not_open_detail() {
     app.active_lane = Lane::Settings;
     app.settings = Some(SettingsState::new(serde_json::json!({})));
     let runner = mp_runner();
-    let before_content = app.content.clone();
+    let before_content = app.content;
 
     send_double_click(&mut app, &runner, 20, 10, (120, 30));
 

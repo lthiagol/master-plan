@@ -2,7 +2,7 @@
 //!
 //! The `mouse` module's `resolve_list_click` returns the row id
 //! + the matched `ListItemHitArea`. The tests in this file
-//! exercise the contract the dispatcher relies on:
+//!   exercise the contract the dispatcher relies on:
 //!
 //! 1. **Resize**: a click on the same logical row resolves to the
 //!    same row id regardless of the terminal width / height.
@@ -45,13 +45,18 @@ fn mk_milestone(id: &str) -> raul::tui::app::MilestoneSummary {
 fn app_with_milestones(count: usize) -> App {
     let mut app = App::new();
     app.select_lane(Lane::Milestones);
-    let ms: Vec<_> = (1..=count).map(|i| mk_milestone(&format!("{i:02}"))).collect();
+    let ms: Vec<_> = (1..=count)
+        .map(|i| mk_milestone(&format!("{i:02}")))
+        .collect();
     app.load_milestones(ms);
     app
 }
 
 fn click_center(hit: &ListItemHitArea) -> (u16, u16) {
-    (hit.rect.x + hit.rect.width / 2, hit.rect.y + hit.rect.height / 2)
+    (
+        hit.rect.x + hit.rect.width / 2,
+        hit.rect.y + hit.rect.height / 2,
+    )
 }
 
 /// AC-06: a click on the center of any visible rect resolves to
@@ -116,7 +121,10 @@ fn viewport_scrolling_resolves_to_shifted_top_row() {
     // Click on the top row of the visible window.
     let (cx, cy) = click_center(first_visible);
     let resolved = resolve_list_click(&app, &view, cx, cy);
-    assert_eq!(resolved.as_ref().map(|(id, _)| id.clone()), Some(first_visible.id.clone()));
+    assert_eq!(
+        resolved.as_ref().map(|(id, _)| id.clone()),
+        Some(first_visible.id.clone())
+    );
 }
 
 /// AC-06 / "filters/search" (hide_done): hiding done milestones
@@ -135,7 +143,10 @@ fn hide_done_filter_keeps_resolution_to_visible_row() {
     for hit in &view.list_item_rects {
         let (cx, cy) = click_center(hit);
         let resolved = resolve_list_click(&app, &view, cx, cy);
-        assert_eq!(resolved.as_ref().map(|(id, _)| id.clone()), Some(hit.id.clone()));
+        assert_eq!(
+            resolved.as_ref().map(|(id, _)| id.clone()),
+            Some(hit.id.clone())
+        );
     }
 }
 
@@ -205,7 +216,10 @@ fn backlog_filter_keeps_resolution_to_visible_row() {
     let hit = &view.list_item_rects[1];
     let (cx, cy) = click_center(hit);
     let resolved = resolve_list_click(&app, &view, cx, cy);
-    assert_eq!(resolved.as_ref().map(|(id, _)| id.clone()), Some("BL-02".to_string()));
+    assert_eq!(
+        resolved.as_ref().map(|(id, _)| id.clone()),
+        Some("BL-02".to_string())
+    );
 }
 
 /// AC-06 / "invalid coordinates": a click on the tab-bar row
