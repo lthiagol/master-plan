@@ -26,7 +26,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-02",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -74,56 +74,56 @@
     {
       "id": "AC-01",
       "description": "Status graph renders per-pane rows with all five fields (label, pane ID, role skill, last notify, last verdict) in golden-file tests; formatting matches the lane's existing text/cursor conventions.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_status_graph --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Multi-milestone queue view renders when session has > 1 milestone; the active milestone is highlighted.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_queue_view --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "`r` re-reads `mp autopilot session show <id>` and `mp autopilot status <id>` through adapters; no legacy autopilot-control command or direct plan-file read remains.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_manual_refresh --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
       "description": "When C2's verifier emits a typed `Violation`, the offending pane row shows a 'role violation' badge; click-to-expand reveals violation name + evidence hint. Golden-file tests cover each violation variant.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_violation_badge --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "The detail panel consumes session show/events, reviews finding list, and M213 next-action APIs. It never reads activity.json or session files directly. Golden fixtures cover cycles, findings, history, drift, and cap fields.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_detail_panel --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "Pause stops new dispatch at the next boundary and Resume continues the same session; Cancel is terminal after confirmation and remains replayable; restarting after Cancel creates a new session from an explicitly selected queue; Steer sends a targeted one-off message through `mp autopilot control steer`.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_recovery_controls --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
       "description": "Per-AC visualization: in the per-milestone detail view, below the cycle-flow timeline, render an `ACs (passed / total)` row-by-row breakdown sourced from session.json `queue[i].ac_pass_fail`. Each row shows AC id + description (truncated) + status (passed / failed / pending) + the stamped evidence string. Failed ACs are visually distinct (red marker); pending ACs are neutral. The list scrolls if it overflows the panel. Golden-file tests cover the three status paths and overflow scrolling.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_ac_detail --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-08",
       "description": "Active-session telemetry aggregates: in the detail view, alongside `drifted` (time-since-last-state-change for the active stage), render cross-milestone aggregates — total time-in-active-stage across all three panes, attempts-per-stage (how many times each cycle stage has been entered across the queue), per-AC pass/fail counts across milestones. Aggregates are computed from session.json state on each refresh; they reset on session start. Golden-file tests cover a synthetic session with one shipped milestone + one in-flight + one pending milestone.",
-      "verification": "cargo nextest run -p raul --test tui_render --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test autopilot_telemetry --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
