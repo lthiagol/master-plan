@@ -450,18 +450,94 @@ fn m229_f02_legacy_show_watch_tab_config_key_is_removed() {
 
 #[test]
 
+
+#[test]
 fn m229_f02_execution_watch_readiness_renamed_to_autopilot_readiness() {
-    // The execution readiness field must surface as
-    // `autopilot_readiness` (not `watch_readiness`) in
-    // `execution_check` JSON.
-    use mp::execution::AutopilotReadiness;
-    let dir = tempfile::TempDir::new().unwrap();
-    let ctx = mp::paths::PlanContext {
-        project_root: dir.path().to_path_buf(),
-        plan_dir: dir.path().join("master-plan"),
-    };
-    // The type is public, the name is the contract. If the rename
-    // regressed, the type would not compile.
-    fn _assert_name(_: AutopilotReadiness) {}
-    let _ = ctx;
+    // F-05 / cycle 3 strengthened: exercise the production
+    // `execution_check` serialization end-to-end and assert the
+    // JSON shape. The original cycle 2 test only declared a
+    // value of type `AutopilotReadiness`; a regression that
+    // re-added `pub watch_readiness: WatchReadiness` on
+    // `ExecutionCheckReport` would still pass. The strengthened
+    // check pins both the runtime contract (the JSON schema) and
+    // a static source-pin that forbids the legacy field name.
+    let env = TestEnv::new();
+    let out = env.run(&["execution", "check", "--format", "json"]);
+    assert!(
+        out.status.success(),
+        "mp execution check --format json must exit 0; got stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("execution check stdout was not JSON: {e}; raw: {stdout}"));
+
+    // The renamed field must be present and shaped as the
+    // canonical autopilot readiness payload.
+    let autopilot = parsed
+        .get("autopilot_readiness")
+        .expect("autopilot_readiness must appear in execution_check JSON");
+    assert!(
+        autopilot.get("ok").is_some(),
+        "autopilot_readiness must carry an `ok` field; got {autopilot}"
+    );
+    assert!(
+        autopilot.get("checks").is_some(),
+        "autopilot_readiness must carry a `checks` array; got {autopilot}"
+    );
+
+    // The legacy field MUST NOT appear anywhere in the JSON —
+    // direct child OR nested under autopilot_readiness.
+    assert!(
+        parsed.get("watch_readiness").is_none(),
+        "watch_readiness must NOT appear at the top level of execution_check JSON; got {parsed}"
+    );
+    let nested = autopilot
+        .get("watch_readiness")
+        .cloned()
+        .unwrap_or(Value::Null);
+    assert!(
+        nested.is_null(),
+        "watch_readiness must NOT appear nested under autopilot_readiness; got {autopilot}"
+    );
+
+    // Also forbid the bare token at any depth via a recursive
+    // contains check. A regression that surfaced the field
+    // elsewhere (e.g. `execution.watch_readiness`) would still
+    // pass the nested-only check.
+    fn assert_no_watch_readiness_token(v: &Value) {
+        if let Value::Object(map) = v {
+            for (k, child) in map {
+                assert!(
+                    k != "watch_readiness",
+                    "raw token `watch_readiness` must NOT appear in any JSON field; found at `{k}`"
+                );
+                assert_no_watch_readiness_token(child);
+            }
+            for arr in map.values().filter_map(|v| v.as_array()) {
+                for child in arr {
+                    assert_no_watch_readiness_token(child);
+                }
+            }
+        }
+    }
+    assert_no_watch_readiness_token(&parsed);
+}
+
+#[test]
+fn m229_f02_execution_struct_does_not_serialize_watch_readiness_field() {
+    // F-05 / cycle 3 source-pin: parse the production
+    // `ExecutionCheckReport` source and refuse any `watch_readiness`
+    // identifier. A regression that re-introduced a
+    // `#[serde(rename = "watch_readiness")]` field or an alias
+    // output would trip this assertion. Defends the wire
+    // contract independently of the runtime serialization path
+    // asserted above.
+    let execution_path = common::repo_root().join("crates/mp/src/execution.rs");
+    let source = std::fs::read_to_string(&execution_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", execution_path.display()));
+    assert!(
+        !source.contains("watch_readiness"),
+        "crates/mp/src/execution.rs must not contain a `watch_readiness` field (M229 rename was to autopilot_readiness); offending source:\n{source}"
+    );
 }
