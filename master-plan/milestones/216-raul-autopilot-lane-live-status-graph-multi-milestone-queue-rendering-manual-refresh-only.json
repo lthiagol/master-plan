@@ -96,8 +96,8 @@
       "id": "AC-04",
       "description": "When C2's verifier emits a typed `Violation`, the offending pane row shows a 'role violation' badge; click-to-expand reveals violation name + evidence hint. Golden-file tests cover each violation variant.",
       "verification": "cargo nextest run -p raul --test autopilot_violation_badge --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --test autopilot_violation_badge --no-fail-fast exit 0 (10/10 pass)"
     },
     {
       "id": "AC-05",
@@ -219,7 +219,7 @@
       ],
       "tests": "cargo nextest run -p raul --test autopilot_violation_badge --no-fail-fast",
       "done_when": "AC-04 evidence is stamped via `mp milestone criterion pass 216 AC-04 --evidence`.",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
