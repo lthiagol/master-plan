@@ -20,7 +20,7 @@
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-03",
-    "updated": "2026-09-03",
+    "updated": "2026-09-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -68,21 +68,21 @@
     {
       "id": "AC-01",
       "description": "Single click selects the correct visible row across Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot, including active search/filter/hide-done states; mapping uses rendered ViewState rectangles rather than raw backing-vector indices.",
-      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test suite_mouse_lanes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
       "description": "Double-click on Milestones, Backlog, Ideas, Path, and Autopilot invokes the same detail action as keyboard Enter. Overview and Settings explicitly remain selection-only because they have no corresponding row-detail action.",
-      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test suite_mouse_details --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
       "description": "Wheel scrolling covers Milestones, Backlog, Ideas, Path, Overview, Settings, and Autopilot and reaches the same viewport/index as equivalent keyboard input.",
-      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test suite_mouse_scroll --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
@@ -96,14 +96,14 @@
     {
       "id": "AC-05",
       "description": "Keyboard behavior remains canonical and RAUL_NO_MOUSE=1 disables mouse capture/handling while all keyboard-path integration tests remain green.",
-      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test suite_mouse_disabled --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "Coordinate mapping remains correct after resize, header/footer changes, viewport scrolling, filters/search, empty lists, and out-of-bounds clicks. Filtered Backlog and Ideas selections resolve to the intended visible item without changing selection on invalid coordinates.",
-      "verification": "cargo nextest run -p raul --test tui_mouse --no-fail-fast",
+      "verification": "cargo nextest run -p raul --test mouse_coordinate_mapping --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
