@@ -45,8 +45,8 @@ mp init   →   plan files (JSON)   →   mp <read|write>   →   raul (humans l
 | Install and start a project | [`getting-started.md`](./getting-started.md) |
 | See every command group and what it does | [`commands.md`](./commands.md) |
 | Understand project config and profiles | [`config.md`](./config.md) |
-| Know how milestones move through their lifecycle | [`../milestone-lifecycle/`](../milestone-lifecycle/) |
-| Know what a milestone document contains | [`../milestone-details/`](../milestone-details/) |
+| Know how milestones move through their lifecycle | [`../milestones/`](../milestones/) |
+| Know what a milestone document contains | [`../milestones/`](../milestones/) |
 
 ## The commands at a glance
 

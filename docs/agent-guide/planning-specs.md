@@ -32,7 +32,7 @@ mp validate
 A spec is `{ title, intent, problem, scope, acceptance_criteria[],
 design_decisions[], open_questions[] }`. Use `mp milestone create --example` to
 see the exact template. The full anatomy is in
-[`../milestone-details/`](../milestone-details/); the essentials:
+[`../milestones/`](../milestones/); the essentials:
 
 - **`intent.outcome`** — one sentence: what users can do after this ships.
 - **`problem.description`** — why it's needed.

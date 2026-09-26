@@ -233,5 +233,5 @@ mp milestone complete <mid> --evidence "<real cargo nextest output with exit cod
 
 - `docs/mp/commands.md` — every `mp` command the agent will use.
 - `docs/mp/config.md` — autopilot role + topology configuration.
-- `docs/milestone-lifecycle/` — the 12-stage mp-flow timeline.
+- `docs/milestones/` — the 12-stage mp-flow timeline.
 - `crates/mp/src/autopilot/verifier.rs` — the verifier implementation.

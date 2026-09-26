@@ -207,8 +207,8 @@ archive/           # soft-deleted milestones, backlog items
 | `docs/mp/commands.md` | CLI reference |
 | `docs/mp/config.md` | Project config & profiles (`full` / `hybrid` / `session`) |
 | `docs/mp/getting-started.md` | Install & first-project onboarding |
-| `docs/milestone-lifecycle/` | Lifecycle state machine + gates (planning / execution / review) |
-| `docs/milestone-details/` | Milestone anatomy — every field & what it's for |
+| `docs/milestones/` | Lifecycle state machine + gates (planning / execution / review) |
+| `docs/milestones/` | Milestone anatomy — every field & what it's for |
 | `docs/raul/` | `raul` TUI — lanes, keybinds, settings |
 | `docs/skills/` | Shipped skills (`mp-flow` / `mp-runner` / `mp-coordinator` + catalog) |
 

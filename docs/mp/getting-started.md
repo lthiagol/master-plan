@@ -140,4 +140,4 @@ mp reviews pass <id> --verdict ok --reviewer alice   # different session than ex
 ```
 
 Each of these steps has detail in [`commands.md`](./commands.md), and the
-lifecycle rationale in [`../milestone-lifecycle/`](../milestone-lifecycle/).
+lifecycle rationale in [`../milestones/`](../milestones/).

@@ -197,5 +197,5 @@ and the `make consumer-surface-lint` target.
 ## See also
 
 - The two CLIs the skills drive: [`../mp/`](../mp/) and [`../raul/`](../raul/).
-- The lifecycle the core skills orchestrate: [`../milestone-lifecycle/`](../milestone-lifecycle/).
+- The lifecycle the core skills orchestrate: [`../milestones/`](../milestones/).
 - An agent-oriented walkthrough: [`../agent-guide/`](../agent-guide/).

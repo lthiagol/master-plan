@@ -66,7 +66,7 @@ A spec that fails these cannot be promoted to `review`.
   choice, and the rationale.
 
 The anatomy of every field is in
-[`../milestone-details/`](../milestone-details/).
+[`./anatomy.md`](./anatomy.md).
 
 ## Spec-only creation
 

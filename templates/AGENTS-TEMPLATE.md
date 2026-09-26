@@ -42,7 +42,7 @@ Use code zone to learn **current behavior** during interviews. Record findings i
 fields (`scope`, `problem.description`, `design_decisions`, acceptance criteria) via
 `mp milestone create --json @-` — not by editing plan JSON directly.
 
-See [`docs/milestone-details/`](~/.agents/master-plan/docs/milestone-details/) for the brownfield `delta`
+See [`docs/milestones/`](~/.agents/master-plan/docs/milestones/) for the brownfield `delta`
 descriptor; greenfield milestones omit it.
 
 ---
@@ -258,7 +258,7 @@ When the user says “go execute”, “work through the plan”, or similar:
 5. On ambiguity, validate fail, or new scope → mp execution pause + escalate
 ```
 
-See [`docs/milestone-lifecycle/execution.md`](~/.agents/master-plan/docs/milestone-lifecycle/execution.md)
+See [`docs/milestones/execution.md`](~/.agents/master-plan/docs/milestones/execution.md)
 and the milestone-loop cheat sheet in
 [`docs/mp/getting-started.md`](~/.agents/master-plan/docs/mp/getting-started.md).
 
@@ -468,7 +468,7 @@ Use `mp brief list` as context — do not re-ask what the brief already covers.
 `mp validate` (and the mutation commands) enforce these. The full state machine —
 `draft → groomed → approved → in-progress → done → self-reviewed → reviewed → complete`,
 plus `remediation` and the blocked/deferred overlays — lives in
-[`docs/milestone-lifecycle/`](~/.agents/master-plan/docs/milestone-lifecycle/).
+[`docs/milestones/`](~/.agents/master-plan/docs/milestones/).
 
 | Gate | Rule |
 |------|------|
@@ -517,8 +517,8 @@ Activate this workflow when the user:
 ## 7. References
 
 - **Agent guide (orientation + workflows):** [`docs/agent-guide/README.md`](~/.agents/master-plan/docs/agent-guide/README.md)
-- **Lifecycle state machine + gates:** [`docs/milestone-lifecycle/`](~/.agents/master-plan/docs/milestone-lifecycle/)
-- **Milestone data model & fields:** [`docs/milestone-details/`](~/.agents/master-plan/docs/milestone-details/)
+- **Lifecycle state machine + gates:** [`docs/milestones/`](~/.agents/master-plan/docs/milestones/)
+- **Milestone data model & fields:** [`docs/milestones/`](~/.agents/master-plan/docs/milestones/)
 - **Command reference:** [`docs/mp/commands.md`](~/.agents/master-plan/docs/mp/commands.md)
 - **Getting started / walkthrough:** [`docs/mp/getting-started.md`](~/.agents/master-plan/docs/mp/getting-started.md)
 - Global CPD skills: `~/.agents/skills/mp-flow/`, `mp-runner/`, `mp-coordinator/`

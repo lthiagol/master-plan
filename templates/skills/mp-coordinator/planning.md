@@ -11,8 +11,8 @@ For deeper reference material that does not duplicate this content:
 | Need | Go to |
 |------|-------|
 | Command reference | `docs/mp/commands.md` |
-| Lifecycle / gates | `docs/milestone-lifecycle/` |
-| Milestone fields | `docs/milestone-details/` |
+| Lifecycle / gates | `docs/milestones/` |
+| Milestone fields | `docs/milestones/` |
 | Agent workflows | `docs/agent-guide/` |
 | Install / harness | `docs/mp/getting-started.md` |
 

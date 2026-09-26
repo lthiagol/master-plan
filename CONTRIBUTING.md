@@ -10,7 +10,7 @@ real rules live in the [`docs/`](docs/) tree.
 1. **Spec before code.** If your change touches `crates/mp/` or
    `crates/raul/` runtime behavior, the relevant milestone in
    `master-plan/milestones/` must have `spec_status: ready`. See
-   [`docs/milestone-lifecycle/planning.md`](docs/milestone-lifecycle/planning.md).
+   [`docs/milestones/planning.md`](docs/milestones/planning.md).
 2. **Use `mp`, not hand edits,** for everything under `master-plan/`.
 3. **Read [AGENTS.md](AGENTS.md)** for the high-level workflow and
    `master-plan/AGENTS.md` for the plan-zone rules.

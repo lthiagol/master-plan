@@ -93,6 +93,6 @@ Pick the detail doc that matches your task. **Read only the one you need.**
 ## Reference
 
 - Full command surface: [`../mp/commands.md`](../mp/commands.md)
-- Lifecycle detail: [`../milestone-lifecycle/`](../milestone-lifecycle/)
-- Milestone anatomy: [`../milestone-details/`](../milestone-details/)
+- Lifecycle detail: [`../milestones/`](../milestones/)
+- Milestone anatomy: [`../milestones/`](../milestones/)
 - When in doubt: `mp <command> --help`.

@@ -1,9 +1,9 @@
 # The anatomy of a milestone
 
 A milestone is one JSON document with a fixed shape. This is a tour of every
-part: what it is, what it's for, and which `mp` commands read and write it. The
-shape is enforced by validation; you never edit it by hand — you mutate it
-through `mp`, which keeps it valid.
+part: what it is, what it's for, and which `mp` commands read and write it.
+The shape is enforced by validation; you never edit it by hand — you mutate
+it through `mp`, which keeps it valid.
 
 ```
 milestone document
@@ -30,7 +30,7 @@ The envelope. Carries the id, title, lifecycle, and bookkeeping.
 | Field | Purpose |
 |-------|---------|
 | `id`, `title`, `slug` | Identity. `id` is a stable numeric id (e.g. `42`). |
-| `lifecycle` | The single canonical state — see [`../milestone-lifecycle/`](../milestone-lifecycle/). One of `draft`, `groomed`, `approved`, `in-progress`, `done`, `self-reviewed`, `reviewed`, `complete`, `remediation`. |
+| `lifecycle` | The single canonical state — see [`./lifecycle.md`](./lifecycle.md). One of `draft`, `groomed`, `approved`, `in-progress`, `executed`, `self-reviewed`, `reviewed`, `complete`, `remediation`. |
 | `lifecycle_at` | RFC3339 timestamp of the last lifecycle transition (for "3d ago" displays). |
 | `spec_status`, `execution_status` | Legacy read-only aliases derived from `lifecycle`. Kept for older consumers. |
 | `priority` | `urgent` \| `high` \| `normal` \| `low` (default `normal`). |
@@ -41,6 +41,7 @@ The envelope. Carries the id, title, lifecycle, and bookkeeping.
 | `created`, `updated` | ISO dates. |
 | `target_version` | Target release version. |
 | `executed_by` | Who/what executed it. |
+| `flow_stages` | Per-stage status of the 12-stage mp-flow timeline (pending / in_progress / done / skipped). See [`./lifecycle.md#mp-flow-stages`](./lifecycle.md#mp-flow-stages). |
 
 **Overlays** (orthogonal to lifecycle, separate booleans):
 
@@ -48,7 +49,7 @@ The envelope. Carries the id, title, lifecycle, and bookkeeping.
 |-------|---------|
 | `blocked`, `blocked_at`, `block_reason`, `blocked_by` | `milestone block --reason …` / `unblock` |
 | `deferred`, `deferred_reason` | `milestone defer --reason …` / `reopen` |
-| `cancelled` | Terminal overlay (`set-status cancelled`). |
+| `cancelled`, `cancelled_at`, `cancel_reason` | Terminal overlay (`set-status cancelled`). |
 | `needs_regrooming` | Flipped by validation when an approved spec drifts. |
 | `remediation_pre_state` | The lifecycle value captured when entering `remediation`, so the exit restores it exactly. |
 
@@ -217,6 +218,9 @@ A single unit of implementation work.
 | `claimed_by`, `claimed_at`, `lease_expires_at` | Concurrency lease for parallel work. |
 | `evidence` | Per-step run evidence. |
 
+> Step `status` remains `done` (a step is finished; the *milestone* is
+> executed). Only the milestone lifecycle was renamed.
+
 `files`/`tests` values prefer observable commands pinned to a crate/test, not
 outcomes. Commands: `milestone step add|show|update|set-status|done|fail|claim|release|split|remove`.
 
@@ -257,7 +261,7 @@ fact with `milestone update --verification …` (useful for clearing a
 
 Structured review feedback. An open **external** finding auto-enters
 `remediation`; resolving the last open one auto-exits it. An open **self**
-finding blocks completion. See [`../milestone-lifecycle/review.md`](../milestone-lifecycle/review.md).
+finding blocks completion. See [`./review.md`](./review.md).
 Commands: `reviews finding add|resolve|list`.
 
 ---
@@ -268,28 +272,15 @@ Commands: `reviews finding add|resolve|list`.
 {
   "delta": {
     "domain": "config",
-    "added":    [ { "path": "…", "kind": "…" } ],
-    "modified": [ { "path": "…", "before": "…", "after": "…" } ],
-    "removed":  [ { "path": "…" } ]
+    "base_version": 1,
+    "added":    [ { "id": "…", "path": "…", "kind": "…" } ],
+    "modified": [ { "id": "…", "path": "…", "before": "…", "after": "…" } ],
+    "removed":  [ { "id": "…", "path": "…" } ]
   }
 }
 ```
 
 Present only for change-driven milestones on an existing codebase. Describes
 what was added, modified, and removed so a reviewer can see the blast radius at
-a glance. Omitted from disk entirely when unset.
-
----
-
-## Reading milestones efficiently
-
-You rarely need the whole document:
-
-- **One field path:** `mp show milestone 42 --fields 'milestone.lifecycle,steps[].status'`
-- **Health rollup:** `mp show milestone 42 --summary`
-- **One AC:** `mp milestone ac show 42 AC-03`
-- **One step:** `mp milestone step show 42 S2`
-- **Find something:** `mp search "config validation" --type ac --include object`
-
-Project specific paths instead of loading the whole document — it keeps agent
-context small and your scripts fast.
+a glance. Omitted from disk entirely when unset (the on-disk JSON omits the
+key when `delta.is_set()` is false).

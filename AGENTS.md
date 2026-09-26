@@ -258,6 +258,6 @@ on long-running commands.
 - `docs/README.md` — documentation index
 - `docs/agent-guide/README.md` — agent orientation + per-workflow detail
 - `docs/mp/commands.md` — CLI reference
-- `docs/milestone-lifecycle/` — lifecycle state machine + gates
-- `docs/milestone-details/` — data model & field reference
+- `docs/milestones/` — lifecycle state machine + gates
+- `docs/milestones/` — data model & field reference
 

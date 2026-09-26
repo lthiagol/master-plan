@@ -199,7 +199,7 @@ TUI preference and is reported under a distinct key.
 
 A finding with an open *external* phase auto-enters the milestone into
 `remediation`; resolving the last open finding auto-exits it. See
-[`../milestone-lifecycle/review.md`](../milestone-lifecycle/review.md).
+[`../milestones/review.md`](../milestones/review.md).
 
 ---
 

@@ -23,16 +23,18 @@ subfolder with a primary `README.md` and, where useful, deeper reference files.
 |--------|--------|
 | [`mp/`](./mp/) | Using the `mp` CLI — global flags, output conventions, command reference, project config |
 | [`raul/`](./raul/) | Using the `raul` terminal UI — lanes, key bindings, themes, settings |
-| [`milestone-lifecycle/`](./milestone-lifecycle/) | The milestone state machine: planning → execution → review, plus overlays and remediation |
-| [`milestone-details/`](./milestone-details/) | The anatomy of a milestone document — every field and what it is for |
+| [`tui/`](./tui/) | TUI usage reference — mouse, keyboard, and terminal-emulator notes for `raul` |
+| [`milestones/`](./milestones/) | The unit of work — what a milestone is, every part of the document, lifecycle phases, transitions, and gates |
 | [`skills/`](./skills/) | The skills that ship with the toolkit and how they are deployed |
+| [`workflows/`](./workflows/) | **For humans.** Concrete recipes and prompt patterns for day-to-day use of master-plan via your agent |
+| [`autopilot/`](./autopilot/) | The `mp autopilot` orchestration surface — session JSON schema, topology, and migration |
 | [`agent-guide/`](./agent-guide/) | **For agents.** A load-once orientation doc plus on-demand detail files for each workflow |
 
 ## Where to start
 
 - **You are a human who wants to look at a plan** → install, then run `raul`. See [`raul/`](./raul/).
 - **You are setting up a project for the first time** → [`mp/getting-started.md`](./mp/getting-started.md).
-- **You want to understand what a milestone is made of** → [`milestone-details/`](./milestone-details/).
+- **You want to understand what a milestone is made of** → [`milestones/`](./milestones/).
 - **You are an agent that will drive the CLI** → [`agent-guide/README.md`](./agent-guide/README.md).
 
 ## Intake at a glance
@@ -47,5 +49,5 @@ sized to the work:
 | Vague "someday" idea | `mp idea create …` | open note, no commitment |
 | Concrete but not-now work | `mp backlog add …` | prioritized, promotable later |
 
-See [`milestone-lifecycle/`](./milestone-lifecycle/) for how milestones move,
+See [`milestones/`](./milestones/) for how milestones move,
 and [`mp/commands.md`](./mp/commands.md) for the full command surface.
