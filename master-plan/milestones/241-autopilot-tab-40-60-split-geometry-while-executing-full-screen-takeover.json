@@ -342,7 +342,7 @@
       "id": "S1.6",
       "work_package": "WP4",
       "order": 3,
-      "action": "Implement the keymap registry additions: 1 2 3 for sidebar tabs; open and close brackets for tab cycle; colon for sidebar collapse; m jump to milestones row; c jump to commit policy; d cycle run mode. Implement dynamic-r binding context-switched via view_state: r means resume when running, run-mode toggle when idle. Keymap overlay rendered on ? or F1.",
+      "action": "Wire S2.1 and S2.2 into the keymap resolver. This step becomes a placeholder for the orchestration only — the actual keymap registry additions live in S2.2 and the dynamic-r context-switch lives in S2.1.",
       "files": [
         "crates/raul/src/tui/keybinds.rs",
         "crates/raul/src/tui/view_state.rs"
@@ -350,9 +350,7 @@
       "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_overlay/)",
       "done_when": "AC-10 passes",
       "status": "pending",
-      "covers_ac": [
-        "AC-10"
-      ],
+      "covers_ac": [],
       "depends_on_steps": [],
       "claimed_by": "",
       "claimed_at": "",
@@ -382,7 +380,7 @@
     {
       "id": "S1.8",
       "work_package": "WP4",
-      "order": 11,
+      "order": 14,
       "action": "Implement the .mp/autopilot-state.json schema v2 reader/writer. Setup block topology harness_uniform harness per role milestones commit_policy run_mode topo_counter plus UI block plus last_run block. Write on every chip click plus each cycle boundary plus sidebar visibility change.",
       "files": [
         "crates/raul/src/tui/state/autopilot.rs"
@@ -392,6 +390,68 @@
       "status": "pending",
       "covers_ac": [
         "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP4",
+      "order": 13,
+      "action": "Implement the dynamic-r binding context-switch via view_state. r means resume when running; run-mode toggle when idle. Touches the resolver that picks the active handler for r.",
+      "files": [
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/dynamic_r_binding/)",
+      "done_when": "AC-10 partial 2 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.2",
+      "work_package": "WP4",
+      "order": 12,
+      "action": "Add the keymap registry additions for the autopilot tab: 1 2 3 for sidebar tabs; open and close brackets for tab cycle; colon for sidebar collapse; m jump to milestones row; c jump to commit policy; d cycle run mode. Wired into App::handle_key and view_state.",
+      "files": [
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_registry_additions/)",
+      "done_when": "AC-10 fully passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP4",
+      "order": 15,
+      "action": "Build the keymap overlay (? or F1). Renders the full binding list as a centered Block with palette.accent border. Includes the dynamic-r context-switch note inline.",
+      "files": [
+        "crates/raul/src/tui/render/overlays.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_overlay/)",
+      "done_when": "AC-10 fully passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
       ],
       "depends_on_steps": [],
       "claimed_by": "",

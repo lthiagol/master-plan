@@ -356,6 +356,25 @@
       "claimed_at": "",
       "lease_expires_at": "",
       "evidence": ""
+    },
+    {
+      "id": "S2b",
+      "work_package": "WP2",
+      "order": 11,
+      "action": "Register mouse hit-test rects for each row of the Theme picker surface. Mouse click on any row applies that theme live. Reuses the M221 mouse plumbing pattern.",
+      "files": [
+        "crates/raul/src/tui/modes/settings/theme_picker.rs",
+        "crates/raul/src/tui/view_state.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_mouse_hit_tests/)",
+      "done_when": "AC-04 partial 2 passes",
+      "status": "pending",
+      "covers_ac": [],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
     }
   ],
   "verification": {
