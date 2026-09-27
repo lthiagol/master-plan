@@ -82,20 +82,24 @@ fn resolve_argv_base_case_emits_only_the_command() {
 
 #[test]
 fn resolve_argv_appends_model_for_each_supported_harness() {
-    // Pin: model must round-trip for all three v1 entries.
+    // 2026-09-27 (opencode CLI reality): opencode's CLI does NOT
+    // accept `--model` at the top level (see registry.rs:opencode
+    // entry — `model_flag: None`). cursor and pi still accept it.
+    // Pinning both shapes here so a future regression that
+    // re-adds `--model` for opencode (or drops it for cursor/pi)
+    // trips this test.
     let model = "claude-opus-4";
+    // opencode: model is recorded but NOT appended to argv.
     assert_eq!(
         reg().resolve_argv("opencode", Some(model), None).unwrap(),
-        vec![
-            "opencode".to_string(),
-            "--model".to_string(),
-            model.to_string()
-        ]
+        vec!["opencode".to_string()]
     );
+    // pi: --model is appended.
     assert_eq!(
         reg().resolve_argv("pi", Some(model), None).unwrap(),
         vec!["pi".to_string(), "--model".to_string(), model.to_string()]
     );
+    // cursor: --model is appended.
     assert_eq!(
         reg().resolve_argv("cursor", Some(model), None).unwrap(),
         vec![
