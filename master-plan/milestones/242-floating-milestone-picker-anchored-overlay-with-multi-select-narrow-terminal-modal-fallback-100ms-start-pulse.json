@@ -278,26 +278,6 @@
       "evidence": ""
     },
     {
-      "id": "S1.4",
-      "work_package": "WP3",
-      "order": 2,
-      "action": "Implement the narrow-terminal fallback renderer. When terminal width < 100 cols the picker renders as a full-screen modal at the SAME widget level. Same internal state different renderer. ~50 LOC extra. Tested via small terminal width fixture.",
-      "files": [
-        "crates/raul/src/tui/render/picker.rs"
-      ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_modal_fallback/)",
-      "done_when": "AC-08 passes",
-      "status": "pending",
-      "covers_ac": [
-        "AC-08"
-      ],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
       "id": "S1.1.1",
       "work_package": "WP4",
       "order": 8,

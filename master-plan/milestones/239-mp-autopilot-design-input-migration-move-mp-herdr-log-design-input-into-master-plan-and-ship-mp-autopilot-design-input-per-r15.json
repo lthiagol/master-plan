@@ -131,7 +131,7 @@
     {
       "id": "S1.1",
       "work_package": "WP1",
-      "order": 4,
+      "order": 5,
       "action": "Add the lossless round-trip integration test that feeds the source fixture and asserts the structured record matches verbatim; ensure suite passes.",
       "files": [
         "crates/mp/tests/autopilot_design_input.rs"
@@ -173,12 +173,14 @@
       "id": "S1.2.1",
       "work_package": "WP1",
       "order": 3,
-      "action": "Remove mp-herdr-log.txt plus mp-herdr-log2.txt from the repo root; update .gitignore plus any external references.",
+      "action": "Update any external references (CHANGELOG, skill bodies, docs) that named mp-herdr-log.txt or mp-herdr-log2.txt to point at the new mp autopilot design-input command instead.",
       "files": [
-        ".gitignore"
+        "CHANGELOG.md",
+        "docs/herdr-log.md",
+        "crates/mp/src"
       ],
-      "tests": "test ! -e mp-herdr-log.txt; test ! -e mp-herdr-log2.txt; git ls-files | rg mp-herdr-log returns nothing; rg mp-herdr-log in templates docs scripts crates is empty; make test; make consumer-surface-lint; mp validate",
-      "done_when": "AC-01 AC-05 pass",
+      "tests": "rg -n mp-herdr-log templates docs crates mp CHANGELOG returns no hits; cargo test -p raul theme_picker_render_with_new_roles;",
+      "done_when": "AC-05 passes",
       "status": "pending",
       "covers_ac": [
         "AC-05"

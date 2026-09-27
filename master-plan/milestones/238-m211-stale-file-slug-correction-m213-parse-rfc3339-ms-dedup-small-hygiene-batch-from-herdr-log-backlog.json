@@ -129,12 +129,14 @@
       "id": "S1.1",
       "work_package": "WP3",
       "order": 3,
-      "action": "Run M211 + M213 scenario tests and make lint + make test",
+      "action": "Extract parse_rfc3339_ms from crates/mp/src/autopilot/cycle.rs and crates/mp/src/autopilot/cycle_stale_state_timeout.rs into crates/mp/src/autopilot/drive/time.rs as a shared helper. Update both call sites to import from the shared module.",
       "files": [
-        "crates/mp"
+        "crates/mp/src/autopilot/drive/time.rs",
+        "crates/mp/src/autopilot/cycle.rs",
+        "crates/mp/src/autopilot/cycle_stale_state_timeout.rs"
       ],
-      "tests": "cargo nextest run -p mp --test autopilot_drive --no-fail-fast; cargo nextest run -p mp --test scenarios_runner --no-fail-fast; make lint; make test",
-      "done_when": "AC-03 AC-04 pass",
+      "tests": "rg -n 'fn parse_rfc3339_ms' crates/mp/src/ returns exactly one definition (in autopilot/drive/time.rs)",
+      "done_when": "AC-02 passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
@@ -160,7 +162,10 @@
         "AC-03",
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
