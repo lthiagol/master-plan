@@ -1,4 +1,4 @@
-# Final draft — choices, tradeoffs, and open questions
+# Final draft — choices, tradeoffs, and resolutions
 
 ## What we chose (and why)
 
@@ -46,6 +46,16 @@ The first is the user's UI choices; the second is what the runner
 actually uses. Two files means the runner doesn't need to read the UI
 state, and the UI can show drift without affecting execution.
 
+### Why a While-Executing full-screen takeover
+
+When the run is live, the split view's setup region becomes irrelevant —
+you can't edit config mid-run (the Pause + Edit flow is the supported
+editing path). The While-Executing screen gives live state the full
+vertical space, including per-milestone intent blurbs, cycle counters,
+progress bars, and the persistent Pause / Stop / Resume row. The State
+tab (idle-only) disappears during a run; per-milestone detail is the
+peek view.
+
 ## Tradeoffs we accepted
 
 - **Setup region is narrower** (40%). A 50/50 split is more balanced but
@@ -55,52 +65,53 @@ state, and the UI can show drift without affecting execution.
   about detecting tmux.
 - **Floating picker eats the central viewport**. On narrow terminals
   (< 100 cols), the picker can't fit, and we fall back to a modal picker
-  (not yet designed — see open questions).
+  (Q1).
 - **State.json schema versioning** is a maintenance burden. We accept it
   for now; a future version can drop v1 entirely.
+- **While-Executing screen is a full takeover** — users going back to
+  setup during a run must Pause + Edit (with confirmation). This is the
+  supported mid-run edit protocol.
+- **Harnesses are hardcoded** in raul (per Q7). New harnesses need a new
+  raul release to appear in the UI. We accept this for v1.
+- **Recent runs is per-repo** (per Q5) — `.mp/autopilot-recent.json` lives
+  at the repo root, sibling of `master-plan/`. Trade-off: if you have
+  multiple repos, each gets its own list. Not shared across machines.
+- **Detached-mode confirmation modal pops every click** (per Q2) — the
+  safest default. Once a user has detached 5 times, the modal might
+  annoy them; we can revisit with a "Don't ask again" after we have
+  usage data.
+- **Activity tail auto-sizes** (per Q6) — at least 8 lines, grows to fill,
+  caps at 30. Sometimes short, sometimes long; users don't pin it.
 
-## Open questions (for the milestone spec to resolve)
+## Resolutions (all 10 open questions, locked-in)
 
-1. **Floating picker's narrow-terminal fallback** — does the modal picker
-   reuse `floating-picker.md`'s sub-screen or is it a separate `subscreens.md`
-   entry? Lean: same internal state, different renderer.
-2. **Run-mode chip + detached confirmation** — is the confirmation modal
-   mandatory on every Detached click, or does it auto-confirm after the
-   first one with a `Don't ask again` checkbox?
-3. **Conflict between `r` = Run mode and `r` = resume** — is the context
-   switch (idle vs. running) explicit enough? Test once in the dogfood
-   cycle and adjust.
-4. **Sidebar split drag handles** — does the divider allow pushing the
-   sidebar to 0% (collapsing it entirely) and a small arrow appears to
-   bring it back? Or is there a minimum width?
-5. **`recent runs` privacy** — keep per-user (`~/.ra_cache`) or per-plan
-   (`.mp/...`)? current draft says per-user; revisit when M221's mouse
-   support gets re-tested with a multi-user setup.
-6. **Activity tail length** — default 8 lines in the Progress tab. Is
-   that enough? Most runs have meaningful events at 1-3 per minute; 8 lines
-   gives 2-3 minutes of context.
-7. **Harness per-role enumerations** — currently `opencode / cursor / pi`
-   per the R-late constraint. When a new harness lands in the registry,
-   does the UI pick it up automatically? Lean: yes, scan
-   `mp config schema get` for harness names.
-8. **Topo id display in advanced override** — `three-agent-001` is the
-   project's example topo id. Is this auto-derived or user-set?
-9. **Sidebar tab availability during run** — State tab stays available
-   during a run (read-only). Activity tab streams. Progress tab is the
-   default. Should `State` be hidden or pinned during a run?
-10. **`just-rendered, not-yet-run` state** — after Confirm in the picker,
-    what happens visually? Does the Start button pulse / outline / pre-arm?
+| # | Question | Resolution |
+|---|---|---|
+| Q1 | Floating picker's narrow-terminal fallback | Same internal state, modal renderer (~50 LOC extra) |
+| Q2 | Detached-mode confirmation pattern | Confirm modal every click (safest default) |
+| Q3 | `r` ambiguity (Run mode vs. resume) | Context-switch the binding (dynamic per state) |
+| Q4 | Sidebar split bounds | Min 25%, max 75% |
+| Q5 | Recent runs location | Per-repo (`.mp/autopilot-recent.json`) |
+| Q6 | Activity tail length | Auto-sized (≥8 lines, fills, capped at 30) |
+| Q7 | Harness enumeration | Hardcoded in raul (per release) |
+| Q8 | Topo id display | Auto-derive from topology + per-plan counter |
+| Q9 | State tab during a run + dedicated run screen | State tab hidden; new "While Executing" full-screen takeover |
+| Q10 | Start-button feedback | Subtle 100ms cyan pulse on Confirm |
+
+Q9 also adds a new design element: the **While Executing** full-screen
+view (see `subscreens.md` §1) that replaces the split when a run is live.
 
 ## What we deliberately skipped (for later)
 
-- **Pause-and-edit** — re-editing config mid-run is a *follow-up*
-  feature. Disabled in this draft; can be added as M242 or M243.
-- **Per-role harness grid when uniform is off** — visually we already
-  show three rows of three chips; advanced override handles the rest.
-- **`recent runs` as a stat dashboard** — counts and trends are nice but
-  not in this draft.
-- **Telemetry history (sparkline)** — current draft shows numerical
-  snapshot; a sparkline would be a `state tab` follow-up.
+- **Pause-and-edit fully wired** — the popup is here, but the mid-run
+  edit protocol beyond pre-fill isn't (the user can Pause + edit but the
+  "Apply" path is staged for M242/M243).
+- **`recent runs` as a stat dashboard** — counts and trends, future.
+- **Telemetry history sparkline** — current draft shows numerical snapshot.
+- **Harness plug-in enumeration** — confirmed per Q7 to be hardcoded; an
+  extension point exists for a future auto-scan (deferred).
+- **Workspace-scoped recent runs** — confirmed per Q5 to be per-repo;
+  add a workspace mode later if multi-monorepo adoption shows up.
 
 ## Engineering-cost boundary
 
@@ -109,28 +120,44 @@ replacement scope:
 
 - Setup region rewrite: ~300 LOC.
 - Sidebar tabs: ~250 LOC.
-- Floating picker: ~250 LOC.
-- Sub-screens (advanced override, detached confirm, peek view, state inspector):
-  ~400 LOC.
+- Floating picker (with narrow-terminal modal fallback): ~280 LOC.
+- While Executing full-screen takeover: ~350 LOC.
+- Other sub-screens (advanced override, detached confirm, peek view,
+  activity log, state inspector): ~400 LOC.
 - State.json read/write: ~120 LOC.
-- New keybinds + focus: ~80 LOC.
+- New keybinds + dynamic context-switch: ~80 LOC.
+- Start-button 100ms pulse animation: ~30 LOC.
 
-Total: roughly **1400 LOC** added; the existing autopilot tab's ~2,400 LOC
-is reduced to about 600 LOC (the parts we keep: lane reducer, telemetry
-collection, picker search backend, override panel).
+Total: roughly **1810 LOC** added; the existing autopilot tab's ~2,400
+LOC is reduced to about 600 LOC (the parts we keep: lane reducer,
+telemetry collection, picker search backend, override panel reducer).
 
-## How to convert this draft into a milestone spec
+## How to convert this draft into milestone(s)
 
-When you greenlight, the natural split is:
+When the user greenlights, the natural split is:
 
-- **M241** — Geometry: 40/60 split, sidebar tabs, control row, setup region.
-  Touches `crates/raul/src/tui/{autopilot, dashboard, lane_lists, view_state}.rs`.
-- **M242** — Floating picker: standalone overlay widget, multi-select
-  backend, state persistence. Smaller scope, fewer touchpoints.
+- **M241 — Geometry & While-Executing takeover.** 40/60 split, sidebar
+  tabs, setup region, control row, full-screen While-Executing view.
+  ~1200 LOC across `crates/raul/src/tui/{autopilot, dashboard,
+  lane_lists, view_state, modes}.rs`.
+- **M242 — Floating milestone picker.** Floating overlay widget, narrow-
+  terminal modal fallback, multi-select backend, state persistence, 100ms
+  Start-pulse animation. ~360 LOC in `crates/raul/src/tui/`.
 
-Both at priority `high`. M241 first because it's the larger surface; M242
-depends on M241 because the picker's `[+ select]` button lives in M241's
-setup region.
+Both at priority `high`. M241 first (larger surface, gates M242's
+`[+ select]` button placement). We can merge into one M241 if you want
+them shipped together — the draft supports either ship.
 
-(We may merge into one M241 if the milestones feel too small individually;
-the draft supports either ship.)
+### AC verification commands (preview)
+
+For M241:
+```
+cargo nextest run -p raul --no-fail-fast -E 'test(/autopilot_(idle|active|sidebar|control_row)/)'
+make lint
+```
+
+For M242:
+```
+cargo nextest run -p raul --no-fail-fast -E 'test(/autopilot_(picker|floating|modal_fallback|pulse)/)'
+cargo nextest run -p raul --no-fail-fast -E 'test(/tui_state_persistence/)' (M241+M242 shared)
+```

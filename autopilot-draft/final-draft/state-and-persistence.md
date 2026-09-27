@@ -17,7 +17,7 @@ Each lives in a different file. See the table.
 | File | Owner | Purpose | Writes when |
 |---|---|---|---|
 | `.mp/autopilot-state.json` | raul (this tab) | Setup choices + UI state (sidebar tab, picker open, drawer open, last selected milestones) | on every chip click; on focus change; on each cycle boundary |
-| `.mp/autopilot-state.last-run.json` | raul | Last completed run summary (sticky audit) | when a run reaches "completed" or "aborted" |
+| `.mp/autopilot-recent.json` | raul | Recent runs history (per Q5: per-repo, lives in `.mp/`) | when a run reaches "completed" or "aborted" |
 | `master-plan/decisions/autopilot/state.json` | raul → mp | Cross-session config the runner reads at Start. Includes topology, harness per role, extras. | on Start; on Stop (rollback); never silently |
 | `master-plan/autopilot/<session-id>.json` | mp / herdr | Live run state (pane count, active run id, last cycle, role assignments) | every cycle; every 250ms by telemetry worker |
 | `master-plan/activity.json` | mp | Audit trail of plan events (also touched by `mp milestone`, `mp reviews`, etc.) | every lifecycle event from any source |
@@ -49,7 +49,8 @@ Each lives in a different file. See the table.
     "sidebar_tab": "progress",
     "picker_open": false,
     "sidebar_visible": true,
-    "split_pct": 40
+    "split_pct": 40,
+    "while_executing_last_seen": "2026-09-27T11:14:23Z"
   }
 }
 ```
@@ -62,8 +63,43 @@ Each lives in a different file. See the table.
   "configuration drift" warning at the top of the setup region.
 - **Harness per role** also lives in `master-plan/decisions/autopilot/harness.json`
   (same mirror pattern).
-- **Recent runs** lives in `~/.ra_cache/autopilot-recent.json` (per-user, not
-  per-plan, because "what I ran today" is a personal log).
+- **Recent runs** lives in **`.mp/autopilot-recent.json`** (per-repo,
+  per Q5). Same `.mp/` that holds session.json; gitignored; lives at
+  the repo root, *sibling* of `master-plan/`.
+
+## Harness enumeration (per Q7)
+
+The harness chips read from a hardcoded list in the raul source (per Q7):
+
+```rust
+const ALLOWED_HARNESSES: &[&str] = &["opencode", "cursor", "pi"];
+```
+
+When a new harness lands in the runtime, a new raul release is required
+to expose it in the UI. Tracking new harnesses is a release-driven
+process; the harness names match those in `master-plan/decisions/autopilot/harness.json`.
+
+## Topo id display (per Q8)
+
+The advanced-override panel's `Topo id` is **auto-derived** from the
+chosen topology + a per-plan counter:
+
+- Pick `1-agent` → `one-agent-001`
+- Pick `2-agent` → `two-agent-001`
+- Pick `3-agent` → `three-agent-001`
+
+The field is read-only — the user sees the id but cannot edit it. The
+counter increments once per plan, stored in
+`.mp/autopilot-state.json::setup.topo_counter`.
+
+## Activity tail length (per Q6)
+
+The activity tail uses an **auto-sized** height:
+- Always renders at least 8 lines.
+- Grows to fill the remaining vertical space in the sidebar (Progress tab
+  in idle state) or in the While Executing full screen.
+- Cap at 30 lines on tall terminals (prevents the activity tail from
+  pushing the controls off-screen).
 
 ## Persistence on close
 
@@ -72,7 +108,7 @@ When the user closes raul:
   the file is up-to-date.
 - The setup region returns to the main screen as if `q` had been pressed.
 - The live runner (if detached) keeps running independently. Reopen raul →
-  it reconnects and the sidebar Progress tab shows current state.
+  it reconnects and the While Executing view shows current state.
 
 ## Migration / schema versioning
 
@@ -89,6 +125,7 @@ older than the current schema, migrate forward:
 - The `Esc to close` timer on accidental outside-clicks — ephemeral.
 - The mouse drag offset from the split divider — only the final `split_pct`
   value is persisted (drags are debounced).
+- The 100ms Start-button pulse animation per Q10 — ephemeral.
 
 ## Conflict resolution
 

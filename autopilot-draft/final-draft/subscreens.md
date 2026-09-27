@@ -1,9 +1,109 @@
-# Other sub-screens
+# Sub-screens
 
-Every modal / drill-down attached to the main screen besides the floating
-picker. (The floating picker is its own document.)
+Every modal / sub-screen attached to the main screen.
 
-## 1. Advanced override (reveal)
+## 1. While Executing (full-screen takeover during run)
+
+This is the dashboard shown the moment a run starts and until it
+completes. The idle split view disappears; the State tab disappears
+with it (Q9). The pause/stop/resume control row stays visible.
+
+### Layout
+
+```
+┌─ Autopilot · LIVE · 3-agent · uniform · opencode · per-finding ─────────────┐
+│                                                                              │
+│  Topo strip (compact, run config recap)                                    │
+│    3-agent · uniform · opencode · per-finding commits · detached           │
+│                                                                              │
+│  ────── milestone lanes ──────                                              │
+│                                                                              │
+│  ●  M236  ⟶  herdr agent prompt opencode                                    │
+│     intent:    close the recurring false-positive at                         │
+│                crates/mp-model/src/milestone.rs:155-158                      │
+│     reviews:   0 open · 0 resolved                                           │
+│     next:      F-01 cycle verification at T=00:13                            │
+│     cycle:     14 of 17   ▰▰▰▰▰▰▱▱  ·  est. 7m 22s left                       │
+│                                                                              │
+│  ●  M238  ⟶  waiting on orchestrator                                        │
+│     intent:    M211 file slug + parse_rfc3339 dedup                          │
+│     reviews:   0 open · 0 resolved                                           │
+│     cycle:      1 of  3   ▰▱▱▱▱▱▱▱  ·  est. 6m 51s left                       │
+│                                                                              │
+│  ○  M234  ⟶  queued · starts when M238 cycles finish                        │
+│                                                                              │
+│  ────── activity (auto-sized, recent first) ──────                         │
+│  11:14:25  orchestrator → runner:        M238 step S1                       │
+│  11:14:26  runner     → orchestrator:    S1 done                            │
+│  11:14:27  orchestrator → verifier:      ok                                 │
+│  11:14:28  verifier   → orchestrator:    M236/AC-04 ok                     │
+│  11:14:29  orchestrator → runner:        M238 step S2                       │
+│  11:14:30  runner     → orchestrator:    S2 done                            │
+│  11:14:31  orchestrator → verifier:      M236/AC-05 in_flight               │
+│                                                                              │
+│  ────── telemetry ──────                                                   │
+│  lanes 2/3 · cycles 14 · queue 1 · qps 0.4 · cost $0.42                    │
+│  last update 50ms ago                                                       │
+│                                                                              │
+│  ────── controls ──────                                                     │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────────────────┐  │
+│  │ ⏸ Pause     │ │ ⏹ Stop      │ │ ↻ Resync    │ │ ⤴ Edit & re-run      │  │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └───────────────────────┘  │
+│                                                                              │
+│  ⏎ peek · Esc → back to setup (with confirm) · ? help                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Sections, in order
+
+1. **Topo strip** — single line summarizing the run config: `topology ·
+   uniform/per-role · harness · commit-policy · run-mode`. Helps the user
+   confirm what they started.
+2. **Milestone lanes** — one row per active milestone with:
+   - Status dot (● green = running; ● yellow = waiting; ⏳ = queued).
+   - ID + `⟶ <human-readable status phrase>`.
+   - Optional 1-line intent blurb (truncated).
+   - Cycle counter and progress bar.
+   - `est. N m SS s left` per cycle.
+   - Click on the row → opens the Per-milestone peek view (see §4).
+3. **Activity** — auto-sized (Q6) — recent first.
+4. **Telemetry** — three stats lines: status counters; cost estimate;
+   telemetry freshness.
+5. **Controls** — Pause / Stop / Resync / Edit & re-run.
+
+### Controls (always visible)
+
+- **Pause** — `p`. Pauses the run; the lane buttons show "▶ Resume".
+  Mid-run edits need the user to Pause first.
+- **Stop** — `x` (with confirm). Stop the run; detaches if detached was on,
+  aborts clean state otherwise.
+- **Resync** — `r` (when paused). Reload session.json + override panel from
+  disk; useful if the user edited the plan via CLI.
+- **Edit & re-run** — `Esc`. Pops a confirm dialog (Q2-style), then
+  returns to the idle split view with the run config pre-filled.
+
+### State tab ↔ peek view
+
+The State tab is gone during a run; its job is fulfilled by:
+- **Per-milestone peek view** (Q9 alternative): click any milestone row.
+- **Topo strip recap** for session-level config.
+
+This avoids showing a static dump that doesn't reflect live changes.
+
+### Return-to-setup path
+
+Two options:
+- `Esc` → `Edit & re-run` modal (auto-pauses the run first).
+- Run completes → auto-return to split view with pre-filled config.
+
+---
+
+## 2. Floating milestone picker (compact anchor-center overlay)
+
+See `floating-picker.md` for the full layout and behavior. The picker
+covers the middle 2/3 of the screen, dimming the surroundings to 30%.
+
+## 3. Advanced override (reveal)
 
 The `⋯ advanced override` link expands inline below the harness grid:
 
@@ -25,12 +125,12 @@ The `⋯ advanced override` link expands inline below the harness grid:
 │     └─────────────────────────────────────────────────┘
 ```
 
-The advanced panel is the existing `OverridePanel` collapsed. "Reset"
-copies the canonical pre-set values back into the harness chips.
+`Topo id` is **auto-derived** from topology + counter (Q8). The field
+is read-only; users see what's chosen but don't type it.
 
-## 2. Per-role harness picker (drilldown)
+## 4. Per-role harness picker (drilldown)
 
-If the user toggles off `✓ uniform`, each role chip becomes clickable:
+Single-select per role, opened when the user toggles off `✓ uniform`:
 
 ```
 ┌── Orchestrator harness ──────────────────────────┐
@@ -40,30 +140,20 @@ If the user toggles off `✓ uniform`, each role chip becomes clickable:
 │   ○ pi                                           │
 │                                                  │
 │   ┌──────────┐  ┌────────────┐                  │
-│   │  Apply   │  │   Cancel   │                  │
+│   │  Apply   │  │   Cancel    │                  │
 │   └──────────┘  └────────────┘                  │
 └─────────────────────────────────────────────────┘
 ```
 
-Single-select per role. Click Apply → harness chip updates → back to main.
+## 5. Detached / Start confirm (Q2)
 
-## 3. Detached / Start confirm
-
-The Start button shows a tooltip on hover/focus:
-
-```
-           ┌─────────────────────────────────────────┐
-           │  normal run       (raul must stay open)│
-           │  detached run  ●  (child survives)      │
-           └─────────────────────────────────────────┘
-```
-
-Choosing detached shows a confirmation popover:
+Because we picked "confirm every click", the Detached chip shows a confirm
+modal every time:
 
 ```
 ┌── Detached mode ─────────────────────────────────────────────┐
 │                                                              │
-│  ⚠  Detached runs keep the autopilot child alive after this    │
+│  ⚠  Detached runs keep the autopilot child alive after this   │
 │  raul window closes. To stop it later, re-attach via          │
 │  `mp autopilot attach <session-id>`.                         │
 │                                                              │
@@ -77,10 +167,10 @@ Choosing detached shows a confirmation popover:
 "Configure extras" reveals the detached-mode knobs (herdr spawn shell,
 session-id prefix, environment file).
 
-## 4. Per-milestone peek view (clickable row in any list)
+## 6. Per-milestone peek view
 
-Pressing `⏎` on a row in the picker OR on the sidebar's activity tail OR
-on the setup's milestone chip opens this:
+Clicking a milestone lane (in the picker or in the While Executing
+view) opens this:
 
 ```
 ┌── M236 ─────────────────────────────────────────────────────┐
@@ -104,7 +194,7 @@ on the setup's milestone chip opens this:
 Read-only by default. The "view reviews" button loads the milestone's
 reviews.json in a sub-panel.
 
-## 5. Sidebar tab: Activity (full log)
+## 7. Sidebar tab: Activity (full log)
 
 ```
 ┌─ activity · full log ────────────────────────────────────────┐
@@ -113,11 +203,7 @@ reviews.json in a sub-panel.
 │  11:14:23  orchestrator → verifier:    ok                     │
 │  11:14:24  verifier   → orchestrator:  M236/AC-03 ok         │
 │  11:14:25  orchestrator → runner:      M238 step S1         │
-│  11:14:26  runner     → orchestrator:  S1 done              │
-│  11:14:27  orchestrator → verifier:    ok                     │
-│  11:14:28  verifier   → orchestrator:  M236/AC-04 ok         │
-│  11:14:29  orchestrator → runner:      M238 step S2         │
-│  11:14:30  runner     → orchestrator:  S2 done              │
+│  11:14:26  runner     → orchestrator:  S2 done              │
 │  ... 22 more lines ...                                       │
 │                                                                │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
@@ -126,7 +212,7 @@ reviews.json in a sub-panel.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## 6. Sidebar tab: State (read-only dump)
+## 8. Sidebar tab: State (read-only dump, idle-only)
 
 ```
 ┌─ state inspector ────────────────────────────────────────────┐
@@ -155,27 +241,28 @@ reviews.json in a sub-panel.
 │         ┌──────────┐  ┌──────────┐                            │
 │         │  Refresh │  │   Copy   │                            │
 │         └──────────┘  └──────────┘                            │
-└────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────┘
 ```
 
-## 7. Post-run summary
+Note: this tab is **hidden while a run is live** (Q9); the per-milestone
+peek view (§6) replaces it for inspecting a single milestone mid-run.
 
-After the run completes (or aborts), the Start button is replaced:
+## 9. Post-run summary
+
+After the run completes (or aborts), the screen flips back to the idle
+split view. The Start button becomes:
 
 ```
 ┌─────────────────────────────────────────┐
 │  ✓  Run completed                        │
 │  3 milestones · 11m 24s                  │
-│  ↻ re-run   ✏ edit & re-run   close    │
+│  ↻ re-run   ✏ edit & re-run    close    │
 └─────────────────────────────────────────┘
 ```
 
-Click "edit & re-run" → returns to setup region with the previous
-configuration pre-filled.
+`edit & re-run` returns to setup with the previous config pre-filled.
 
-## 8. Resume / restart picker
-
-When the user clicks the `↻ Resume` button mid-run (or on a completed run):
+## 10. Resume / restart picker
 
 ```
 ┌── Resume ────────────────────────────────────────────────────┐
@@ -192,4 +279,19 @@ When the user clicks the `↻ Resume` button mid-run (or on a completed run):
 │        │  Resume  │  │  Restart │  │  Cancel    │            │
 │        └──────────┘  └──────────┘  └────────────┘            │
 └──────────────────────────────────────────────────────────────┘
+```
+
+## 11. Start button pulse (Q10)
+
+After clicking **Confirm** in the floating picker, the Start button in
+the idle split view does a brief 100ms cyan-border pulse — a tactile
+click registration. Then the screen flips to the While Executing view.
+
+Mock local behavior:
+
+```
+T+0ms     : confirm clicked
+T+10ms    : start button border thickens, label pulses
+T+100ms   : pulse fades
+T+~300ms  : first orchestrator event arrives, While Executing view is fully rendered
 ```
