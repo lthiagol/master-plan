@@ -133,3 +133,21 @@ fn spawn_failure_display_message_mentions_command_and_exit() {
     assert!(msg.contains("3"), "Display should mention exit code: {msg}");
     assert!(msg.contains("boom"), "Display should mention stderr: {msg}");
 }
+
+#[test]
+fn build_pane_split_args_carries_direction_down_for_herdr_0_9_plus() {
+    // 2026-09-27 dogfood: herdr 0.9.x added --direction right|down as a
+    // required flag. Without it the spawn exits with code 2 and the
+    // autopilot can never reach its first cycle. Pin the flag here so
+    // a future herdr-shape change can't silently regress the spawn
+    // path back to the 0.7.x shape.
+    let argv = build_pane_split_args(std::path::Path::new("/repo"));
+    let dir_idx = argv.iter().position(|a| a == "--direction")
+        .expect("build_pane_split_args must include --direction for herdr >= 0.9.0");
+    assert_eq!(
+        argv.get(dir_idx + 1).map(String::as_str),
+        Some("down"),
+        "--direction must be 'down'; got {:?}",
+        argv
+    );
+}

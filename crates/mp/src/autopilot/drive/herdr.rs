@@ -100,9 +100,13 @@ pub fn resolve_harness_kind(rc: &RoleConfig) -> String {
 /// here (not on the agent start call) because herdr 0.7.x takes
 /// the cwd as a pane property, not an agent property.
 pub fn build_pane_split_args(cwd: &Path) -> Vec<String> {
+    // 2026-09-27 (herdr 0.9.x): `herdr pane split` requires
+    // `--direction right|down`. We default to `down`.
     vec![
         "pane".into(),
         "split".into(),
+        "--direction".into(),
+        "down".into(),
         "--cwd".into(),
         cwd.to_string_lossy().into_owned(),
     ]
@@ -120,6 +124,9 @@ pub fn build_pane_split_args(cwd: &Path) -> Vec<String> {
 /// source of truth for the flag shape (`registry_is_the_single_source_for_supported_set`
 /// in `tests/watch_config.rs`).
 pub fn build_start_args(label: &str, kind: &str, pane_id: &str, extras: &[String]) -> Vec<String> {
+    // 2026-09-27 (herdr 0.9.x): harness extras must travel after
+    // the `--` separator so herdr forwards them verbatim to the
+    // harness binary.
     let mut argv = vec![
         "agent".into(),
         "start".into(),
@@ -128,6 +135,7 @@ pub fn build_start_args(label: &str, kind: &str, pane_id: &str, extras: &[String
         kind.into(),
         "--pane".into(),
         pane_id.into(),
+        "--".into(),
     ];
     argv.extend(extras.iter().cloned());
     argv
@@ -187,9 +195,13 @@ pub struct PaneHandle {
 /// `pane_id` / `target` keys for the pane identifier.
 pub fn find_existing_pane(label: &str, herdr_list_json: &str) -> Option<String> {
     let parsed: serde_json::Value = serde_json::from_str(herdr_list_json).ok()?;
+    // 2026-09-27 (herdr 0.9.x): the actual list lives under
+    // `result.agents` in the JSON-RPC envelope.
     let agents_arr = parsed
-        .get("agents")
+        .get("result")
+        .and_then(|r| r.get("agents"))
         .and_then(|v| v.as_array())
+        .or_else(|| parsed.get("agents").and_then(|v| v.as_array()))
         .or_else(|| parsed.as_array())?;
     for agent in agents_arr {
         let name = agent
@@ -214,25 +226,46 @@ pub fn find_existing_pane(label: &str, herdr_list_json: &str) -> Option<String> 
 /// function tries JSON first, then a conservative regex-lite
 /// scan, then falls back to `None` (caller uses the label as a
 /// fallback target — herdr accepts the label as a target alias).
+///
+/// 2026-09-27 (herdr 0.9.x): herdr wraps every response in a
+/// JSON-RPC envelope `{"id":"cli:...", "result":{...}}`. The
+/// pane id lives at different nested paths:
+/// - `pane split` returns `result.pane.pane_id`
+/// - `agent start` returns `result.agent.pane_id`
+/// The top-level `id` field is the JSON-RPC envelope id, not a
+/// real pane id; skip it when the envelope is present.
 pub fn parse_pane_id_from_start_output(output: &str) -> Option<String> {
     let trimmed = output.trim();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        for key in ["pane_id", "id", "target", "pane"] {
-            if let Some(s) = v.get(key).and_then(|x| x.as_str()) {
-                return Some(s.to_string());
-            }
-        }
-        if let Some(obj) = v.get("agent").and_then(|x| x.as_object()) {
-            for key in ["pane_id", "id", "target"] {
-                if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
-                    return Some(s.to_string());
+        if let Some(result) = v.get("result").and_then(|r| r.as_object()) {
+            for slot in ["pane", "agent"] {
+                if let Some(obj) = result.get(slot).and_then(|s| s.as_object()) {
+                    for key in ["pane_id", "id", "target"] {
+                        if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
+                            return Some(s.to_string());
+                        }
+                    }
                 }
             }
         }
-        if let Some(obj) = v.get("pane").and_then(|x| x.as_object()) {
-            for key in ["pane_id", "id", "target"] {
-                if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
+        if v.get("result").is_none() {
+            for key in ["pane_id", "id", "target", "pane"] {
+                if let Some(s) = v.get(key).and_then(|x| x.as_str()) {
                     return Some(s.to_string());
+                }
+            }
+            if let Some(obj) = v.get("agent").and_then(|x| x.as_object()) {
+                for key in ["pane_id", "id", "target"] {
+                    if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
+                        return Some(s.to_string());
+                    }
+                }
+            }
+            if let Some(obj) = v.get("pane").and_then(|x| x.as_object()) {
+                for key in ["pane_id", "id", "target"] {
+                    if let Some(s) = obj.get(key).and_then(|x| x.as_str()) {
+                        return Some(s.to_string());
+                    }
                 }
             }
         }
@@ -274,8 +307,12 @@ pub fn which_herdr() -> Option<PathBuf> {
 /// string on failure (so `find_existing_pane` is a no-op when herdr
 /// is unreachable — `ensure_pane` then falls through to spawn).
 pub fn list_panes(herdr_bin: &Path) -> Result<String> {
+    // 2026-09-27 (herdr 0.9.x drift): herdr 0.7.x accepted
+    // `--format json` on `agent list`; 0.9.x does not. Drop the
+    // flag; herdr's default output is already JSON (a JSON-RPC
+    // envelope wrapping the `result.agents` array).
     let out = Command::new(herdr_bin)
-        .args(["agent", "list", "--format", "json"])
+        .args(["agent", "list"])
         .output()
         .with_context(|| format!("failed to spawn {} agent list", herdr_bin.display()))?;
     if !out.status.success() {
@@ -1004,12 +1041,16 @@ mod tests {
 
     #[test]
     fn build_pane_split_args_carry_cwd() {
+        // 2026-09-27 (herdr 0.9.x): `--direction right|down` is
+        // required since herdr 0.9.x. We default to `down`.
         let args = build_pane_split_args(Path::new("/repo"));
         assert_eq!(
             args,
             vec![
                 "pane".to_string(),
                 "split".to_string(),
+                "--direction".to_string(),
+                "down".to_string(),
                 "--cwd".to_string(),
                 "/repo".to_string(),
             ]
@@ -1018,6 +1059,8 @@ mod tests {
 
     #[test]
     fn build_start_args_shape_matches_herdr_cli() {
+        // 2026-09-27: argv now ends with `--` so herdr forwards
+        // everything after to the harness binary.
         let args = build_start_args("role-runner-1", "opencode", "%3", &[]);
         assert_eq!(
             args,
@@ -1029,15 +1072,15 @@ mod tests {
                 "opencode".to_string(),
                 "--pane".to_string(),
                 "%3".to_string(),
+                "--".to_string(),
             ]
         );
     }
 
     #[test]
-    fn build_start_args_appends_extras_after_pane() {
-        // M197 followup: harness extras (model / thinking flags from
-        // `HarnessRegistry::resolve_argv`) land after `--pane <id>`
-        // so herdr forwards them through to the harness binary.
+    fn build_start_args_appends_extras_after_separator() {
+        // 2026-09-27: extras now live AFTER the `--` separator
+        // so herdr forwards them verbatim to the harness binary.
         let args = build_start_args(
             "label",
             "opencode",
@@ -1054,6 +1097,7 @@ mod tests {
                 "opencode".to_string(),
                 "--pane".to_string(),
                 "%3".to_string(),
+                "--".to_string(),
                 "--model".to_string(),
                 "claude-opus-4".to_string(),
             ]
@@ -1072,19 +1116,21 @@ mod tests {
 
     #[test]
     fn harness_extra_flags_resolves_model_and_thinking_from_registry() {
-        // M197 followup: the registry's resolve_argv tail is the
-        // authoritative source for the harness flag shape. Pass
-        // through `--model` / `--thinking` when the role config
-        // sets them AND the harness entry declares the matching
-        // flag (opencode has `--model` only; cursor has both).
+        // 2026-09-27: opencode's registry entry no longer claims
+        // `--model` (its CLI doesn't accept it). The opencode leg
+        // of this test now expects an empty extras vec — the
+        // role's `model` is set but not transmitted.
         let rc = RoleConfig {
             harness: Some("opencode".into()),
             model: Some("claude-opus-4".into()),
             ..Default::default()
         };
         let extras = harness_extra_flags(&rc);
-        assert!(extras.contains(&"--model".to_string()));
-        assert!(extras.contains(&"claude-opus-4".to_string()));
+        assert!(
+            !extras.contains(&"--model".to_string()),
+            "opencode's CLI does not accept --model; flag must not be emitted"
+        );
+        assert!(extras.is_empty(), "opencode with no thinking flag → empty extras");
 
         let rc = RoleConfig {
             harness: Some("cursor".into()),

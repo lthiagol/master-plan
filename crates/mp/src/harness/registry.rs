@@ -64,10 +64,16 @@ const V1_ENTRIES: &[HarnessEntry] = &[
         id: "opencode",
         display_name: "OpenCode",
         command: "opencode",
-        // OpenCode's CLI accepts `--model <name>` (verified against
-        // its `opencode --help` output). Thinking level is not a CLI
-        // flag in v1 — the harness surfaces it via config.
-        model_flag: Some("--model"),
+        // 2026-09-27 (herdr 0.9.x drift / opencode CLI reality):
+        // OpenCode's CLI does NOT accept `--model <name>` at the
+        // top level — its CLI flags are directory, --standalone,
+        // --server, --auto, --continue, --session, --prompt. The
+        // model is selected at session start (via the in-OpenCode
+        // TUI / per-session config), not via the launch argv.
+        // Appending `--model <name>` here causes OpenCode to hang
+        // for ~30s before herdr's readiness probe times out.
+        // model_flag: None — keep the registry honest.
+        model_flag: None,
         thinking_flag: None,
     },
     HarnessEntry {
@@ -281,16 +287,15 @@ mod tests {
 
     #[test]
     fn resolve_argv_appends_model_flag_when_entry_supports_it() {
-        // opencode supports --model.
+        // 2026-09-27: opencode no longer claims --model support
+        // (its CLI doesn't accept it; the registry reflects the
+        // real flag surface). For opencode, the model flag is
+        // never appended regardless of caller.
         assert_eq!(
             reg()
                 .resolve_argv("opencode", Some("claude-opus-4"), None)
                 .unwrap(),
-            vec![
-                "opencode".to_string(),
-                "--model".to_string(),
-                "claude-opus-4".to_string()
-            ]
+            vec!["opencode".to_string()]
         );
         // cursor supports both.
         assert_eq!(
