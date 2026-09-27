@@ -107,6 +107,11 @@ fn start_command_opencode_prints_base_argv() {
 
 #[test]
 fn start_command_appends_model_flag_when_overridden() {
+    // 2026-09-27 (opencode CLI reality): opencode does NOT accept
+    // `--model` at the top level. The `--model` arg is recorded
+    // in the report's `model` field and is communicated to opencode
+    // via per-session config, not via the launch argv. This test
+    // pins the corrected contract.
     let env = TestEnv::new();
     let out = env.run(&[
         "agent",
@@ -124,7 +129,7 @@ fn start_command_appends_model_flag_when_overridden() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["argv"], json!(["opencode", "--model", "claude-opus-4"]));
+    assert_eq!(v["argv"], json!(["opencode"]));
     assert_eq!(v["model"], "claude-opus-4");
 }
 

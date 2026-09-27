@@ -514,7 +514,10 @@ impl std::error::Error for HarnessFlagError {}
 /// [`HarnessFlagError::Unsupported`] before any pane creation.
 ///
 /// Per-harness shape:
-/// - **opencode**: `--skill <name> --model <id>`
+/// - **opencode**: `--skill <name>` (no `--model`; opencode's CLI
+///   does not accept `--model` — the model is selected at session
+///   start via OpenCode's TUI / per-session config, not via the
+///   launch argv).
 /// - **cursor**:   `--agent <name> --model <id>`
 /// - **pi**:       `--skill <name> --model <id>` (Pi's CLI
 ///   surfaces skill / model via the same flag set; per the v1
@@ -522,7 +525,9 @@ impl std::error::Error for HarnessFlagError {}
 ///
 /// `model` is appended only when the resolved config populates it
 /// (the built-in default leaves it `None` so the harness falls
-/// back to its own default model).
+/// back to its own default model). For opencode specifically,
+/// `model` is intentionally NOT emitted even when the role config
+/// sets one — opencode's CLI rejects `--model` at the top level.
 pub fn harness_extra_flags(rc: &ResolvedRoleConfig) -> Result<Vec<String>, HarnessFlagError> {
     let mut out = Vec::new();
     match rc.harness.as_str() {
@@ -545,9 +550,16 @@ pub fn harness_extra_flags(rc: &ResolvedRoleConfig) -> Result<Vec<String>, Harne
             });
         }
     }
+    // 2026-09-27 (opencode CLI reality): opencode's CLI does NOT
+    // accept `--model <id>` at the top level — the model is
+    // selected at session start via OpenCode's TUI / per-session
+    // config, not via the launch argv. cursor and pi still emit
+    // `--model` because their CLIs accept it.
     if let Some(model) = rc.model.as_deref().filter(|s| !s.is_empty()) {
-        out.push("--model".into());
-        out.push(model.to_string());
+        if rc.harness.as_str() != "opencode" {
+            out.push("--model".into());
+            out.push(model.to_string());
+        }
     }
     Ok(out)
 }
@@ -716,7 +728,11 @@ mod tests {
     }
 
     #[test]
-    fn harness_extra_flags_opencode_appends_skill_and_model() {
+    fn harness_extra_flags_opencode_appends_skill_but_not_model() {
+        // 2026-09-27 (opencode CLI reality): opencode does not
+        // accept `--model` at the top level. The model is
+        // selected at session start via OpenCode's TUI / per-
+        // session config, not via the launch argv.
         let mut rc = resolve_role_config(
             None,
             None,
@@ -728,12 +744,7 @@ mod tests {
         let flags = harness_extra_flags(&rc).unwrap();
         assert_eq!(
             flags,
-            vec![
-                "--skill".to_string(),
-                "mp-runner".to_string(),
-                "--model".to_string(),
-                "anthropic/claude-opus-4-1".to_string(),
-            ]
+            vec!["--skill".to_string(), "mp-runner".to_string()]
         );
     }
 

@@ -229,11 +229,11 @@ pub fn find_existing_pane(label: &str, herdr_list_json: &str) -> Option<String> 
 ///
 /// 2026-09-27 (herdr 0.9.x): herdr wraps every response in a
 /// JSON-RPC envelope `{"id":"cli:...", "result":{...}}`. The
-/// pane id lives at different nested paths:
-/// - `pane split` returns `result.pane.pane_id`
-/// - `agent start` returns `result.agent.pane_id`
-/// The top-level `id` field is the JSON-RPC envelope id, not a
-/// real pane id; skip it when the envelope is present.
+/// pane id lives at different nested paths depending on the
+/// command: `pane split` returns `result.pane.pane_id`, and
+/// `agent start` returns `result.agent.pane_id`. Crucially: the
+/// top-level `id` field IS the JSON-RPC envelope id, not a real
+/// pane id; skip it when the envelope is present.
 pub fn parse_pane_id_from_start_output(output: &str) -> Option<String> {
     let trimmed = output.trim();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {

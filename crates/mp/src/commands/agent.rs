@@ -144,6 +144,14 @@ mod tests {
 
     #[test]
     fn harness_start_command_resolves_opencode_with_model() {
+        // 2026-09-27 (opencode CLI reality): opencode's CLI does
+        // NOT accept `--model <name>` at the top level. The
+        // model is selected at session start (via OpenCode's TUI
+        // or per-session config), not via the launch argv. The
+        // `model` field in HarnessStartCommandReport is the
+        // configured model name; the `argv` is what herdr forwards
+        // to the harness binary. The two are intentionally
+        // independent.
         let reg = HarnessRegistry::v1();
         let argv = reg
             .resolve_argv("opencode", Some("claude-opus-4"), None)
@@ -156,7 +164,7 @@ mod tests {
         };
         let v = serde_json::to_value(&report).unwrap();
         assert_eq!(v["id"], "opencode");
-        assert_eq!(v["argv"], json!(["opencode", "--model", "claude-opus-4"]));
+        assert_eq!(v["argv"], json!(["opencode"]));
         assert_eq!(v["model"], "claude-opus-4");
     }
 

@@ -29,14 +29,22 @@ fn each_v1_entry_resolves_to_a_well_formed_command() {
             !entry.command.is_empty(),
             "{id} must declare a non-empty command"
         );
-        // Every v1 entry supports the --model flag today; pinning
-        // it here means a future regression that silently removes
-        // --model surface will trip the test.
-        assert_eq!(
-            entry.model_flag,
-            Some("--model"),
-            "{id} must accept --model in v1"
-        );
+        // 2026-09-27 (opencode CLI reality): opencode does NOT
+        // accept `--model` at the top level. cursor and pi do.
+        // Per-harness model support is now heterogeneous; this
+        // test pins the corrected contract.
+        if id == "opencode" {
+            assert_eq!(
+                entry.model_flag, None,
+                "opencode must NOT emit --model at the top level"
+            );
+        } else {
+            assert_eq!(
+                entry.model_flag,
+                Some("--model"),
+                "{id} must accept --model in v1"
+            );
+        }
     }
 }
 
@@ -173,12 +181,23 @@ fn registry_round_trips_through_serde() {
     // JSON output. Pinning the field names here means a future
     // refactor that silently renames a field will trip the
     // integration test instead of the user-facing CLI.
-    let v = serde_json::to_value(reg().get("cursor").unwrap()).unwrap();
-    assert!(v["id"].is_string());
-    assert!(v["display_name"].is_string());
-    assert!(v["command"].is_string());
-    assert!(v["model_flag"].is_string());
-    assert!(v["thinking_flag"].is_string());
+    //
+    // 2026-09-27 (opencode CLI reality): `model_flag` is now
+    // `None` for opencode (its CLI rejects `--model`). Pin both
+    // shapes — cursor/pi carry the string, opencode carries null.
+    let v_cursor = serde_json::to_value(reg().get("cursor").unwrap()).unwrap();
+    assert!(v_cursor["id"].is_string());
+    assert!(v_cursor["display_name"].is_string());
+    assert!(v_cursor["command"].is_string());
+    assert!(v_cursor["model_flag"].is_string());
+    assert!(v_cursor["thinking_flag"].is_string());
+
+    let v_opencode = serde_json::to_value(reg().get("opencode").unwrap()).unwrap();
+    assert!(v_opencode["id"].is_string());
+    assert!(v_opencode["display_name"].is_string());
+    assert!(v_opencode["command"].is_string());
+    assert!(v_opencode["model_flag"].is_null());
+    assert!(v_opencode["thinking_flag"].is_null());
 }
 
 #[test]

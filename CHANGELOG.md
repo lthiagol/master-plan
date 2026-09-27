@@ -1,5 +1,11 @@
 ## Unreleased — WIP CI hardening
 
+- **mp-model doc-comment lint cleanup (M236).** Closed the
+  recurring `clippy::doc_overindented_list_items` lint at
+  `crates/mp-model/src/milestone.rs:155-158` (4 backlog
+  occurrences in M209/M212/M220/M222 review cycles). One-line
+  continuation consolidation; pinned by `cargo clippy -p mp-model
+  --all-targets -- -D warnings` exiting 0 from a clean tree.
 - **Breaking release cleanup (M229).** The legacy `mp watch` and
   `mp watch-control` aliases plus the `mp autopilot migrate` shim
   were removed. The canonical surface is `mp autopilot start`,

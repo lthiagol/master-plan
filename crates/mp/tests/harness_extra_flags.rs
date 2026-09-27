@@ -5,7 +5,9 @@
 //! `HarnessFlagError::Unsupported`).
 //!
 //! Per-harness shape pinned by golden fixtures:
-//! - opencode: `--skill <name> [--model <id>]`
+//! - opencode: `--skill <name>` (model is NOT emitted; opencode's
+//!   CLI does not accept `--model`; the model is selected at
+//!   session start via OpenCode's TUI / per-session config)
 //! - cursor:   `--agent <name> [--model <id>]`
 //! - pi:       `--skill <name> [--model <id>]`
 
@@ -20,21 +22,18 @@ fn rc(role: Role) -> ResolvedRoleConfig {
 }
 
 #[test]
-fn golden_opencode_appends_skill_and_model() {
+fn golden_opencode_appends_skill_but_not_model() {
+    // 2026-09-27 (opencode CLI reality): opencode does NOT accept
+    // `--model` at the top level. Model is selected at session
+    // start via OpenCode's TUI / per-session config, not via the
+    // launch argv. The harness_extra_flags surface therefore omits
+    // `--model` for opencode even when the role config sets one.
     let mut r = rc(Role::Runner);
     r.harness = "opencode".into();
     r.skill = "mp-runner".into();
     r.model = Some("anthropic/claude-opus-4-1".into());
     let flags = harness_extra_flags(&r).unwrap();
-    assert_eq!(
-        flags,
-        vec![
-            "--skill".to_string(),
-            "mp-runner".to_string(),
-            "--model".to_string(),
-            "anthropic/claude-opus-4-1".to_string(),
-        ]
-    );
+    assert_eq!(flags, vec!["--skill".to_string(), "mp-runner".to_string()]);
 }
 
 #[test]
