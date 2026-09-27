@@ -2095,6 +2095,22 @@
       "reviewed_at": "2026-09-04",
       "notes": "Fix workflow: 7 CI failures resolved. AC-01..AC-05 verified (3/3, 3/3, 4/4, 1/1, 9/9 pass). fmt+clippy clean. TFTT: golden+schema reverts fail tests; herdr deferral revert passes locally (herdr on PATH) but fix is CI-parity correct per commit 03d55c2.",
       "milestone_completed_at": "2026-09-04"
+    },
+    {
+      "milestone_id": "236",
+      "verdict": "ok",
+      "reviewer": "mavis",
+      "reviewed_at": "2026-09-27",
+      "notes": "",
+      "milestone_completed_at": "2026-09-27"
+    },
+    {
+      "milestone_id": "236",
+      "verdict": "ok",
+      "reviewer": "mavis",
+      "reviewed_at": "2026-09-27",
+      "notes": "M236: 5-line doc reformat in milestone.rs:155-158 closes the recurring clippy::doc_overindented_list_items lint (4× backlog in M209/M212/M220/M222). cargo clippy --workspace --all-targets -- -D warnings exits 0 from a clean tree. AC evidence recorded via milestone ac update; CHANGELOG entry added under Unreleased.",
+      "milestone_completed_at": "2026-09-27"
     }
   ],
   "comments": [

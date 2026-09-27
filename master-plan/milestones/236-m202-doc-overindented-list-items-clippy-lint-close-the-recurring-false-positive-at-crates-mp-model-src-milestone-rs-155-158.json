@@ -3,9 +3,9 @@
     "id": "236",
     "title": "M202 doc-overindented-list-items clippy lint — close the recurring false-positive at crates/mp-model/src/milestone.rs:155-158",
     "slug": "m202-doc-overindented-list-items-clippy-lint-close-the-recurring-false-positive-at-crates-mp-model-src-milestone-rs-155-158",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,11 +23,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T03:05:01.773950+00:00",
+    "lifecycle_at": "2026-09-27T23:31:09.951329+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T03:05:01.773953+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-27T23:34:17.837349+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-27T23:34:17.837349+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-27T23:33:15.708581+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-27T23:34:17.837349+00:00"
       },
       "specify": {
         "status": "done",
@@ -59,29 +75,29 @@
       "id": "AC-01",
       "description": "cargo clippy --all-targets -- -D warnings exits 0 on a clean baseline (after make clean).",
       "verification": "make clean && cargo clippy --all-targets -- -D warnings (exit 0).",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make clean && cargo clippy --all-targets -- -D warnings exits 0 (commit 2646458)"
     },
     {
       "id": "AC-02",
       "description": "crates/mp-model/src/milestone.rs:155-158 no longer triggers doc_overindented_list_items.",
       "verification": "cargo clippy -p mp-model --all-targets -- -D warnings 2>&1 | rg 'doc_overindented_list_items' (no matches).",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo clippy -p mp-model --all-targets -- -D warnings emits no doc_overindented_list_items lines (commit 2646458)"
     },
     {
       "id": "AC-03",
       "description": "make test still passes after the doc-comment edit.",
       "verification": "make test (exit 0).",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make test (modulo the long-known flaky run_herdr_with_timeout_kills_entire_process_group which fails under parallel make-test load but passes in isolation) — 5322/5323 pass"
     },
     {
       "id": "AC-04",
       "description": "CHANGELOG entry under the next release notes the mp-model doc-comment cleanup.",
       "verification": "head -30 CHANGELOG.md | rg -i 'doc-overindented|mp-model doc' (exit 0).",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "head -30 CHANGELOG.md | rg -i 'doc-overindented|mp-model doc' returns the M236 entry under Unreleased (commit 2646458)"
     }
   ],
   "work_packages": [
@@ -137,7 +153,7 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-27",
     "branch": "",
     "evidence": ""
   }
