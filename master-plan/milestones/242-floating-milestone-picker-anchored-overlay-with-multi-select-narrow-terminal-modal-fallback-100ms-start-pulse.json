@@ -1,0 +1,347 @@
+{
+  "milestone": {
+    "id": "242",
+    "title": "Floating milestone picker: anchored overlay with multi-select, narrow-terminal modal fallback, 100ms Start-pulse",
+    "slug": "floating-milestone-picker-anchored-overlay-with-multi-select-narrow-terminal-modal-fallback-100ms-start-pulse",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "241"
+    ],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T16:02:12.839207+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T16:02:12.839209+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T16:02:12.839209+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The milestone selection workflow becomes a floating center overlay (anchored to the middle 2/3 of the screen) with multi-select via checkboxes. On terminals narrower than 100 cols the same internal state renders as a full-screen modal. After Confirm, the Start button does a 100ms cyan pulse to register the click before the screen flips to While-Executing (M241)."
+  },
+  "problem": {
+    "description": "Today the milestone picker lives inside the milestone lane (M207) as a sub-pane that takes the full tab — or, in the predecessor option drafts (autopilot-draft/option01 etc.), as a modal that covers the whole screen. The 2026-09-26 audit surfaced a new requirement: pickers should be floating (not full-screen), multi-select via checkbox (not radio), and bounded by a 30% dimmed backdrop. The picker needs to share state with the run config so that Confirm commits the same selection to .mp/autopilot-state.json::setup.milestones. On narrow terminals (<100 cols), a backdrop overlay doesn't fit — the picker must collapse to a full-screen modal at the same renderer level, sharing internal state. After Confirm, the user needs feedback that the click registered before the While-Executing screen takes over (~250-500ms latency); a 100ms cyan pulse on the Start button does it without visual noise."
+  },
+  "scope": {
+    "in_scope": [
+      "Floating picker overlay widget — anchored to the middle 2/3 of the screen (horizontally and vertically); backdrop dims the surrounding setup + sidebar to 30% opacity.",
+      "Multi-select backend — checkbox toggle; selection stored as Vec<MilestoneSummary>; persists across filter changes (a milestone selected under 'ready-only' stays selected when you switch to 'all').",
+      "Filter chip row: 4 mutually-exclusive chips (all / ready-only / in-progress / complete).",
+      "Search box with '/' focus: filters by ID prefix or title substring.",
+      "Selection summary line at the bottom of the picker: 'N selected · ~N min est. · uniform harness'.",
+      "Confirm and Cancel buttons: Confirm commits to .mp/autopilot-state.json::setup.milestones and closes; Cancel closes without committing.",
+      "Narrow-terminal fallback: when the terminal width is < 100 cols, the picker renders as a full-screen modal at the SAME widget level — same internal state, different renderer (~50 LOC extra).",
+      "100ms cyan pulse on the Start button after Confirm — animation timing wrapper with a one-shot 100ms tick; renders in the idle split view's Start button before the While-Executing takeover fires.",
+      "Mouse Model B (free click + focus) — click anywhere on a row toggles, click on a checkbox toggles without row focus change, click outside dimmed-backdrop closes (with a 2-click-to-close confirmation to avoid accidental dismissals).",
+      "Keyboard: j/k move row, gg/G top/bottom, space / x toggle, 1/2/3/4 switch filter chip, / focus search, esc or click-outside cancels.",
+      "Edge cases: 0-matches shows 'No milestones match the filter' with Confirm disabled; empty selection at Confirm shows a one-line 'no milestones selected — Start will be disabled' warning requiring a second click to dismiss; in-progress milestones show a '↳ stale' badge (can't be re-picked).",
+      "Selected items disabled in completed state (cannot re-pick)."
+    ],
+    "out_of_scope": [
+      "Geometry + sidebar + While-Executing takeover (M241 — comes first).",
+      "Recent-runs UI (deferred to a future milestone per Q5).",
+      "Picker animations beyond the 100ms Start-pulse (no slide-down for now; defer to a polish milestone).",
+      "Per-mile per-milestone progress search (different feature)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "Picker opens as a floating center overlay anchored to the middle 2/3 of the screen; backdrop dims the surrounding setup + sidebar regions to 30% opacity.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/floating_picker_open|floating_picker_anchor|backdrop_dim_factor/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Multi-select via checkboxes toggles selection state; pressing space or x on a focused row toggles; click on a checkbox toggles without row focus change.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/floating_picker_toggle|checkbox_independent_of_focus|keyboard_toggle/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Selection persists across filter changes; switching from 'ready-only' to 'all' keeps the previously selected items selected.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/selection_persists_across_filters/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "4 filter chips (all / ready-only / in-progress / complete) mutually exclusive; switching updates the visible list; in-progress / complete rows are not selectable.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_chip_exclusivity|in_progress_not_selectable|complete_not_selectable/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "'/' search box focuses on '/' keypress (when picker is open); typing filters by ID prefix and title substring; empty state shown when no matches.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_search_focus|picker_search_substring|picker_empty_state/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Selection summary line: 'N selected · ~N min est. · uniform harness' updates live as selection changes; 0 selected disables Confirm with a one-line warning.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_summary_live|picker_summary_zero_disables_confirm/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Confirm commits selection to .mp/autopilot-state.json::setup.milestones and closes the picker; Cancel closes without committing; both are wired to the existing planner state read on Start.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_confirm_commit|picker_cancel_no_commit|setup_milestones_round_trip/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "On terminal width < 100 cols, the picker renders as a full-screen modal at the SAME widget level — same internal state, different renderer; tested by passing a small terminal width fixture.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_modal_fallback_narrow|modal_fallback_same_internal_state/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "100ms cyan pulse on the Start button after Confirm — animation fires for ~100ms, then the screen transitions to While-Executing (which M241 owns); the pulse is implemented as a one-shot animation tick in view_state.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/start_pulse_animation|start_pulse_one_shot|start_pulse_with_then_transitions_to_active/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "Outside-click dismissal: first outside click dims the picker further and adds a 'click again to close' hint; second outside click closes the picker; Cancel still available.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/outside_click_two_step_dismiss/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-11",
+      "description": "make lint + make test + consumer-surface-lint remain green; cargo clippy --workspace --all-targets -- -D warnings exits 0.",
+      "verification": "make lint && make test && make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Floating picker widget",
+      "goal": "Floating center overlay anchored to middle 2/3 of screen; dimmed backdrop to 30%; multi-select backend; checkbox toggle; selection persists across filter changes; filter chips + search.",
+      "rollback": "Drop the floating widget; restore the existing milestone-lane sub-pane picker."
+    },
+    {
+      "id": "WP2",
+      "name": "Confirm cancel + state commit",
+      "goal": "Confirm commits to .mp/autopilot-state.json setup milestones and closes picker; Cancel closes without committing. Summary line live-updates. Outside-click two-step dismissal.",
+      "rollback": "Revert to a single-confirm no-state-commit behavior on Cancel."
+    },
+    {
+      "id": "WP3",
+      "name": "Narrow terminal fallback",
+      "goal": "On terminals narrower than 100 cols, the same internal state renders as a full-screen modal at the same widget level. ~50 LOC extra.",
+      "rollback": "Disable the modal fallback; picker only works on wide terminals."
+    },
+    {
+      "id": "WP4",
+      "name": "Start-pulse animation",
+      "goal": "100ms cyan pulse on the Start button after Confirm; one-shot animation tick in view_state; transitions to While-Executing (M241) afterward.",
+      "rollback": "Disable the pulse; transition is instantaneous."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Implement the floating picker overlay widget. Anchored to middle 2/3 of screen. Backdrop dims surrounding setup + sidebar to 30. Multi-select backend with checkbox toggle. Selection persists across filter changes.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs",
+        "crates/raul/src/tui/state/autopilot_picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/floating_picker/)",
+      "done_when": "AC-01 AC-02 AC-03 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 7,
+      "action": "Implement 4 filter chips plus search focus. Empty state. in-progress and complete not selectable.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/filter_chip|picker_search|picker_empty_state/)",
+      "done_when": "AC-04 AC-05 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04",
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Implement the picker summary line: N selected + N min est + uniform harness. Live-updates as selection changes. Zero selection disables Confirm with one-line warning requiring second click.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_summary_live|picker_summary_zero_disables_confirm/)",
+      "done_when": "AC-06 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.3",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Implement Confirm and Cancel buttons. Confirm commits to state.json setup milestones and closes picker; Cancel closes without committing. Outside-click two-step dismissal.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs",
+        "crates/raul/src/tui/state/autopilot.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_confirm_commit|picker_cancel_no_commit|outside_click_two_step_dismiss/)",
+      "done_when": "AC-07 AC-10 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07",
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2.1",
+      "work_package": "WP3",
+      "order": 6,
+      "action": "Implement the narrow-terminal fallback renderer. When terminal width < 100 cols the picker renders as a full-screen modal at the SAME widget level. Same internal state different renderer. ~50 LOC extra.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_modal_fallback/)",
+      "done_when": "AC-08 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.4",
+      "work_package": "WP3",
+      "order": 2,
+      "action": "Implement the narrow-terminal fallback renderer. When terminal width < 100 cols the picker renders as a full-screen modal at the SAME widget level. Same internal state different renderer. ~50 LOC extra. Tested via small terminal width fixture.",
+      "files": [
+        "crates/raul/src/tui/render/picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_modal_fallback/)",
+      "done_when": "AC-08 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP4",
+      "order": 8,
+      "action": "Implement the 100ms cyan pulse animation on the Start button after Confirm. One-shot animation tick in view_state.",
+      "files": [
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/src/tui/render/lane_lists.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/start_pulse_animation/)",
+      "done_when": "AC-09 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2.2",
+      "work_package": "WP4",
+      "order": 5,
+      "action": "Run make lint plus make test plus consumer-surface-lint plus cargo clippy --workspace --all-targets -- -D warnings; ensure no regressions.",
+      "files": [
+        "crates/raul"
+      ],
+      "tests": "make lint; make test; make consumer-surface-lint",
+      "done_when": "AC-11 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-11"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
