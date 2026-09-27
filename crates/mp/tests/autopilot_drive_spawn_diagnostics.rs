@@ -141,6 +141,13 @@ fn build_pane_split_args_carries_direction_down_for_herdr_0_9_plus() {
     // autopilot can never reach its first cycle. Pin the flag here so
     // a future herdr-shape change can't silently regress the spawn
     // path back to the 0.7.x shape.
+    //
+    // Companion unit test: crates/mp/src/autopilot/drive/herdr.rs
+    // `build_pane_split_args_carry_cwd` pins the full argv vector
+    // shape (including --direction down); this integration test
+    // complements it with an explicit position+value assertion so
+    // a regression that drops the flag trips here even if the
+    // surrounding order changes.
     let argv = build_pane_split_args(std::path::Path::new("/repo"));
     let dir_idx = argv.iter().position(|a| a == "--direction")
         .expect("build_pane_split_args must include --direction for herdr >= 0.9.0");
