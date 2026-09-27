@@ -7,9 +7,10 @@
 > **A project management tool for coding agents, with a TUI for humans.**
 
 master-plan is a toolkit that turns [crafted prompts](https://github.com/lthiagol/crafted-prompt-development)
-into shipped work. Agents drive the plan through the **`mp`** CLI; humans review it through the
-**`raul`** terminal UI. The plan lives in a directory of JSON files that `mp` owns — never
-hand-edited, validated on every write, and auditable end to end.
+into shipped work. The **`mp`** CLI is for coding agents; the **`raul`** terminal UI is
+for human review. Humans stay the real users, working through agents that call `mp` on
+their behalf — every interaction is meant to be AI-assisted. The plan is a directory of
+JSON files owned by `mp`, never hand-edited, validated on every write, and reviewed through `raul`.
 
 ## Contents
 
@@ -111,8 +112,8 @@ carries both formulas. Tap it once, then pick one.
 ```bash
 brew tap lthiagol/tap https://github.com/lthiagol/homebrew-tap
 brew install master-plan
-mp install        # adds skills + harness hooks for OpenCode / Cursor / Pi
-mp doctor         # sanity-check the install
+mp install --harness opencode,cursor,pi   # adds skills + harness hooks for OpenCode / Cursor / Pi
+mp doctor                                  # sanity-check the install
 ```
 
 #### DEV tap
@@ -157,7 +158,7 @@ mp doctor
 ```bash
 # update
 brew upgrade master-plan            # or master-plan-dev
-mp install --update
+mp install                          # idempotent — redeploys skills + harness hooks
 
 # uninstall
 brew uninstall master-plan

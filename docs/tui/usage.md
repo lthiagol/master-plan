@@ -12,10 +12,11 @@ human-facing surface of the toolkit.
 
 | Action | Mouse | Keyboard |
 |--------|-------|----------|
-| Switch lane | Click tab label | `Tab` / `Shift+Tab` (or `1`–`7`) |
+| Switch lane | Click tab label | `Tab` / `Shift+Tab` (or `1`–`7`; lane 6 is Autopilot only when `ui.show_autopilot_tab = true`, otherwise Settings) |
 | Select row | Click row | `j` / `k` (or arrow keys) |
 | Open detail | Double-click row | `Enter` |
 | Scroll | Wheel | `j` / `k` / `PgUp` / `PgDn` |
+| Refresh (re-read plan) | — | `Ctrl-R` (refresh; `r` is now resolve-annotation, not refresh) |
 | Sort rebind | — | `o` (per-lane sort menu) |
 | Help | — | `?` |
 | Quit | — | `q` |
@@ -124,6 +125,6 @@ the tested ones, currently).
 test harness drives synthetic mouse events through
 `handle_mouse` directly, never via the real `crossterm` event
 loop. The env var is a runtime escape hatch for end users, not a
-test fixture. The CI smoke run (`.github/workflows/plan.yml`)
-builds the binary, runs the suite, and asserts each integration
-test in `crates/raul/tests/suite_mouse_*.rs` exits 0.
+test fixture. CI runs `make ci` (which builds the binary, runs
+the suite, and asserts each integration test in
+`crates/raul/tests/suite_mouse_*.rs` exits 0).

@@ -207,7 +207,8 @@ Event payload:
 {
   "seq":          <int>,
   "kind":         "dispatch" | "transition" | "review" | "decision"
-                 | "control" | "note" | "recovery",
+                 | "control" | "note" | "recovery"
+                 | "assignment_dispatched",
   "at":           "<RFC3339>",
   "actor":        "<token>",
   "session_id":   "<id>",            // optional
@@ -312,6 +313,7 @@ No event is ever deleted or rewritten. Append-only.
 ```text
 mp autopilot session list
 mp autopilot session show <id>
+mp autopilot session recover <id>
 mp autopilot session transition --session <id> --role <r> --state <s> [--working-on <m:n>] [--actor <a>]
 mp autopilot note add --session <id> --kind <k> --body <body> [--cycle <n>] [--milestone <id>]
 ```

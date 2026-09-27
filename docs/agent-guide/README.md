@@ -36,9 +36,9 @@ Full rules and rationale: [`core-principles.md`](./core-principles.md).
 ## The lifecycle at a glance
 
 ```
-draft → groomed → approved → in-progress → done → (review) → complete
-                       │          │           │         │
-                       │          │           │         └─ self-reviewed → reviewed
+draft → groomed → approved → in-progress → executed → (review) → complete
+                       │          │           │           │
+                       │          │           │           └─ self-reviewed → reviewed
                        │          │           └─ blocked / deferred (overlays)
                        └──────────┴─ spec gates: ACs (G3), out-of-scope (G4), deps done (G8)
 ```
@@ -46,7 +46,7 @@ draft → groomed → approved → in-progress → done → (review) → complet
 - `complete` is **terminal**. The executor marks work complete after
   self-verifying; an independent `mp reviews pass` (a different session) is
   what makes it trustworthy before it's considered shipped.
-- `done` means "finished, awaiting review" — it is not shipped.
+- `executed` means "finished, awaiting review" — it is not shipped.
 - An open external finding auto-enters `remediation`; resolving the last one
   exits it.
 

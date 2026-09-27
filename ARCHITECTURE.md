@@ -1,6 +1,6 @@
 # `mp` architecture
 
-> **Last updated:** 2026-07-10 — module locality splits (`cli/`, `milestone/{io,spec,complete}`, raul `render/*`).
+> **Last updated:** 2026-09-26 — `app/` sub-router split (`app.rs` is now a 13-line wrapper around `app/dispatch.rs`, plus `app/{agent,interview,spec}.rs`).
 
 ---
 
@@ -11,7 +11,8 @@
 | `main.rs` | Binary entry point (minimal — call cli) |
 | `cli/` | Clap CLI surface split by command group (`cli/mod.rs` + `cli/{milestone,plan,reviews,…}.rs`); stable `crate::cli::*` re-exports |
 | `milestone/` | Domain CRUD split: `io` (load/write), `spec` (create/update/lifecycle), `complete` (verify/complete); stable `crate::milestone::*` re-exports |
-| `app.rs` | Command dispatch (`cmd_*` routers, ≤400 lines) |
+| `app.rs` | 13-line wrapper around `app/dispatch.rs` (kept for backward compat) |
+| `app/` | Sub-router split: `dispatch` (`cmd_*` routers, ≤400 lines), `agent`, `interview`, `spec` |
 | **`commands/`** | Handler modules (one per top-level command) |
 | `commands/common.rs` | Shared helpers: `emit()`, `emit_gate_failure()`, `read_evidence()`, `milestone_summary()` |
 | `commands/mod.rs` | `mod` declarations |
@@ -24,7 +25,7 @@
 | `wp.rs` | Work package CRUD |
 | `paths.rs` | `PlanContext` — project-root resolution, plan-dir discovery, safe path-segment helpers |
 | `path_engine.rs` | `mp path` / `mp next` — execution order, adoption pins, strategy |
-| `plan_gaps.rs` | Per-milestone readiness/coverage (`mp plan gaps`, decompose scaffolding) |
+| `plan_gaps.rs` | Per-milestone readiness/coverage (`mp plan gaps`; drives milestone decompose scaffolding) |
 | `track_kind.rs` | Track kind enum (`bugfix`, `tweak`, `chore`) |
 | `validate/` | Validation gates (G1–G14, T1–T2, R1, W01) — `plan.rs`, `gates.rs`, `milestone_warnings.rs`, `tracks.rs`, `report.rs` |
 | `ac_verify.rs` | AC verification execution (runnable via `sh -c`; `MP_VERIFY_NO_SHELL=1` strict mode) |
@@ -37,7 +38,7 @@
 | `graph.rs` | `mp graph` — dependency/coverage graph |
 | `inbox.rs` | `mp inbox` |
 | `hygiene.rs` | `mp hygiene` |
-| `groom.rs` | `mp groom milestone` |
+| `groom.rs` | `mp milestone groom` |
 | `brief.rs` | `mp brief *` |
 | `charter.rs` | Charter (goals/non-goals) |
 | `brownfield.rs` | Brownfield detection + delta-rebase |
@@ -82,11 +83,11 @@ main.rs                       # argv → cli::Cli
                            └─ assets.rs      # embedded templates + schemas
 
 Paths: paths.rs / path_engine.rs / plan_gaps.rs / path_prefs.rs
-Gate enforcement: validate/ (G1–G14, R1, T1–T2), ac_verify.rs (M30 complete gate)
+Gate enforcement: validate/ (G1–G14, R1, T1–T2), ac_verify.rs (per-AC complete gate)
 Harness / install: install.rs / harness.rs / doctor.rs
 ```
 
-Rules: `app.rs` stays ≤400 lines; handlers delegate to domain modules; `store.rs` is the sole persistence seam.
+Rules: `app/dispatch.rs` stays ≤400 lines; handlers delegate to domain modules; `store.rs` is the sole persistence seam.
 
 ---
 
@@ -129,7 +130,7 @@ archive/           # soft-deleted milestones, backlog items
 
 **ID formats:** M## (milestone) · S## (step) · WP## (work package) · AC-## (acceptance criterion) · AN-## (annotation) · BF-## / TW-## / CH-## (track items) · B-## (backlog) · Q-XX (question) · F-## (challenge finding) · D-### (decision) · ID-01 (idea).
 
-`store.rs`: generic `load_toml<T>` / `save_toml<T>` + `atomic_write`. Writes enforce schema via `schema.rs` (now backed by `mini_schema`). IDs generated via `next_available_id` (scans existing files in the directory). `mp sync` rebuilds the `[[milestones]]` index in `plan.toml`.
+`store.rs`: per-resource `load_*` / `write_*` functions plus `atomic_write`. Writes enforce schema via `schema.rs` (backed by `mini_schema`). Milestone IDs generated via `next_milestone_id`. `mp sync` lives in `sync.rs` and rebuilds the `milestones` index in `plan.json`.
 
 ---
 
@@ -187,9 +188,9 @@ archive/           # soft-deleted milestones, backlog items
 - **Emit/ok shape:** every command returns `{ "ok": true, … }` or `{ "ok": false, "errors": […] }`. Gate failures exit 2.
 - **Output formats:** `json` (default — omit `--format` on reads) · `toml` (debug: raw file passthrough, serialized lists, or GraphViz DOT on `graph`). Styled tables and TUI live in `raul`.
 - **`mp validate` vs `plan_gaps`:** use **`mp validate`** for plan-wide integrity — schema-ish gates (G1–G14), index drift (W01/W03), annotation rules (R1), track shape (T1–T2). Use **`plan_gaps`** for **per-milestone execution readiness** — missing work packages/steps, AC coverage map, `execution_ready` hints for `mp execution check` / `mp path`. Overlap on empty `step.tests` is intentional: `validate` enforces it under `strictness=full` (G10); `plan_gaps` reports it as a coverage gap for grooming. Do not duplicate gate logic into `plan_gaps`.
-- **`mp validate` gates:** G1–G5 (structure), G6–G7 (spec status), G8–G10 (start execution, strictness), G11–G13 (delta/brownfield), G14 (approval-annotation gate), R1 (annotation validation), T1–T2 (tracks), B1–B3 (brief), W01 (index drift).
+- **`mp validate` gates:** G1–G5 (structure), G6–G7 (spec status), G8–G10 (start execution, strictness), G11–G13 (delta/brownfield), G14 (approval-annotation gate), R1 (annotation validation), T1–T2 (tracks), B1–B3 (brief), W01/W03 (index drift).
 - **Spec lifecycle:** `draft` → `interview` → `review` → `ready` → `implemented` → `verified`.
-- **Two-zone rule:** plan zone (`master-plan/`) → all I/O via `mp`; code zone (`src/`, `tests/`, docs) → open editing.
+- **Two-zone rule:** plan zone (`master-plan/`) → all I/O via `mp`; code zone (`crates/mp/`, `crates/raul/`, `tests/`, docs, root config) → open editing.
 - **Dep policy:** pin features explicitly where impactful (M21 `dep-audit` gate ≤150). Documented exceptions: `mp-model` (path crate, serde-only), `walkdir` / `include_dir` (no optional feature flags). Pinned: `regex` (`std`, `unicode-perl`), `serde_json` (`std`), `tempfile` (`getrandom`). `jsonschema` is dev-only oracle; runtime uses `mini_schema`.
 - **raul dep policy (M73):** workspace-pinned `crossterm = 0.29`; `ratatui 0.30` with `crossterm_0_29` (required to dedupe crossterm 0.28 pulled by ratatui 0.29). CLI tables via `raul::table`; styling via `crossterm::style::Stylize`. Gate: `make dep-audit-raul` (≤100 transitive, no comfy-table/owo-colors). Baseline was 118 transitive with duplicate terminal stacks.
 - **Embedded assets (M29):** templates + schemas compiled into the binary via `include_dir`. `MP_HOME` is an optional disk override.

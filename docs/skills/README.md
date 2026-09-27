@@ -29,7 +29,7 @@ Each manifest declares:
 | Category | Deploys by default? | Skills |
 |----------|---------------------|--------|
 | **`core`** | Yes — the three base CPD skills deploy on a bare `mp install` | `mp-flow`, `mp-runner`, `mp-coordinator` |
-| **`catalog`** | No — opt in with `mp install --skills …` | `spec-grill`, `codebase-design`, `diagnosing-bugs` |
+| **`catalog`** | No — opt in with `mp install --skills …` | `spec-grill`, `codebase-design`, `diagnosing-bugs`, `mp-orchestrator`, `mp-reviewer` |
 | **`internal`** | Never — excluded from the install registry | `mp-code-review` (repo maintainers only) |
 
 ## Managing skills
@@ -58,13 +58,13 @@ The meta-skill. Loads the **12-stage timeline** of a milestone's life and binds
 each stage to the role that owns it. Any agent (coordinator or runner) loads
 this first; it is the map both roles share.
 
-| Stages 1–4 | Spec authoring (coordinator): Draft, Groom, Specify, Approve |
+| Stages 1–4 | Spec authoring (coordinator): Define outcome, Interview & shape, Write acceptance, Approve spec |
 |------------|--------------------------------------------------------------|
-| Stages 5–7 | Execution (runner): Claim & execute, Self-review, Complete |
+| Stages 5–7 | Execution (runner): Claim & execute, Self-review, Mark complete |
 | Stage 8 | External review (coordinator) |
-| Stage 9 | Remediate (runner) |
+| Stage 9 | Remediate findings (runner) |
 | Stage 10 | Re-review (coordinator) |
-| Stages 11–12 | Document, Hand off (coordinator) |
+| Stages 11–12 | Document, Hand-off (coordinator) |
 
 ### `mp-runner` — executing + fixing (runner role)
 Owns the execution domain (stages 5–7) and remediation (stage 9). When a session
@@ -103,6 +103,21 @@ insight: build a tight feedback loop first (a pass/fail signal that goes red on
 *this* bug); everything else (bisection, hypothesis testing, instrumentation)
 consumes it. *Vendored from `mattpocock/skills` (MIT).*
 
+### `mp-orchestrator` — autopilot cycle decisions + state writes (orchestrator role)
+The orchestrator role for autopilot sessions: decides what the runner executes
+next, advances the milestone through `executed` / `remediate` / `complete`, and
+writes autopilot state. Distinct from the legacy `coordinator` role from the
+original `mp watch` two-pane design; the autopilot redesign splits the legacy
+coordinator into **orchestrator** (cycle decisions) + **reviewer** (independent
+verification). Loads alongside `mp-flow`.
+
+### `mp-reviewer` — autopilot independent verification + verdict writes (reviewer role)
+The reviewer role for autopilot sessions: reads the runner's self-review and
+code, compares claims against diff + tests, and emits findings + verdicts via
+`mp reviews finding add` / `mp reviews pass`. The reviewer session is **never**
+the same session that wrote the code under review — that session-boundary
+discipline is the foundation of independent review. Loads alongside `mp-flow`.
+
 ## Repository-internal skills (not deployed)
 
 Some skills in `templates/skills/` are **not part of the consumer surface**:
@@ -124,10 +139,12 @@ documentation and code-review discipline as anything else in the repo.
 ## How harnesses discover skills
 
 Skills are deployed into the conventional per-harness skills directory
-(`~/.agents/skills`, `~/.cursor/skills`, the Pi skills tree). The harness reads
-each skill's `description` frontmatter to decide when to load it, then surfaces
-the full `SKILL.md` to the agent when the trigger fires. `mp install --check`
-verifies that the deployed set matches the registry and reports drift.
+(`~/.agents/skills`, `~/.cursor/skills`, the shared `~/.agents/skills` for Pi —
+Pi co-installs with OpenCode to keep one canonical copy per skill id). The
+harness reads each skill's `description` frontmatter to decide when to load it,
+then surfaces the full `SKILL.md` to the agent when the trigger fires.
+`mp install --check` verifies that the deployed set matches the registry and
+reports drift.
 
 ## Authoring rules — keep the consumer surface self-contained
 

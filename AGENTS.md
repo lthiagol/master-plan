@@ -64,7 +64,7 @@ Humans use `raul` separately for status and review views.
 - **Consumer-surface hygiene — no internal provenance.** Files that ship to
   adopters (`templates/skills/**`, `docs/**`, user-facing READMEs) must be
   self-contained: no internal milestone IDs (`M\d+`), no lesson codes
-  (`L\d`), and no pointers to repo-internal files
+  (`L\d+`), and no pointers to repo-internal files
   (`docs/code-review-lessons.md`, `docs/dogfood/…`). Name the *capability*
   (`mp config get agent.automation.branch_strategy`), not the milestone that
   introduced it. Milestone IDs remain the native vocabulary inside
@@ -83,7 +83,7 @@ pass/fail with retries; `cargo test` is a serial fallback only.
 | Command | What |
 |---------|------|
 | `make test` | `cargo nextest run` + `cargo fmt --check` (no clippy). Requires `mp` on PATH/`MP_HOME`. With `NEXTTEST=1` uses nextest `--profile ci` (`fail-fast=false`) |
-| `make lint` | `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` + consumer-surface leak guard (CI runs clippy from `plan.yml` directly) |
+| `make lint` | `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` + consumer-surface leak guard (CI runs `make ci` end-to-end) |
 | `make consumer-surface-lint` | ripgrep guard over the consumer surface (templates/skills/** + docs/**); flags internal milestone IDs, lesson codes, and dead doc pointers |
 | `make ci` | `make lint` + `make test` + `mp-flow-lint` + `test-scenarios` — requires `mp` (preflight). Used by `wip-ci.yml` / `stable-ci.yml` after putting `target/release` on PATH; locally: `eval "$(make dev-env)"` |
 | `make mp-flow-lint` | Assert mp-flow SKILL.md matches the 12-stage `stages.toml` |
@@ -147,8 +147,8 @@ cargo nextest run -p mp --no-fail-fast -E 'not test(/some_slow_test/)'
 
 # Format check + clippy with -D warnings (treats warnings as errors).
 # Note: `make lint` uses the dev profile (faster local iteration); CI
-# in .github/workflows/plan.yml uses `cargo clippy --release --all-targets`
-# for a stricter gate. Both must remain clean — use the release form
+# invokes `make ci` (which runs clippy against `--release` for a
+# stricter gate). Both must remain clean — use the release form
 # below when reproducing the exact CI gate.
 cargo fmt --all -- --check
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings

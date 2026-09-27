@@ -7,7 +7,7 @@ binding is also configurable — see [Customizing](#customizing) at the bottom.
 
 | Action | Default keys |
 |--------|--------------|
-| Previous lane | `←`  `h`  `Shift+Tab` |
+| Previous lane | `←`  `Shift+Tab` |
 | Next lane | `→`  `l`  `Tab` |
 | Jump to lane 1–7 | `1` `2` `3` `4` `5` `6` `7` |
 | Focus content pane | `Enter` |
@@ -33,15 +33,12 @@ These only do something when you have drilled into a milestone.
 | Action | Default keys |
 |--------|--------------|
 | Select / drill in | `Enter` |
-| Refresh (re-read from disk) | `r` |
+| Refresh (re-read from disk) | `Ctrl-R` |
 | Toggle filter | `f` |
 | Toggle hide-done | `h` |
-| Toggle auto-refresh (Overview lane) | `w`  `W` |
 
-> **Two different "watch" things.** The `w`/`W` binding above toggles
-> *auto-refresh polling* on the Overview lane. The **Watch lane** (lane 6) is
-> a separate tab for driving `mp watch`; its keys are listed below under
-> [Watch lane](#watch-lane).
+> The Autopilot lane (lane 6, when visible) drives the `mp autopilot`
+> workflow — see [Autopilot lane](#autopilot-lane) below.
 
 ## Filtering, sorting & search
 
@@ -59,20 +56,26 @@ lane through `mp config set sort.<lane> <key>`.
 While the sort-rebind menu is open, it is modal: `↑`/`↓` (or `k`/`j`) cycle the
 sort key, `Enter` binds and closes, `Esc` cancels without binding.
 
-## Watch lane
+## Autopilot lane
 
-The **Watch** lane (lane 6) is the visual surface for the `mp watch` workflow:
-it renders the drivable-milestone picker, the lifecycle graph, the ordered
-queue, and the live agent output of a watch run. The lane is a *view* — the
-actual control surface is the `mp watch` and `mp watch-control` CLI
+The **Autopilot** lane (lane 6, only visible when
+`ui.show_autopilot_tab = true`) is the visual surface for the `mp autopilot`
+workflow: it renders the drivable-milestone picker, the lifecycle graph, the
+ordered queue, and the live agent output of an autopilot run. The lane is a
+*view* — the actual control surface is the `mp autopilot` CLI
 ([`../mp/commands.md`](../mp/commands.md)):
 
 ```bash
-mp watch <id> [<id>…] [--dry-run]   # drive milestones through their lifecycle
-mp watch-control status             # queue, active milestone, stage, outcome
-mp watch-control stop               # gracefully stop the live run
-mp watch-control output             # bounded snapshot of the active pane
+mp autopilot start <id> [<id>…] [--dry-run]   # drive milestones through their lifecycle
+mp autopilot status                            # queue, active milestone, stage, outcome
+mp autopilot stop                              # gracefully stop the live run
+mp autopilot output                            # bounded snapshot of the active pane
 ```
+
+When `ui.show_autopilot_tab = false` (the default), the Autopilot lane is
+hidden and **Settings is lane 6** instead of lane 7. Lane-number bindings
+(`1`–`7`) skip the hidden lane; everything else in this file is lane-ordinal
+agnostic. Use `mp config set ui.show_autopilot_tab true` to enable.
 
 The lane's interactive keys (picker selection, dry-run preflight, start/stop)
 are wired through the action set but not yet bound to the keyboard dispatcher;
@@ -89,6 +92,12 @@ use the CLI commands above to drive a run today.
 | Open review menu | `m` |
 | Open Settings lane | `Ctrl+O` |
 
+> The on-screen legend reflects the **content-canonical** meaning of `r`
+> (resolve an open annotation). On a data lane without an open annotation,
+> `Ctrl-R` is the refresh binding. The two never collide in practice —
+> when an annotation thread is focused, `r` resolves; elsewhere, `Ctrl-R`
+> refreshes.
+
 ## Global
 
 | Action | Default keys |
@@ -103,8 +112,10 @@ While the help overlay is open, **any** key closes it; `q`/`Q` also quits.
 A few keys are intentionally re-interpreted by what has focus. This is by design,
 not a conflict:
 
-- **`h`** — *previous lane* when the tab bar is focused, *hide-done* inside a list.
-- **`r`** — *refresh* on a data lane, *resolve annotation* in an annotation thread.
+- **`h`** — *hide-done* inside a list. (Previous-lane alias `h` was removed
+  in the lane-rename refactor; `←` and `Shift+Tab` cover that role.)
+- **`r`** — *resolve annotation* in an annotation thread; refresh on a data
+  lane is `Ctrl-R`, never `r`.
 - **`Tab`/`Shift+Tab`** — lane navigation (they used to toggle a focus state).
 
 The on-screen legend (`?`) reflects the *content-canonical* meaning of each key;
@@ -157,6 +168,7 @@ a reload (the signal handler only flips a flag — parse + swap run on the
 next event-loop tick). On every platform the explicit reload action (see
 the Settings lane) does the same swap.
 
-Precedence: user-level `keybinds.toml` > legacy mp-config `[keybinds]` JSON
-> hardcoded defaults. Reads never write either source; use of the legacy
-JSON emits one migration hint per load.
+Precedence: user-level `keybinds.toml` > hardcoded defaults. Reads never
+write either source. The legacy mp-config `[keybinds]` JSON overlay was
+removed entirely (no longer honored, no migration hint emitted) — move
+any bindings you still want into `keybinds.toml`.

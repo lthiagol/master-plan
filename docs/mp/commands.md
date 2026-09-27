@@ -177,7 +177,7 @@ at least one execution-ready milestone or track-pending work exists,
 **and** `watch_readiness.ok` is true. The two surfaces (`execution check`,
 `execution status`, `mp autopilot start`, `mp milestone handoff`) answer the
 same go/no-go question so the readiness signal cannot drift between
-them. The `ui.show_watch_tab` value is a separate
+them. The `ui.show_autopilot_tab` value is a separate
 TUI preference and is reported under a distinct key.
 
 ### Reviews — `mp reviews …`
@@ -230,8 +230,8 @@ A finding with an open *external* phase auto-enters the milestone into
 | `mp git status\|suggest-message\|commit` | Git helpers (status-aware commit messages) |
 | `mp scratch path` / `scratch new <label>` | In-repo scratch workspace (for big JSON payloads) |
 | `mp digest [--since …] [--days N] [--markdown] [--out …]` | Activity digest |
-| `mp watch <id> [<id>…] [--dry-run] [--resume\|--force]` | Drive milestones through their lifecycle by spawning runner/coordinator agents |
-| `mp watch-control status\|stop\|output\|result` | Structured watch control-plane (machine-client read surface for a live or last run) |
+| `mp autopilot start <id> [<id>…] [--dry-run] [--resume\|--force]` | Drive milestones through their lifecycle by spawning the orchestrator + runner + reviewer role panes |
+| `mp autopilot status\|stop\|output\|result` | Structured autopilot control-plane (machine-client read surface for a live or last run) |
 | `mp review sidecar <id> --output <path> [--finding F-XX]` | Write a hunk-compatible agent-context sidecar of a milestone's findings + comments |
 | `mp agent role` / `agent harness list\|start-command` | Agent role + harness command registry |
 | `mp skill context` | Compact project context for an agent |

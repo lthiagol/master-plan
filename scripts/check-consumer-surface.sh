@@ -44,9 +44,14 @@ PATTERNS=(
 
 # Paths scanned. Repo-relative (the script cd's to the repo root above).
 # `mp-code-review/` is repository-internal and excluded. Adopter-facing
-# entrypoints (root README.md) are included alongside templates/skills + docs.
+# entrypoints (root README.md + the root + harness templates) are
+# included alongside templates/skills + docs.
 SCAN_PATHS=(
     "templates/skills"
+    "templates/AGENTS-TEMPLATE.md"
+    "templates/ROOT-AGENTS-SNIPPET.md"
+    "templates/harness"
+    "templates/watch"
     "docs"
     "README.md"
 )

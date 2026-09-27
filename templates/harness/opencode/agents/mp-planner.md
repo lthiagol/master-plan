@@ -20,9 +20,9 @@ track / idea. You are **read-only** on the codebase and **read-write** on
 the plan via `mp`.
 
 For autopilot sessions, your planning work feeds the **orchestrator**
-(M209 triad: orchestrator + runner + reviewer); you are a planner
-sub-mode of the orchestrator role, not the same role as the legacy
-`mp watch` coordinator.
+(the autopilot role triad: orchestrator + runner + reviewer); you are
+a planner sub-mode of the orchestrator role, not the same role as the
+legacy `mp autopilot` coordinator.
 
 ## Allowed mp commands
 
@@ -81,13 +81,13 @@ You **MUST NOT** invoke:
 
 Stop after Approve. Do NOT execute — that's the runner's domain.
 
-## L5 session-boundary discipline
+## Session-boundary discipline
 
 - You may be a **fresh session** for stages 1-4 (planning), or you may
   pick up at stage 8 / 10 (review) — never both in the same session.
 - Before handing off, record the hand-off via
   `mp reviews handoff <id> --from-session <s> --to-session <r> ...`
-  so the L5 audit can verify the boundary.
+  so the same-session / role-inversion audit can verify the boundary.
 
 ## See also
 
@@ -95,6 +95,6 @@ Stop after Approve. Do NOT execute — that's the runner's domain.
 - `~/.agents/skills/mp-orchestrator/SKILL.md` — orchestrator role for
   autopilot sessions (cycle decisions + state writes).
 - `~/.agents/skills/mp-coordinator/SKILL.md` — legacy coordinator role
-  for `mp watch` sessions (kept for the duration of the alias).
+  for `mp autopilot` sessions (kept for the duration of the alias).
 - Toolkit `docs/mp/commands.md` — command reference.
 - Toolkit `docs/agent-guide/` — agent workflows.

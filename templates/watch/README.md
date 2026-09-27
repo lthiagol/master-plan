@@ -10,7 +10,7 @@ users ship per-project replacements without recompiling:
 | `<plan_dir>/watch/<stage>.md` (project-local) | the compiled default |
 | `templates/watch/<stage>.md` (compiled in via `include_str!`) | nothing — final rung |
 
-`mp watch` logs a `prompt_source` event per stage whose value
+`mp autopilot start` logs a `prompt_source` event per stage whose value
 distinguishes `override` from `default`
 (see `crates/mp/src/autopilot/drive/prompts.rs::TemplateSource::label`).
 
@@ -21,16 +21,17 @@ Four placeholders are substituted at render time by
 
 | Placeholder | Substituted with |
 |-------------|-------------------|
-| `{header}` | `# mp watch — <stage> M<id>: <title>…`, lifecycle target, and the SAFETY preamble + trust-boundary tags (the XML wrappers `<title>`, `<milestone-id>`, `<ac-list>`, `<step-list>`) |
-| `{id}` | The milestone id (e.g. `M149`) |
+| `{header}` | `# mp autopilot — <stage> M<id>: <title>…`, lifecycle target, and the SAFETY preamble + trust-boundary tags (the XML wrappers `<title>`, `<milestone-id>`, `<ac-list>`, `<step-list>`) |
+| `{id}` | The milestone id (e.g. `149`) |
 | `{ac_list}` | Inline `<ac-list>...</ac-list>` rendering of acceptance criteria (xml-escaped) |
 | `{step_list}` | Inline `<step-list>...</step-list>` rendering of steps (xml-escaped) |
 
 `{header}` MUST be present in any override file. If an override
 file is missing `{header}`, the loader refuses it and falls back
 to the compiled default — the SAFETY preamble and trust-boundary
-tags are essential for prompt-injection defense (M149 review F-10)
-and we will not strip them silently.
+tags are essential for prompt-injection defense (the F-10 review
+finding during the autopilot prompt-template rework) and we will
+not strip them silently.
 
 ## Override file policy (F-12)
 
@@ -63,10 +64,10 @@ template is ≈ 1 KiB.
 ## Override rungs — caller-supplied vs CLI flag
 
 The `<override_dir>` rung is a **library/caller** knob, not a
-public `mp watch` CLI flag. Today there is no `--template-override-dir`
-on `mp watch`; the rung exists so future harnesses, internal callers,
+public `mp autopilot` CLI flag. Today there is no `--template-override-dir`
+on `mp autopilot start`; the rung exists so future harnesses, internal callers,
 and tests can plug in their own template directory without touching
-the project tree. Operators using `mp watch` interact only with the
+the project tree. Operators using `mp autopilot start` interact only with the
 project-local rung (`<plan_dir>/watch/<stage>.md`), and that rung
 is what the dry-run preview renders against.
 
@@ -90,6 +91,11 @@ is what the dry-run preview renders against.
 - The AC-pass command is `mp milestone ac pass <id> <ac-id>` (or
   the long form `mp milestone criterion pass`). The legacy
   `mp milestone ac criterion pass` form does not exist.
+- The `mp watch` and `mp watch-control` spellings were removed when
+  the autopilot redesign landed; `mp autopilot start` / `mp autopilot
+  status|stop|output|result` are the canonical entry points. Any
+  override text that names the legacy verbs is referring to that
+  historical surface, not a current CLI.
 
 ## Adding a new stage
 

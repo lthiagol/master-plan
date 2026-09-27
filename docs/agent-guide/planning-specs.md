@@ -87,8 +87,8 @@ Neither is a normal authoring tool.
 ## Spec review projection
 
 ```bash
-mp spec since-approval <id>     # what changed since the last approval
-mp spec review <id>             # condensed review-oriented projection
+mp spec diff <id>     # what changed since the last approval
+mp spec review <id>   # condensed review-oriented projection
 ```
 
 Useful right before re-approving after a drift fix.

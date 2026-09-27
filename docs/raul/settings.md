@@ -50,18 +50,27 @@ The `--color` CLI flag overrides `ui.color` for a single run.
 | `macchiato` | Catppuccin (dark) |
 | **`mocha`** | Catppuccin dark — the default |
 | `dracula` | Dracula |
-| `monochrome` | No color accents |
 
 An unknown theme name falls back to `mocha`.
 
-## Key bindings (`[keybinds]`)
+> `monochrome` exists internally as the no-accent palette used when
+> `ui.color` is disabled, but it is **not** a user-selectable theme —
+> `ui.theme = monochrome` falls back to `mocha` like any other unknown
+> value. Disable color via `ui.color = false` instead.
 
-Every navigation key is configurable. See [`keybinds.md`](./keybinds.md) for the
-full binding table and the customization grammar. Summary:
+## Key bindings
+
+Every navigation key is configurable via the user-level
+`~/.config/raul/keybinds.toml` (see [`keybinds.md`](./keybinds.md) for the
+full binding table and the customization grammar). The legacy project-config
+`[keybinds]` JSON overlay was removed; use `mp config set` only for non-keybind
+preferences.
+
+Summary:
 
 ```bash
-mp config set keybinds.quit "q"
-mp config set keybinds.next_lane '["Right", "l", "Tab"]'
+mp config set ui.color false
+mp config set ui.icons ascii
 ```
 
 ## Review-side integrations (`[review]`)

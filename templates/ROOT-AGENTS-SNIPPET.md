@@ -17,7 +17,7 @@ mp next
 ## Key rules
 
 1. **Never edit files under `master-plan/` directly.** Use `mp` for all reads and writes.
-2. **Spec before code.** No application changes until `spec_status: ready`.
+2. **Spec before code.** No application changes until the spec is approved (`lifecycle: approved`; the legacy read-only alias was `spec_status: ready`).
 3. **Reads use JSON** (default stdout). For human display, use `raul` or summarize JSON.
 4. **After every write, validate.** `mp validate`
 5. **Plan-only mode.** When asked to plan without implementing, stop after `mp` writes.
@@ -27,15 +27,14 @@ mp next
 ## Lifecycle
 
 ```
-Track:    start → done                              (no external review needed)
-Milestone: executing → executed → review-ready
-                            → in-review → done      (independent review required)
+Track:    in-progress → done                        (no external review needed)
+Milestone: executed → (review in registry) → complete (independent review required)
 ```
 
-`done` for a milestone is reachable **only** via `mp reviews pass` (an independent
-pass). `mp milestone complete` enters the review queue — it does not ship. See
-`master-plan/AGENTS.md` §3.3b–§3.3d for the full flow, the execution contract, and
-the remediation loop.
+`complete` for a milestone is reachable **only** via `mp reviews pass` (an
+independent pass). `mp milestone complete` enters the review queue — it does
+not ship. See `master-plan/AGENTS.md` §3.3b–§3.3d for the full flow, the
+execution contract, and the remediation loop.
 
 ## Quick reference
 

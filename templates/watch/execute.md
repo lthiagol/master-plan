@@ -19,6 +19,7 @@ all steps are done, then stamp per-AC evidence via
 (or the long form `mp milestone criterion pass {id} <AC_ID>`).
 
 When all ACs pass: `mp milestone complete {id} --evidence "…"` transitions
-lifecycle to **`complete`** (terminal; see M148 Option A — the runner does not
-transit `self-reviewed` separately). The coordinator picks up at the next
-loop iteration for external review.
+lifecycle to `executed` for the review queue (or directly to `complete` iff an
+external review has already been recorded). The reviewer picks up at the next
+loop iteration for external review. The runner does not transit `self-reviewed`
+separately — that state lives on the reviews registry, not the lifecycle.

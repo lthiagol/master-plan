@@ -24,7 +24,7 @@ returns a specific lane's head.
 |------|----------|
 | `blocked` | Milestones with the `blocked` overlay |
 | `execution` | In-progress milestones ready for the next step (the default for `mp next`) |
-| `review` | Milestones in the review queue (`done`, awaiting review) |
+| `review` | Milestones in the review queue (`executed`, awaiting review) |
 | `grooming` | Specs being authored/refined (not yet approved) |
 | `backlog` | Deferred/promotable work |
 
@@ -54,7 +54,7 @@ Useful flags: `--horizon N` (how far ahead to look, default 50),
 ## Typed lists
 
 ```bash
-mp list milestones [--filter <preset>] [--status …] [--spec-status …] [--where 'field==value'] [--take N]
+mp list milestones [--filter <groom-state>] [--preset <name>] [--status …] [--spec-status …] [--where 'field==value'] [--take N]
 mp list steps --milestone <id>
 mp list tracks
 mp list backlog
@@ -62,8 +62,11 @@ mp list decisions
 mp list archived
 ```
 
-Common presets for `list milestones --filter`: `done`, `pending`, `in-progress`,
-`partial`, `grooming`, `spec-status ready,interview`. `--where` uses the shared
+Common values for `list milestones --filter` (a groom-state): `done`,
+`pending`, `in-progress`, `partial`, `blocked`, `grooming`. Named presets
+via `--preset` cover things like `force-bypassed`. Combine legacy
+`--spec-status` flags (or a single `--where 'spec_status==ready,interview'`
+clause) to filter by spec status. `--where` uses the shared
 `<field>==<value>` grammar (same one `milestone bulk` uses).
 
 ## Reading one milestone

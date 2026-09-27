@@ -1,8 +1,8 @@
 # Executing
 
 You are the **runner**: an approved, decomposed milestone is moving through
-`in-progress → done`. Implement in the **code zone** (project source); record
-progress in the **plan zone** through `mp`.
+`in-progress → executed`. Implement in the **code zone** (project source);
+record progress in the **plan zone** through `mp`.
 
 ## Before you start
 
@@ -54,8 +54,8 @@ Once all steps are `done` and ACs verified:
 mp milestone complete <id> --evidence "all ACs green; clippy clean"
 ```
 
-`complete` re-runs the gates, then flips lifecycle to `done` and the milestone
-enters the review queue. It refuses to complete unless:
+`complete` re-runs the gates, then flips lifecycle to `executed` and the
+milestone enters the review queue. It refuses to complete unless:
 
 1. every step is `done`,
 2. every AC is `pass`ed (or `fail`ed with a reason), and
@@ -102,9 +102,9 @@ mp reviews finding add <id> --severity low --desc "drift: AC-02 relaxed to a gre
 A reviewer who finds undeclared drift loses trust in the whole submission; a
 declared drift is a decision they can evaluate.
 
-## After `done`
+## After `executed`
 
-`done` is **not** terminal — it means "finished, awaiting review." The milestone
-moves to the review queue. An **independent** agent/session then reviews it
-([`reviewing.md`](./reviewing.md)). You (the executor) should not review your
-own work.
+`executed` is **not** terminal — it means "finished, awaiting review." The
+milestone moves to the review queue. An **independent** agent/session then
+reviews it ([`reviewing.md`](./reviewing.md)). You (the executor) should not
+review your own work.

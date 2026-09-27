@@ -41,7 +41,7 @@ different cut of the same plan.
 | **Path** | The work queue across planning lanes (blocked, execution, review, grooming, backlog) |
 | **Backlog** | Deferred/parked items, promotable into milestones or tracks |
 | **Ideas** | Vague "someday" ideas — promotable into milestones, backlog, or tracks |
-| **Watch** | The `mp watch` driver surface: browse drivable milestones and watch the live queue, lifecycle graph, and agent output of an `mp watch` run |
+| **Autopilot** | The `mp autopilot` driver surface: browse drivable milestones and watch the live queue, lifecycle graph, and agent output of an `mp autopilot start` run (visible when `ui.show_autopilot_tab = true`) |
 | **Settings** | raul UI preferences (color, icons, theme, hide-done) |
 
 Navigate lanes with `←`/`→` (or `h`/`l`, or `Tab`/`Shift+Tab`), or jump directly
@@ -64,9 +64,9 @@ with the number keys `1`–`7`.
   reopens one.
 - **Approval & review menu.** `p` toggles an approval request; `m` opens the
   review menu (which runs a pre-flight check before approving).
-- **Watch lane.** Shows the `mp watch` picker, lifecycle graph, queue, and
-  live agent output. Start and control runs through the `mp watch` /
-  `mp watch-control` CLI (see [`../mp/commands.md`](../mp/commands.md)).
+- **Autopilot lane.** Shows the `mp autopilot` picker, lifecycle graph,
+  queue, and live agent output. Start and control runs through the
+  `mp autopilot` CLI (see [`../mp/commands.md`](../mp/commands.md)).
 - **Help.** `?` opens the on-screen legend, generated from the live key
   bindings so it never drifts from reality.
 

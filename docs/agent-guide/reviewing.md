@@ -38,7 +38,7 @@ mp reviews pass <id> --verdict ok --reviewer alice --notes "all claims verified"
 ```
 
 When the spec is also `verified`, a `--verdict ok` auto-promotes the milestone
-`done → complete` (terminal). `--verdict changes-needed` does **not** promote.
+`executed → complete` (terminal). `--verdict changes-needed` does **not** promote.
 
 Batch the queue when appropriate:
 
@@ -76,7 +76,7 @@ to you:
 ```bash
 # 1. You filed findings → milestone is in remediation
 # 2. Executor (different session) fixes each, re-verifies, resolves:
-mp milestone set-status <id> executing
+mp milestone set-status <id> in-progress
 # … fix in the code zone …
 mp milestone step done <id> <step>
 mp reviews finding resolve <id> F-01 --commit <sha>
@@ -95,8 +95,8 @@ captured pre-state.
 
 | `review_state` | Means |
 |----------------|-------|
-| *(empty)* | not `done` yet |
-| `pending-review` | `done`, no review recorded |
+| *(empty)* | not yet executed |
+| `pending-review` | `executed`, no review recorded |
 | `open-findings` | reviewed, has open findings |
 | `remediated` | reviewed, every finding was *fixed* |
 | `reviewed-clean` | reviewed, no findings (or all dismissed) |

@@ -170,7 +170,7 @@ technical_context, assumptions, risks, follow_ups.
 
 Use only after the spec is approved (`lifecycle: approved`).
 
-Triggered by: *"break this into steps"*, *"plan implementation for M03"*, *"decompose M03"*.
+Triggered by: *"break this into steps"*, *"plan implementation for the milestone"*, *"decompose the milestone"*.
 
 ```text
 1. mp milestone groom <id>
@@ -276,7 +276,7 @@ to review. This is not a code review — it is proof that the work is honest.
 3. If an AC cannot be honestly passed:
    mp milestone block <id> --reason "AC-05 blocked: <why>"
    → escalate. Do NOT --force.
-4. mp milestone complete <id>   # → lifecycle: executed; enters the review queue (NOT shipped)
+4. mp milestone complete <id>   # transitions lifecycle to `complete` (terminal) iff an external review has been recorded; otherwise lands at `executed` for the review queue
 5. mp validate
 ```
 
@@ -368,7 +368,7 @@ Use when the user asks for status, summaries, or what's next.
 | What's next? | `mp next` or `mp path` |
 | Full work queue | `mp path` |
 | Do M4 before M3 | `mp path pin 04 --before 03` |
-| What should we do with M03? | `mp milestone groom 03` |
+| What should we do with this milestone? | `mp milestone groom <id>` |
 | Steps for a milestone | `mp list steps --milestone <id>` |
 | Park idea for later | `mp idea create ...` |
 | Small bugfix | `mp track add bugfix ...` |
@@ -466,7 +466,7 @@ Use `mp brief list` as context — do not re-ask what the brief already covers.
 ## 4. Lifecycle Gates
 
 `mp validate` (and the mutation commands) enforce these. The full state machine —
-`draft → groomed → approved → in-progress → done → self-reviewed → reviewed → complete`,
+`draft → groomed → approved → in-progress → executed → self-reviewed → reviewed → complete`,
 plus `remediation` and the blocked/deferred overlays — lives in
 [`docs/milestones/`](~/.agents/master-plan/docs/milestones/).
 
