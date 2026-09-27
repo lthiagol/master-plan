@@ -1,0 +1,366 @@
+{
+  "milestone": {
+    "id": "243",
+    "title": "Theme system polish — sync schema, live-apply picker, Alucard, Frappe-dim fix",
+    "slug": "theme-system-polish-sync-schema-live-apply-picker-alucard-frappe-dim-fix",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T16:20:45.302646+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T16:20:45.302651+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T16:20:45.302651+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The Settings lane grows a Theme picker surface that lists all 7 palettes (latte / frappe / macchiato / mocha / dracula / alucard + reset) with 6-color swatches per row and a synthetic status-icon preview row. Highlights re-tint the entire TUI immediately (live-apply); the existing Save flow (s) commits the choice to config.toml. The catalog gains Alucard (Dracula light); Frappe's dim is corrected to Subtext0; the schema's allowed-list is derived from the catalog."
+  },
+  "problem": {
+    "description": "raul ships six palettes (Crates/raul/src/theme.rs: LATTE, FRAPPE, MACCHIATO, MOCHA, DRACULA, MONOCHROME) and a Settings lane ui.theme key (docs/raul/settings.md) — but (a) the settings schema test fixture locks allowed=['mocha','latte'] while the code defines six, (b) only the two schema-allowed names surface in the Settings lane while the others work via config.toml fallback, (c) no live preview — changing theme requires restart, (d) Frappe dim is 0x949cbb (Overlay2) where the canonical Frappe dim should be 0xa5adce (Subtext0), (e) Draculatheme's light variant Alucard is not shipped even though the dracula theme is. The audit pass on 2026-09-26 also chose four user-confirmed directions: live-apply on highlight (T-1), persist-on-Save (T-2), include a Reset row (T-3), and explicitly NOT plan for custom user palettes (T-4). This M243 milestone implements all five fixes in one bundle."
+  },
+  "scope": {
+    "in_scope": [
+      "Sync crates/raul/src/tui/modes/settings/schema.rs so that 'ui.theme' allowed-list is derived from crates/raul/src/theme.rs::ALL via a function (theme_allowed_names() -> Vec<&'static str>) instead of being a hand-maintained ['mocha','latte'] literal; the existing schema test fixture is updated to assert all six.",
+      "Add ALUCARD as a 7th Palette in crates/raul/src/theme.rs (Dracula light variant from draculatheme.com): accent Green #50fa7b, success Purple #bd93f9 (or Teal #50fa7b adjusted), warn Orange #ffb86c, danger Red #ff5555, dim Comment #6272a4, foreground Foreground #6c5ce6 — exact spec values are read from draculatheme.com/contribute at spec time.",
+      "Fix FRAPPE dim: change 0x949cbb to 0xa5adce (Catppuccin Frappe Subtext0).",
+      "Add a Theme picker surface in crates/raul/src/tui/modes/settings.rs (or a new modes/settings/theme_picker.rs module): the rendered row for ui.theme becomes a vertical list of 7 entries (6 named palettes + 1 'Default (mocha)' reset row). Each named-palette row shows: name, 6-color swatch block (accent / success / warn / danger / dim / foreground rendered in the actual palette), and a one-line description.",
+      "Below the picker list, a one-row synthetic status preview row: rendered icons (in-progress done ready blocked accent dim) using the currently-highlighted palette's colors; this shows how the 6 roles compose in a TUI-shape context.",
+      "Live-apply semantics: as the picker highlight moves (mouse hover or arrow keys), App::palette swaps to the highlighted palette; the entire TUI re-tints with the new colors immediately. No restart, no Enter required for the visual swap.",
+      "Persist-on-Save: the live-applied palette stays in App::palette until the user presses s in the Settings lane; then the choice is written to config.toml via the existing mp config set path. Cancel discards. The status preview chip in the Settings header shows 'preview' vs 'saved' to disambiguate live-applied-but-unsaved from saved.",
+      "Reset-to-default row: selecting it (mouse click / Enter / arrow + Enter) reverts the live preview to mocha; the saved value remains whatever was last persisted.",
+      "Mouse Model B (free click + focus): every row's hit-test rect is registered; clicking a row applies it live.",
+      "Keyboard: arrow keys move highlight, Enter would be a no-op because live-apply handles it, Esc returns to Settings row index without applying (no live preview saved)."
+    ],
+    "out_of_scope": [
+      "Custom user-defined palettes from ~/.config/raul/themes/*.toml (per T-4 user direction: not planned).",
+      "Per-component accent roles (e.g., focus_ring, surface_1, surface_2): would extend the Palette struct beyond 6 roles.",
+      "Auto-detection of terminal capability (COLORFTERM, $TERM) for monochrome suggestion: deferred.",
+      "Time-of-day or context-aware theme switching: explicitly skipped per the user's review-direction.",
+      "Refactor of CtColor / CLI color path: settings are TUI-specific. CLI stays untouched.",
+      "Light/dark variants of all 5 Catppuccin palettes beyond Mocha (e.g., we already have Latte)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "ui.theme schema allowed-list is derived from theme::ALL at runtime; the test fixture asserts all 7 names are accepted (6 palettes + 'mocha' default-name also listed). Drift detection: schema test fails on mismatch.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/schema_allows_all_themes|theme_allowed_names_function/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Alucard (Dracula light) is registered as a 7th static palette in crates/raul/src/theme.rs; selecting 'alucard' in config.toml resolves via Palette::by_name without fallback to mocha.",
+      "verification": "cargo test -p raul theme; cargo nextest run -p raul --no-fail-fast -E 'test(/palette_by_name_alucard/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Frappe dim is 0xa5adce (Catppuccin Frappe Subtext0) per official spec, not 0x949cbb.",
+      "verification": "grep 'rgb(0xa5adce)' crates/raul/src/theme.rs (must return the frappe line); cargo test -p raul theme_frappe_dim_matches_spec",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Settings lane shows a Theme picker surface: a vertical list of 7 entries (6 palettes + reset). Each named-palette row renders name + 6-color swatch + one-line description. Mouse click and arrow keys both switch the highlighted row.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_picker_render|theme_picker_swatch|theme_picker_mouse|theme_picker_keyboard/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Below the picker list, a one-row synthetic status preview is rendered using the currently-highlighted palette's colors. Status types displayed: in-progress / done / ready / blocked / accent / dim — exercising all 6 palette roles.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_picker_preview_row/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Live-apply: highlighting a row sets App::palette immediately; the next render call paints with the new colors. No restart required.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_live_apply_on_highlight|theme_live_repaint_no_restart/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "Persist-on-Save: the Settings save flow writes ui.theme to config.toml via mp config set when s is pressed; pressing s with the live highlight different from the saved value commits the highlight. Pressing Esc reverts the live highlight to the saved value when the Settings editor closes (or to the row last edited).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_persist_on_save|theme_esc_reverts_live_to_saved/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "Reset-to-default row exists at the bottom of the picker list; selecting it sets the live preview back to mocha.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_picker_reset_row/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "Status chip in Settings header disambiguates 'preview' (live-applied-but-unsaved) from 'saved'. The current saved value is shown, plus the current live highlight if different.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_status_chip_preview_vs_saved/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "make lint + make test + consumer-surface-lint remain green; cargo clippy --workspace --all-targets -- -D warnings exits 0; no mp config consumers break.",
+      "verification": "make lint && make test && make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Catalog fixes",
+      "goal": "Sync schema theme allowed-list to palette ALL. Fix Frappe dim. Add Alucard (7th palette). Update docs.",
+      "rollback": "Revert dim fix and Alucard; restore schema test data verbatim."
+    },
+    {
+      "id": "WP2",
+      "name": "Picker surface",
+      "goal": "Theme picker surface in Settings lane: 7-entry list with 6-color swatches and synthetic status preview row. Live-apply on highlight; persist-on-Save; reset row.",
+      "rollback": "Revert picker UI; theme change reverts to manual config edits."
+    },
+    {
+      "id": "WP3",
+      "name": "Verify and ship",
+      "goal": "make lint, make test, consumer-surface-lint, cargo clippy all green; tail-of-tests confirms AC-01..AC-09.",
+      "rollback": "Drop to whichever passing subset; never ship a red-only merge."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Add Alucard as a 7th static palette in crates/raul/src/theme.rs (Dracula light variant: accent Green success Purple warn Orange danger Red dim Comment foreground Foreground). Adjust exact colors to match the draculatheme.com spec.",
+      "files": [
+        "crates/raul/src/theme.rs"
+      ],
+      "tests": "cargo test -p raul theme; cargo nextest run -p raul --no-fail-fast -E test(/palette_by_name_alucard/)",
+      "done_when": "AC-02 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Fix Frappe dim to 0xa5adce (Catppuccin Frappe Subtext0 per official spec). Add a unit test that asserts the FRAPPE static value matches the spec.",
+      "files": [
+        "crates/raul/src/theme.rs"
+      ],
+      "tests": "grep rgb 0xa5adce crates/raul/src/theme.rs; cargo test -p raul theme_frappe_dim_matches_spec",
+      "done_when": "AC-03 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Sync schema test fixture to assert all 7 palette names.",
+      "files": [
+        "crates/raul/src/tui/modes/settings/schema.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/schema_allows_all_themes/)",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Build the Theme picker surface in Settings. Vertical list of 7 entries: 6 named palettes plus a reset row at the bottom. Each named row shows palette name, 6-color swatch in the actual palette accent/success/warn/danger/dim/foreground, and a one-line description. Mouse Model B: each row hit-test rect registered.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_render|theme_picker_swatch|theme_picker_mouse|theme_picker_keyboard/)",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP2",
+      "order": 10,
+      "action": "Add a one-row synthetic status preview below the picker. Icons in-progress done ready blocked accent dim using the highlighted palette colors. Exercises all 6 palette roles.",
+      "files": [
+        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_preview_row/)",
+      "done_when": "AC-05 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.2",
+      "work_package": "WP2",
+      "order": 9,
+      "action": "Implement live-apply on highlight. Mouse hover or arrow keys move highlight set App.palette to the highlighted palette. The next render call paints with the new colors. No restart required.",
+      "files": [
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_live_apply_on_highlight|theme_live_repaint_no_restart/)",
+      "done_when": "AC-06 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.3",
+      "work_package": "WP2",
+      "order": 8,
+      "action": "Implement persist-on-Save. Pressing s on the Settings lane with the live highlight different from the saved value writes ui.theme to config.toml via mp config set. Esc restores saved theme.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_persist_on_save|theme_esc_reverts_live_to_saved/)",
+      "done_when": "AC-07 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.4",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Add the reset row at the bottom. Selecting it sets live preview back to mocha. Saved value unchanged.",
+      "files": [
+        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_reset_row/)",
+      "done_when": "AC-08 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-08"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.5",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add the Settings header chip showing preview vs saved. Live highlight different from saved shows preview dashed; matches saved shows saved solid.",
+      "files": [
+        "crates/raul/src/tui/modes/settings.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_status_chip_preview_vs_saved/)",
+      "done_when": "AC-09 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.6",
+      "work_package": "WP3",
+      "order": 5,
+      "action": "Run make lint, make test, make consumer-surface-lint, cargo clippy --workspace --all-targets -- -D warnings. Verify all ACs.",
+      "files": [
+        "crates/raul"
+      ],
+      "tests": "make lint; make test; make consumer-surface-lint; cargo clippy --workspace --all-targets -- -D warnings",
+      "done_when": "AC-10 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-10"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
