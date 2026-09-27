@@ -303,9 +303,13 @@ pub fn which_herdr() -> Option<PathBuf> {
     None
 }
 
-/// Run `herdr agent list --format json` and return its stdout. Empty
+/// Run `herdr agent list` and return its stdout. Empty
 /// string on failure (so `find_existing_pane` is a no-op when herdr
 /// is unreachable — `ensure_pane` then falls through to spawn).
+///
+/// 2026-09-27 (herdr 0.9.x drift): herdr 0.9.x returns JSON by
+/// default (a JSON-RPC envelope wrapping `result.agents`); older
+/// herdr versions accepted `--format json`, which we no longer pass.
 pub fn list_panes(herdr_bin: &Path) -> Result<String> {
     // 2026-09-27 (herdr 0.9.x drift): herdr 0.7.x accepted
     // `--format json` on `agent list`; 0.9.x does not. Drop the
@@ -1225,12 +1229,72 @@ mod tests {
         assert_eq!(parse_pane_id_from_start_output(""), None);
     }
 
-    // ─── S4 + S5 unit tests ───────────────────────────────────────────────────
+    // 2026-09-27 (herdr 0.9.x): herdr wraps every response in a
+    // JSON-RPC envelope `{"id":"cli:...", "result":{...}}`. The
+    // tests below pin the envelope-shape branches of
+    // parse_pane_id_from_start_output and find_existing_pane.
+    // The envelope `id` is the JSON-RPC envelope id, NOT a real
+    // pane id — none of the assertions below may return it.
+
+    #[test]
+    fn parse_start_output_envelope_pane_split_shape() {
+        // `herdr pane split` 0.9.x wire shape (per tests/common/fake_herdr.rs).
+        let out = r#"{"id":"cli:pane:split","result":{"pane":{"pane_id":"wA:p3"}}}"#;
+        assert_eq!(
+            parse_pane_id_from_start_output(out),
+            Some("wA:p3".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_start_output_envelope_agent_start_shape() {
+        // `herdr agent start` 0.9.x wire shape. When both pane_id
+        // and id are present under agent, pane_id wins (it is the
+        // actual pane reference).
+        let out = r#"{"id":"cli:agent:start","result":{"agent":{"pane_id":"wA:p5","id":"a-7"}}}"#;
+        assert_eq!(
+            parse_pane_id_from_start_output(out),
+            Some("wA:p5".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_start_output_envelope_id_is_not_a_pane_id() {
+        // Negative pin: the JSON-RPC envelope `id` field must NOT be
+        // returned as the pane id. Guard against a regression that
+        // accidentally re-picks the envelope id (e.g., "cli:pane:split").
+        let out = r#"{"id":"cli:pane:split","result":{"pane":{"pane_id":"wA:p3"}}}"#;
+        assert_ne!(
+            parse_pane_id_from_start_output(out),
+            Some("cli:pane:split".to_string()),
+            "envelope id must never be returned as the pane id"
+        );
+    }
+
+    #[test]
+    fn find_existing_pane_matches_0_9_x_envelope_shape() {
+        // `herdr agent list` 0.9.x wire shape: JSON-RPC envelope
+        // wrapping the `result.agents` array. Both `pane_id` (preferred)
+        // and `id` (fallback) keys must resolve.
+        let json = r#"{"id":"cli:agent:list","result":{"agents":[
+            {"name": "role-runner-1", "pane_id": "%5"},
+            {"name": "role-coordinator-1", "id": "%7"}
+        ]}}"#;
+        assert_eq!(
+            find_existing_pane("role-runner-1", json),
+            Some("%5".to_string())
+        );
+        assert_eq!(
+            find_existing_pane("role-coordinator-1", json),
+            Some("%7".to_string())
+        );
+        assert_eq!(find_existing_pane("role-runner-2", json), None);
+    }
 
     // ─── S4 + S5 unit tests ───────────────────────────────────────────────────
-    // (placeholder kept intentionally blank: pure-function cases for
-    // S4/S5 live in this module; behavioral cases that need a fake
-    // herdr binary live in tests/autopilot_drive_herdr_wait.rs.)
+    // Pure-function cases for S4/S5 live in this module; behavioral
+    // cases that need a fake herdr binary live in
+    // tests/autopilot_drive_herdr_wait.rs.
 
     #[test]
     fn lifecycle_target_roundtrips_str() {
