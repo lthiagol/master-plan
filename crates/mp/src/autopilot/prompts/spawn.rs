@@ -742,10 +742,7 @@ mod tests {
         rc.model = Some("anthropic/claude-opus-4-1".into());
         rc.skill = "mp-runner".into();
         let flags = harness_extra_flags(&rc).unwrap();
-        assert_eq!(
-            flags,
-            vec!["--skill".to_string(), "mp-runner".to_string()]
-        );
+        assert_eq!(flags, vec!["--skill".to_string(), "mp-runner".to_string()]);
     }
 
     #[test]

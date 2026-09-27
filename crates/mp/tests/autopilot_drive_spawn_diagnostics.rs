@@ -149,7 +149,9 @@ fn build_pane_split_args_carries_direction_down_for_herdr_0_9_plus() {
     // a regression that drops the flag trips here even if the
     // surrounding order changes.
     let argv = build_pane_split_args(std::path::Path::new("/repo"));
-    let dir_idx = argv.iter().position(|a| a == "--direction")
+    let dir_idx = argv
+        .iter()
+        .position(|a| a == "--direction")
         .expect("build_pane_split_args must include --direction for herdr >= 0.9.0");
     assert_eq!(
         argv.get(dir_idx + 1).map(String::as_str),

@@ -1134,7 +1134,10 @@ mod tests {
             !extras.contains(&"--model".to_string()),
             "opencode's CLI does not accept --model; flag must not be emitted"
         );
-        assert!(extras.is_empty(), "opencode with no thinking flag → empty extras");
+        assert!(
+            extras.is_empty(),
+            "opencode with no thinking flag → empty extras"
+        );
 
         let rc = RoleConfig {
             harness: Some("cursor".into()),
