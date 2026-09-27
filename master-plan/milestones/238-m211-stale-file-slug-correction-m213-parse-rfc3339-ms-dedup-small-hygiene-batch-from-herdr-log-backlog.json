@@ -1,0 +1,175 @@
+{
+  "milestone": {
+    "id": "238",
+    "title": "M211 stale file slug correction + M213 parse_rfc3339_ms dedup — small hygiene batch from herdr-log backlog",
+    "slug": "m211-stale-file-slug-correction-m213-parse-rfc3339-ms-dedup-small-hygiene-batch-from-herdr-log-backlog",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T03:05:26.105827+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T03:05:26.105830+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T03:05:26.105830+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "M211's milestone file name matches its spec title, and parse_rfc3339_ms is defined once in a shared autopilot/drive helper module instead of duplicated between cycle.rs and cycle_stale_state_timeout.rs."
+  },
+  "problem": {
+    "description": "Two cosmetic-but-real issues logged in mp-herdr-log2.txt session 1+3: (a) M211's milestone file is `211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` but its spec title is 'mp autopilot typed task assignment — orchestrator dispatch through herdr argv.' (b) M213's `cycle_stale_state_timeout.rs` duplicates the `parse_rfc3339_ms` function already defined in `cycle.rs`. Both reviewed-and-filed findings landed as 'backlog class' (low severity, no commit), but they're cheap to fix alongside the M230/cleanup pass and removing them reduces reviewer-noise on every autopilot milestone that follows."
+  },
+  "scope": {
+    "in_scope": [
+      "Rename `master-plan/milestones/211-mp-autopilot-lane-notification-wire-format-shell-command-never-printed-text.json` to a slug matching the current title (`211-mp-autopilot-typed-task-assignment.json`); update any references that point at the old path.",
+      "Extract the duplicated `parse_rfc3339_ms` (and any other small RFC3339 parsing helpers already duplicated in autopilot/drive/) into `crates/mp/src/autopilot/drive/time.rs`. Update `cycle_stale_state_timeout.rs` and `cycle.rs` to import from the shared module.",
+      "Add a `rg -n 'fn parse_rfc3339_ms'` source-pin that asserts exactly one definition exists.",
+      "Re-run the M211 + M213 reviewer scenario tests to confirm no behavior change."
+    ],
+    "out_of_scope": [
+      "Touching any spec content (titles, AC verification fields, scope.in_scope items).",
+      "Refactoring other RFC3339 helper functions outside `autopilot/drive/`.",
+      "Re-doing the M211/M213 review cycles; the rename is hygiene, not a regression."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "M211 milestone file name matches the spec title slug; no orphan references to the old path remain.",
+      "verification": "ls master-plan/milestones/211* shows the new slug; rg -n 'mp-autopilot-lane-notification-wire-format' master-plan/ crates/mp/ templates/ docs/ returns no matches.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "fn parse_rfc3339_ms is defined exactly once in the autopilot module tree.",
+      "verification": "rg -n 'fn parse_rfc3339_ms' crates/mp/src/ returns exactly one definition (in autopilot/drive/time.rs).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Existing M211 + M213 scenarios pass without behavior change.",
+      "verification": "cargo nextest run -p mp --test autopilot_drive --no-fail-fast AND cargo nextest run -p mp --test scenarios_runner --no-fail-fast (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "make lint + make test remain clean.",
+      "verification": "make lint && make test.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Verify",
+      "goal": "Run M211 + M213 scenario tests; make lint and make test stay green",
+      "rollback": "Revert the source change; restored behavior matches the prior baseline."
+    },
+    {
+      "id": "WP2",
+      "name": "Rename M211 file slug",
+      "goal": "M211 file name matches spec title; orphan references updated",
+      "rollback": "git mv revert"
+    },
+    {
+      "id": "WP3",
+      "name": "Dedup parse_rfc3339_ms",
+      "goal": "parse_rfc3339_ms defined once in autopilot/drive/time.rs",
+      "rollback": "Restore duplicate definitions"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP2",
+      "order": 1,
+      "action": "Rename the M211 milestone file to a slug matching the spec title (mp autopilot typed task assignment).",
+      "files": [
+        "master-plan/milestones/211-mp-autopilot-typed-task-assignment.json"
+      ],
+      "tests": "rg -n mp-autopilot-lane-notification-wire-format master-plan crates templates docs returns nothing; ls master-plan/milestones/211- shows the new name",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "Run M211 + M213 scenario tests and make lint + make test",
+      "files": [
+        "crates/mp"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_drive --no-fail-fast; cargo nextest run -p mp --test scenarios_runner --no-fail-fast; make lint; make test",
+      "done_when": "AC-03 AC-04 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Re-run the M211 plus M213 scenario tests; make lint and make test.",
+      "files": [
+        "crates/mp"
+      ],
+      "tests": "cargo nextest run autopilot_drive; cargo nextest run scenarios_runner; make lint; make test",
+      "done_when": "AC-03 AC-04 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

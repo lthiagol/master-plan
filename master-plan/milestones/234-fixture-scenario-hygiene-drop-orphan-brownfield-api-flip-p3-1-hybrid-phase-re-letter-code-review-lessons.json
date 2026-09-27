@@ -1,0 +1,191 @@
+{
+  "milestone": {
+    "id": "234",
+    "title": "fixture/scenario hygiene — drop orphan brownfield-api, flip p3.1-hybrid phase, re-letter code-review lessons",
+    "slug": "fixture-scenario-hygiene-drop-orphan-brownfield-api-flip-p3-1-hybrid-phase-re-letter-code-review-lessons",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T02:53:31.042781+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T02:53:31.042783+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T02:53:31.042783+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Test fixtures ship only what consumer tests load, scenarios are marked with the phase their runtime can run, and the L1-L63 lesson anchors still resolve after a reordering."
+  },
+  "problem": {
+    "description": "Three fixture/scenario drifts: (a) tests/fixtures/projects/brownfield-api/ is referenced ONLY in master-plan/milestones/28-green-ci-step-test-backfill-testing-hardening.json:79 text — no integration test loads the fixture, so the M28 claim 'all six fixture projects validated' is half-true. (b) tests/scenarios/p3.1-hybrid-work-next-track/scenario.json is marked phase: implemented while its own notes field reads 'Session milestone under sessions/ is not in Rust path yet — documents target hybrid behavior'; the scenarios_runner refuses to skip it on regression but the path it expects does not exist. (c) crates/mp/tests/fixtures/code-review-lessons.md entries are not in monotonic L-number order (e.g. L47 precedes L12; L48, L39-L43 interrupted; L15-L21 shuffled); consumers like templates/skills/mp-code-review/SKILL.md reference ranges like 'L1-L63' that are stable, but skills that point at individual lessons by number may surprise readers."
+  },
+  "scope": {
+    "in_scope": [
+      "Either delete tests/fixtures/projects/brownfield-api/ entirely, OR wire it into at least one integration test under crates/mp/tests/brownfield_*.rs that calls mp validate / mp list on it (so the M28 'all six validated' CI claim is real). Update M28 evidence accordingly.",
+      "Flip tests/scenarios/p3.1-hybrid-work-next-track/scenario.json to phase: planned and replace its assertions with stdout_contains checks that pass against today's mp behavior; OR land the sessions/ path the notes describe and keep phase: implemented.",
+      "Renumber or alphabetize crates/mp/tests/fixtures/code-review-lessons.md so the L-IDs are monotonically increasing, then update any L\\d+ anchor references in templates/skills/mp-code-review/SKILL.md or in the runnable pattern fixtures that named the old order.",
+      "Move (or relabel with a header) the lessons file to make its dual role obvious — it is consumed by the repo-internal mp-code-review skill only, not as a test fixture."
+    ],
+    "out_of_scope": [
+      "Rewriting the contents of individual L1-L63 lessons (the syllabus stays as-is).",
+      "Refactoring the scenarios_runner to do anything other than skip planned-phase scenarios."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "tests/fixtures/projects/brownfield-api is either deleted or loaded by at least one passing integration test, and M28 evidence reflects whichever path was taken.",
+      "verification": "test ! -e tests/fixtures/projects/brownfield-api || cargo nextest run -p mp --no-fail-fast -E 'test(/brownfield_api/)' (positive; either condition satisfies AC); master-plan/milestones/28-*.json has evidence matching whichever choice was made.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "tests/scenarios/p3.1-hybrid-work-next-track/scenario.json runs cleanly today (phase matches reality): either marked phase: planned and skipped, or its assertions are realized in code so phase: implemented passes.",
+      "verification": "cargo nextest run -p mp --test scenarios_runner --no-fail-fast (no regression on p3.1-hybrid-work-next-track scenario).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The lessons catalog ids are in monotonically-increasing order and every L\\d+ anchor used in templates/skills/mp-code-review/SKILL.md (or in code_review_patterns.rs) resolves to an actual lesson title.",
+      "verification": "python3 -c \"import re,sys; ids=[int(m.group(1)) for m in re.finditer(r'^## L(\\d+)', open('crates/mp/tests/fixtures/code-review-lessons.md').read(), re.M)]; assert ids == sorted(ids), ids\" (exit 0); rg -n '\\bL(\\d+)\\b' templates/skills/mp-code-review/SKILL.md | xargs -I{} rg -q 'L\\1' crates/mp/tests/fixtures/code-review-lessons.md.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "The lessons file has a one-paragraph header explaining its dual role (test fixture carrying skill content / skill syllabus consumed by an excluded skill), pointing readers to either location.",
+      "verification": "head -10 crates/mp/tests/fixtures/code-review-lessons.md (or wherever it ends up) includes the paragraph; consumer-surface-lint remains clean (file is under EXCLUDE_PATHS or the relabeled location is also excluded).",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Fixture hygiene",
+      "goal": "Drop the orphan brownfield-api fixture or wire it; flip p3.1-hybrid scenario to its real phase; reletter code-review lessons",
+      "rollback": "Restore the orphan fixture; revert p3.1 phase; revert lesson numbering"
+    },
+    {
+      "id": "WP2",
+      "name": "Lessons catalog relabel",
+      "goal": "Move (or relabel) the lessons file so its dual role is obvious to readers and consumer-surface-lint remains clean",
+      "rollback": "Restore the file to its original location and header"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Either delete tests/fixtures/projects/brownfield-api/ entirely, OR wire it into at least one integration test under crates/mp/tests/brownfield_*.rs that calls mp validate / mp list on it; update M28 evidence accordingly.",
+      "files": [
+        "tests/fixtures/projects/brownfield-api",
+        "crates/mp/tests/brownfield_api.rs",
+        "master-plan/milestones/28-green-ci-step-test-backfill-testing-hardening.json"
+      ],
+      "tests": "test ! -e tests/fixtures/projects/brownfield-api || cargo nextest run -p mp --no-fail-fast -E 'test(/brownfield_api/)'",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Flip tests/scenarios/p3.1-hybrid-work-next-track/scenario.json to phase: planned and replace its assertions with stdout_contains checks that pass against today's mp behavior; OR land the sessions/ path the notes describe and keep phase: implemented.",
+      "files": [
+        "tests/scenarios/p3.1-hybrid-work-next-track/scenario.json"
+      ],
+      "tests": "cargo nextest run -p mp --test scenarios_runner --no-fail-fast",
+      "done_when": "AC-02 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Renumber or alphabetize crates/mp/tests/fixtures/code-review-lessons.md so the L-IDs are monotonically increasing; update any L\\d+ anchor references in templates/skills/mp-code-review/SKILL.md or in code_review_patterns.rs that named the old order.",
+      "files": [
+        "crates/mp/tests/fixtures/code-review-lessons.md",
+        "templates/skills/mp-code-review/SKILL.md"
+      ],
+      "tests": "python3 -c 'import re; ids=[int(m.group(1)) for m in re.finditer(r\"^## L(\\d+)\", open(\"crates/mp/tests/fixtures/code-review-lessons.md\").read(), re.M)]; assert ids == sorted(ids)' (exit 0); rg -n 'L\\d+' templates/skills/mp-code-review/SKILL.md | xargs -I{} rg -q 'L\\1' crates/mp/tests/fixtures/code-review-lessons.md",
+      "done_when": "AC-03 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Move (or relabel with a one-paragraph header) the lessons file to make its dual role obvious — test fixture carrying skill content / skill syllabus consumed by an excluded skill; consumer-surface-lint remains clean.",
+      "files": [
+        "crates/mp/tests/fixtures/code-review-lessons.md",
+        "docs/internal/code-review-lessons.md"
+      ],
+      "tests": "head -10 crates/mp/tests/fixtures/code-review-lessons.md (or wherever it lands) includes the dual-role paragraph; make consumer-surface-lint",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

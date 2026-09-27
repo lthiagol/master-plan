@@ -1,0 +1,210 @@
+{
+  "milestone": {
+    "id": "231",
+    "title": "mp-flow skill table-vs-stages drift — extend mp_flow_lint to assert SKILL.md role-binding row matches stages.toml",
+    "slug": "mp-flow-skill-table-vs-stages-drift-extend-mp-flow-lint-to-assert-skill-md-role-binding-row-matches-stages-toml",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T02:53:30.909655+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T02:53:30.909657+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T02:53:30.909657+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "make mp-flow-lint enforces that the role-binding table at templates/skills/mp-flow/SKILL.md stays in lockstep with templates/skills/mp-flow/stages.toml — both stage names and role bindings — so a rename in one cannot silently drift the other."
+  },
+  "problem": {
+    "description": "scripts/mp_flow_lint.py only checks that SKILL.md has `## <name>` sections for every entry in stages.toml (lines 62-87). The role-binding table in SKILL.md:13-28 lists 12 stages with names that disagree with stages.toml for 7/12 rows: stages.toml uses 'Draft, Groom, Specify, Approve, Claim & execute, Self-review, Complete, External review, Remediate, Re-review, Document, Hand off' while SKILL.md writes 'Define outcome, Interview & shape, Write acceptance, Approve spec, Claim & execute, Self-review, Mark complete, External review, Remediate findings, Re-review, Document, Hand-off'. The comment at stages.toml:115-122 says the table 'mirrors' the role-binding summary — but the SKILL.md drifted and the lint does not catch it. Today the gate passes falsely."
+  },
+  "scope": {
+    "in_scope": [
+      "Extend scripts/mp_flow_lint.py to parse the role-binding table from templates/skills/mp-flow/SKILL.md and assert each row matches the [role_binding.*] key in templates/skills/mp-flow/stages.toml for stage_id, stage_name, owner.",
+      "Update templates/skills/mp-flow/SKILL.md role-binding table to use the canonical stage names from stages.toml (re-order so the table reads top-down the same as the stages.toml flow_stages section).",
+      "Add a negative-fixture test under tests/fixtures/mp-flow-lint/ that demonstrates drift (deliberate broken SKILL.md) and assert the lint refuses to pass.",
+      "Document the new contract in docs/skills/README.md or docs/agent-guide/README.md so future skill edits know the lint catches drift."
+    ],
+    "out_of_scope": [
+      "Renumbering stages (the 12-stage flow stays canonical).",
+      "Adding new stages or new roles.",
+      "Changing the role ownership rules (this is a name-drift fix, not a process change)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "scripts/mp_flow_lint.py parses the role-binding table in SKILL.md and asserts each row matches stages.toml [role_binding.*] / owner / stage_name for all 12 stages.",
+      "verification": "python3 -c \"import scripts.mp_flow_lint\" fails-not, python3 scripts/mp_flow_lint.py --json prints 12 rows, and a deliberately drifted SKILL.md (in a temp tree) fails with a precise per-row diagnostic that names the offending stage_id, the expected vs actual values.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "templates/skills/mp-flow/SKILL.md role-binding table uses the canonical stage names from stages.toml so the lint passes against current content.",
+      "verification": "make mp-flow-lint (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Negative fixture proves the lint refuses to pass on a drifted SKILL.md.",
+      "verification": "cargo nextest run -p mp --test mp_flow_lint_drift --no-fail-fast (positive fixture passes, negative fixture (drifted SKILL.md) fails the lint with the expected diagnostic).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "make lint and consumer-surface-lint remain clean (no new lint warnings, no consumer surface leaks).",
+      "verification": "make lint && make consumer-surface-lint.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Lint extension",
+      "goal": "scripts/mp_flow_lint.py parses SKILL.md role-binding table and asserts equality with stages.toml for 12 stages",
+      "rollback": "Revert scripts/mp_flow_lint.py to its current section-heading-only check; restore the drifted SKILL.md"
+    },
+    {
+      "id": "WP2",
+      "name": "SKILL.md canonicalization + fixtures",
+      "goal": "SKILL.md role-binding table uses canonical stage names from stages.toml; a negative fixture proves the lint catches drift",
+      "rollback": "Revert SKILL.md wording; drop the negative-fixture test"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Extend scripts/mp_flow_lint.py to parse the SKILL.md role-binding table; assert each row matches [role_binding.*] key + owner + stage_name from templates/skills/mp-flow/stages.toml; emit a per-row diagnostic that names the offending stage_id.",
+      "files": [
+        "scripts/mp_flow_lint.py"
+      ],
+      "tests": "python3 scripts/mp_flow_lint.py --json emits 12 rows; a deliberately drifted SKILL.md in a temp tree fails with a precise diagnostic",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Update templates/skills/mp-flow/SKILL.md role-binding table to use the canonical stage names from stages.toml (Draft / Groom / Specify / Approve / Claim & execute / Self-review / Complete / External review / Remediate / Re-review / Document / Hand off).",
+      "files": [
+        "templates/skills/mp-flow/SKILL.md"
+      ],
+      "tests": "make mp-flow-lint (exit 0)",
+      "done_when": "AC-02 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "Run make lint and consumer-surface-lint; ensure no new warnings, then update CHANGELOG.",
+      "files": [
+        "CHANGELOG.md"
+      ],
+      "tests": "make lint && make consumer-surface-lint",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Run make lint and consumer-surface-lint; ensure no new warnings, then update CHANGELOG.",
+      "files": [
+        "CHANGELOG.md"
+      ],
+      "tests": "make lint && make consumer-surface-lint",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add a negative-fixture test under tests/fixtures/mp-flow-lint that proves the lint refuses to pass on a drifted SKILL.md; document the new contract in docs/skills/README.md and docs/agent-guide/README.md.",
+      "files": [
+        "tests/fixtures/mp-flow-lint",
+        "docs/skills/README.md",
+        "docs/agent-guide/README.md"
+      ],
+      "tests": "cargo nextest run -p mp --test mp_flow_lint_drift --no-fail-fast",
+      "done_when": "AC-03 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

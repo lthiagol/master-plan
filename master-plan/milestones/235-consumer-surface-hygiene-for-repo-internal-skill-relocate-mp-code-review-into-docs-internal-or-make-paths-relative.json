@@ -1,0 +1,173 @@
+{
+  "milestone": {
+    "id": "235",
+    "title": "consumer-surface hygiene for repo-internal skill — relocate mp-code-review into docs/internal or make paths relative",
+    "slug": "consumer-surface-hygiene-for-repo-internal-skill-relocate-mp-code-review-into-docs-internal-or-make-paths-relative",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T02:53:31.082779+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T02:53:31.082781+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T02:53:31.082781+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "The repo-internal mp-code-review skill is unambiguously repo-only: copies to downstream repos cannot break, the consumer-surface-lint no longer has to special-case it, and the audit trail (which lessons catalog + patterns file is canonical) is explicit."
+  },
+  "problem": {
+    "description": "templates/skills/mp-code-review/SKILL.md is currently excluded from consumer-surface-lint via EXCLUDE_PATHS in scripts/check-consumer-surface.sh:59 — but the file is full of internal vocabulary: 8+ references to L\\d+ lesson codes (lines 3,18,19,46-51,67,74-76,83,131-132), M\\d+ milestone ids (line 20 references M173 S1, line 43 'Lessons with runnable Pattern: blocks (M173 S1)'), and 5 references to a repo-internal path `crates/mp/tests/fixtures/code-review-lessons.md` (lines 11,18,66,116,131). The exclusion is intentional (the skill is master-plan-repo-only; see its own header), but if a future maintainer copies this skill into an adopter repo, the prose breaks with dead links and confusing identifiers. The current lint only catches leaks from the SHIPPED skills; nothing structurally enforces 'this skill must not be downstream-able'."
+  },
+  "scope": {
+    "in_scope": [
+      "Move templates/skills/mp-code-review/ → docs/internal/skills/mp-code-review/ (and update AGENTS.md, docs/skills/README.md, plus the few references in templates/harness/cursor/agents/mp-planner.md and templates/harness/opencode/agents/mp-planner.md) so the EXCLUDE_PATHS no longer needs a templates/-side exception.",
+      "Replace 5 hardcoded `crates/mp/tests/fixtures/code-review-lessons.md` and `crates/mp/tests/code_review_patterns.rs` paths in the SKILL.md with a single relative-link convention (e.g. `${REPO_ROOT}/crates/mp/tests/fixtures/code-review-lessons.md`) plus a sentence explaining adopters must resolve the variable, OR drop the prose path references and rely on the canonical doc-map at docs/skills/README.md.",
+      "Add a `PROVENANCE: REPO-ONLY — NOT INSTALLABLE` header to docs/internal/skills/mp-code-review/SKILL.md so a casual reader knows not to ship it.",
+      "Remove the EXCLUDE_PATHS carve-out for templates/skills/mp-code-review/ from scripts/check-consumer-surface.sh, and verify the lint remains clean.",
+      "Add a CHANGELOG entry recording the move."
+    ],
+    "out_of_scope": [
+      "Rewriting the lesson catalog body (the L1-L63 content stays as-is).",
+      "Touching the runnable patterns (crates/mp/tests/code_review_patterns.rs) — they are tests and live where they belong.",
+      "Removing the EXCLUDE_PATHS carve-out for any other skill (currently only mp-code-review is exempted)."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "The mp-code-review skill lives at docs/internal/skills/mp-code-review/ with a PROVENANCE header; the templates/-side exception is gone.",
+      "verification": "test ! -e templates/skills/mp-code-review && test -e docs/internal/skills/mp-code-review/SKILL.md && head -10 docs/internal/skills/mp-code-review/SKILL.md includes 'PROVENANCE: REPO-ONLY'.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "scripts/check-consumer-surface.sh no longer carves out a templates/skills/mp-code-review path; the lint runs against the moved file's new home and still passes (because the new home is under docs/internal which is already excluded or via the same rule that excludes it).",
+      "verification": "! grep -nE 'mp-code-review' scripts/check-consumer-surface.sh && bash scripts/check-consumer-surface.sh (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The SKILL.md prose no longer hardcodes `crates/mp/...` paths; the remaining repo-internal references are either relative or templated.",
+      "verification": "rg -n 'crates/mp/(tests|src)/' docs/internal/skills/mp-code-review/SKILL.md returns at most the canonical-relative anchors and not raw absolute repo paths.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "make lint and consumer-surface-lint remain clean; the canonical install-smoke contract still rejects mp-code-review from a registered install.",
+      "verification": "make lint && make consumer-surface-lint && cargo nextest run -p mp --test install_skills_v2 --no-fail-fast -E 'test(/internal_skill/)' (existing negative tests pass; if the test names an absolute path, update them to the new home).",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Skill relocation",
+      "goal": "Move templates/skills/mp-code-review → docs/internal/skills/mp-code-review with a PROVENANCE: REPO-ONLY header",
+      "rollback": "Restore templates/skills/mp-code-review; restore scripts/check-consumer-surface.sh EXCLUDE_PATHS carve-out"
+    },
+    {
+      "id": "WP2",
+      "name": "Lint + content cleanup",
+      "goal": "Drop EXCLUDE_PATHS carve-out; replace 5 hardcoded  paths with relative anchors; verify consumer-surface-lint remains clean",
+      "rollback": "Re-add EXCLUDE_PATHS carve-out; restore hardcoded paths"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Move the templates skill to docs/internal and update the cross-references.",
+      "files": [
+        "AGENTS.md",
+        "docs/skills/README.md",
+        "templates/harness/cursor/agents/mp-planner.md"
+      ],
+      "tests": "test -e docs/internal/skills/mp-code-review/SKILL.md",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Strip hardcoded paths in SKILL.md and drop EXCLUDE_PATHS carve-out.",
+      "files": [
+        "docs/internal/skills/mp-code-review/SKILL.md",
+        "scripts/check-consumer-surface.sh"
+      ],
+      "tests": "bash scripts/check-consumer-surface.sh exits 0",
+      "done_when": "AC-02 AC-03 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02",
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP2",
+      "order": 3,
+      "action": "Run make lint plus consumer-surface-lint plus install-skills-v2 contract.",
+      "files": [
+        "scripts/check-consumer-surface.sh"
+      ],
+      "tests": "make lint; make consumer-surface-lint; cargo nextest run -p mp --test install_skills_v2 --no-fail-fast",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

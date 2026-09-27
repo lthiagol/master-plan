@@ -8917,15 +8917,92 @@
     {
       "id": "228",
       "title": "post-cutover autopilot internal cleanup — rename watch modules/tests and remove dead orchestration paths",
-      "spec_status": "ready",
-      "execution_status": "planned",
+      "spec_status": "verified",
+      "execution_status": "done",
       "blocked_by": ""
     },
     {
       "id": "229",
       "title": "breaking-release cleanup — remove mp watch and legacy autopilot migration shims",
+      "spec_status": "verified",
+      "execution_status": "done",
+      "blocked_by": ""
+    },
+    {
+      "id": "230",
+      "title": "post-M229 raul TUI Watch lane collapse — remove tui::watch duplicate state and Watch* actions",
       "spec_status": "ready",
-      "execution_status": "deferred",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "231",
+      "title": "mp-flow skill table-vs-stages drift — extend mp_flow_lint to assert SKILL.md role-binding row matches stages.toml",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "232",
+      "title": "test infrastructure quality — split lib_api.rs mega-helper and dedup seed/gig-git helpers across suites",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "233",
+      "title": "test coverage gap closure — autopilot_detach, breaking_release apply, archive/purge/metrics, gates G6/G14, error-path negatives",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "234",
+      "title": "fixture/scenario hygiene — drop orphan brownfield-api, flip p3.1-hybrid phase, re-letter code-review lessons",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "235",
+      "title": "consumer-surface hygiene for repo-internal skill — relocate mp-code-review into docs/internal or make paths relative",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "236",
+      "title": "M202 doc-overindented-list-items clippy lint — close the recurring false-positive at crates/mp-model/src/milestone.rs:155-158",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "237",
+      "title": "mp autopilot activity reconcile + per-write activity events — close the M200/M207/M228 audit-trail gap",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "238",
+      "title": "M211 stale file slug correction + M213 parse_rfc3339_ms dedup — small hygiene batch from herdr-log backlog",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "239",
+      "title": "mp autopilot design-input migration — move mp-herdr-log design input into master-plan and ship `mp autopilot design-input` (per R15)",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "240",
+      "title": "Path + Milestones subtitle support — emit intent.outcome through path_engine and render a description line on the Milestones row",
+      "spec_status": "ready",
+      "execution_status": "planned",
       "blocked_by": ""
     }
   ],

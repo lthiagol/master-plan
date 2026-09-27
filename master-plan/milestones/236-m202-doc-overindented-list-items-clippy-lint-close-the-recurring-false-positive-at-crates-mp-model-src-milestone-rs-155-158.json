@@ -1,0 +1,144 @@
+{
+  "milestone": {
+    "id": "236",
+    "title": "M202 doc-overindented-list-items clippy lint — close the recurring false-positive at crates/mp-model/src/milestone.rs:155-158",
+    "slug": "m202-doc-overindented-list-items-clippy-lint-close-the-recurring-false-positive-at-crates-mp-model-src-milestone-rs-155-158",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T03:05:01.773950+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T03:05:01.773953+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T03:05:01.773953+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "cargo clippy --all-targets -- -D warnings is green from a clean baseline; the recurring mp-model doc_overindented_list_items lint (4 occurrences in M209/M212/M220/M222) is fixed once."
+  },
+  "problem": {
+    "description": "crates/mp-model/src/milestone.rs lines 155-158 trigger clippy::doc_overindented_list_items with clippy 1.98+ (introduced during M202 cycle 3, commit 6204555). The reviewer correctly filed it as out-of-scope backlog against M209, M212, M220, and M222 — 4 milestones in a row. Each remediation cycle shipped with the lint still red. A 5-line reformat closes it for good."
+  },
+  "scope": {
+    "in_scope": [
+      "Edit crates/mp-model/src/milestone.rs:155-158 to fix the doc-overindented-list-items formatting (indented continuation to match the parent bullet).",
+      "Re-run cargo clippy --all-targets -- -D warnings on a clean tree (make clean + cargo clippy).",
+      "Run cargo fmt --check + cargo test -p mp-model + the wider make test to ensure the formatting change doesn't break anything.",
+      "Add a CHANGELOG entry under the next release: 'mp-model doc-comment lint cleanup; closes the M209/M212/M220/M222 backlog pattern.'"
+    ],
+    "out_of_scope": [
+      "Touching any clippy::pedantic warnings.",
+      "Refactoring the milestone-doc bullet that triggered this (the doc text stays the same, only the indentation/positioning is corrected).",
+      "Backporting the fix to other crates' doc comments."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "cargo clippy --all-targets -- -D warnings exits 0 on a clean baseline (after make clean).",
+      "verification": "make clean && cargo clippy --all-targets -- -D warnings (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "crates/mp-model/src/milestone.rs:155-158 no longer triggers doc_overindented_list_items.",
+      "verification": "cargo clippy -p mp-model --all-targets -- -D warnings 2>&1 | rg 'doc_overindented_list_items' (no matches).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "make test still passes after the doc-comment edit.",
+      "verification": "make test (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "CHANGELOG entry under the next release notes the mp-model doc-comment cleanup.",
+      "verification": "head -30 CHANGELOG.md | rg -i 'doc-overindented|mp-model doc' (exit 0).",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Implementation",
+      "goal": "Ship the documented fix or subcommand; pass the AC verifications.",
+      "rollback": "Revert the source change; restored behavior matches the prior baseline."
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Edit crates/mp-model/src/milestone.rs:155-158 to fix the doc-overindented-list-items formatting.",
+      "files": [
+        "crates/mp-model/src/milestone.rs"
+      ],
+      "tests": "cargo clippy -p mp-model --all-targets -- -D warnings",
+      "done_when": "AC-01 AC-02 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Run make clean then cargo clippy --all-targets -- -D warnings; verify zero lint failures; then make test; add CHANGELOG entry.",
+      "files": [
+        "CHANGELOG.md"
+      ],
+      "tests": "make clean; cargo clippy --all-targets -- -D warnings; make test; head CHANGELOG.md shows the entry",
+      "done_when": "AC-03 AC-04 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

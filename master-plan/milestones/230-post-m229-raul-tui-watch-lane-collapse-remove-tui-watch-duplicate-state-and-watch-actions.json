@@ -1,0 +1,276 @@
+{
+  "milestone": {
+    "id": "230",
+    "title": "post-M229 raul TUI Watch lane collapse — remove tui::watch duplicate state and Watch* actions",
+    "slug": "post-m229-raul-tui-watch-lane-collapse-remove-tui-watch-duplicate-state-and-watch-actions",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T02:53:28.309881+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T02:53:28.309883+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T02:53:28.309883+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "After M229's mp-side removal, the raul TUI exposes a single Autopilot lane with no duplicate Watch state, no Watch-prefixed Action variants, and no tui::watch module; users who press the same keymap as today reach the same outcome."
+  },
+  "problem": {
+    "description": "M228 renamed canonical autopilot internals in crates/mp/ but the raul TUI still carries both lanes: App::watch (crates/raul/src/tui/app.rs:696) holds a `Watch` model alongside App::autopilot, and crates/raul/src/tui/watch.rs (1465 lines) duplicates types, parser, and preflight/start/stop handlers that route through `mp watch`. Action::WatchStart, Action::WatchStop, Action::WatchRefresh, Action::WatchPreflight, Action::WatchToggleSelect, Action::WatchMovePicker, Action::WatchMoveQueue, Action::WatchClearQueue (crates/raul/src/tui/action.rs:241-266) all dispatch to that module. M229 removed the mp watch alias and the watch-control subcommands, so the raul side now points at nothing — the Watch lane renders, parses, and shells out to commands that no longer exist. Leaving this dead module in tree makes fixes to the live autopilot lane riskier (two source-of-truth surfaces for the same workflow) and confuses adopters who diff raul releases."
+  },
+  "scope": {
+    "in_scope": [
+      "Delete crates/raul/src/tui/watch.rs and remove its pub mod entry in crates/raul/src/tui/mod.rs.",
+      "Remove Action::Watch* variants from crates/raul/src/tui/action.rs:241-266, 488, 849-880, 1820 and any dependent Rust flow that names them.",
+      "Remove App::watch (and Watch::empty() initializer) from crates/raul/src/tui/app.rs:696,835 and any render/polling path that reads it.",
+      "Re-route the keybinds/keymap (and migrate the legacy keybind source if any references survive) so Watch-prefixed actions map to the equivalent Autopilot action without breaking the user-visible flow.",
+      "Update the top-tab nav (crates/raul/src/tui/dashboard.rs), the autopilot lane picker, and any text/help surface that still says 'Watch' instead of 'Autopilot' where it would otherwise mislead.",
+      "Wire the migration diagnostic so users with a stale Watch keybind config get a one-shot on-screen hint pointing to the Autopilot lane and the new keybind.",
+      "Regenerate consumer-surface golden scenarios / install fixtures that reference the Watch lane or its labels."
+    ],
+    "out_of_scope": [
+      "Changing the Autopilot lane (tui/autopilot.rs) surface or its keybind policy.",
+      "Changing the mp autopilot CLI commands, state shapes, or migration shims — that is owned by M229.",
+      "Removing historical changelog entries or archived milestone files."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "No tui::watch module exists after this ships: `crates/raul/src/tui/watch.rs` is gone, `pub mod watch;` is gone from `crates/raul/src/tui/mod.rs`, and no source file in `crates/raul/src/` references `tui::watch::` or `crate::tui::watch::`.",
+      "verification": "test ! -e crates/raul/src/tui/watch.rs && ! rg -n 'pub mod watch|::watch::|tui::watch' crates/raul/src/ (exit 0 with no matches).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "App state holds no Watch field: `App::watch` is removed and the only autopilot-related lane state lives under `App::autopilot`.",
+      "verification": "rg -n 'pub watch:' crates/raul/src/ (must return nothing); rg -n 'watch:\\s*Watch::empty|watch:\\s*Watch\\b' crates/raul/src/ (must return nothing).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Action enum carries no `Watch*` variant; the only autopilot-related actions are the Autopilot* variants.",
+      "verification": "rg -n 'Action::Watch' crates/raul/src/ (must return nothing); rg -n '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/ (must return nothing).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Existing keybinds that pointed at Watch* actions still reach the equivalent Autopilot behavior (no UX regression for users with cached keybind configs from before M229).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/autopilot_lane/)'.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "The migration diagnostic surfaces a one-shot on-screen hint when the loaded keybind config still names a Watch-prefixed action, naming the Autopilot lane and the replacement keybind.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/watch_to_autopilot_migration/)' (new test in crates/raul/tests/tui_keybinds_migration.rs).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "Full mp + raul test suite plus consumer-surface lint pass with no behavior change on autopilot lane UX or JSON shape.",
+      "verification": "make test && make consumer-surface-lint.",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Watch lane deletion",
+      "goal": "Remove every Watch-prefixed surface in raul so a single Autopilot lane owns the workflow",
+      "rollback": "Restore tui/watch.rs and the Watch action variants; the canonical Autopilot behavior is unchanged so the rollback is purely additive"
+    },
+    {
+      "id": "WP2",
+      "name": "Keybind migration + diagnostics",
+      "goal": "Preserve user-visible behavior: prior Watch keybinds now drive the equivalent Autopilot action, and stale configs surface a one-shot migration hint",
+      "rollback": "Re-enable Watch-prefixed keybinds behind a config flag so historical installs keep working until the next session"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Delete crates/raul/src/tui/watch.rs and the pub mod entry in tui/mod.rs; canonicalize whatever the module re-exported under tui::autopilot.",
+      "files": [
+        "crates/raul/src/tui/watch.rs",
+        "crates/raul/src/tui/mod.rs",
+        "crates/raul/src/tui/action.rs",
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "test ! -e crates/raul/src/tui/watch.rs && ! rg -n 'pub mod watch' crates/raul/src/tui/mod.rs",
+      "done_when": "AC-01 source-pin passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Remove Watch* Action variants from tui/action.rs:241-266,488,849-880,1820 and every reference in helper dispatches.",
+      "files": [
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "rg -n 'Action::Watch' crates/raul/src/ must return nothing",
+      "done_when": "AC-03 source-pin passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.1",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Remove the App::watch field and any Watch::empty() initializer; tui::app.rs:696,835.",
+      "files": [
+        "crates/raul/src/tui/app.rs"
+      ],
+      "tests": "rg -n 'pub watch:|watch:\\s*Watch::empty|watch:\\s*Watch\\b' crates/raul/src/ must return nothing",
+      "done_when": "AC-02 source-pin passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1.2",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Update render/watch.rs, runner_helpers.rs, poll.rs, dashboard.rs and any other code that referenced the Watch module — drop those branches and ensure they no longer compile against tui::watch.",
+      "files": [
+        "crates/raul/src/tui/render/watch.rs",
+        "crates/raul/src/tui/runner_helpers.rs",
+        "crates/raul/src/tui/poll.rs",
+        "crates/raul/src/tui/dashboard.rs"
+      ],
+      "tests": "rg -n 'tui::watch::|crate::tui::watch::' crates/raul/src/ must return nothing",
+      "done_when": "AC-01 + AC-02 source-pins pass and cargo check -p raul is clean",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Re-route the keybinds/keymap so any historical Watch-prefixed keybind source maps to the equivalent Autopilot action; preserve the user-visible flow.",
+      "files": [
+        "crates/raul/src/config.rs",
+        "crates/raul/src/tui/keybinds.rs",
+        "crates/raul/src/tui/key_combo.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybinds/)'",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Run the full test suite plus consumer-surface-lint; ensure no behavior change on autopilot lane UX or JSON shape; record the CHANGELOG entry.",
+      "files": [
+        "CHANGELOG.md",
+        "tests/fixtures"
+      ],
+      "tests": "make test && make consumer-surface-lint",
+      "done_when": "AC-06 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.2",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "Add a one-shot on-screen migration hint that surfaces when the loaded keybind config still names a Watch-prefixed action, naming the Autopilot lane plus the replacement keybind.",
+      "files": [
+        "crates/raul/src/tui/dashboard.rs",
+        "crates/raul/src/tui/keybinds.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/watch_to_autopilot_migration/)",
+      "done_when": "AC-05 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

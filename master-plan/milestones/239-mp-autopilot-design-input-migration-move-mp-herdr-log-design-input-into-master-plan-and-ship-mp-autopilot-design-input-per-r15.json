@@ -1,0 +1,198 @@
+{
+  "milestone": {
+    "id": "239",
+    "title": "mp autopilot design-input migration — move mp-herdr-log design input into master-plan and ship `mp autopilot design-input` (per R15)",
+    "slug": "mp-autopilot-design-input-migration-move-mp-herdr-log-design-input-into-master-plan-and-ship-mp-autopilot-design-input-per-r15",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T03:05:41.483759+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T03:05:41.483761+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T03:05:41.483761+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Substantive lessons from the autopilot design-input section in mp-herdr-log.txt are queryable through `mp autopilot design-input show <topic>` and discoverable in the plan zone, not lost when a repo-root log file gets truncated."
+  },
+  "problem": {
+    "description": "mp-herdr-log.txt:328-339 (R15 — log file fragility): the repo-root log file has been truncated multiple times during the autopilot test runs. The future Drive milestone (now folded into M207-M229) was supposed to migrate the orchestration log INTO master-plan/ as a structured record queryable via `mp autopilot design-input`. The lessons themselves were consumed by M207-M229, but the durable record was never built — mp-herdr-log.txt still sits at the repo root and remains a single-source-of-truth-loss risk. The user has now asked us to remove the log files in this audit pass; the design-input lessons must move into the plan zone first, otherwise we lose them."
+  },
+  "scope": {
+    "in_scope": [
+      "Define a JSON schema for an autopilot design-input record (e.g., `master-plan/decisions/M-autopilot-design-input.json`, or per-decision files under `master-plan/decisions/autopilot/`).",
+      "Write a one-time migration script (or `mp autopilot design-input sync` subcommand) that ingests mp-herdr-log.txt and mp-herdr-log2.txt's substantive sections (the R1-R15 hard requirements from mp-herdr-log.txt and the cross-session lessons in mp-herdr-log2.txt's 'Lessons carried forward' / 'New lessons' / 'Forward-looking' sections) into the structured records.",
+      "Add `mp autopilot design-input show <topic>` and `mp autopilot design-input list` subcommands that read the structured records and return JSON / pretty output.",
+      "Add 5+ integration tests that load the canonical topics (e.g., `lane-notification`, `cycle-matrix`, `role-boundaries`, `commit-strategy`, `m202-doc-lint`) and assert the structured content matches the original.",
+      "Only AFTER the migration is verified: delete mp-herdr-log.txt and mp-herdr-log2.txt from the repo root and add them to .gitignore so re-clones don't resurrect them. Update any 'see mp-herdr-log.txt' references in code to point at the new command."
+    ],
+    "out_of_scope": [
+      "Re-running the autopilot test; the design-input is one-way text-to-structured migration.",
+      "Changing the test fixture content (the lessons stay as-is; only their storage shape changes).",
+      "Adding new design-input records for M230-M238 — those are captured via the standard mp reviews / mp decisions paths and do NOT need the design-input shape."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "mp-herdr-log.txt and mp-herdr-log2.txt are no longer at the repo root after the migration ships; they are absent from git's tree.",
+      "verification": "test ! -e mp-herdr-log.txt && test ! -e mp-herdr-log2.txt; git ls-files | rg 'mp-herdr-log' returns nothing.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "Structured records exist under master-plan/decisions/ (or equivalent), one per R1-R15 topic, with content that matches the source lesson word-for-word.",
+      "verification": "ls master-plan/decisions/autopilot/ shows 15 files (matching R1..R15); a sample diff test asserts that `mp autopilot design-input show lane-notification` returns the source paragraph verbatim.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "mp autopilot design-input list / show subcommands return JSON; the consumer-surface-lint stays clean (these are agent-facing, must not pollute).",
+      "verification": "mp autopilot design-input list (returns ≥15 entries); mp autopilot design-input show lane-notification returns the R4 paragraph; make consumer-surface-lint.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Integration test ingests a fixture of the original log sections and round-trips through the new command; lossless migration is provable.",
+      "verification": "cargo nextest run -p mp --test autopilot_design_input --no-fail-fast; the test feeds a fixture of the original text and asserts the structured record bytes match the source.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "make test remains green; an existing repo-root reference (e.g., a CHANGELOG line or skill body that said 'see mp-herdr-log.txt') now points at the new command.",
+      "verification": "make test; rg -n 'mp-herdr-log' templates/ docs/ scripts/ crates/ (after migration must be empty or point at the design-input command).",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "CLI plus tests plus cleanup",
+      "goal": "Ship the design-input command; prove lossless migration; delete repo-root logs",
+      "rollback": "Restore mp-herdr-log files from git"
+    },
+    {
+      "id": "WP2",
+      "name": "Schema and sync",
+      "goal": "Define the design-input JSON schema; ingest mp-herdr-log.txt and mp-herdr-log2.txt into structured records",
+      "rollback": "Restore from git"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP2",
+      "order": 1,
+      "action": "Define the JSON schema and ingest the source lessons into per-topic records under master-plan/decisions/autopilot/.",
+      "files": [
+        "master-plan/decisions/autopilot",
+        "docs/schemas/autopilot-design-input.schema.json"
+      ],
+      "tests": "ls master-plan/decisions/autopilot/ shows 15 files",
+      "done_when": "AC-02 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Add the lossless round-trip integration test that feeds the source fixture and asserts the structured record matches verbatim; ensure suite passes.",
+      "files": [
+        "crates/mp/tests/autopilot_design_input.rs"
+      ],
+      "tests": "cargo nextest run -p mp --test autopilot_design_input --no-fail-fast",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03",
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Remove mp-herdr-log.txt and mp-herdr-log2.txt from the repo root and add them to .gitignore; update any external references that name them; run full test plus consumer-surface-lint plus plan-validate.",
+      "files": [
+        ".gitignore"
+      ],
+      "tests": "test ! -e mp-herdr-log.txt; test ! -e mp-herdr-log2.txt; git ls-files | rg mp-herdr-log returns nothing; rg mp-herdr-log templates docs scripts crates returns nothing; make test; make consumer-surface-lint; mp validate",
+      "done_when": "AC-01 AC-05 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2.1",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Remove mp-herdr-log.txt plus mp-herdr-log2.txt from the repo root; update .gitignore plus any external references.",
+      "files": [
+        ".gitignore"
+      ],
+      "tests": "test ! -e mp-herdr-log.txt; test ! -e mp-herdr-log2.txt; git ls-files | rg mp-herdr-log returns nothing; rg mp-herdr-log in templates docs scripts crates is empty; make test; make consumer-surface-lint; mp validate",
+      "done_when": "AC-01 AC-05 pass",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

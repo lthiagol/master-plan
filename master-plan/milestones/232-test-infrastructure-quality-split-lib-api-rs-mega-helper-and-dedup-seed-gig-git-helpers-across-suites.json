@@ -1,0 +1,219 @@
+{
+  "milestone": {
+    "id": "232",
+    "title": "test infrastructure quality — split lib_api.rs mega-helper and dedup seed/gig-git helpers across suites",
+    "slug": "test-infrastructure-quality-split-lib-api-rs-mega-helper-and-dedup-seed-gig-git-helpers-across-suites",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "high",
+    "created": "2026-09-27",
+    "updated": "2026-09-27",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-27T02:53:30.956571+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-27T02:53:30.956573+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-27T02:53:30.956573+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Touching common test helpers no longer forces 50+ integration test binaries to recompile, and the seed-handoff / git-init helpers live in one place the suites consume — not three."
+  },
+  "problem": {
+    "description": "crates/mp/tests/common/lib_api.rs is 1020+ lines (single file covering PlanContext bootstrap, milestone/step/wp/ac mutations, validate, git, JSON parsing, capture_stdio via dup2, and run_with_retry) imported by 50+ test files. Adding one helper recompiles every test binary that depends on it. The file also contains `seed_handoff_gate(env: &TestEnv)` duplicated verbatim in crates/mp/tests/suites/plan_diff.rs:33-50 and crates/mp/tests/suites/digest.rs:6-43, and `init_git` repeated in crates/mp/tests/suites/git_suggest.rs:6-23 and crates/mp/tests/suites/p12_recommendation_batch.rs:5+."
+  },
+  "scope": {
+    "in_scope": [
+      "Split crates/mp/tests/common/lib_api.rs into per-domain submodules under crates/mp/tests/common/lib_api/{ctx.rs, mutation.rs, io.rs, capture.rs, seed.rs, git.rs}. The current lib_api.rs file becomes either a thin re-export shim or is removed once every importer migrates to the submodules.",
+      "Move capture_stdio (lib_api.rs:1024-1108, dup2-based stdout helper) into its own module so it does not pull in the rest of lib_api.rs.",
+      "Extract seed_handoff_gate + init_git + capture_stdio as methods on TestEnv (or under tests/common/seed.rs / tests/common/git.rs) and update the three suite files to import from one source.",
+      "Add a no-op smoke test that asserts the new module structure compiles and the consumers still resolve (catches mistakes when one suite forgets the import path).",
+      "Add a CHANGELOG entry under the next milestone release noting the test-helper refactor; no behavior change."
+    ],
+    "out_of_scope": [
+      "Redesigning the TestEnv or mp_bin_snapshot contract.",
+      "Adding new helpers; the refactor is purely structural.",
+      "Touching crates/raul/tests/ which has its own (smaller) common test scaffold."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "crates/mp/tests/common/lib_api.rs is no longer a single mega-file: it either holds only re-exports or is gone in favor of crates/mp/tests/common/lib_api/<domain>.rs.",
+      "verification": "wc -l crates/mp/tests/common/lib_api.rs (must be < 100 lines OR the file is removed and 50+ consumers route to crates/mp/tests/common/lib_api/<domain>.rs).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "The seed_handoff_gate / init_git / capture_stdio helpers are defined once (single source of truth) and every prior duplicate suite imports from that one path.",
+      "verification": "rg -n 'fn seed_handoff_gate|fn init_git|fn capture_stdio' crates/mp/tests/ returns one definition per helper, plus its tests.",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Editing one helper module's body (e.g. ctx.rs) compiles only the tests that depend on it, not the full 50+ binary chain. The refactor does not increase total test compile time.",
+      "verification": "touch crates/mp/tests/common/lib_api/ctx.rs && cargo nextest run -p mp --no-fail-fast -E 'test(/lib_api/)' (only ctx-touching tests rebuild; full make test wall-clock drop vs baseline is recorded in CHANGELOG).",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "All previously-passing mp/raul integration tests still pass after the refactor.",
+      "verification": "make test (exit 0 on the same tests that exited 0 at baseline).",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "lib_api split",
+      "goal": "crates/mp/tests/common/lib_api.rs becomes a thin re-export shim or is removed in favor of crates/mp/tests/common/lib_api/<domain>.rs",
+      "rollback": "Restore the monolithic lib_api.rs; consumers re-import the same surface"
+    },
+    {
+      "id": "WP2",
+      "name": "Helper dedup",
+      "goal": "seed_handoff_gate, init_git, capture_stdio helpers are defined once",
+      "rollback": "Restore the duplicated helpers in each suite"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "Split crates/mp/tests/common/lib_api.rs into per-domain submodules: crates/mp/tests/common/lib_api/{ctx.rs, mutation.rs, io.rs, capture.rs}.",
+      "files": [
+        "crates/mp/tests/common/lib_api.rs",
+        "crates/mp/tests/common/lib_api/ctx.rs",
+        "crates/mp/tests/common/lib_api/mutation.rs",
+        "crates/mp/tests/common/lib_api/io.rs",
+        "crates/mp/tests/common/lib_api/capture.rs"
+      ],
+      "tests": "wc -l crates/mp/tests/common/lib_api.rs (must be < 100) or ! test -e crates/mp/tests/common/lib_api.rs && test -e crates/mp/tests/common/lib_api/ctx.rs",
+      "done_when": "AC-01 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.1",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "Extract capture_stdio into crates/mp/tests/common/lib_api/capture.rs; update the 50+ consumers to import from the new path.",
+      "files": [
+        "crates/mp/tests/common/lib_api/capture.rs"
+      ],
+      "tests": "rg -n 'fn capture_stdio' crates/mp/tests/ returns exactly one definition",
+      "done_when": "AC-02 capture_stdio single-source passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "Verify editing one helper module's body compiles only the tests that depend on it; record wall-clock delta in CHANGELOG.",
+      "files": [
+        "crates/mp/tests/common/lib_api",
+        "CHANGELOG.md"
+      ],
+      "tests": "touch crates/mp/tests/common/lib_api/ctx.rs && cargo nextest run -p mp --no-fail-fast -E 'test(/lib_api/)' (only ctx-touching tests rebuild)",
+      "done_when": "AC-03 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 4,
+      "action": "Extract seed_handoff_gate, init_git into crates/mp/tests/common/seed.rs and crates/mp/tests/common/git.rs (or as TestEnv methods); refactor suites/plan_diff.rs, suites/digest.rs, suites/git_suggest.rs, suites/p12_recommendation_batch.rs to import from one source.",
+      "files": [
+        "crates/mp/tests/common/seed.rs",
+        "crates/mp/tests/common/git.rs",
+        "crates/mp/tests/suites/plan_diff.rs",
+        "crates/mp/tests/suites/digest.rs",
+        "crates/mp/tests/suites/git_suggest.rs",
+        "crates/mp/tests/suites/p12_recommendation_batch.rs"
+      ],
+      "tests": "rg -n 'fn seed_handoff_gate|fn init_git' crates/mp/tests/ returns exactly one definition per helper",
+      "done_when": "AC-02 dedup passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "Run the full mp/raul test suite plus a no-op smoke that asserts the new module structure compiles and the consumers still resolve.",
+      "files": [
+        "crates/mp/tests"
+      ],
+      "tests": "make test",
+      "done_when": "AC-04 passes",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
