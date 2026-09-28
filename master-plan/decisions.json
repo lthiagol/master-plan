@@ -132,6 +132,111 @@
       "summary": "ADR-014: JSON-canonical plan persistence",
       "context": "M92 drops TOML on disk; JSON is canonical at rest and at the CLI boundary. Agent-first product; humans use raul; hand-edit forbidden; JSON Schema already validates I/O — persist what you serve. Supersedes the prior TOML-on-disk decision.",
       "milestone": "92"
+    },
+    {
+      "id": "D-19",
+      "date": "2026-09-28",
+      "summary": "herdr-log R1: Topology parameter",
+      "context": "Hard requirement for the future Drive milestone: `mp watch` MUST accept `--topology 1-agent|2-agent-runner|2-agent-reviewer|2-agent-planner|3-agent` (or `--lanes planner,runner,reviewer`). Default: 3-agent for full milestones, 1-agent for trivial/tracks. Role-collapse allowed — the orchestrator absorbs planner/runner/reviewer roles as needed for resource-constrained runs. Topology can change at runtime (user may add/remove panes via raul). source: git show 438b093^:mp-herdr-log.txt (R1, design-input section)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-20",
+      "date": "2026-09-28",
+      "summary": "herdr-log R2: Cycle-count governance",
+      "context": "Hard requirement: default 2 cycles (review → fix → re-review → pass); soft cap 3 cycles; hard limit 4 cycles, after which the system escalates regardless of pass/fail. The tightened reviewer prompt (\"blockers only\") kicks in at cycle 2 (NOT cycle 3 — M201 showed cycle 2 was already mostly passing, so tightening earlier catches drift faster). Lower topology yields a lower cycle budget, because less independence means fewer trust-cycles needed. source: git show 438b093^:mp-herdr-log.txt (R2)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-21",
+      "date": "2026-09-28",
+      "summary": "herdr-log R3: Decision matrix (post-review)",
+      "context": "Hard requirement, recorded as pseudocode: on review -> if cycle >= 4: escalate; if drift_ratio >= 0.8 and cycle >= 2: ship_with_backlog; if high severity or correctness-medium: cycle_next; if low_count >= 3: cycle_next (with tightened prompt); if low_count <= 2: ship_with_backlog; else: cycle_next. source: git show 438b093^:mp-herdr-log.txt (R3)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-22",
+      "date": "2026-09-28",
+      "summary": "herdr-log R4: Lane notification contract (push-based)",
+      "context": "Hard requirement: each lane notifies the orchestrator via `herdr agent prompt <ORCH_PANE_ID> \"<role>: <summary>\"`. The command MUST execute as a SHELL COMMAND through the lane's bash tool — NOT a printed message; opencode agents interpret \"notify the orchestrator\" as \"print the message\" by default, so the prompt must show the exact command. Notification format: `<role>: cycle N done. Filed <count> findings: <ids or none>. Pass: <yes|no>. Lifecycle: <state>.` source: git show 438b093^:mp-herdr-log.txt (R4)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-23",
+      "date": "2026-09-28",
+      "summary": "herdr-log R5: Orchestrator verification protocol (mandatory)",
+      "context": "Hard requirement: before accepting a lane's \"done\" notification the orchestrator MUST verify state independently — state = mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status; acts = grep '\"subject\": \"<id>\"' master-plan/activity.json | tail -3; assert state.lifecycle in {executed, complete}; assert state.execution_status == \"done\"; assert len(acts) > 0; if any check fails: REJECT the report and send the lane back. This catches the M201 cycle-1 fabricated-notification bug. source: git show 438b093^:mp-herdr-log.txt (R5)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-24",
+      "date": "2026-09-28",
+      "summary": "herdr-log R6: Per-step discipline (runner contract)",
+      "context": "Hard requirement: the runner MUST call `mp milestone step done <id> <step>` for every step. The orchestrator verifies this on completion; missing step-done calls trigger either manual completion by the orchestrator or a reject-and-resend. Per-step status is part of the audit trail — skipping it breaks the trail. source: git show 438b093^:mp-herdr-log.txt (R6)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-25",
+      "date": "2026-09-28",
+      "summary": "herdr-log R7: AC verification regex semantics",
+      "context": "Hard requirement: `test(/.../)` matches test FUNCTION names and `binary(/.../)` matches test BINARY names; the nextest filter form must match what the AC claims to verify. Verify with `cargo nextest list -E \"...\"` that the filter actually matches something — a regex matching 0 tests is a silent pass. This was the F-06 M200 regression, where a broken regex masked 14+ M198-era failures. source: git show 438b093^:mp-herdr-log.txt (R7)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-26",
+      "date": "2026-09-28",
+      "summary": "herdr-log R8: mp verify executor constraints",
+      "context": "Hard requirement: the mp verify executor rejects `&&`, `;`, and newlines in AC verification fields, so each line in a verification field must be a self-contained command. `--skip-verify` is debt, not a shortcut — use it only as a last resort and document why in the commit message. The future Drive milestone SHOULD fix the verifier to handle `&&` chains (split AC-06 verification into a single cargo nextest invocation that covers both crates, per the M200 F-04 fix). source: git show 438b093^:mp-herdr-log.txt (R8)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-27",
+      "date": "2026-09-28",
+      "summary": "herdr-log R9: Build-cleanliness discipline",
+      "context": "Hard requirement: run `make clean` before each review cycle that involves validation, to remove stale cargo artifacts that can mask source-level regressions. In M201 cycle 3 this removed 28.8 GiB / 772k files in ~30s; the cold build after clean took ~10 min for the raul + mp test binaries. Establish it as a routine: every milestone cycle starts with a clean build. source: git show 438b093^:mp-herdr-log.txt (R9)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-28",
+      "date": "2026-09-28",
+      "summary": "herdr-log R10: Per-AC evidence discipline",
+      "context": "Hard requirement: evidence must be a per-AC command + exit code + test count, NOT a generic string. Cycle 1 of M200 recorded only `evidence: \"All 5 reviewer findings (F-01..F-05) resolved. All 6 AC verifications + 8 step tests pass honestly without --skip-verify.\"` — useless for reproduction. The future skill template must require the actual command, exit code, and pass count in per-AC evidence. source: git show 438b093^:mp-herdr-log.txt (R10)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-29",
+      "date": "2026-09-28",
+      "summary": "herdr-log R11: Reviewer contract",
+      "context": "Hard requirement: the reviewer does NOT edit crates/ — its writes are limited to `mp reviews *`. Reviewer activation is by orchestrator prompt, not by a lifecycle gate; this avoids the M200 problem of a milestone being approved but not done, blocking the gate. The reviewer uses the same notification contract as the runner. source: git show 438b093^:mp-herdr-log.txt (R11)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-30",
+      "date": "2026-09-28",
+      "summary": "herdr-log R12: TUI caveat (idea create --body @file)",
+      "context": "Hard requirement, from the M201 ID-01/ID-11 incident: `mp idea create --body @file` stores the body as a path reference, and the TUI does not render those — the idea is invisible in the TUI tab. Use `--body \"$(cat file)\"` for inline storage instead. The underlying file-vs-inline TUI rendering behaviour was filed as a future bug. source: git show 438b093^:mp-herdr-log.txt (R12)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-31",
+      "date": "2026-09-28",
+      "summary": "herdr-log R13: Lifecycle state model (M196)",
+      "context": "Hard requirement: states run approved -> in-progress -> executed -> complete, with remediation as a side-state driven by open findings. `mp milestone complete` moves to `executed` (terminal from the executor side); `mp reviews pass --verdict ok` moves to `complete` (terminal). `executed` does NOT auto-promote to `complete` — the reviewer pass is required for the final transition. `lifecycle=executed` is the M196 terminal state, replacing the older `lifecycle=done`, so any code gating on `lifecycle=done` will break. source: git show 438b093^:mp-herdr-log.txt (R13)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-32",
+      "date": "2026-09-28",
+      "summary": "herdr-log R14: herdr integration quirks",
+      "context": "Hard requirement (four quirks). (1) `herdr pane read` defaults to `--source recent` which returns EMPTY — always pass `--source visible` to see the current screen. (2) `herdr agent prompt --wait --until idle` matches the FIRST observed turn boundary after submission and does not distinguish \"did nothing\" from \"finished\"; for multi-turn work use `--until working` first. (3) The opencode bridge never reports `agent_status=done` reliably (M149 review finding) — use `mp show milestone` lifecycle polling, NOT herdr agent status, for completion gating. (4) `target/debug/mp` is the freshly built binary while `/opt/homebrew/bin/mp` is the installed (possibly stale) one — for source-level fixes rebuild and use target/debug/mp, or `make install` first. source: git show 438b093^:mp-herdr-log.txt (R14)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-33",
+      "date": "2026-09-28",
+      "summary": "herdr-log R15: Log file fragility",
+      "context": "Hard requirement: mp-herdr-log.txt at the repo root was truncated multiple times during the test (cause unknown, not pursued); substantive test state lives in git + plan.json + activity.json, not in the narrative log. The future Drive milestone should (a) move the orchestration log INTO master-plan/ as a structured record (probably under reviews/, or a new orchestrator_log.json), (b) preserve history with git commits alongside milestones, and (c) surface log entries via `mp` commands so they are discoverable from the plan zone. source: git show 438b093^:mp-herdr-log.txt (R15)",
+      "milestone": "239"
     }
   ]
 }
