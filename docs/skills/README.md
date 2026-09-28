@@ -30,7 +30,7 @@ Each manifest declares:
 |----------|---------------------|--------|
 | **`core`** | Yes — the three base CPD skills deploy on a bare `mp install` | `mp-flow`, `mp-runner`, `mp-coordinator` |
 | **`catalog`** | No — opt in with `mp install --skills …` | `spec-grill`, `codebase-design`, `diagnosing-bugs`, `mp-orchestrator`, `mp-reviewer` |
-| **`internal`** | Never — excluded from the install registry | `mp-code-review` (repo maintainers only) |
+| **`internal`** | Never — excluded from the install registry and kept out of the template tree | `mp-code-review` (repo maintainers only, `internal/skills/`) |
 
 ## Managing skills
 
@@ -120,21 +120,33 @@ discipline is the foundation of independent review. Loads alongside `mp-flow`.
 
 ## Repository-internal skills (not deployed)
 
-Some skills in `templates/skills/` are **not part of the consumer surface**:
-they are coupled to master-plan's own fixtures and the archived lessons
-catalog, so they have no value to adopters. They live in the skill tree
-for repo-internal use (the dogfood loop, milestone reviews of master-plan
-itself) but are **not** in the public catalog above and are **not**
-deployed by `mp install`.
+Some skills are **not part of the consumer surface at all**: they are
+coupled to master-plan's own fixtures and the archived lessons catalog, so
+they have no value to adopters. They live under `internal/skills/` —
+deliberately outside `templates/`, so the installer never sees them and
+copying the template tree into an adopter project never carries them along.
+Use them for repo-internal work (the dogfood loop, milestone reviews of
+master-plan itself). They are **not** in the public catalog above and are
+**not** deployed by `mp install`.
 
-| Skill | Audience | Notes |
-|-------|----------|-------|
-| `mp-code-review` | Master-plan maintainers only | Manifest `category: internal` — excluded from `mp install` / `--list-skills`. Lesson-pattern pre-screen + runnable fixtures in `crates/mp/tests/code_review_patterns.rs`; lessons catalog at `crates/mp/tests/fixtures/code-review-lessons.md`. Load from the repo tree, not via install. |
+| Skill | Audience | Location |
+|-------|----------|----------|
+| `mp-code-review` | Master-plan maintainers only | `internal/skills/mp-code-review/` — load it from the repo tree, not via install |
+
+`mp install --skills=mp-code-review` fails: a repo-only skill is not in the
+install registry, so the selection is rejected as an unknown skill and the
+skill never shows up in `mp install --list-skills`. Its manifest still
+declares `category: internal` — that category stays reserved for repo-only
+skills. The skill's own
+[SKILL.md](../../internal/skills/mp-code-review/SKILL.md) documents the
+lesson-pattern pre-screen and the runnable fixtures it pins
+(`crates/mp/tests/code_review_patterns.rs`).
 
 The consumer-surface de-internalization rules (no `M\d+` IDs, no `L\d+`
 codes, no dead `docs/` pointers) do **not** apply to repository-internal
-skills — they are not shipped to adopters. They still get the same
-documentation and code-review discipline as anything else in the repo.
+skills — they are not shipped to adopters, and they sit outside the linted
+trees entirely. They still get the same documentation and code-review
+discipline as anything else in the repo.
 
 ## How harnesses discover skills
 
@@ -177,7 +189,8 @@ in the same bundle, resolved by relative path). Treat any `docs/…` or
 
 ### Where milestone IDs *are* allowed
 
-Inside `master-plan/` (the plan zone) and repo-internal dogfood notes
+Inside `master-plan/` (the plan zone), repo-only skills under
+`internal/skills/**`, and repo-internal dogfood notes
 (`mp-dogfood-log.md`, plan JSON, test fixtures), milestone IDs are the native
 vocabulary and stay. The ban is specifically the **consumer surface**:
 `templates/skills/**`, `docs/**`, and any README an adopter reads.

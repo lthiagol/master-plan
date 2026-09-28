@@ -2,6 +2,8 @@
 name: mp-code-review
 description: Lesson-pattern code review — pre-screen changes against the runnable Pattern: blocks for L6/L8/L13/L14/L15 (and the broader L1–L63 catalog), file findings via `mp reviews finding add`, and pin regressions with grep/ripgrep fixtures. Use when reviewing a milestone's diff before stage-8 sign-off.
 ---
+<!-- PROVENANCE: REPO-ONLY — NOT INSTALLABLE. Lives outside templates/ so the
+     installer never sees it and the consumer-surface lint needs no carve-out. -->
 
 # mp-code-review — lesson-pattern review (repository-internal)
 
@@ -123,8 +125,9 @@ are repo-relative. The lesson-contract check is:
 ## Install
 
 This skill is **not** installable via `mp install` (manifest
-`category: internal`). Load it from the repo tree
-(`templates/skills/mp-code-review/`) when reviewing master-plan itself.
+`category: internal`, and it lives outside the install registry's
+source tree). Load it from the repo tree
+(`internal/skills/mp-code-review/`) when reviewing master-plan itself.
 
 ## See also
 
