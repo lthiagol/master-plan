@@ -1,5 +1,26 @@
 ## Unreleased — WIP CI hardening
 
+- **raul theme system gained three quiet layering roles (M244).**
+  `Palette` now carries `focus_ring` (where the cursor is: focused tab
+  fill, selected-row border + marker, selected board box, focused Path
+  node), `surface_1` (the panel a surface floats on: overlay / modal
+  backdrops and the header + footer chrome bands), and `surface_2` (one
+  layer up, inside a surface: selected or hovered list row, selected row
+  in a modal, detail-view AC rows), populated for every shipped palette
+  from the official upstream values (Catppuccin Lavender / Mantle /
+  Surface0, Dracula Cyan / Background Light / Selection). Previously the
+  six pre-existing roles meant selection highlights, focused chips,
+  modal surfaces, and nested panels all drew with the same accent /
+  foreground / dim and never set a background, so layers were
+  indistinguishable and the UI was loud. The renderers now adopt the
+  roles: selected list and board rows are `surface_2` with a
+  `focus_ring` marker, overlays and chrome are `surface_1`, and the
+  focused tab is `focus_ring`. Swapping `ui.theme` recolors every role
+  in the next frame. The six existing role values are unchanged, and
+  `monochrome` collapses the new roles to the terminal default so
+  layering falls back to modifiers. `docs/raul/settings.md` documents
+  each role and where it is used. The Settings theme picker (a separate
+  milestone) will adopt the roles when it lands.
 - **mp-flow role-binding table is now lint-locked to the stage manifest
   (M231).** `make mp-flow-lint` only checked that `SKILL.md` had a
   `## <name>` section per `[[stages]]` entry in `stages.toml`; the
