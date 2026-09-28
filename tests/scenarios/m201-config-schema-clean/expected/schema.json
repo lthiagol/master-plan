@@ -38,6 +38,12 @@
       "description": "When true, the runner pushes the review branch automatically once it lands cleanly."
     },
     {
+      "key": "agent.automation.stall_timeout_minutes",
+      "type": "integer",
+      "default": "30",
+      "description": "How many minutes the autopilot drive loop waits for a stalled runner (1 to 240). The timer pauses while the runner is working, so a long build is never treated as a stall."
+    },
+    {
       "key": "git.auto_commit",
       "type": "bool",
       "default": "false",

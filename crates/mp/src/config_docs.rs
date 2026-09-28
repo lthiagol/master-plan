@@ -20,13 +20,12 @@
 
 use crate::config::{ConfigSchemaReport, SchemaEntry, CONFIG_SCHEMA_VERSION};
 
-/// Accepted values for `agent.automation.stall_timeout_minutes`,
-/// rendered by `mp config schema` so operators see the range without
-/// reading the source. The full integer range is validated in
-/// `crate::config::validate_stall_timeout_minutes`.
-pub const STALL_TIMEOUT_MINUTES_RANGE_CHOICES: &[&str] = &["1..=240"];
+/// Pinned row count for [`KEY_DESCRIPTIONS`]. Every added or removed
+/// setting bumps this, which is the point: the schema surface is a
+/// contract with the golden fixtures and with raul's Settings lane.
+pub const EXPECTED_KEY_DESCRIPTIONS_LEN: usize = 46;
 
-/// M201: 45 per-key rows. The list is the single source of truth that
+/// M201: per-key rows. The list is the single source of truth that
 /// `mp config schema` projects into the `keys` array (sorted by key at
 /// emit time).
 #[allow(clippy::type_complexity)]
@@ -62,10 +61,14 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
     ),
     (
         "agent.automation.stall_timeout_minutes",
-        "int",
+        "integer",
         "30",
-        Some(STALL_TIMEOUT_MINUTES_RANGE_CHOICES),
-        "How many minutes the autopilot drive loop waits for a stalled runner. The timer pauses while the runner is working, so a long build is never treated as a stall.",
+        // Non-choice rows must not carry `allowed` (pinned by
+        // `choice_rows_carry_allowed_non_choice_rows_do_not`), so the
+        // accepted range lives in the prose and is enforced by
+        // `config::validate_stall_timeout_minutes`.
+        None,
+        "How many minutes the autopilot drive loop waits for a stalled runner (1 to 240). The timer pauses while the runner is working, so a long build is never treated as a stall.",
     ),
     (
         "git.auto_commit",
@@ -451,15 +454,14 @@ pub fn build_schema_report() -> ConfigSchemaReport {
 mod tests {
     use super::*;
 
-    /// F-01: KEY_DESCRIPTIONS must hold exactly 45 rows after M200 dropped
-    /// `focus_content`. Adding a new setting without touching this list
-    /// breaks the schema contract — pin it.
+    /// F-01: KEY_DESCRIPTIONS row count is pinned — adding a setting
+    /// without bumping this number breaks the schema contract.
     #[test]
-    fn key_descriptions_len_is_45() {
+    fn key_descriptions_len_is_pinned() {
         assert_eq!(
             KEY_DESCRIPTIONS.len(),
-            45,
-            "KEY_DESCRIPTIONS must have exactly 45 rows; got {}",
+            EXPECTED_KEY_DESCRIPTIONS_LEN,
+            "KEY_DESCRIPTIONS must have exactly {EXPECTED_KEY_DESCRIPTIONS_LEN} rows; got {}",
             KEY_DESCRIPTIONS.len()
         );
     }
@@ -540,14 +542,14 @@ mod tests {
         }
     }
 
-    /// F-05: build_schema_report produces exactly 45 sorted entries with
-    /// `$schema_version: "1.0"` at the top. The golden fixture relies on
-    /// this shape.
+    /// F-05: build_schema_report emits exactly the pinned number of
+    /// sorted entries with `$schema_version: "1.0"` at the top. The
+    /// golden fixture relies on this shape.
     #[test]
-    fn build_schema_report_emits_45_sorted_keys() {
+    fn build_schema_report_emits_pinned_sorted_keys() {
         let report = build_schema_report();
         assert_eq!(report.schema_version, "1.0");
-        assert_eq!(report.keys.len(), 45);
+        assert_eq!(report.keys.len(), EXPECTED_KEY_DESCRIPTIONS_LEN);
         let keys: Vec<&str> = report.keys.iter().map(|e| e.key.as_str()).collect();
         let mut sorted = keys.clone();
         sorted.sort();

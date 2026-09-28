@@ -620,7 +620,7 @@ pub fn wait_for_readiness_with(
             // Start (or continue) the settle window. `settle_ms == 0`
             // short-circuits on the first idle read — the legacy
             // behaviour, preserved verbatim.
-            let since = *idle_since.get_or_insert_with(|| now());
+            let since = *idle_since.get_or_insert_with(&mut now);
             if now().duration_since(since) >= settle {
                 return Ok(());
             }

@@ -1,5 +1,32 @@
 ## Unreleased — WIP CI hardening
 
+- **Autopilot stopped losing the first prompt, and stopped calling a slow
+  runner hung.** A prompt is now delivered only after the harness has reported
+  `idle` **continuously** for a settle window (`mp autopilot start
+  --prompt-settle-ms <ms>`, default 5000). The status read reports `idle` while
+  a freshly spawned pane's TUI is still booting, and the old first-idle gate
+  delivered into that window — the prompt was written into a harness that was
+  not listening. Any non-idle read resets the window; `--prompt-settle-ms 0`
+  restores the old behaviour. **The stall timer now only runs while the runner
+  is not working**, so a long build or test run — a steady `working` status
+  with the lifecycle parked — is no longer reported as hung after 30 minutes.
+  A hard ceiling still applies at any status: no lifecycle advance for 4x the
+  stall timeout stalls the run, so pausing the timer cannot make a genuinely
+  hung runner immortal. The threshold is tunable per project via
+  `agent.automation.stall_timeout_minutes` (1..=240, default 30), with
+  `--stall-timeout-ms` overriding it per run.
+
+- **`mp autopilot wait` and `mp autopilot tail` — follow a run without
+  polling it.** `mp autopilot status` is a snapshot, so watching a run meant
+  re-running it in a loop or tailing `activity.json` by hand.
+  `mp autopilot wait <id> [--timeout <sec>]` blocks until the milestone reaches
+  the lifecycle its run is waiting for (or `complete`), exiting **0** with
+  `{reached: true, lifecycle}` or **1** with `{reached: false, reason,
+  lifecycle}` where `reason` is `timeout`, `run-stopped`, or `run-failed`.
+  `mp autopilot tail <id> [--follow] [--since <rfc3339>] [--idle <sec>]`
+  streams that milestone's journal events oldest-first as JSON lines, and with
+  `--follow` keeps watching until the run goes quiet for `--idle` seconds.
+
 - **raul's Settings lane gained a live-preview theme picker, and the
   theme catalog gained Alucard (M243).** The `ui.theme` row now expands
   into a picker: one row per shipped palette with a six-block swatch

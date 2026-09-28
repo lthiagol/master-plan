@@ -35,6 +35,10 @@ pub enum AutopilotCmd {
     /// (queue, active milestone, lifecycle, stage, target, role, pane
     /// ids, log path, run outcome). Replaces the removed
     /// `mp watch-control status`.
+    ///
+    /// This is a snapshot. To block on a run instead of polling it,
+    /// use `mp autopilot wait <id>`; to stream one milestone's
+    /// activity, use `mp autopilot tail <id> --follow`.
     Status {
         /// Summary only (classification + pid_alive). Default false.
         #[arg(long)]

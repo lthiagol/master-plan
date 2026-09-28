@@ -159,12 +159,9 @@ pub(crate) fn cmd_autopilot_tail(
             // Follow mode with nothing new for `--idle`: a normal
             // end, not a failure.
             Some(observe::TailStop::Idle) => return Ok(()),
-            None => {
-                if !follow {
-                    return Ok(());
-                }
-                std::thread::sleep(POLL);
-            }
+            // More to come — only reachable when following, since
+            // `tail_batch` reports Eof for a drained non-follow.
+            None => std::thread::sleep(POLL),
         }
     }
 }

@@ -97,6 +97,7 @@ pub fn target_for(state: Option<&AutopilotRunState>, milestone_id: &str) -> Opti
 
 /// Classification of one poll sample: keep waiting, or stop with a
 /// reason.
+#[derive(Debug, PartialEq, Eq)]
 enum PollVerdict {
     Keep,
     Stop(WaitReason),
@@ -305,7 +306,10 @@ pub fn tail_batch(
 
     TailBatch {
         events: Vec::new(),
-        stop: if following && elapsed_since_last >= idle_budget {
+        stop: if !following {
+            // Journal drained and nobody asked us to keep watching.
+            Some(TailStop::Eof)
+        } else if elapsed_since_last >= idle_budget {
             Some(TailStop::Idle)
         } else {
             None

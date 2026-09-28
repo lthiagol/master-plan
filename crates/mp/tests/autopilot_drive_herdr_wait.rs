@@ -860,7 +860,7 @@ fn stall_lifecycle_advance_resets_the_timer() {
                 // below the target, so neither short-circuits the
                 // wait — this is genuine forward movement, not a
                 // disguised completion.
-                if (clock.minutes() / 20) % 2 == 0 {
+                if (clock.minutes() / 20).is_multiple_of(2) {
                     Ok("approved".to_string())
                 } else {
                     Ok("in-progress".to_string())

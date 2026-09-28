@@ -230,8 +230,10 @@ A finding with an open *external* phase auto-enters the milestone into
 | `mp git status\|suggest-message\|commit` | Git helpers (status-aware commit messages) |
 | `mp scratch path` / `scratch new <label>` | In-repo scratch workspace (for big JSON payloads) |
 | `mp digest [--since …] [--days N] [--markdown] [--out …]` | Activity digest |
-| `mp autopilot start <id> [<id>…] [--dry-run] [--resume\|--force]` | Drive milestones through their lifecycle by spawning the orchestrator + runner + reviewer role panes |
+| `mp autopilot start <id> [<id>…] [--dry-run] [--resume\|--force] [--prompt-settle-ms <ms>] [--stall-timeout-ms <ms>] | Drive milestones through their lifecycle by spawning the orchestrator + runner + reviewer role panes. `--prompt-settle-ms` sets the continuous-idle window before a prompt is delivered (default 5000, `0` = first-idle); `--stall-timeout-ms` overrides `agent.automation.stall_timeout_minutes` for this run |
 | `mp autopilot status\|stop\|output\|result` | Structured autopilot control-plane (machine-client read surface for a live or last run) |
+| `mp autopilot wait <id> [--timeout <sec>]` | Block until a milestone reaches its run's target lifecycle (or `complete`); exit 0 on success, 1 with a typed `reason` otherwise |
+| `mp autopilot tail <id> [--follow] [--since <rfc3339>] [--idle <sec>]` | Stream one milestone's activity-journal events, oldest first, one JSON object per line; `--follow` exits after `--idle` seconds of quiet |
 | `mp review sidecar <id> --output <path> [--finding F-XX]` | Write a hunk-compatible agent-context sidecar of a milestone's findings + comments |
 | `mp agent role` / `agent harness list\|start-command` | Agent role + harness command registry |
 | `mp skill context` | Compact project context for an agent |

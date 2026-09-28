@@ -183,7 +183,7 @@ fn tail_follow_picks_up_events_written_while_it_runs() {
     let journal = env.tmp.path().join("master-plan/activity.json");
     let mp_bin = common::mp_bin();
 
-    let mut child = std::process::Command::new(&mp_bin)
+    let mut child = std::process::Command::new(mp_bin)
         .env("MP_HOME", env.tmp.path())
         .env("MP_INSTALL_DIR", env.tmp.path().join("install-target"))
         .env(
