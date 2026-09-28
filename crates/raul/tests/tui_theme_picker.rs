@@ -469,3 +469,84 @@ fn click_off_the_picker_is_ignored() {
         "the highlight must not move"
     );
 }
+
+// --- status preview (AC-05) ------------------------------------------------
+
+#[test]
+fn status_preview_lists_every_lifecycle_role() {
+    assert_eq!(
+        theme_picker::STATUS_PREVIEW.len(),
+        6,
+        "in-progress / done / ready / blocked / accent / dim"
+    );
+    let labels: Vec<&str> = theme_picker::STATUS_PREVIEW
+        .iter()
+        .map(|(l, _)| *l)
+        .collect();
+    assert_eq!(
+        labels,
+        vec!["in-progress", "done", "ready", "blocked", "accent", "dim"]
+    );
+}
+
+#[test]
+fn status_preview_row_renders_under_the_picker() {
+    let app = app_with_open_picker("mocha");
+    let out = render_full(&app, 140, 44);
+    for label in ["in-progress", "done", "ready", "blocked", "accent", "dim"] {
+        assert!(
+            out.contains(label),
+            "status preview chip {label:?} missing:\n{out}"
+        );
+    }
+    // The preview sits below every palette row.
+    let alucard = out.find("alucard").expect("alucard row renders");
+    let blocked = out.find("blocked").expect("status preview renders");
+    assert!(
+        blocked > alucard,
+        "the status preview must be the last row of the expansion"
+    );
+}
+
+#[test]
+fn status_preview_paints_in_the_highlighted_palette() {
+    // Highlight alucard and check the preview repaints in ITS colors.
+    let mut app = app_with_open_picker("mocha");
+    app.settings
+        .as_mut()
+        .unwrap()
+        .theme
+        .set_cursor(theme_picker::row_for_name("alucard").expect("alucard row exists"));
+    app.apply_theme_preview();
+
+    let backend = TestBackend::new(140, 44);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            let v = view_state::compute_view(&app, f.area());
+            render::render(f, &app, &v);
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+
+    // Alucard's success #14710A and danger #CB3A2A are unique to it, so
+    // finding both proves the preview (not mocha) is what got painted.
+    assert!(
+        has_fg(buffer, rgb(theme::ALUCARD.success)),
+        "status preview must use the highlighted palette's success color"
+    );
+    assert!(
+        has_fg(buffer, rgb(theme::ALUCARD.danger)),
+        "status preview must use the highlighted palette's danger color"
+    );
+}
+
+#[test]
+fn status_preview_absent_when_the_picker_is_collapsed() {
+    let app = settings_app("mocha");
+    let out = render_full(&app, 140, 44);
+    assert!(
+        !out.contains("in-progress"),
+        "the status preview belongs to the expansion only:\n{out}"
+    );
+}

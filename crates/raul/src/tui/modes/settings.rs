@@ -139,6 +139,9 @@ pub enum SettingsRow {
     /// One row of the expanded `ui.theme` picker, carrying its index
     /// into [`theme_picker::rows()`].
     Theme(usize),
+    /// M243: the one-row status preview drawn under the palette rows
+    /// in the highlighted palette.
+    ThemeStatus,
 }
 
 /// The full row sequence for the current state.
@@ -159,6 +162,11 @@ pub fn settings_rows(picker_expanded: bool) -> Vec<SettingsRow> {
             for r in 0..theme_picker::ROW_COUNT {
                 rows.push(SettingsRow::Theme(r));
             }
+            // M243: one status-preview row under the palette rows, so
+            // the operator sees what the TUI's lifecycle colors look
+            // like under the theme they are considering — not just the
+            // six-swatch portrait the palette rows already show.
+            rows.push(SettingsRow::ThemeStatus);
         }
     }
     rows

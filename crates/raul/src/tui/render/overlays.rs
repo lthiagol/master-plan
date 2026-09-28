@@ -777,6 +777,12 @@ fn render_settings_list(
                     &cursor_marker_style,
                 )));
             }
+            SettingsRow::ThemeStatus => {
+                items.push(ListItem::new(render_theme_status_preview(
+                    *state.theme.preview_palette(),
+                    palette,
+                )));
+            }
         }
     }
 
@@ -850,6 +856,39 @@ fn render_theme_picker_row(
         Style::default().fg(palette.dim)
     };
     spans.push(Span::styled(row.description(), desc_style));
+    Line::from(spans)
+}
+
+/// M243: the one-row status preview drawn under the palette rows.
+///
+/// The palette rows show each theme's six-role swatch. This row shows
+/// what the TUI's *lifecycle* colors look like under the theme the
+/// operator currently has highlighted — in-progress, done, ready,
+/// blocked, plus accent and dim as the two non-lifecycle roles the
+/// chrome leans on hardest.
+///
+/// `preview` is the highlighted palette (so the preview tracks the
+/// highlight); `palette` is the app's live palette, which the row
+/// falls back to for its own text so the row always has a readable
+/// label even if a palette ever ships a degenerate role.
+fn render_theme_status_preview(preview: ThemePalette, palette: ThemePalette) -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = vec![Span::raw("    ")];
+    for (label, role) in theme_picker::STATUS_PREVIEW {
+        let color = match role {
+            "accent" => preview.accent,
+            "success" => preview.success,
+            "warn" => preview.warn,
+            "danger" => preview.danger,
+            "dim" => preview.dim,
+            _ => palette.dim,
+        };
+        spans.push(Span::styled("██", Style::default().fg(color)));
+        spans.push(Span::styled(
+            format!(" {label}"),
+            Style::default().fg(palette.dim),
+        ));
+        spans.push(Span::raw("  "));
+    }
     Line::from(spans)
 }
 
