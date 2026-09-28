@@ -1,5 +1,19 @@
 ## Unreleased — WIP CI hardening
 
+- **Repo-only skill moved out of the template tree (M235).** The
+  `mp-code-review` skill — lesson-pattern pre-screen plus runnable
+  fixtures — moved from `templates/skills/mp-code-review/` to
+  `internal/skills/mp-code-review/`. It was never deployable (manifest
+  `category: internal`, so `mp install` and `mp install --list-skills`
+  skip it) but it did sit inside the adopter template tree, so copying
+  `templates/` into a project would have carried a repo-only skill along.
+  Its behavior is unchanged: `mp install --skills=mp-code-review` still
+  fails, rejected as an unknown skill, and the `internal` manifest
+  category stays reserved for future repo-only skills. As a side effect,
+  `scripts/check-consumer-surface.sh` no longer needs the
+  `EXCLUDE_PATHS` carve-out it carried for the skill's internal lesson
+  codes and milestone ids, and `make consumer-surface-lint` is clean
+  without it.
 - **mp-model doc-comment lint cleanup (M236).** Closed the
   recurring `clippy::doc_overindented_list_items` lint at
   `crates/mp-model/src/milestone.rs:155-158` (4 backlog
