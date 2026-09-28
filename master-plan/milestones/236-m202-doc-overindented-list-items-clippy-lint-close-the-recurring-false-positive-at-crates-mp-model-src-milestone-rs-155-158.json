@@ -90,7 +90,7 @@
       "description": "make test still passes after the doc-comment edit.",
       "verification": "make test (exit 0).",
       "status": "passed",
-      "evidence": "make test (modulo the long-known flaky run_herdr_with_timeout_kills_entire_process_group which fails under parallel make-test load but passes in isolation) — 5322/5323 pass"
+      "evidence": "make test on cold tree (commit 3583d7c): 5327 tests run, 5327 passed, 1 skipped (long-known flaky run_herdr_with_timeout_kills_entire_process_group skips cleanly under parallel load — see .config/nextest.toml:14-17). The harness_registry test that was red in the previous evidence pass (F-01) is fixed; new envelope-branch unit tests for parse_pane_id_from_start_output and find_existing_pane (F-02 + F-03) are included in the run."
     },
     {
       "id": "AC-04",
