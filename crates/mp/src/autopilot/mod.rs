@@ -75,6 +75,7 @@ pub mod gate;
 pub mod lifecycle;
 pub mod list;
 pub mod notes;
+pub mod observe;
 pub mod prompts;
 pub mod reconcile;
 pub mod recovery;

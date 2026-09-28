@@ -6,6 +6,7 @@ pub(crate) mod autopilot;
 pub(crate) mod autopilot_control;
 pub(crate) mod autopilot_detach;
 pub(crate) mod autopilot_drive;
+pub(crate) mod autopilot_observe;
 pub(crate) mod backlog;
 pub(crate) mod breaking_release;
 pub(crate) mod brief;

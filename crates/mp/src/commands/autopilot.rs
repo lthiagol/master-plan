@@ -73,6 +73,15 @@ pub(crate) fn cmd_autopilot(
                 ctx, force, format, fields,
             )
         }
+        AutopilotCmd::Wait { id, timeout } => {
+            crate::commands::autopilot_observe::cmd_autopilot_wait(ctx, id, timeout, format)
+        }
+        AutopilotCmd::Tail {
+            id,
+            follow,
+            since,
+            idle,
+        } => crate::commands::autopilot_observe::cmd_autopilot_tail(ctx, id, follow, since, idle),
         AutopilotCmd::Session { cmd } => cmd_autopilot_session(ctx, cmd, format, fields),
         AutopilotCmd::Note { cmd } => match cmd {
             AutopilotNoteCmd::Add(args) => cmd_autopilot_note_add(ctx, args, format, fields),

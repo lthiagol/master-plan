@@ -71,6 +71,36 @@ pub enum AutopilotCmd {
         #[arg(long)]
         force: bool,
     },
+    /// Block until a milestone reaches the lifecycle its run is
+    /// waiting for (or `complete`). Exits 0 on success, 1 otherwise
+    /// with a typed `reason` — so a shell caller can block on a run
+    /// without polling.
+    Wait {
+        /// Milestone id to wait on (e.g. `246`).
+        #[arg(value_name = "ID")]
+        id: String,
+        /// Give up after this many seconds. Default 1800 (30 min).
+        #[arg(long, default_value_t = crate::autopilot::observe::DEFAULT_WAIT_TIMEOUT_SECS)]
+        timeout: u64,
+    },
+    /// Print the activity journal for one milestone, oldest first,
+    /// one JSON object per line. With `--follow`, keeps watching
+    /// until the run goes quiet for `--idle` seconds.
+    Tail {
+        /// Milestone id whose events to print (e.g. `246`).
+        #[arg(value_name = "ID")]
+        id: String,
+        /// Keep watching for new events after the journal is drained.
+        #[arg(long)]
+        follow: bool,
+        /// Only print events at or after this RFC3339 timestamp.
+        #[arg(long)]
+        since: Option<String>,
+        /// With `--follow`, exit after this many seconds with no new
+        /// event. Default 5.
+        #[arg(long, default_value_t = crate::autopilot::observe::DEFAULT_TAIL_IDLE_SECS)]
+        idle: u64,
+    },
     /// Per-session folder operations (`<plan_dir>/autopilot/<id>/session.json`).
     Session {
         #[command(subcommand)]
