@@ -2151,6 +2151,14 @@
       "reviewed_at": "2026-09-28",
       "notes": "Cycle 1 via herdr-orc: verdict ok, 1 low finding. Cold build enabled and reproduced (1523 raul tests, clippy clean on dev and release, fmt, consumer-surface). Reviewer proved the catalog-parity guarantee has teeth via three independent mutations (extra UI_THEMES name, extra theme::ALL palette, duplicate) each breaking a different test, and confirmed the runner loop watches app.version() so apply_theme_preview's touch() does drive the next frame. F-01 (low): the_next_frame_repaints_in_the_new_palette does not actually pin live-apply, because the picker swatch paints each palette's own accent in its own row so ALUCARD.accent lands in the buffer regardless. Behaviour is correct; the test is weaker than its name.",
       "milestone_completed_at": "2026-09-28"
+    },
+    {
+      "milestone_id": "244",
+      "verdict": "ok",
+      "reviewer": "herdr-orc reviewer lane (w19:pQ)",
+      "reviewed_at": "2026-09-28",
+      "notes": "Two cycles. Cycle 1 (base 8995b12): verdict ok, 0 findings, cold build re-verified. Cycle 2 (base 252955e, commit 1783064): verdict changes-needed with F-01 (medium), F-02/F-03 (low). F-01 was that AC-03's filter gated only 1 of its 3 claims; the reviewer explicitly graded it a planning/spec defect, not a code defect, and supplied the corrected combined filter. The orchestrator applied that exact filter to both AC-03 and step S1.2 and verified it non-vacuous. No code change was required in response -- the reviewer had already confirmed the implementation sound, scope respected, and tests non-vacuous by mutation. F-02 (pre-existing reset-row label pad <14 vs a 15-char label) and F-03 (surface_1 fill covers the whole Settings list widget) are low and left unactioned; F-02 logged separately as a dogfood entry.",
+      "milestone_completed_at": "2026-09-28"
     }
   ],
   "comments": [

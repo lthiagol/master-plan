@@ -3,9 +3,9 @@
     "id": "244",
     "title": "Theme system follow-up — per-component accent roles (focus_ring + surface_1 + surface_2)",
     "slug": "theme-system-follow-up-per-component-accent-roles-focus-ring-surface-1-surface-2",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -25,11 +25,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T16:50:01.740064+00:00",
+    "lifecycle_at": "2026-09-28T17:05:34.469479+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T16:50:01.740067+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-28T17:05:45.943866+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-28T17:05:45.943866+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-28T17:05:45.978061+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-28T17:05:45.943866+00:00"
       },
       "specify": {
         "status": "done",
@@ -65,42 +81,42 @@
       "description": "Palette has focus_ring, surface_1, surface_2 with the exact per-palette values in scope for all 7 palettes (6 named + monochrome).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_match_spec/)'",
       "status": "passed",
-      "evidence": "herdr-orc cycle 1. palette_roles_match_spec 1/1. Per-palette literals genuinely pinned: reviewer mutated 0x7287fd to 0x7287fe and the test failed as predicted. SCOPE CAVEAT: the AC says 7 palettes (6 named + monochrome); ALUCARD does not exist yet and is owned by M243, so this test pins the 6 that exist and needs one row added when Alucard lands. palette_roles_non_degenerate iterates ALL, so Alucard is already covered there."
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     },
     {
       "id": "AC-02",
       "description": "Selected list/board rows use surface_2 bg + focus_ring marker; overlays/modals and chrome use surface_1 bg; focused detail rows use surface_2; focused tabs use focus_ring (TestBackend cell assertions).",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/selected_row|overlay|detail|chrome|tab/)'",
       "status": "passed",
-      "evidence": "herdr-orc cycle 1. 5/5. Load-bearing design confirmed against ratatui 0.30.2 source: Cell::set_style only updates fg when style.fg.is_some(), so a foreground in row_highlight_style wipes the focus_ring marker. The runners background-only highlight with fg on row/cell styles is correct; the reviewer reproduced the bad state and the marker test failed as predicted. The three rewritten existing tests were verified to preserve their original intent."
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     },
     {
       "id": "AC-03",
       "description": "The Settings theme picker draws on surface_1, marks the highlighted row with focus_ring, and its swatch shows all 9 roles.",
-      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/)'",
-      "status": "pending",
-      "evidence": ""
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/) or test(/surface_1/) or test(/focus_ring/)'",
+      "status": "passed",
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     },
     {
       "id": "AC-04",
       "description": "For every named palette surface_1, surface_2, and foreground are pairwise distinct and focus_ring differs from accent.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_non_degenerate/)'",
       "status": "passed",
-      "evidence": "herdr-orc cycle 1. palette_roles_non_degenerate 1/1 over theme::ALL."
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     },
     {
       "id": "AC-05",
       "description": "Swapping App::palette at runtime changes the role colors in the next rendered frame; docs/raul/settings.md has the role table.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/live_swap/)' && rg -q 'surface_1' docs/raul/settings.md",
       "status": "passed",
-      "evidence": "herdr-orc cycle 1. live_swap 1/1 plus rg -q surface_1 docs/raul/settings.md exit 0; the 24-line role table was reviewed and matches the implementation."
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     },
     {
       "id": "AC-06",
       "description": "raul tests, clippy, fmt, and consumer-surface lint are clean.",
       "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "passed",
-      "evidence": "herdr-orc cycle 1. 1462/1462 pass, clippy -D warnings exit 0, fmt exit 0, consumer-surface lint clean. The six existing role values were not changed and M241/M242 autopilot surfaces are untouched, both per out_of_scope."
+      "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
     }
   ],
   "work_packages": [
@@ -179,9 +195,9 @@
         "crates/raul/src/tui/modes/settings/theme_picker.rs",
         "crates/raul/tests/tui_theme_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/)'",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/) or test(/surface_1/) or test(/focus_ring/)'",
       "done_when": "AC-03 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -265,8 +281,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-28",
     "branch": "",
-    "evidence": ""
+    "evidence": "herdr-orc, two cycles. Cycle 1 (base 8995b12): runner 74ce96f (S0), 8c72e80 (S1), f8c8686 (S1.1), 1779ad2 (S1.3), 76bc1ad + c688ebd (S1.4); reviewer verdict ok with 0 findings. Cycle 2: S1.2 was blocked on M243's theme picker; M243 has since landed, and the runner committed 1783064 widening SWATCH_ROLES 6->9, painting the picker on surface_1, and keeping the background-only highlight so the focus_ring marker survives. Cycle-2 review returned changes-needed with F-01 (medium): AC-03's filter gated only 1 of its 3 claims -- a planning defect, not a code defect -- and supplied the combined filter, which the orchestrator applied to both AC-03 and step S1.2. R5 verified the fix non-vacuous: mutating palette::overlay_backdrop from surface_1 to surface_2 fails the background test while the focus_ring test survives. MP_VERIFY_ALLOW_SHELL=1 required because AC-03/AC-05/AC-06 are shell pipelines; MP_VERIFY_TIMEOUT_SECS raised because AC-06 chains a full raul suite with clippy, fmt and the consumer-surface lint."
   }
 }

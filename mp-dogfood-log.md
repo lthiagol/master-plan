@@ -255,3 +255,28 @@ milestone (or a successor), not by reverting the work that closed them.
 - Workaround: export `MP_VERIFY_TIMEOUT_SECS` (e.g. 1800) alongside `MP_VERIFY_ALLOW_SHELL=1` when completing any milestone whose AC is a full multi-crate build plus test plus lint chain. Never reach for `--force` here — the command was never run, so forcing would record completion on unverified work.
 - Verdict: **spec-gap** (plan ergonomics: AC authors write natural full-suite verifications that exceed the default deadline, and nothing in the milestone hints that the deadline must be raised).
 - Status: backlog.
+
+---
+
+## Entry — 2026-09-28 — a Settings picker row label overflows its own padding field
+
+- Date / when: 2026-09-28, herdr-orc cycle 2 review of M244, finding F-02.
+- Command attempted: read of `render_theme_picker_row` in `crates/raul/src/tui/render/overlays.rs`; the label field is `format!("{label:<14}")`.
+- Observed output: no test failure — the reset row's description sits one column right of the palette rows, because the label is `Default (mocha)` (15 chars) and the 14-char pad never applies. Visually detectable, functionally silent.
+- Suspected cause / code path: the pad width is a hardcoded literal that was never widened when the longest label was added. Present in the cycle-2 base sha 252955e at two sites (lines 602 and 844), so it predates this work and is not a cycle-2 regression.
+- Workaround: none needed; a one-character change (`<14` -> `<15`) aligns the row. Left unactioned because M244's scope bars cosmetic changes and the cycle-2 runner correctly reported it rather than fixing it.
+- Verdict: **bug** (cosmetic misalignment, pre-existing).
+- Status: backlog.
+
+---
+
+## Entry — 2026-09-28 — three AC `verification` filters did not match the tests written for them
+
+- Date / when: 2026-09-28, across the herdr-orc session (M239, M243, M244).
+- Command attempted: `mp milestone complete <id>` and orchestrator re-runs of each AC's stated `verification`.
+- Observed output: in each case the filter matched zero or a subset of the relevant tests, yet the milestone still reached `ok`/`complete`. M239 AC-01's clause 3 matched M239's own milestone slug and could never pass; M243 AC-09's `test(/status_chip/)` matched 0 tests (exit 4) while the real tests were named `header_chip_*`; M244 AC-03's `test(/roles/)` gated the swatch width but never ran the `surface_1` or `focus_ring` tests.
+- Suspected cause / code path: AC authors write filters naming what they expect the tests to be called. Nothing checks that the predicted name is the name that was written, so a gate can silently assert nothing about most of what its AC claims — worse than no gate, because it manufactures confidence.
+- Workaround: reword each filter to match reality, in both the AC and the step `tests` field (the duplication that separately broke M239's completion gate). Done for all three. Nothing mechanical prevents a recurrence.
+- Proposed durable fix: a lint alongside `scripts/audit-step-tests.sh` that executes each AC's `verification` filter and flags when it matches zero tests, or when the matched set is narrower than the AC's claims imply.
+- Verdict: **spec-gap**.
+- Status: backlog.
