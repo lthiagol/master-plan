@@ -1445,6 +1445,12 @@ fn apply_settings_commit_edit(app: &mut App, runner: &MpRunner) -> Result<()> {
 }
 
 fn apply_settings_save(app: &mut App, runner: &MpRunner) -> Result<()> {
+    // M243: with the `ui.theme` picker expanded, `s` commits the
+    // highlighted palette by staging it like any other key — one save
+    // path, one dry-run, one `mp config set ui.theme`. No bespoke
+    // write path for themes.
+    stage_settings_theme_picker(app);
+
     // **M169-rev (LOW fix):** `BTreeMap` iterates key-sorted so the
     // on-disk write order is deterministic across runs.
     let staged: Vec<(String, String)> = app
@@ -1515,8 +1521,50 @@ fn apply_settings_save(app: &mut App, runner: &MpRunner) -> Result<()> {
     }
 
     reload_settings_after_save(app, runner)?;
+    // M243: the save landed, so the picker has nothing left to
+    // preview — close it. `mark_saved` already ran inside
+    // `reload_settings_after_save_keeping`, where the reloaded
+    // on-disk `ui.theme` is the authority on what is now saved.
+    if let Some(state) = app.settings.as_mut() {
+        state.theme.collapse();
+    }
     app.set_flash_message(format!("Saved {} setting(s)", staged.len()));
     Ok(())
+}
+
+/// M243: stage the highlighted palette as a `ui.theme` edit so the
+/// existing `apply_settings_save` path carries it. No-op when the
+/// picker is not the open editor.
+fn stage_settings_theme_picker(app: &mut App) -> bool {
+    let Some(state) = app.settings.as_mut() else {
+        return false;
+    };
+    if !state.theme_picker_open() {
+        return false;
+    }
+    let name = state.theme.preview_name().to_string();
+    state.staged_edits.insert(
+        crate::tui::modes::settings::theme_picker::THEME_KEY.to_string(),
+        name,
+    );
+    true
+}
+
+/// M243: Esc on the theme picker — drop the preview, restore the saved
+/// palette, close the expansion. The restore reads the picker's
+/// `saved` value rather than re-reading config, so it is correct even
+/// if the on-disk config changed underneath us mid-preview.
+fn apply_settings_cancel_theme_picker(app: &mut App) {
+    let Some(state) = app.settings.as_mut() else {
+        return;
+    };
+    state.theme.cancel();
+    let saved = state.theme.saved_theme().to_string();
+    state.theme.collapse();
+    if let Some(p) = crate::theme::Palette::by_name(&saved) {
+        app.palette = p;
+    }
+    app.touch();
 }
 
 fn settings_dry_run_errors(dry: &serde_json::Value, key: &str) -> Vec<String> {
@@ -1595,6 +1643,15 @@ pub fn reload_settings_after_save_keeping(
         if let Some(theme) = data.pointer("/config/ui/theme").and_then(|v| v.as_str()) {
             if let Some(p) = crate::theme::Palette::by_name(theme) {
                 app.palette = p;
+            }
+            // M243: the reloaded value is the authority on what is
+            // saved, so re-seat the picker's saved value and cursor
+            // from it. Doing this here (rather than on the save's
+            // success path) keeps the picker honest after a *failed*
+            // save too — the value on disk did not change, and the
+            // picker should not claim it did.
+            if let Some(state) = app.settings.as_mut() {
+                state.theme.mark_saved(theme.to_string());
             }
         }
         if let Some(icons) = data.pointer("/config/ui/icons").and_then(|v| v.as_str()) {
@@ -1717,6 +1774,13 @@ pub fn apply_esc(app: &mut App, _runner: &MpRunner) -> Result<()> {
             .is_some_and(|s| matches!(s.focus, SettingsFocus::Editing))
         {
             apply_settings_cancel_edit(app);
+            return Ok(());
+        }
+        // M243: Esc on an expanded `ui.theme` picker drops the preview
+        // and restores the saved palette. Runs BEFORE the no-op below,
+        // because the flat list still has nothing to cancel.
+        if app.settings.as_ref().is_some_and(|s| s.theme_picker_open()) {
+            apply_settings_cancel_theme_picker(app);
             return Ok(());
         }
         // Esc on the Settings lane (no active edit) is a no-op.

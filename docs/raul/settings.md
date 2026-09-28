@@ -19,6 +19,9 @@ The footer shows `[Save (s)]` (with a `*` when you have unsaved staged edits) an
 `[Cancel (Esc)]`. Press `s` to persist; `Esc` to discard. Saving calls
 `mp config set` under the hood.
 
+`ui.theme` is the one row with its own editor — see
+[The theme picker](#the-theme-picker).
+
 ## UI preferences (`[ui]`)
 
 | Key | Values | Default | Effect |
@@ -50,8 +53,51 @@ The `--color` CLI flag overrides `ui.color` for a single run.
 | `macchiato` | Catppuccin (dark) |
 | **`mocha`** | Catppuccin dark — the default |
 | `dracula` | Dracula |
+| `alucard` | Alucard Classic — Dracula's light counterpart |
 
 An unknown theme name falls back to `mocha`.
+
+### The theme picker
+
+The `ui.theme` row has a picker. Put the highlight on the row and press `Enter`:
+
+```text
+▼ ui.theme  [choice]  mocha
+    latte        ██████  Catppuccin Latte — light
+    frappe       ██████  Catppuccin Frappé — dim and soft
+    macchiato    ██████  Catppuccin Macchiato — mid-dark
+  ▶ mocha        ██████  Catppuccin Mocha — deep dark (default)
+    dracula      ██████  Dracula — classic dark
+    alucard      ██████  Alucard Classic — Dracula's light counterpart
+    Default (mocha)     Reset to the default palette
+      ██ in-progress  ██ done  ██ ready  ██ blocked  ██ accent  ██ dim
+```
+
+Each palette row carries a six-block swatch drawn in that palette, so you can
+compare themes by looking at them. The row underneath is a status preview showing
+what the lifecycle colors look like under the palette you have highlighted.
+
+**Moving the highlight applies the theme immediately** — the whole TUI repaints
+in the highlighted palette on the next frame, including the picker itself. Nothing
+is written to disk until you save.
+
+| Key | Does |
+|-----|------|
+| `Enter` | open the picker / close it again, keeping the live preview |
+| `Up` `k` `Left` | highlight the row above |
+| `Down` `j` `Right` | highlight the row below |
+| `s` | save the highlighted palette (`mp config set ui.theme`) and close the picker |
+| `Esc` | drop the preview, restore the saved palette, close the picker |
+
+The mouse works too: hovering a row previews it, clicking it moves the highlight.
+
+`Default (mocha)` previews and saves the default palette, so saving it writes
+`ui.theme = mocha` — it is a shortcut for the default, not a way to unset the
+key.
+
+The Settings header shows `saved: <name>` when the highlight matches what is on
+disk, and `preview: <name> (saved: <name>)` while you are looking at something
+else, so an unsaved preview is never silent.
 
 > `monochrome` exists internally as the no-accent palette used when
 > `ui.color` is disabled, but it is **not** a user-selectable theme —

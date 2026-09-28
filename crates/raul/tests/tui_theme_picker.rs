@@ -668,3 +668,191 @@ fn live_apply_is_a_noop_outside_settings() {
         "apply_theme_preview must not repaint when the picker is not the open editor"
     );
 }
+
+// --- save / cancel (AC-07) -------------------------------------------------
+
+/// A real `MpRunner` pointed at a throwaway project, so the save path
+/// exercises the actual `mp config set ui.theme` round-trip rather
+/// than a mock. `dry-run` and the reload after save both shell out.
+fn fixture_runner(tag: &str) -> raul::mp_runner::MpRunner {
+    let mut r = raul::mp_runner::MpRunner::new().expect("mp on PATH for fixture");
+    let tmp = std::env::temp_dir().join(format!("m243_theme_picker_{tag}"));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    std::fs::create_dir_all(tmp.join("master-plan")).unwrap();
+    std::fs::write(
+        tmp.join("master-plan").join("config.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "project": { "name": "fixture", "description": "d", "stack": [], "created": "2026-01-01" },
+            "ui": { "theme": "mocha" }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    r.set_project_root(tmp.clone());
+    r.set_plan_dir(tmp.join("master-plan"));
+    r
+}
+
+fn saved_theme_on_disk(r: &raul::mp_runner::MpRunner) -> String {
+    let v = r
+        .run::<serde_json::Value>("config", &["get", "ui.theme"])
+        .expect("config get ui.theme");
+    v.get("value")
+        .and_then(|x| x.as_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[test]
+fn s_saves_the_highlighted_palette_through_mp() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("save");
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("alucard").unwrap();
+    app.settings.as_mut().unwrap().theme.set_cursor(n);
+    app.apply_theme_preview();
+
+    apply_action(&mut app, &runner, Action::SettingsSave).expect("save");
+
+    assert_eq!(
+        saved_theme_on_disk(&runner),
+        "alucard",
+        "s must write ui.theme through mp config set"
+    );
+    let state = app.settings.as_ref().unwrap();
+    assert_eq!(state.theme.saved_theme(), "alucard");
+    assert!(!state.theme.is_expanded(), "saving closes the picker");
+    assert_eq!(app.effective_palette().name, "alucard");
+}
+
+#[test]
+fn esc_restores_the_saved_palette() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("esc");
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("dracula").unwrap();
+    app.settings.as_mut().unwrap().theme.set_cursor(n);
+    app.apply_theme_preview();
+    assert_eq!(app.effective_palette().name, "dracula", "preview is live");
+
+    apply_action(&mut app, &runner, Action::Esc).expect("esc");
+
+    assert_eq!(
+        app.effective_palette().name,
+        "mocha",
+        "Esc must restore the saved palette"
+    );
+    let state = app.settings.as_ref().unwrap();
+    assert_eq!(
+        state.theme.saved_theme(),
+        "mocha",
+        "saved value is untouched"
+    );
+    assert!(!state.theme.is_expanded(), "Esc closes the picker");
+    assert_eq!(
+        saved_theme_on_disk(&runner),
+        "mocha",
+        "Esc must not write to disk"
+    );
+}
+
+#[test]
+fn esc_then_resave_keeps_the_restore_stable() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("esc_resave");
+    let mut app = app_with_open_picker("mocha");
+    for name in ["latte", "alucard"] {
+        let n = theme_picker::row_for_name(name).unwrap();
+        let state = app.settings.as_mut().unwrap();
+        state.selected_idx = theme_idx();
+        state.theme.expand();
+        state.theme.set_cursor(n);
+        app.apply_theme_preview();
+        assert_eq!(app.effective_palette().name, name);
+        apply_action(&mut app, &runner, Action::Esc).expect("esc");
+        assert_eq!(
+            app.effective_palette().name,
+            "mocha",
+            "Esc always returns to the saved value, not the last preview"
+        );
+    }
+    assert_eq!(saved_theme_on_disk(&runner), "mocha");
+}
+
+#[test]
+fn esc_on_a_closed_picker_is_a_noop() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("esc_closed");
+    let mut app = settings_app("mocha");
+    apply_action(&mut app, &runner, Action::Esc).expect("esc");
+    assert_eq!(app.effective_palette().name, "mocha");
+    assert!(!app.settings.as_ref().unwrap().theme.is_expanded());
+}
+
+#[test]
+fn s_with_a_closed_picker_does_not_stage_a_theme() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("save_closed");
+    let mut app = settings_app("mocha");
+    apply_action(&mut app, &runner, Action::SettingsSave).expect("save");
+    assert!(
+        !app.settings
+            .as_ref()
+            .unwrap()
+            .staged_edits
+            .contains_key("ui.theme"),
+        "a closed picker must not write ui.theme on an unrelated save"
+    );
+    assert_eq!(saved_theme_on_disk(&runner), "mocha");
+}
+
+#[test]
+fn s_key_on_the_lane_saves_the_picker() {
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use raul::tui::action::Action;
+    raul::config::set_color_enabled(true);
+    let app = app_with_open_picker("mocha");
+    let actions = raul::tui::modes::settings::handle_key(
+        KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE),
+        &app,
+    );
+    assert_eq!(
+        actions,
+        vec![Action::SettingsSave],
+        "s on the picker must route to the existing Settings save path"
+    );
+}
+
+#[test]
+fn s_still_saves_other_staged_keys_alongside_the_theme() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("save_both");
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("frappe").unwrap();
+    app.settings.as_mut().unwrap().theme.set_cursor(n);
+    // The operator also staged an unrelated key before saving.
+    app.settings
+        .as_mut()
+        .unwrap()
+        .staged_edits
+        .insert("ui.icons".to_string(), "ascii".to_string());
+
+    apply_action(&mut app, &runner, Action::SettingsSave).expect("save");
+
+    assert_eq!(saved_theme_on_disk(&runner), "frappe");
+    let icons = runner
+        .run::<serde_json::Value>("config", &["get", "ui.icons"])
+        .expect("config get ui.icons");
+    assert_eq!(
+        icons.get("value").and_then(|v| v.as_str()),
+        Some("ascii"),
+        "saving the theme must not drop the operator's other staged edits"
+    );
+}
