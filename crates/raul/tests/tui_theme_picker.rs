@@ -60,6 +60,12 @@ fn build_test_schema() -> SettingsSchema {
 fn settings_app(saved_theme: &str) -> App {
     let mut app = App::new();
     app.select_lane(Lane::Settings);
+    // Mirror what `run_tui` does at startup: `App::palette` follows
+    // the configured `ui.theme`, so the picker and the live palette
+    // agree before any preview happens.
+    if let Some(p) = raul::theme::Palette::by_name(saved_theme) {
+        app.palette = p;
+    }
     let config = serde_json::json!({
         "ui": { "color": true, "icons": "unicode", "theme": saved_theme,
                 "hide_done": false, "show_autopilot_tab": false },
@@ -854,5 +860,106 @@ fn s_still_saves_other_staged_keys_alongside_the_theme() {
         icons.get("value").and_then(|v| v.as_str()),
         Some("ascii"),
         "saving the theme must not drop the operator's other staged edits"
+    );
+}
+
+// --- reset row (AC-08) -----------------------------------------------------
+
+#[test]
+fn reset_row_previews_the_default_palette() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("dracula");
+    assert_eq!(app.effective_palette().name, "dracula");
+
+    let reset = theme_picker::RESET_ROW;
+    assert_eq!(reset, 6, "the reset row is the 7th row");
+    app.settings.as_mut().unwrap().theme.set_cursor(reset);
+    app.apply_theme_preview();
+
+    assert_eq!(
+        app.effective_palette().name,
+        "mocha",
+        "the reset row must preview mocha"
+    );
+    assert_eq!(app.settings.as_ref().unwrap().theme.preview_name(), "mocha");
+}
+
+#[test]
+fn reset_row_saves_ui_theme_mocha() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("reset");
+    let mut app = app_with_open_picker("dracula");
+    app.settings
+        .as_mut()
+        .unwrap()
+        .theme
+        .set_cursor(theme_picker::RESET_ROW);
+    app.apply_theme_preview();
+    assert_eq!(app.effective_palette().name, "mocha");
+
+    apply_action(&mut app, &runner, Action::SettingsSave).expect("save");
+
+    assert_eq!(
+        saved_theme_on_disk(&runner),
+        "mocha",
+        "saving the reset row must write ui.theme=mocha"
+    );
+    let state = app.settings.as_ref().unwrap();
+    assert_eq!(state.theme.saved_theme(), "mocha");
+    assert!(!state.theme.is_expanded());
+}
+
+#[test]
+fn reset_row_is_idempotent_from_the_default_theme() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    // Already on mocha: the reset row previews the same palette and is
+    // not reported as a preview of something else.
+    app.settings
+        .as_mut()
+        .unwrap()
+        .theme
+        .set_cursor(theme_picker::RESET_ROW);
+    app.apply_theme_preview();
+    assert_eq!(app.effective_palette().name, "mocha");
+    assert!(
+        !app.settings.as_ref().unwrap().theme.is_previewing(),
+        "resetting to the value already saved is not a preview"
+    );
+}
+
+#[test]
+fn reset_row_renders_with_its_label_and_description() {
+    let app = app_with_open_picker("dracula");
+    let out = render_full(&app, 140, 44);
+    assert!(
+        out.contains("Default (mocha)"),
+        "the reset row must be labeled with the palette it resets to:\n{out}"
+    );
+    assert!(
+        out.contains("Reset to the default palette"),
+        "the reset row must explain itself:\n{out}"
+    );
+}
+
+#[test]
+fn reset_row_has_no_swatch_of_its_own() {
+    // The reset row is an action, not a palette. Repeating mocha's
+    // swatch beside mocha's own row would read as a duplicate entry.
+    let app = app_with_open_picker("mocha");
+    let out = render_full(&app, 140, 44);
+    let mocha_row = out
+        .lines()
+        .find(|l| l.contains("Catppuccin Mocha"))
+        .expect("mocha row renders");
+    let reset_row = out
+        .lines()
+        .find(|l| l.contains("Default (mocha)"))
+        .expect("reset row renders");
+    assert!(mocha_row.contains('█'), "the mocha row must carry a swatch");
+    assert!(
+        !reset_row.contains('█'),
+        "the reset row must not repeat a swatch: {reset_row:?}"
     );
 }
