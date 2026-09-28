@@ -157,6 +157,49 @@ pub static ALL: [Palette; 5] = [LATTE, FRAPPE, MACCHIATO, MOCHA, DRACULA];
 mod tests {
     use super::*;
 
+    /// Pin the exact per-palette values of the three layering roles.
+    /// These are official upstream theme colors, not taste:
+    ///
+    /// | palette    | focus_ring | surface_1 | surface_2 | source                        |
+    /// |------------|------------|-----------|-----------|-------------------------------|
+    /// | latte      | `0x7287fd` | `0xe6e9ef` | `0xccd0da` | Catppuccin Lavender/Base/Subtle0 |
+    /// | frappe     | `0xbabbf1` | `0x292c3c` | `0x414559` | Catppuccin Lavender/Mantle/Surface0 |
+    /// | macchiato  | `0xb7bdf8` | `0x1e2030` | `0x363a4f` | Catppuccin Lavender/Mantle/Surface0 |
+    /// | mocha      | `0xb4befe` | `0x181825` | `0x313244` | Catppuccin Lavender/Mantle/Surface0 |
+    /// | dracula    | `0x8be9fd` | `0x343746` | `0x44475a` | draculatheme.com/spec Cyan/Background Light/Selection |
+    ///
+    /// `alucard` is intentionally absent — it ships with the ALUCARD
+    /// palette in M243 (M244 `depends_on: [243]`). Its spec values
+    /// are `0x036a96` / `0xdedccf` / `0xcfcfde` (Cyan / Background
+    /// Light / Selection) and the test below picks it up for free
+    /// once M243 adds the static to `ALL`.
+    ///
+    /// `monochrome` pins the `Color::Reset` collapse.
+    #[test]
+    fn palette_roles_match_spec() {
+        let cases: &[(&'static Palette, Color, Color, Color)] = &[
+            (&LATTE, rgb(0x7287fd), rgb(0xe6e9ef), rgb(0xccd0da)),
+            (&FRAPPE, rgb(0xbabbf1), rgb(0x292c3c), rgb(0x414559)),
+            (&MACCHIATO, rgb(0xb7bdf8), rgb(0x1e2030), rgb(0x363a4f)),
+            (&MOCHA, rgb(0xb4befe), rgb(0x181825), rgb(0x313244)),
+            (&DRACULA, rgb(0x8be9fd), rgb(0x343746), rgb(0x44475a)),
+        ];
+        for (p, ring, s1, s2) in cases {
+            assert_eq!(p.focus_ring, *ring, "{} focus_ring", p.name);
+            assert_eq!(p.surface_1, *s1, "{} surface_1", p.name);
+            assert_eq!(p.surface_2, *s2, "{} surface_2", p.name);
+        }
+    }
+
+    /// The no-color palette collapses every layering role to `Reset`;
+    /// layering is carried by modifiers instead of hue.
+    #[test]
+    fn monochrome_roles_collapse_to_reset() {
+        assert_eq!(MONOCHROME.focus_ring, Color::Reset);
+        assert_eq!(MONOCHROME.surface_1, Color::Reset);
+        assert_eq!(MONOCHROME.surface_2, Color::Reset);
+    }
+
     /// The layering roles are only useful if they actually separate
     /// the layers they name. A palette that reuses one color for
     /// `surface_1`, `surface_2`, and `foreground` would collapse
