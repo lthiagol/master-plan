@@ -1,5 +1,15 @@
 # Code Review Lessons
 
+This file has two jobs at once, and it is the single source for both. It is a
+**pattern fixture**: `crates/mp/tests/code_review_patterns.rs` parses the
+`Pattern:` blocks below and runs the greps and `cargo nextest` invocations they
+cite, so every Positive/Negative fixture pair stays executable. It is also the
+**syllabus** for the repository-internal `mp-code-review` skill
+(`internal/skills/mp-code-review/SKILL.md`), which walks these lessons to
+pre-screen a milestone's diff before sign-off. Editing this file therefore
+changes both a test's behavior and a reviewer's checklist — keep both jobs in
+mind, and do not move it out of `crates/mp/tests/fixtures/`.
+
 Concrete lessons accumulated from real code reviews, organized so they can be
 appended to over time. Each entry has a **name**, **what it looks like**, a
 **real example**, and a **takeaway** for future reviews and skill design.

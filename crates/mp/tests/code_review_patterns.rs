@@ -306,6 +306,40 @@ fn lessons_index_is_complete_and_sorted() {
     }
 }
 
+/// T-10: the file opens with a paragraph that states its dual role — the
+/// runnable pattern fixture for this test binary *and* the lesson syllabus
+/// for the repository-internal `mp-code-review` skill. The two audiences
+/// pull in opposite directions (a maintainer appending a pattern block vs a
+/// reviewer looking up a lesson), so the file is easy to "clean up" in a
+/// way that quietly breaks one of them. Naming both roles in the preamble
+/// makes that cost visible at the point of the edit. Scoped to the text
+/// before the first `## ` section so the claim cannot be satisfied by a
+/// stray mention deep in a lesson body.
+#[test]
+fn lessons_header_states_dual_role() {
+    let path = lessons_path();
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let preamble = text
+        .split("\n## ")
+        .next()
+        .unwrap_or_else(|| panic!("{} has no preamble", path.display()));
+
+    for needle in [
+        "code_review_patterns.rs",
+        "mp-code-review",
+        "pattern fixture",
+        "syllabus",
+    ] {
+        assert!(
+            preamble.contains(needle),
+            "lessons preamble does not name '{needle}' — it must state both roles \
+             (pattern fixture for crates/mp/tests/code_review_patterns.rs, syllabus \
+             for the mp-code-review skill):\n{preamble}"
+        );
+    }
+}
+
 /// T-01: each of L6, L8, L13, L14, L15 has a `**Pattern:**` block in the
 /// lessons doc. Locks in the M173 S1 deliverable.
 #[test]
