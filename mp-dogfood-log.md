@@ -205,7 +205,8 @@ milestone (or a successor), not by reverting the work that closed them.
 - Workaround: none found. `mp validate` does not self-heal, and no reindex command was located. The mismatch is only visible as a warning, so it does not block work — but it makes the plan permanently non-clean until someone hand-edits `plan.json`, which the plan zone forbids.
 - Verdict: **bug**.
 - Status: backlog.
-- Update 2026-09-28: reproduced a second time on M231 (`mp milestone complete 231` → same W03, index `implemented` vs file `verified`). Two independent reproductions across two milestones confirm this is systematic to the `complete` path, not a one-off. It is now the normal end state of closing any milestone this way, so the plan cannot be left validate-clean without a code fix.
+- Update 2026-09-28: reproduced a second time on M231 (`mp milestone complete 231` → same W03, index `implemented` vs file `verified`). Two independent reproductions across two milestones confirm this is systematic to the `complete` path, not a one-off.
+- Update 2026-09-28 (correction, via herdr-orc M239 review F-01): the mismatch is **self-healing**. An unrelated later `mp` write (rewording M239's AC-01) re-indexed `plan.json` and silently corrected M234's stale entry from `implemented` to `verified`, clearing its W03 with no other action. So the earlier claim in this entry that "the plan cannot be left validate-clean without a code fix" was too strong: the index is only stale until the next write that re-derives it. The real defect is narrower — `complete` writes the index and the file from two different derivations, so a milestone is left inconsistent between its own close and the next unrelated `mp` write.
 
 ---
 
@@ -217,3 +218,15 @@ milestone (or a successor), not by reverting the work that closed them.
 - Suspected cause / code path: `.gitignore` covers no Python bytecode caching, and several repo scripts are Python (`scripts/mp_flow_lint.py`, `scripts/check-consumer-surface.sh`'s helpers, `scripts/audit-*.sh`). Any lane that runs them can pollute a clean-worktree assertion — which this repo's discipline gate depends on.
 - Verdict: **bug** (hygiene gap; cheap fix, not yet filed as a milestone).
 - Status: backlog. Filed by herdr-orc reviewer as F-05 on M231 cycle 1 (low severity).
+
+---
+
+## Entry — 2026-09-28 — an impossible AC command is duplicated in the step `tests` field
+
+- Date / when: 2026-09-28, closing M239 after a herdr-orc cycle.
+- Command attempted: `mp milestone ac update 239 AC-01 --verification "…"` to reword a self-impossible AC, followed by `mp milestone complete 239`.
+- Observed output: `complete` still failed with `S1.2: step tests command failed (exit 1)`. The reword had only been applied to AC-01; the same command text also lived in step S1.2's `tests` field, which the completion gate verifies independently of the AC. Fixing the AC alone was not enough.
+- Suspected cause / code path: `milestone complete` runs both the per-AC verification commands and the per-step `tests` commands. Nothing couples the two, so a correction applied to one can leave the other holding a stale command that can never pass. Anyone repairing a spec-gap in an AC should first check whether the same string is duplicated in a step's `tests` field.
+- Related: the underlying M239 AC-01 problem itself -- `! git ls-files | rg -q 'mp-herdr-log'` matching M239's own milestone slug -- is a spec-gap in the milestone, recorded in that milestone's evidence and resolved by anchoring the pathspec.
+- Verdict: **spec-gap** (repair ergonomics: no way to see, from an AC edit, that a step carries the same command).
+- Status: backlog.

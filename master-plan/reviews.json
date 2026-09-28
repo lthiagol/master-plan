@@ -2135,6 +2135,14 @@
       "reviewed_at": "2026-09-28",
       "notes": "Cycle 1 via herdr-orc: verdict ok, 0 findings. Cold build enabled. Reviewer independently verified: M28 fixture-count staleness (Makefile 5 vs M28 AC-05 claim of 6) is real but out of scope, follow-up milestone is the right vehicle; 197 lines for 3 tests is proportionate; the lessons file is not consumer-surface-exposed; index is 60/60 strictly ascending with every heading covered once; the S1 deletion has no out-of-tree references; and all three new tests are load-bearing via its own mutation testing.",
       "milestone_completed_at": "2026-09-28"
+    },
+    {
+      "milestone_id": "239",
+      "verdict": "ok",
+      "reviewer": "herdr-orc reviewer lane (w19:pG)",
+      "reviewed_at": "2026-09-28",
+      "notes": "Cycle 1 via herdr-orc: verdict ok, 1 low finding (F-01, against the orchestrator: commit 2da4df0 silently flipped M234's plan.json index spec_status from implemented to verified -- legitimate cleanup but undisclosed). Reviewer ruled the AC-01 reword a faithful repair, confirmed the recovery is faithful and complete, the plan-zone carve-out held, the deletion is recoverable from git, .gitignore was untouched, and the open decisions remain undecided as-recorded.",
+      "milestone_completed_at": "2026-09-28"
     }
   ],
   "comments": [
