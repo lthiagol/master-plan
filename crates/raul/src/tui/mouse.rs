@@ -268,11 +268,29 @@ fn dispatch_single_click(app: &mut App, row_id: &str) -> bool {
             false
         }
         Lane::Settings => {
-            // Settings row click: the renderer is responsible
-            // for emitting hit areas keyed by the canonical
-            // `settings_idx` (the integer index into the flat
-            // list). Without that plumbing this arm is a no-op
-            // — the keyboard path remains canonical.
+            // M243: a click on a `ui.theme` picker row moves the
+            // highlight, matching the `j` / `k` / arrow path. The
+            // live-apply lives in one place (`App::apply_theme_
+            // preview`) so the mouse, the keyboard and the initial
+            // render all take the same route.
+            if let Some(row) = row_id.strip_prefix("settings.theme.") {
+                let Ok(n) = row.parse::<usize>() else {
+                    return false;
+                };
+                let moved = app
+                    .settings
+                    .as_mut()
+                    .is_some_and(|state| state.theme.set_cursor(n));
+                if moved {
+                    app.apply_theme_preview();
+                    return true;
+                }
+                return false;
+            }
+            // Any other Settings row: the renderer does not publish
+            // hit areas for the flat key list (only the picker is
+            // clickable), so this is a no-op — the keyboard path
+            // remains canonical.
             false
         }
         _ => false,

@@ -891,6 +891,28 @@ impl App {
         }
     }
 
+    /// M243: repaint in the palette the `ui.theme` picker currently
+    /// highlights (AC-06).
+    ///
+    /// The single place the live-apply happens, so the three ways of
+    /// moving the highlight — arrows / `j` / `k`
+    /// (`move_up`/`move_down`), the mouse (`mouse::dispatch_single_click`)
+    /// and hover — cannot drift apart. A no-op when the picker is not
+    /// the open editor, so it is safe to call unconditionally.
+    pub fn apply_theme_preview(&mut self) {
+        let Some(state) = self.settings.as_ref() else {
+            return;
+        };
+        if !state.theme_picker_open() {
+            return;
+        }
+        let palette = state.theme.preview_palette();
+        if self.palette != palette {
+            self.palette = palette;
+        }
+        self.touch();
+    }
+
     pub fn load_dashboard(&mut self, snapshot: DashboardSnapshot) {
         self.dashboard = snapshot;
         self.touch();
@@ -1003,9 +1025,7 @@ impl App {
                 // newly highlighted theme.
                 if state.theme_picker_open() {
                     if state.theme.move_cursor(-1) {
-                        let palette = state.theme.preview_palette();
-                        self.palette = palette;
-                        self.touch();
+                        self.apply_theme_preview();
                     }
                     return;
                 }
@@ -1175,9 +1195,7 @@ impl App {
                 // highlight; moving it live-applies the palette.
                 if state.theme_picker_open() {
                     if state.theme.move_cursor(1) {
-                        let palette = state.theme.preview_palette();
-                        self.palette = palette;
-                        self.touch();
+                        self.apply_theme_preview();
                     }
                     return;
                 }

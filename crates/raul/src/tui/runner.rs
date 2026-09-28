@@ -1020,8 +1020,29 @@ pub fn handle_mouse(
                 return Ok(());
             }
         }
+        MouseEventKind::Moved => {
+            // M243: hovering a `ui.theme` picker row moves the
+            // highlight, so the operator gets the same live preview
+            // from the mouse as from the arrows — no click required.
+            // Scoped to the Settings picker: hover-to-select is NOT
+            // the house rule on the other lanes, and turning it on
+            // there would be a behavior change well outside this
+            // milestone.
+            if app.active_lane == super::app::Lane::Settings {
+                // `handle_dispatch` re-resolves the row id from the
+                // view, so there is nothing to do but call it; the
+                // rect filter above is just a cheap early-out.
+                if view
+                    .list_item_rects
+                    .iter()
+                    .any(|hit| point_in_rect(x, y, hit.rect))
+                    && mouse::handle_dispatch(app, &view, x, y, false)
+                {
+                    return Ok(());
+                }
+            }
+        }
         MouseEventKind::Drag(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left) => {
-            // Up clears the click-history so a click-then-drag-then-
             // release doesn't accidentally classify as a double.
             // (A genuine double-click is Down + Down; the Up arm
             // never fires between them because the user is still

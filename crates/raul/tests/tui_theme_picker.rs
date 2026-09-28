@@ -337,3 +337,135 @@ fn picker_renders_on_a_narrow_pane_without_panicking() {
         }
     }
 }
+
+// --- mouse -----------------------------------------------------------------
+
+/// Click at the center of the hit rect registered for picker row `n`
+/// and return whether the highlight landed on that row.
+fn click_picker_row(app: &mut App, width: u16, height: u16, n: usize) -> bool {
+    let view = view_state::compute_view(app, ratatui::layout::Rect::new(0, 0, width, height));
+    let id = format!("settings.theme.{n}");
+    let hit = view
+        .list_item_rects
+        .iter()
+        .find(|h| h.id == id)
+        .unwrap_or_else(|| panic!("no hit rect for {id}"))
+        .clone();
+    let x = hit.rect.x + hit.rect.width / 2;
+    let y = hit.rect.y;
+    let consumed = raul::tui::mouse::handle_dispatch(app, &view, x, y, false);
+    consumed && app.settings.as_ref().unwrap().theme.cursor() == n
+}
+
+#[test]
+fn each_picker_row_registers_a_hit_rect() {
+    let app = app_with_open_picker("mocha");
+    let view = view_state::compute_view(&app, ratatui::layout::Rect::new(0, 0, 120, 44));
+    let ids: Vec<&str> = view.list_item_rects.iter().map(|h| h.id.as_str()).collect();
+    for n in 0..theme_picker::ROW_COUNT {
+        assert!(
+            ids.contains(&format!("settings.theme.{n}").as_str()),
+            "row {n} must register a hit rect; got {ids:?}"
+        );
+    }
+    assert_eq!(
+        view.list_item_rects.len(),
+        theme_picker::ROW_COUNT,
+        "the Settings lane publishes picker rects only"
+    );
+}
+
+#[test]
+fn collapsed_picker_publishes_no_hit_rects() {
+    let app = settings_app("mocha");
+    let view = view_state::compute_view(&app, ratatui::layout::Rect::new(0, 0, 120, 44));
+    assert!(
+        view.list_item_rects.is_empty(),
+        "a collapsed picker must not be clickable: {:?}",
+        view.list_item_rects
+    );
+}
+
+/// The hit rects must line up with the rows that are actually drawn —
+/// a rect one row off would move the highlight to the wrong palette,
+/// which is worse than no mouse support at all.
+#[test]
+fn hit_rects_line_up_with_the_rendered_rows() {
+    let app = app_with_open_picker("mocha");
+    let view = view_state::compute_view(&app, ratatui::layout::Rect::new(0, 0, 120, 44));
+    let backend = TestBackend::new(120, 44);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            let v = view_state::compute_view(&app, f.area());
+            render::render(f, &app, &v);
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+
+    for hit in &view.list_item_rects {
+        let n: usize = hit
+            .id
+            .strip_prefix("settings.theme.")
+            .unwrap()
+            .parse()
+            .unwrap();
+        let label = theme_picker::row_at(n).label();
+        let line: String = (0..buffer.area().width)
+            .map(|x| buffer[(x, hit.rect.y)].symbol())
+            .collect();
+        assert!(
+            line.contains(&label),
+            "hit rect for row {n} points at y={} which renders {line:?}, not {label:?}",
+            hit.rect.y
+        );
+    }
+}
+
+#[test]
+fn click_moves_the_highlight() {
+    let mut app = app_with_open_picker("mocha");
+    let start = app.settings.as_ref().unwrap().theme.cursor();
+    assert_ne!(start, 0);
+    assert!(
+        click_picker_row(&mut app, 120, 44, 0),
+        "clicking row 0 must move the highlight there"
+    );
+    assert_eq!(app.settings.as_ref().unwrap().theme.preview_name(), "latte");
+}
+
+#[test]
+fn hover_moves_the_highlight() {
+    let mut app = app_with_open_picker("mocha");
+    let view = view_state::compute_view(&app, ratatui::layout::Rect::new(0, 0, 120, 44));
+    let hit = view
+        .list_item_rects
+        .iter()
+        .find(|h| h.id == "settings.theme.5")
+        .expect("alucard row rect")
+        .clone();
+    // Hover arrives as a Moved event; the runner routes it through
+    // the same dispatcher a click uses.
+    let consumed =
+        raul::tui::mouse::handle_dispatch(&mut app, &view, hit.rect.x + 2, hit.rect.y, false);
+    assert!(consumed, "hover over a picker row must move the highlight");
+    assert_eq!(
+        app.settings.as_ref().unwrap().theme.preview_name(),
+        "alucard"
+    );
+}
+
+#[test]
+fn click_off_the_picker_is_ignored() {
+    let mut app = app_with_open_picker("mocha");
+    let before = app.settings.as_ref().unwrap().theme.cursor();
+    let view = view_state::compute_view(&app, ratatui::layout::Rect::new(0, 0, 120, 44));
+    // y=0 is the tab bar, well above the Settings list.
+    let consumed = raul::tui::mouse::handle_dispatch(&mut app, &view, 10, 0, false);
+    assert!(!consumed, "a click outside the picker must not be consumed");
+    assert_eq!(
+        app.settings.as_ref().unwrap().theme.cursor(),
+        before,
+        "the highlight must not move"
+    );
+}

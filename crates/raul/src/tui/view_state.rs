@@ -722,7 +722,11 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
                 compute_backlog_list_rects(&mut view, app, content_area);
             }
             Lane::Settings => {
-                // Settings content is the modal overlay; no list rects.
+                // M243: hit areas for the expanded `ui.theme` picker.
+                // The Settings lane is otherwise a modal overlay with
+                // no clickable rows, so this is the only rects it
+                // publishes.
+                compute_settings_picker_rects(&mut view, app, content_area);
             }
             Lane::Autopilot => {
                 // M221: hit areas for the Autopilot picker. The
@@ -1353,6 +1357,108 @@ fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
             rect: Rect {
                 x: inner_x,
                 y: inner_y_start.saturating_add(i as u16),
+                width: inner_width,
+                height: 1,
+            },
+        });
+    }
+}
+
+/// M243: hit areas for the Settings `ui.theme` picker rows.
+///
+/// Mirrors the vertical budget in
+/// `render::overlays::render_settings_lane` (keymap view on top, the
+/// list in the middle, the description card at the bottom) and reuses
+/// `modes::settings::settings_rows` for the row sequence, so the
+/// clickable rows are the drawn rows by construction rather than by
+/// two copies of the same arithmetic staying in sync.
+///
+/// Ids are `settings.theme.<n>`, where `n` is the picker's row index;
+/// `mouse::dispatch_single_click` maps that back onto
+/// `ThemePicker::set_cursor`.
+///
+/// Only rows inside the current scroll window get a rect — a row the
+/// operator cannot see is not clickable.
+fn compute_settings_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
+    let Some(state) = app.settings.as_ref() else {
+        return;
+    };
+    if !state.theme.is_expanded() {
+        return;
+    }
+    // The schema-unavailable path replaces the list with an error
+    // block, so there is nothing to click.
+    if state.schema.is_none() {
+        return;
+    }
+
+    // Vertical budget, mirroring `render_settings_lane`.
+    let keymap_view_height = if area.height >= 60 {
+        (area.height / 2).clamp(6, 45)
+    } else {
+        6u16.min(area.height / 3).clamp(3, 6)
+    };
+    let below = Rect {
+        x: area.x,
+        y: area.y.saturating_add(keymap_view_height),
+        width: area.width,
+        height: area.height.saturating_sub(keymap_view_height),
+    };
+    let card_height = 9u16.min(below.height.saturating_sub(5));
+    let list_area = Rect {
+        x: below.x,
+        y: below.y,
+        width: below.width,
+        height: below.height.saturating_sub(card_height),
+    };
+    // Borders eat the top and bottom row of the list block.
+    let inner_h = list_area.height.saturating_sub(2) as usize;
+    if inner_h == 0 {
+        return;
+    }
+
+    let rows = crate::tui::modes::settings::settings_rows(true);
+    let total_rows = rows.len();
+    if total_rows == 0 {
+        return;
+    }
+    // The renderer smooth-scrolls the window to keep the picker
+    // cursor in view; the rects must be computed against the same
+    // window or they would point at the wrong lines.
+    let cursor_offset = rows
+        .iter()
+        .position(|r| {
+            matches!(
+                r,
+                crate::tui::modes::settings::SettingsRow::Theme(i) if *i == state.theme.cursor()
+            )
+        })
+        .unwrap_or(0);
+    let view_offset = total_rows.checked_sub(inner_h).map_or(0, |_| {
+        cursor_offset
+            .saturating_sub(inner_h.saturating_sub(2))
+            .min(total_rows.saturating_sub(inner_h))
+    });
+    let view_end = (view_offset + inner_h).min(total_rows);
+
+    let inner_x = list_area.x.saturating_add(1);
+    let inner_width = list_area.width.saturating_sub(2);
+    if inner_width == 0 {
+        return;
+    }
+
+    for (row_idx, row) in rows.iter().enumerate().take(view_end).skip(view_offset) {
+        let crate::tui::modes::settings::SettingsRow::Theme(n) = row else {
+            continue;
+        };
+        view.list_item_rects.push(ListItemHitArea {
+            id: format!("settings.theme.{n}"),
+            rect: Rect {
+                x: inner_x,
+                y: list_area
+                    .y
+                    .saturating_add(1)
+                    .saturating_add((row_idx - view_offset) as u16),
                 width: inner_width,
                 height: 1,
             },

@@ -122,6 +122,48 @@ fn theme_picker_key(
     Vec::new()
 }
 
+/// One row of the Settings flat list, in render order.
+///
+/// M243: the `ui.theme` row can expand into picker rows, which means
+/// "which row is on screen at line N" is no longer a pure function of
+/// `SETTINGS_KEYS`. The renderer (`render::overlays`) and the mouse
+/// hit-test (`view_state::compute_settings_picker_rects`) both need
+/// that mapping, so it lives here — one definition, two consumers,
+/// no drift between what is drawn and what is clickable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsRow {
+    /// A `▾ <section>` banner.
+    Section(&'static str),
+    /// A configurable key row, carrying its `SETTINGS_KEYS` index.
+    Key(usize, &'static str),
+    /// One row of the expanded `ui.theme` picker, carrying its index
+    /// into [`theme_picker::rows()`].
+    Theme(usize),
+}
+
+/// The full row sequence for the current state.
+///
+/// `picker_expanded` controls whether the 7 theme rows are spliced in
+/// beneath `ui.theme`; the caller passes
+/// `state.theme.is_expanded()`.
+pub fn settings_rows(picker_expanded: bool) -> Vec<SettingsRow> {
+    let mut rows: Vec<SettingsRow> = Vec::new();
+    let mut last_section: Option<&'static str> = None;
+    for (i, (section, key)) in SETTINGS_KEYS.iter().enumerate() {
+        if Some(*section) != last_section {
+            rows.push(SettingsRow::Section(section));
+            last_section = Some(*section);
+        }
+        rows.push(SettingsRow::Key(i, key));
+        if *key == theme_picker::THEME_KEY && picker_expanded {
+            for r in 0..theme_picker::ROW_COUNT {
+                rows.push(SettingsRow::Theme(r));
+            }
+        }
+    }
+    rows
+}
+
 /// `(section, key)` for the row at `idx`, or `None` if out of range.
 pub fn flat_key(idx: usize) -> Option<(&'static str, &'static str)> {
     SETTINGS_KEYS.get(idx).copied()

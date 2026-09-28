@@ -10,6 +10,7 @@ use crate::tui::key_combo::{format_key_combo, KeyCombo};
 use crate::tui::keybinds::KeybindsViewRow;
 use crate::tui::mode::Mode;
 use crate::tui::modes::settings::theme_picker;
+use crate::tui::modes::settings::SettingsRow;
 #[allow(unused_imports)]
 // keybind_default_label + value_for_key are used inside nested fns below
 use crate::tui::modes::settings::{keybind_default_label, value_for_key, SETTINGS_KEYS};
@@ -662,31 +663,12 @@ fn render_settings_list(
         .add_modifier(Modifier::BOLD);
     let badge_style = Style::default().fg(palette.dim);
 
-    // Build the full rendered row sequence: section headers + Key rows.
-    // Cursor math stays the same as the M168 flat-list contract.
-    enum RowKind {
-        Section(&'static str),
-        Key(usize, &'static str, &'static str), // (SETTINGS_KEYS index, section, key)
-        /// M243: one row of the expanded `ui.theme` picker, carrying
-        /// its index into `theme_picker::rows()`.
-        Theme(usize),
-    }
-    let mut rows: Vec<RowKind> = Vec::new();
-    let mut last_section: Option<&'static str> = None;
-    for (i, (section, key)) in SETTINGS_KEYS.iter().enumerate() {
-        if Some(*section) != last_section {
-            rows.push(RowKind::Section(section));
-            last_section = Some(*section);
-        }
-        rows.push(RowKind::Key(i, section, key));
-        // M243: the `ui.theme` row expands in place into 7 picker
-        // rows (6 named palettes + Default) directly beneath it.
-        if *key == theme_picker::THEME_KEY && state.theme.is_expanded() {
-            for r in 0..theme_picker::ROW_COUNT {
-                rows.push(RowKind::Theme(r));
-            }
-        }
-    }
+    // Build the full rendered row sequence: section headers + Key rows
+    // + (when the theme picker is expanded) the 7 picker rows.
+    // `modes::settings::settings_rows` owns the sequence so the mouse
+    // hit-test in `view_state` cannot drift from what is drawn here.
+    let picker_open = state.theme.is_expanded();
+    let rows = crate::tui::modes::settings::settings_rows(picker_open);
 
     // Map selected_idx (a SETTINGS_KEYS index) onto the rendered row
     // index for cursor math. While the picker is expanded the cursor
@@ -695,15 +677,14 @@ fn render_settings_list(
     let selected = state
         .selected_idx
         .min(SETTINGS_KEYS.len().saturating_sub(1));
-    let picker_open = state.theme.is_expanded();
     let mut selected_row_idx: usize = 0;
     for (i, r) in rows.iter().enumerate() {
         match r {
-            RowKind::Key(idx, _, _) if *idx == selected && !picker_open => {
+            SettingsRow::Key(idx, _) if *idx == selected && !picker_open => {
                 selected_row_idx = i;
                 break;
             }
-            RowKind::Theme(idx) if *idx == state.theme.cursor() && picker_open => {
+            SettingsRow::Theme(idx) if *idx == state.theme.cursor() && picker_open => {
                 selected_row_idx = i;
                 break;
             }
@@ -725,13 +706,13 @@ fn render_settings_list(
     let mut items: Vec<ListItem> = Vec::new();
     for r in &rows[view_offset..view_end] {
         match r {
-            RowKind::Section(section) => {
+            SettingsRow::Section(section) => {
                 items.push(ListItem::new(Line::from(Span::styled(
                     format!(" ▾ {section} "),
                     section_header_style,
                 ))));
             }
-            RowKind::Key(idx, _section, key) => {
+            SettingsRow::Key(idx, key) => {
                 // Resolve the value cell: staged > on-disk > default.
                 let mut val = state
                     .staged_edits
@@ -787,7 +768,7 @@ fn render_settings_list(
                 };
                 items.push(ListItem::new(line));
             }
-            RowKind::Theme(idx) => {
+            SettingsRow::Theme(idx) => {
                 items.push(ListItem::new(render_theme_picker_row(
                     theme_picker::row_at(*idx),
                     *idx == state.theme.cursor(),
