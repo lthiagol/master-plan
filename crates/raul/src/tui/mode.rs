@@ -177,13 +177,23 @@ impl SettingsState {
 
     /// Is the focused key the theme picker, and is its expansion open?
     ///
-    /// The single predicate every picker path (keyboard, mouse,
-    /// renderer) gates on, so they can never disagree about whether
-    /// the picker owns the input.
+    /// The single predicate every picker *input* path (keyboard,
+    /// mouse) gates on, so they can never disagree about whether the
+    /// picker owns the input.
     pub fn theme_picker_open(&self) -> bool {
-        self.theme.is_expanded()
-            && crate::tui::modes::settings::flat_key(self.selected_idx)
-                .is_some_and(|(_, key)| key == crate::tui::modes::settings::theme_picker::THEME_KEY)
+        self.theme.is_expanded() && self.theme_row_focused()
+    }
+
+    /// Is the focused key the `ui.theme` row, expanded or not?
+    ///
+    /// Wider than [`Self::theme_picker_open`] on purpose: the header
+    /// chip has to keep reporting whether the screen is showing a
+    /// saved or unsaved theme after the operator collapses the picker
+    /// to look around. Gating the chip on the expansion would hide
+    /// that signal at exactly the moment it matters.
+    pub fn theme_row_focused(&self) -> bool {
+        crate::tui::modes::settings::flat_key(self.selected_idx)
+            .is_some_and(|(_, key)| key == crate::tui::modes::settings::theme_picker::THEME_KEY)
     }
 
     /// The `ui.theme` index into `SETTINGS_KEYS`, or `None` when the

@@ -786,11 +786,21 @@ fn render_settings_list(
         }
     }
 
+    // M243: the block title doubles as the theme chip. Shown whenever
+    // the `ui.theme` row is focused — not only while the picker is
+    // expanded, so the chip still reports saved-vs-preview after the
+    // operator collapses the picker or saves. A user focused on any
+    // other row sees the plain lane title.
+    let title = if state.theme_row_focused() {
+        format!(" {LANE_SETTINGS} — {} ", state.theme.state_label())
+    } else {
+        format!(" {LANE_SETTINGS} ")
+    };
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Plain)
-            .title(format!(" {LANE_SETTINGS} ")),
+            .title(title),
     );
     let list_selected = selected_row_idx
         .saturating_sub(view_offset)

@@ -963,3 +963,87 @@ fn reset_row_has_no_swatch_of_its_own() {
         "the reset row must not repeat a swatch: {reset_row:?}"
     );
 }
+
+// --- header chip (AC-09) ---------------------------------------------------
+
+#[test]
+fn header_chip_shows_saved_when_the_highlight_matches_disk() {
+    let app = app_with_open_picker("mocha");
+    let out = render_full(&app, 140, 44);
+    assert!(
+        out.contains("saved: mocha"),
+        "the chip must report the saved theme:\n{out}"
+    );
+    assert!(
+        !out.contains("preview:"),
+        "nothing is being previewed yet:\n{out}"
+    );
+}
+
+#[test]
+fn header_chip_names_both_the_preview_and_the_saved_theme() {
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("alucard").unwrap();
+    app.settings.as_mut().unwrap().theme.set_cursor(n);
+    app.apply_theme_preview();
+    let out = render_full(&app, 140, 44);
+    assert!(
+        out.contains("preview: alucard (saved: mocha)"),
+        "the chip must distinguish the preview from the saved value:\n{out}"
+    );
+}
+
+#[test]
+fn header_chip_is_absent_when_another_row_is_focused() {
+    // A user who never touches ui.theme should see the plain lane title.
+    let mut app = settings_app("dracula");
+    app.settings.as_mut().unwrap().selected_idx = 0; // ui.color
+    assert!(!app.settings.as_ref().unwrap().theme_row_focused());
+    let out = render_full(&app, 140, 44);
+    assert!(
+        !out.contains("saved:") && !out.contains("preview:"),
+        "no chip on a row that is not ui.theme:\n{out}"
+    );
+}
+
+#[test]
+fn header_chip_survives_collapsing_the_picker() {
+    // Collapsing closes the rows but leaves the live preview applied.
+    // The chip must keep saying so, or the operator has no way to tell
+    // the screen is showing something they have not saved.
+    let mut app = app_with_open_picker("mocha");
+    app.settings
+        .as_mut()
+        .unwrap()
+        .theme
+        .set_cursor(theme_picker::row_for_name("frappe").unwrap());
+    app.apply_theme_preview();
+    app.settings.as_mut().unwrap().theme.collapse();
+
+    let out = render_full(&app, 140, 44);
+    assert!(
+        out.contains("preview: frappe (saved: mocha)"),
+        "a collapsed picker must still report the unsaved preview:\n{out}"
+    );
+}
+
+#[test]
+fn header_chip_tracks_the_saved_value_after_a_save() {
+    use raul::tui::action::{apply_action, Action};
+    raul::config::set_color_enabled(true);
+    let runner = fixture_runner("chip_save");
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("dracula").unwrap();
+    app.settings.as_mut().unwrap().theme.set_cursor(n);
+    app.apply_theme_preview();
+    assert!(render_full(&app, 140, 44).contains("preview: dracula"));
+
+    apply_action(&mut app, &runner, Action::SettingsSave).expect("save");
+
+    let out = render_full(&app, 140, 44);
+    assert!(
+        out.contains("saved: dracula"),
+        "after saving, the chip must report the new saved theme:\n{out}"
+    );
+    assert!(!out.contains("preview:"));
+}

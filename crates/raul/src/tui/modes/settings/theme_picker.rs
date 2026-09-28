@@ -275,6 +275,21 @@ impl ThemePicker {
         }
     }
 
+    /// The Settings block-title chip.
+    ///
+    /// `saved: <name>` when the highlight matches what is on disk;
+    /// `preview: <name> (saved: <name>)` while the operator is looking
+    /// at something else. The two-name form is the whole point — a
+    /// live preview that silently differs from disk would otherwise
+    /// look exactly like a saved change.
+    pub fn state_label(&self) -> String {
+        if self.is_previewing() {
+            format!("preview: {} (saved: {})", self.preview_name(), self.saved)
+        } else {
+            format!("saved: {}", self.saved)
+        }
+    }
+
     /// Esc: drop the preview and put the highlight back on the saved
     /// theme. The caller restores `App::palette` from
     /// [`Self::saved_theme`].
@@ -418,6 +433,21 @@ mod tests {
             );
         }
         assert_eq!(row_for_name("nope"), None);
+    }
+
+    #[test]
+    fn state_label_reads_saved_then_preview() {
+        let mut t = ThemePicker::new("mocha");
+        assert_eq!(t.state_label(), "saved: mocha");
+        t.expand();
+        t.set_cursor(row_for_name("alucard").unwrap());
+        assert_eq!(
+            t.state_label(),
+            "preview: alucard (saved: mocha)",
+            "a preview must name BOTH the preview and what is on disk"
+        );
+        t.mark_saved("alucard");
+        assert_eq!(t.state_label(), "saved: alucard");
     }
 
     #[test]
