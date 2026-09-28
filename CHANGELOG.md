@@ -1,5 +1,32 @@
 ## Unreleased — WIP CI hardening
 
+- **raul's Settings lane gained a live-preview theme picker, and the
+  theme catalog gained Alucard (M243).** The `ui.theme` row now expands
+  into a picker: one row per shipped palette with a six-block swatch
+  drawn in that palette and a one-line description, a `Default (mocha)`
+  reset row, and a status-preview row showing what the lifecycle
+  colors look like under the highlighted theme. **Moving the highlight
+  repaints the whole TUI in that palette on the next frame** — arrows,
+  `j` / `k`, and the mouse all work — so you pick a theme by looking
+  at it rather than by reading its name. Nothing reaches disk until `s`,
+  which commits the highlighted palette through the existing
+  `mp config set` path (and picks up any other staged Settings edits in
+  the same save); `Esc` drops the preview and restores the saved
+  palette. The Settings title carries a chip — `saved: <name>`, or
+  `preview: <name> (saved: <name>)` — so an unsaved preview is never
+  silent. Two palettes changed: **Alucard Classic** (Dracula's light
+  counterpart) ships as a first-class selectable theme, and **Frappé's
+  `dim` moved to Catppuccin Subtext0** so it matches the secondary-text
+  role in the other three Catppuccin flavors instead of reading a step
+  brighter. The theme-name list also stopped being copy-pasted: it now
+  lives once in `mp-model` and feeds both `mp config set ui.theme`
+  validation and raul's palette catalog, with a test asserting the two
+  sets are equal in both directions — so a name mp would accept but
+  raul cannot render (or a palette raul ships that mp rejects) now
+  fails the build instead of silently falling back at runtime. The
+  no-color `monochrome` palette is deliberately outside both lists; it
+  is what `ui.color = false` selects. `docs/raul/settings.md`
+  documents the picker, the key map, and every palette.
 - **raul theme system gained three quiet layering roles (M244).**
   `Palette` now carries `focus_ring` (where the cursor is: focused tab
   fill, selected-row border + marker, selected board box, focused Path
