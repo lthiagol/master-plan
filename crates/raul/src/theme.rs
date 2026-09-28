@@ -1,9 +1,10 @@
 //! Color theme palettes for raul's output (CLI + TUI).
 //!
 //! A [`Palette`] maps raul's semantic color roles to concrete colors. raul ships
-//! with the Catppuccin palette (latte, frappe, macchiato, mocha) and Dracula.
-//! `ui.theme` (see S2) selects the active palette; renderers consume the
-//! semantic slots so a theme switch recolors the whole surface.
+//! with the Catppuccin palette (latte, frappe, macchiato, mocha), Dracula,
+//! and Alucard (Dracula's light counterpart). `ui.theme` (see S2) selects
+//! the active palette; renderers consume the semantic slots so a theme
+//! switch recolors the whole surface.
 
 use ratatui::style::Color;
 
@@ -132,6 +133,31 @@ pub static DRACULA: Palette = Palette {
     surface_2: rgb(0x44475a),
 };
 
+/// Alucard Classic — Dracula's light counterpart.
+///
+/// Values are the official Alucard Classic theme, not taste:
+/// accent `#644AC9` (Purple), success `#14710A` (Green),
+/// warn `#846E15` (Yellow), danger `#CB3A2A` (Red), dim `#6C664B`
+/// (Comment), foreground `#1F1F1F` (Foreground). The role mapping
+/// mirrors [`DRACULA`]: raul's `accent` is the purple family,
+/// `success` green, `warn` yellow, `danger` red, `dim` the comment
+/// tone, `foreground` the light-theme text color.
+pub static ALUCARD: Palette = Palette {
+    name: "alucard",
+    accent: rgb(0x644ac9),
+    success: rgb(0x14710a),
+    warn: rgb(0x846e15),
+    danger: rgb(0xcb3a2a),
+    dim: rgb(0x6c664b),
+    foreground: rgb(0x1f1f1f),
+    // Layering roles: official Alucard Cyan / Background Light /
+    // Selection. Populating these is filling in fields on a new
+    // palette — the roles themselves were added by M244.
+    focus_ring: rgb(0x036a96),
+    surface_1: rgb(0xdedccf),
+    surface_2: rgb(0xcfcfde),
+};
+
 /// Neutral palette when `color_enabled()` is false — no theme accent RGB.
 pub static MONOCHROME: Palette = Palette {
     name: "monochrome",
@@ -151,7 +177,7 @@ pub static MONOCHROME: Palette = Palette {
     surface_2: Color::Reset,
 };
 
-pub static ALL: [Palette; 5] = [LATTE, FRAPPE, MACCHIATO, MOCHA, DRACULA];
+pub static ALL: [Palette; 6] = [LATTE, FRAPPE, MACCHIATO, MOCHA, DRACULA, ALUCARD];
 
 #[cfg(test)]
 mod tests {
@@ -167,13 +193,7 @@ mod tests {
     /// | macchiato  | `0xb7bdf8` | `0x1e2030` | `0x363a4f` | Catppuccin Lavender/Mantle/Surface0 |
     /// | mocha      | `0xb4befe` | `0x181825` | `0x313244` | Catppuccin Lavender/Mantle/Surface0 |
     /// | dracula    | `0x8be9fd` | `0x343746` | `0x44475a` | draculatheme.com/spec Cyan/Background Light/Selection |
-    ///
-    /// `alucard` is intentionally absent — it ships with the ALUCARD
-    /// palette in M243 (M244 `depends_on: [243]`). Its spec values are
-    /// `0x036a96` / `0xdedccf` / `0xcfcfde` (Cyan / Background Light /
-    /// Selection); add a `(&ALUCARD, ...)` row to `cases` when M243
-    /// lands. (`palette_roles_non_degenerate` below iterates `ALL`, so
-    /// it covers alucard with no edit.)
+    /// | alucard    | `0x036a96` | `0xdedccf` | `0xcfcfde` | Alucard Classic Cyan/Background Light/Selection |
     ///
     /// `monochrome` pins the `Color::Reset` collapse.
     #[test]
@@ -184,12 +204,48 @@ mod tests {
             (&MACCHIATO, rgb(0xb7bdf8), rgb(0x1e2030), rgb(0x363a4f)),
             (&MOCHA, rgb(0xb4befe), rgb(0x181825), rgb(0x313244)),
             (&DRACULA, rgb(0x8be9fd), rgb(0x343746), rgb(0x44475a)),
+            (&ALUCARD, rgb(0x036a96), rgb(0xdedccf), rgb(0xcfcfde)),
         ];
         for (p, ring, s1, s2) in cases {
             assert_eq!(p.focus_ring, *ring, "{} focus_ring", p.name);
             assert_eq!(p.surface_1, *s1, "{} surface_1", p.name);
             assert_eq!(p.surface_2, *s2, "{} surface_2", p.name);
         }
+    }
+
+    /// Alucard Classic ships as a first-class named palette. Pin the
+    /// exact hexes so a future "taste tweak" to the light theme has
+    /// to be a deliberate edit, not a drift.
+    ///
+    /// accent `#644AC9` / success `#14710A` / warn `#846E15` /
+    /// danger `#CB3A2A` / dim `#6C664B` / foreground `#1F1F1F`.
+    #[test]
+    fn alucard_matches_spec() {
+        assert_eq!(ALUCARD.name, "alucard");
+        assert_eq!(ALUCARD.accent, rgb(0x644ac9), "alucard accent #644AC9");
+        assert_eq!(ALUCARD.success, rgb(0x14710a), "alucard success #14710A");
+        assert_eq!(ALUCARD.warn, rgb(0x846e15), "alucard warn #846E15");
+        assert_eq!(ALUCARD.danger, rgb(0xcb3a2a), "alucard danger #CB3A2A");
+        assert_eq!(ALUCARD.dim, rgb(0x6c664b), "alucard dim #6C664B");
+        assert_eq!(
+            ALUCARD.foreground, rgb(0x1f1f1f),
+            "alucard foreground #1F1F1F"
+        );
+    }
+
+    /// `alucard` must be reachable by name and listed in `ALL` —
+    /// otherwise `ui.theme = "alucard"` validates in mp but
+    /// silently falls back at runtime via `by_name` returning `None`.
+    #[test]
+    fn palette_by_name_alucard() {
+        let found = Palette::by_name("alucard").expect("alucard must resolve by name");
+        assert_eq!(found.name, "alucard");
+        assert_eq!(found.accent, ALUCARD.accent);
+        assert!(
+            ALL.iter().any(|p| p.name == "alucard"),
+            "alucard must be listed in ALL"
+        );
+        assert_eq!(ALL.len(), 6, "ALL carries the 6 named palettes");
     }
 
     /// The no-color palette collapses every layering role to `Reset`;
