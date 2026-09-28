@@ -1,5 +1,24 @@
 ## Unreleased — WIP CI hardening
 
+- **mp-flow role-binding table is now lint-locked to the stage manifest
+  (M231).** `make mp-flow-lint` only checked that `SKILL.md` had a
+  `## <name>` section per `[[stages]]` entry in `stages.toml`; the
+  role-binding table itself was never read. 7 of its 12 Name cells had
+  drifted from the manifest (the table said `Define outcome` /
+  `Interview & shape` / `Write acceptance` / `Approve spec` /
+  `Mark complete` / `Remediate findings` / `Hand-off` where the manifest
+  says `Draft` / `Groom` / `Specify` / `Approve` / `Complete` /
+  `Remediate` / `Hand off`) while the lint stayed green — even though
+  `stages.toml`'s own header claims the table mirrors the manifest and
+  "the lint fails" on divergence. The lint now parses the
+  `| Stage | Name | Owner |` table and diffs every row against
+  `[[stages]]` number / name / role, plus the manifest's own
+  `[role_binding.*].stages` lists, emitting one diagnostic per mismatch
+  that names the stage, the field, and the expected vs actual value. It
+  also gained `--skill` / `--manifest` path overrides and a `--json`
+  view that prints the 12 parsed rows. The table in `SKILL.md` was
+  corrected to the canonical manifest names; no stages were added,
+  removed, or renumbered, and role ownership is unchanged.
 - **Repo-only skill moved out of the template tree (M235).** The
   `mp-code-review` skill — lesson-pattern pre-screen plus runnable
   fixtures — moved from `templates/skills/mp-code-review/` to
