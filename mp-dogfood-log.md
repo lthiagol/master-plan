@@ -61,6 +61,7 @@ milestone (or a successor), not by reverting the work that closed them.
 - Suspected cause / code path: the lifecycle-writing subcommands in `crates/mp/src/milestone/` (or wherever they live now after M228's rename) do not write to activity.json by default; `mp reviews pass` has the same gap. M225's restart + reconciliation was for *partial state* — it didn't include an "activity rebuild" recovery path.
 - Verdict: **bug** (cli surface gap; no recovery command).
 - One-line: lifecycle writers don't add activity.json events; recovery path fixed in M237 (`mp autopilot activity reconcile`).
+- Update 2026-09-27 (grooming): `complete` and `reviews pass` already emit lifecycle events; the real gap is `step done` / `criterion pass`. M237 re-scoped to those writers plus `mp activity reconcile <id>` (top-level, not under `autopilot`).
 - Status: bug.
 
 ---
@@ -74,6 +75,7 @@ milestone (or a successor), not by reverting the work that closed them.
 - Verdict: **backlog** (cosmetic; reviewer noise).
 - One-line: cosmetic hygiene batch from herdr-log backlog; M211 file renamed + parse_rfc3339_ms extracted to autopilot/drive/time.rs in M238.
 - Status: backlog.
+- Update 2026-09-27 (grooming): M238 cancelled — slug drift is cosmetic (ids are the key) and `parse_rfc3339_ms` has a single definition (`autopilot/cycle.rs`); `cycle_stale_state_timeout.rs` no longer exists. Verdict → **wontfix**.
 
 ---
 
@@ -85,4 +87,106 @@ milestone (or a successor), not by reverting the work that closed them.
 - Suspected cause / code path: the future Drive milestone design input (R1-R15) was consumed by M207-M229 in practice, but no `mp autopilot design-input` migration command was ever shipped.
 - Verdict: **spec-gap** (architecture gap; logs are not discoverable via `mp`).
 - One-line: per R15, mp autopilot design-input should land in master-plan/ and the repo-root logs should go away; M239 closes the loop.
+- Update 2026-09-27 (grooming): the logs were already trimmed in commit 438b093 and now falsely claim "migrated via M239". M239 re-scoped: recover R1-R15 + session lessons from `git show 438b093^:mp-herdr-log*.txt` into `mp decision add` (summaries `herdr-log R<n>:` / `herdr-log L<n>:`), then delete both files. No new CLI.
 - Status: spec-gap.
+
+---
+
+## Entry — 2026-09-27 — `mp scratch new` prints JSON, AGENTS.md recipe expects a bare path
+
+- Date / when: 2026-09-27, grooming pass over M230-M246.
+- Command attempted: `SCRATCH=$(mp scratch new m-update)` then `cat > "$SCRATCH/payload.json"` (the AGENTS.md "Temporary workspace" recipe).
+- Observed output: exit 0; stdout is `{"path": ".../.mp-scratch/m-update-<ts>", "scratch_dir": ...}`, so `$SCRATCH` holds JSON and the redirect fails.
+- Suspected cause / code path: `mp scratch new` follows the JSON-by-default read contract; the recipe predates it. Either add a `--path-only`/raw mode or fix the recipe to `jq -r .path`.
+- Verdict: **bug** (docs ↔ CLI mismatch).
+- Status: bug.
+
+---
+
+## Entry — 2026-09-27 — `mp list milestones --include intent` silently ignored
+
+- Date / when: 2026-09-27, grooming pass (M240 premise check).
+- Command attempted: `mp list milestones --include intent`.
+- Observed output: exit 0; rows carry no `intent` and no warning is emitted for the unsupported include value.
+- Suspected cause / code path: `crates/mp/src/commands/list.rs` accepts arbitrary `--include` values without validation. M240 adds `intent.outcome` to list rows unconditionally; the silent-ignore stays.
+- Verdict: **bug** (unknown --include values should error like unknown --fields paths).
+- Status: bug.
+
+---
+
+## Entry — 2026-09-27 — `mp plan verify-ac` misparses `python3 -c` verifications
+
+- Date / when: 2026-09-27, grooming pass.
+- Command attempted: `mp plan verify-ac <id>` on an AC whose verification was `python3 -c '...'`.
+- Observed output: `python script not found: 3`.
+- Suspected cause / code path: the verify-ac executor's interpreter detection treats `python3` as `python` + script `3`. Workaround used: express counts with `rg | wc -l` / `awk` instead of `python3 -c`.
+- Verdict: **bug**.
+- Status: bug.
+
+---
+
+## Entry — 2026-09-27 — W43 false positives for dotted step ids (`S1.2` → `S12`)
+
+- Date / when: 2026-09-27, grooming pass (`mp validate` after M232/M243 edits).
+- Command attempted: `mp validate`.
+- Observed output: `W43 step S2.1 action references non-existent step S12` (M232) and `... S22` (M243), although S1.2 / S2.2 exist.
+- Suspected cause / code path: `crates/mp/src/validate/milestone_warnings.rs::extract_milestone_refs` builds `cleaned` with `is_alphanumeric()` (dropping `.`) before the S-ref check that intends to allow `.` — the dot branch is dead.
+- Verdict: **bug**.
+- Status: bug.
+
+---
+
+## Entry — 2026-09-27 — no writer for `cancel_reason`
+
+- Date / when: 2026-09-27, cancelling M238.
+- Command attempted: `mp milestone set-status 238 cancelled` (no reason flag exists).
+- Observed output: cancelled; `cancel_reason` cannot be set by any command. Workaround: `mp note add --milestone-id 238 --title ... --body <reason>`.
+- Suspected cause / code path: `set-status` has no `--reason`; `deferred` has `deferred_reason` but cancel has no counterpart.
+- Verdict: **spec-gap**.
+- Status: spec-gap.
+
+---
+
+## Entry — 2026-09-27 — approved milestones can be re-scoped with no re-approval signal
+
+- Date / when: 2026-09-27, grooming pass.
+- Command attempted: `mp milestone update <id> --json @payload` (title / problem / scope) plus AC/step rewrites on milestones in `lifecycle: approved`.
+- Observed output: all writes succeed; `needs_regrooming` stays false, lifecycle stays approved, no warning.
+- Suspected cause / code path: fragment and metadata writers don't consult lifecycle; there is no "spec changed since approval" marker.
+- Verdict: **spec-gap** (a material rewrite of an approved spec should at least be flagged).
+- Status: spec-gap.
+
+---
+
+## Entry — 2026-09-27 — step authoring ergonomics (`--order`, `step add --depends-on-steps`)
+
+- Date / when: 2026-09-27, grooming pass.
+- Command attempted: `mp milestone step add <id> ... --depends-on-steps S1.1.1`; reordering steps via `step update --order`.
+- Observed output: `unexpected argument '--depends-on-steps'` on `step add` (only `step update` has it); no `--order` anywhere, so ordering is expressed only through dependencies. Also `step remove` refuses when split children exist, so duplicate parents must be repurposed instead of removed.
+- Suspected cause / code path: `mp milestone step add` flag set is narrower than `step update`.
+- Verdict: **backlog**.
+- Status: backlog.
+- Update 2026-09-27: `step add --depends-on-steps` scheduled in M247. `--order` → **wontfix** (dependencies already express order). `step remove` refusing with split children is correct behavior.
+
+---
+
+## Entry — 2026-09-27 — `set-spec-status ready` jumps a bare draft straight to `lifecycle: approved`
+
+- Date / when: 2026-09-27, creating M247.
+- Command attempted: `mp milestone create --json @…` (lifecycle draft), then `mp milestone set-spec-status 247 ready` because `mp milestone wp add` refuses below spec_status ready.
+- Observed output: exit 0; lifecycle went draft → approved in one call while the milestone had zero work packages and zero steps, with no groom/specify stages and no approve gate.
+- Suspected cause / code path: set-spec-status maps `ready` onto `lifecycle: approved` without running the approve gate, and the WP/step writers require `ready`, so the only way to decompose a new milestone is to approve it first.
+- Verdict: **spec-gap** (ordering deadlock: decomposition requires approval, approval should require decomposition).
+- Status: spec-gap.
+- Update 2026-09-27: scheduled in M248 (approval integrity).
+
+---
+
+## Entry — 2026-09-27 — `milestone create --json` rejects `work_packages` / `steps`
+
+- Date / when: 2026-09-27, creating M248.
+- Command attempted: `mp milestone create --json @create-c.json` with a full spec (ACs + work_packages + steps).
+- Observed output: exit 1, `milestone create JSON contains unsupported field(s): 'steps'; 'work_packages'`.
+- Suspected cause / code path: `CreateMilestoneInput` carries both fields and the create path applies them (`milestone/spec.rs` ~463-470), but the `CREATE_MILESTONE_KEYS` allow-list (~190) omits them, so the JSON path can never create a decomposed draft.
+- Verdict: **bug**.
+- Status: scheduled in M248 (S1).
