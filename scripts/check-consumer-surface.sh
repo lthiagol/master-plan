@@ -14,9 +14,9 @@
 #                   `watch_readiness`) and imperative-verb English uses
 #                   are also allowlisted via line+anchor entries.
 #
-# Repository-internal skills (templates/skills/mp-code-review/) are excluded:
-# the spec marks them as master-plan-repo-only and exempts them from the
-# consumer-surface de-internalization rules.
+# Repo-only skills live under `internal/skills/`, which is not a scan root,
+# so they need no carve-out here and cannot leak into an adopter's copy of
+# the template tree.
 #
 # Inline allowlist: each ALLOW entry is "label:file:line:anchor:reason" and
 # matches a known-good exception. The `anchor` field is a substring of the
@@ -43,9 +43,9 @@ PATTERNS=(
 )
 
 # Paths scanned. Repo-relative (the script cd's to the repo root above).
-# `mp-code-review/` is repository-internal and excluded. Adopter-facing
-# entrypoints (root README.md + the root + harness templates) are
-# included alongside templates/skills + docs.
+# Adopter-facing entrypoints (root README.md + the root + harness templates)
+# are included alongside templates/skills + docs. There are no exclusions:
+# every scan root must be clean on its own merits.
 SCAN_PATHS=(
     "templates/skills"
     "templates/AGENTS-TEMPLATE.md"
@@ -54,9 +54,6 @@ SCAN_PATHS=(
     "templates/watch"
     "docs"
     "README.md"
-)
-EXCLUDE_PATHS=(
-    "templates/skills/mp-code-review"
 )
 
 # Inline allowlist. Each entry: "<label>:<file>:<line>:<anchor>:<reason>".
@@ -102,14 +99,6 @@ mktemp_file() {
     mktemp -t "${template}.XXXXXX" 2>/dev/null \
         || mktemp 2>/dev/null \
         || mktemp -t "${template}"
-}
-
-build_rg_excludes() {
-    local exclude_args=() p
-    for p in "$@"; do
-        exclude_args+=(--glob "!${p}/**")
-    done
-    printf '%s\n' "${exclude_args[@]}"
 }
 
 usage() {
@@ -285,13 +274,6 @@ is_allowlisted() {
     return 1
 }
 
-# Build rg exclusion args. Done with a simple loop so the script works on
-# bash 3.2 (macOS default) where `mapfile` is not available.
-rg_excludes=()
-while IFS= read -r arg; do
-    [ -n "$arg" ] && rg_excludes+=("$arg")
-done < <(build_rg_excludes "${EXCLUDE_PATHS[@]}")
-
 for entry in "${PATTERNS[@]}"; do
     label="${entry%%|*}"
     pattern="${entry#*|}"
@@ -299,7 +281,6 @@ for entry in "${PATTERNS[@]}"; do
     # rg exits 1 when no matches; that's clean for this pattern. We capture
     # output and only fail if violations remain after allowlist filtering.
     rg --line-number --no-heading --color=never \
-        "${rg_excludes[@]}" \
         "$pattern" "${SCAN_PATHS[@]}" >"$tmp_matches" || true
 
     if [ ! -s "$tmp_matches" ]; then
