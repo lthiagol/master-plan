@@ -75,6 +75,7 @@ pub(crate) fn cmd_autopilot_drive(
     dry_run: bool,
     log_file: Option<PathBuf>,
     stall_timeout_ms: Option<u64>,
+    prompt_settle_ms: Option<u64>,
     poll_interval_ms: Option<u64>,
     resume: bool,
     force: bool,
@@ -271,6 +272,7 @@ pub(crate) fn cmd_autopilot_drive(
         log_path: &log_path,
         preconditions,
         stall_timeout_ms,
+        prompt_settle_ms,
         poll_interval_ms,
         resume,
         force,
@@ -308,6 +310,9 @@ struct DriveOpts<'a> {
     log_path: &'a std::path::Path,
     preconditions: PreconditionReport,
     stall_timeout_ms: Option<u64>,
+    /// M246 WP1 / AC-01: continuous-idle settle window applied by
+    /// the readiness gate before a prompt is delivered.
+    prompt_settle_ms: Option<u64>,
     poll_interval_ms: Option<u64>,
     /// M152 / AC-02: re-attach to any herdr role panes that already
     /// exist for the active milestones (`mp watch --resume`).
@@ -334,6 +339,7 @@ fn cmd_autopilot_drive_execute(opts: DriveOpts<'_>) -> Result<()> {
         log_path,
         preconditions,
         stall_timeout_ms,
+        prompt_settle_ms,
         poll_interval_ms,
         resume,
         force,
@@ -618,6 +624,14 @@ fn cmd_autopilot_drive_execute(opts: DriveOpts<'_>) -> Result<()> {
             stall_timeout_ms: stall,
             ..ops.wait_options()
         });
+    }
+    // M246 WP1 / AC-01: the settle window lives on ReadinessOptions,
+    // not WaitOptions — it gates the *prompt delivery* path, not
+    // the lifecycle poll. `0` is a meaningful value here (legacy
+    // first-idle), so the override is applied unconditionally when
+    // the flag is present rather than guarded by a truthiness test.
+    if let Some(settle) = prompt_settle_ms {
+        ops.set_readiness_settle_ms(settle);
     }
 
     // AC-02: when resuming (or when re-using force-kept existing

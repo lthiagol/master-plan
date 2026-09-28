@@ -96,6 +96,7 @@ pub(crate) fn cmd_autopilot_start(
         args.dry_run,
         args.log_file,
         args.stall_timeout_ms,
+        args.prompt_settle_ms,
         args.poll_interval_ms,
         args.resume,
         args.force,

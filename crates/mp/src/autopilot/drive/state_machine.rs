@@ -513,6 +513,19 @@ impl SystemDriveOps {
         self.wait
     }
 
+    /// M246 WP1 / AC-01: set the readiness gate's continuous-idle
+    /// settle window. `0` is meaningful (legacy first-idle), so the
+    /// caller applies the override whenever the flag is present
+    /// rather than guarding on truthiness.
+    pub fn set_readiness_settle_ms(&mut self, settle_ms: u64) {
+        self.readiness.settle_ms = settle_ms;
+    }
+
+    /// Read the current readiness options (CLI override path).
+    pub fn readiness_options(&self) -> ReadinessOptions {
+        self.readiness
+    }
+
     /// Look up a cached pane handle by role (without spawning).
     /// Used by tests to assert pane-reuse behavior.
     pub fn cached_pane(&self, role: Role) -> Option<&PaneHandle> {

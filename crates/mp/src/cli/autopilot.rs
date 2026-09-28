@@ -114,6 +114,13 @@ pub struct AutopilotStartArgs {
     /// the agent as hung. Default: 1_800_000 (30 min).
     #[arg(long)]
     pub stall_timeout_ms: Option<u64>,
+    /// How long the harness must report `idle` *continuously*
+    /// before a prompt is delivered. Guards against delivering
+    /// into a still-booting harness (the prompt is otherwise
+    /// lost). Default: 5000. `0` restores the legacy
+    /// first-idle behaviour.
+    #[arg(long)]
+    pub prompt_settle_ms: Option<u64>,
     /// Lifecycle poll interval in milliseconds. Default: 1000.
     #[arg(long)]
     pub poll_interval_ms: Option<u64>,
