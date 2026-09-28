@@ -3,9 +3,9 @@
     "id": "231",
     "title": "mp-flow skill table-vs-stages drift — extend mp_flow_lint to assert SKILL.md role-binding row matches stages.toml",
     "slug": "mp-flow-skill-table-vs-stages-drift-extend-mp-flow-lint-to-assert-skill-md-role-binding-row-matches-stages-toml",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,11 +23,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T02:53:30.909655+00:00",
+    "lifecycle_at": "2026-09-28T04:32:38.754166+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:30.909657+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-28T04:32:39.747056+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-28T04:32:39.747056+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-28T04:32:39.782328+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-28T04:32:39.747056+00:00"
       },
       "specify": {
         "status": "done",
@@ -61,29 +77,29 @@
       "id": "AC-01",
       "description": "scripts/mp_flow_lint.py checks every row of the SKILL.md role-binding table (Stage, Name, Owner) against stages.toml and names the stage, field, and expected vs actual on mismatch; --json prints the 12 parsed rows.",
       "verification": "python3 scripts/mp_flow_lint.py --json",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits f0bcdae (S1), 980b2d9 (S1.1), 3b55dd6 (S2), 05e7e4a (S1.1.1); reviewer verdict ok with 5 low findings, commit b97a26a. Orchestrator R5 re-ran all 4 ACs independently and additionally probed the lint with 4 adversarial mutations (Name drift, Owner drift, missing row, renumbering), all correctly exit 1. Reviewer ran 8 probes including duplicate rows and bidirectional role_binding breaks. stages.toml untouched. MP_VERIFY_ALLOW_SHELL=1 required because AC-04 is a shell one-liner (make lint && make consumer-surface-lint); every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-02",
       "description": "templates/skills/mp-flow/SKILL.md role-binding table uses the canonical stage names from stages.toml so the lint passes against current content.",
       "verification": "make mp-flow-lint (exit 0).",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits f0bcdae (S1), 980b2d9 (S1.1), 3b55dd6 (S2), 05e7e4a (S1.1.1); reviewer verdict ok with 5 low findings, commit b97a26a. Orchestrator R5 re-ran all 4 ACs independently and additionally probed the lint with 4 adversarial mutations (Name drift, Owner drift, missing row, renumbering), all correctly exit 1. Reviewer ran 8 probes including duplicate rows and bidirectional role_binding breaks. stages.toml untouched. MP_VERIFY_ALLOW_SHELL=1 required because AC-04 is a shell one-liner (make lint && make consumer-surface-lint); every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-03",
       "description": "Negative fixture proves the lint refuses to pass on a drifted SKILL.md.",
       "verification": "cargo nextest run -p mp --test mp_flow_lint_drift --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits f0bcdae (S1), 980b2d9 (S1.1), 3b55dd6 (S2), 05e7e4a (S1.1.1); reviewer verdict ok with 5 low findings, commit b97a26a. Orchestrator R5 re-ran all 4 ACs independently and additionally probed the lint with 4 adversarial mutations (Name drift, Owner drift, missing row, renumbering), all correctly exit 1. Reviewer ran 8 probes including duplicate rows and bidirectional role_binding breaks. stages.toml untouched. MP_VERIFY_ALLOW_SHELL=1 required because AC-04 is a shell one-liner (make lint && make consumer-surface-lint); every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-04",
       "description": "Lint and consumer-surface guard stay clean.",
       "verification": "make lint && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits f0bcdae (S1), 980b2d9 (S1.1), 3b55dd6 (S2), 05e7e4a (S1.1.1); reviewer verdict ok with 5 low findings, commit b97a26a. Orchestrator R5 re-ran all 4 ACs independently and additionally probed the lint with 4 adversarial mutations (Name drift, Owner drift, missing row, renumbering), all correctly exit 1. Reviewer ran 8 probes including duplicate rows and bidirectional role_binding breaks. stages.toml untouched. MP_VERIFY_ALLOW_SHELL=1 required because AC-04 is a shell one-liner (make lint && make consumer-surface-lint); every command was reviewed and executed before opting in."
     }
   ],
   "work_packages": [
@@ -111,7 +127,7 @@
       ],
       "tests": "python3 scripts/mp_flow_lint.py --json",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -131,7 +147,7 @@
       ],
       "tests": "make mp-flow-lint (exit 0)",
       "done_when": "AC-02 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -153,7 +169,7 @@
       ],
       "tests": "make lint && make consumer-surface-lint && make mp-flow-lint",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -179,7 +195,7 @@
       ],
       "tests": "cargo nextest run -p mp --test mp_flow_lint_drift --no-fail-fast",
       "done_when": "AC-03 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -193,8 +209,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-28",
     "branch": "",
-    "evidence": ""
+    "evidence": "herdr-orc cycle 1: runner commits f0bcdae (S1), 980b2d9 (S1.1), 3b55dd6 (S2), 05e7e4a (S1.1.1); reviewer verdict ok with 5 low findings, commit b97a26a. Orchestrator R5 re-ran all 4 ACs independently and additionally probed the lint with 4 adversarial mutations (Name drift, Owner drift, missing row, renumbering), all correctly exit 1. Reviewer ran 8 probes including duplicate rows and bidirectional role_binding breaks. stages.toml untouched. MP_VERIFY_ALLOW_SHELL=1 required because AC-04 is a shell one-liner (make lint && make consumer-surface-lint); every command was reviewed and executed before opting in."
   }
 }

@@ -203,3 +203,15 @@ milestone (or a successor), not by reverting the work that closed them.
 - Workaround: none found. `mp validate` does not self-heal, and no reindex command was located. The mismatch is only visible as a warning, so it does not block work — but it makes the plan permanently non-clean until someone hand-edits `plan.json`, which the plan zone forbids.
 - Verdict: **bug**.
 - Status: backlog.
+- Update 2026-09-28: reproduced a second time on M231 (`mp milestone complete 231` → same W03, index `implemented` vs file `verified`). Two independent reproductions across two milestones confirm this is systematic to the `complete` path, not a one-off. It is now the normal end state of closing any milestone this way, so the plan cannot be left validate-clean without a code fix.
+
+---
+
+## Entry — 2026-09-28 — `.gitignore` has no `__pycache__` / `*.pyc` entry
+
+- Date / when: 2026-09-28, during the M231 herdr-orc cycle.
+- Command attempted: `python3 scripts/mp_flow_lint.py --json` (and the `cargo nextest` run for `mp_flow_lint_drift`, which shells out to it).
+- Observed output: no error — the point is the side effect. An orchestrator-adjacent lane dropped an untracked `scripts/__pycache__/` into the worktree, which showed up in `git status` and would have appeared in the review diff. The runner cleaned it up; the reviewer could not reproduce it (different Python 3.14.7 invocation shape), so reproduction is environment-dependent.
+- Suspected cause / code path: `.gitignore` covers no Python bytecode caching, and several repo scripts are Python (`scripts/mp_flow_lint.py`, `scripts/check-consumer-surface.sh`'s helpers, `scripts/audit-*.sh`). Any lane that runs them can pollute a clean-worktree assertion — which this repo's discipline gate depends on.
+- Verdict: **bug** (hygiene gap; cheap fix, not yet filed as a milestone).
+- Status: backlog. Filed by herdr-orc reviewer as F-05 on M231 cycle 1 (low severity).

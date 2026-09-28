@@ -2119,6 +2119,14 @@
       "reviewed_at": "2026-09-28",
       "notes": "Cycle 1 review via herdr-orc: verdict ok, 0 findings. All 4 ACs independently re-verified by the orchestrator. R5 gate passed. Reviewer findings commit 3f32d8d.",
       "milestone_completed_at": "2026-09-28"
+    },
+    {
+      "milestone_id": "231",
+      "verdict": "ok",
+      "reviewer": "herdr-orc reviewer lane (w19:pC)",
+      "reviewed_at": "2026-09-28",
+      "notes": "Cycle 1 via herdr-orc: verdict ok, 5 low findings (F-01 misleading duplicate-row wording, F-02 README repo-path consumer-surface precedent, F-03 README redundancy/adopter voice, F-04 two unrequested-scope items, F-05 missing __pycache__ gitignore). No high/medium. Reviewer commit b97a26a. Cold build enabled and re-verified after cargo clean.",
+      "milestone_completed_at": "2026-09-28"
     }
   ],
   "comments": [
