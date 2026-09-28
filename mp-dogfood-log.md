@@ -76,6 +76,7 @@ milestone (or a successor), not by reverting the work that closed them.
 - One-line: cosmetic hygiene batch from herdr-log backlog; M211 file renamed + parse_rfc3339_ms extracted to autopilot/drive/time.rs in M238.
 - Status: backlog.
 - Update 2026-09-27 (grooming): M238 cancelled — slug drift is cosmetic (ids are the key) and `parse_rfc3339_ms` has a single definition (`autopilot/cycle.rs`); `cycle_stale_state_timeout.rs` no longer exists. Verdict → **wontfix**.
+- Update 2026-09-28 (M239): the `mp-herdr-log2.txt` cited above was deleted in 94b48f0; its content is recovered into `mp decision list` (`herdr-log R1:`–`R15:`, `herdr-log L1:`–`L11:`), source `git show 438b093^:mp-herdr-log*.txt`.
 
 ---
 
@@ -88,6 +89,7 @@ milestone (or a successor), not by reverting the work that closed them.
 - Verdict: **spec-gap** (architecture gap; logs are not discoverable via `mp`).
 - One-line: per R15, mp autopilot design-input should land in master-plan/ and the repo-root logs should go away; M239 closes the loop.
 - Update 2026-09-27 (grooming): the logs were already trimmed in commit 438b093 and now falsely claim "migrated via M239". M239 re-scoped: recover R1-R15 + session lessons from `git show 438b093^:mp-herdr-log*.txt` into `mp decision add` (summaries `herdr-log R<n>:` / `herdr-log L<n>:`), then delete both files. No new CLI.
+- Update 2026-09-28 (M239): done — both logs deleted in 94b48f0, and the R1-R15 design input plus 11 session lessons are recovered into `mp decision list` as `herdr-log R<n>:` / `herdr-log L<n>:`, each citing `git show 438b093^:mp-herdr-log*.txt`.
 - Status: spec-gap.
 
 ---
