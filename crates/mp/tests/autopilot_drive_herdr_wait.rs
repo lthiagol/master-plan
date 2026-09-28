@@ -183,6 +183,7 @@ fn send_prompt_blocks_on_readiness_then_delivers() {
     let opts = ReadinessOptions {
         timeout_ms: 1_000,
         poll_interval_ms: 1,
+        settle_ms: 0,
     };
     send_prompt(fake.path(), &p, "go", &opts).unwrap();
 
@@ -209,6 +210,7 @@ fn wait_for_readiness_times_out_when_never_idle() {
     let opts = ReadinessOptions {
         timeout_ms: 50,
         poll_interval_ms: 5,
+        settle_ms: 0,
     };
     let err = wait_for_readiness_with(fake.path(), &p, &opts, Instant::now).unwrap_err();
     let msg = format!("{err:#}");
@@ -230,6 +232,7 @@ fn wait_for_readiness_returns_when_idle_immediately() {
     let opts = ReadinessOptions {
         timeout_ms: 1_000,
         poll_interval_ms: 1,
+        settle_ms: 0,
     };
     wait_for_readiness_with(fake.path(), &p, &opts, Instant::now).unwrap();
 }

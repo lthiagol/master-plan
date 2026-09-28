@@ -550,6 +550,20 @@ pub struct ReadinessOptions {
     /// Poll interval for the readiness loop. Defaults to 200ms in
     /// production; tests pass 1ms.
     pub poll_interval_ms: u64,
+    /// M246 WP1 / AC-01: how long the harness must have reported
+    /// `idle` *continuously* before the prompt is delivered.
+    ///
+    /// `read_agent_status` falls back to `idle` whenever
+    /// `herdr agent wait --timeout 0` exits 0 without a parseable
+    /// status — which includes the window where a freshly spawned
+    /// pane's harness TUI is still booting. The first-idle gate
+    /// therefore fires during boot and the prompt is dropped on the
+    /// floor. Requiring a continuous idle window closes that hole.
+    ///
+    /// Any non-idle read resets the window to zero. `0` preserves the
+    /// legacy first-idle behaviour exactly (the escape hatch for
+    /// callers that depend on it).
+    pub settle_ms: u64,
 }
 
 impl Default for ReadinessOptions {
@@ -557,6 +571,7 @@ impl Default for ReadinessOptions {
         Self {
             timeout_ms: 60_000,
             poll_interval_ms: 200,
+            settle_ms: 5_000,
         }
     }
 }
@@ -584,7 +599,13 @@ pub fn wait_for_readiness_with(
 ) -> Result<()> {
     let start = now();
     let timeout = Duration::from_millis(opts.timeout_ms);
+    let settle = Duration::from_millis(opts.settle_ms);
     let poll = Duration::from_millis(opts.poll_interval_ms.max(1));
+    // M246 WP1 / AC-01: when the current continuous-idle streak
+    // started. `None` = the last read was not idle (or we have not
+    // read yet). Any non-idle read clears it, so the window can
+    // only be satisfied by an *unbroken* run of idle reads.
+    let mut idle_since: Option<Instant> = None;
     loop {
         // M152 S4: bail on graceful shutdown. The drive loop already
         // checks between iterations; this check covers the readiness
@@ -596,7 +617,18 @@ pub fn wait_for_readiness_with(
 
         let status = read_agent_status(herdr_bin, pane).unwrap_or_else(|_| "unknown".to_string());
         if status == "idle" {
-            return Ok(());
+            // Start (or continue) the settle window. `settle_ms == 0`
+            // short-circuits on the first idle read — the legacy
+            // behaviour, preserved verbatim.
+            let since = *idle_since.get_or_insert_with(|| now());
+            if now().duration_since(since) >= settle {
+                return Ok(());
+            }
+        } else {
+            // Non-idle: the streak is broken. A harness that flaps
+            // working → idle → working during boot must re-serve the
+            // full window before we commit a prompt.
+            idle_since = None;
         }
         if opts.timeout_ms > 0 && now().duration_since(start) >= timeout {
             bail!(
