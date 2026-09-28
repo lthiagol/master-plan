@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
+    "depends_on": [
+      "243"
+    ],
+    "effort": "M",
     "risk": "low",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -36,68 +38,67 @@
     }
   },
   "intent": {
-    "outcome": "Extend the Palette struct with three new roles (focus_ring, surface_1, surface_2) so renderers can use them in addition to the 6 base roles. Every palette in theme.rs (latte, frappe, macchiato, mocha, dracula, alucard + monochrome) gets matching colors picked from the official spec. The milestones tab, picker, Settings header, and While-Executing takeover use the new roles for visual layering — currently everything maps to accent / foreground / dim and gets visually loud."
+    "outcome": "Palette gains three quiet roles — focus_ring, surface_1, surface_2 — populated for every palette (including monochrome), and the list, overlay, board, detail, and chrome renderers use them so focus and nested panels read as distinct layers instead of everything collapsing onto accent / foreground / dim."
   },
   "problem": {
-    "description": "After M243 ships the live-apply picker, raul will have a working theme system with 6 base semantic colors. But the renderer set currently collapses every visual layer onto accent / foreground / dim: the floating picker backdrop, the sidebar tab strip, the Activity-tab filter chip, the milestone detail's per-AC row, the while-executing topo strip. This makes the TUI visually loud — there are no quiet layers. Adding focus_ring (a quiet contrast color for the focused chip / selected-row overlay), surface_1 (a quiet panel background for sidebars / picker surfaces), and surface_2 (a slightly brighter panel background for nested layers like the Activity tab inside the Progress tab) gives renderers a 9-role color vocabulary. Without this, picking accent-only keeps the surface flat, and themes that lean on neutral palettes (Dracula, Alucard) under-deliver visually vs. what's in the official color docs."
+    "description": "crates/raul/src/theme.rs::Palette has six roles (accent, success, warn, danger, dim, foreground). Renderers therefore draw selection highlights, focused chips, modal/overlay surfaces, and nested panels with the same accent/foreground/dim colors, and never set a background, so layers are indistinguishable and the UI is loud. The official palettes define quiet layering colors that raul ignores (Catppuccin Lavender / Mantle / Surface0; Dracula and Alucard Background Light / Selection)."
   },
   "scope": {
     "in_scope": [
-      "Extend crates/raul/src/theme.rs::Palette with three new fields: focus_ring (used for selected-row outlines, focused-key chips, focused-button borders; named in the same color-spec role style as accent), surface_1 (a quiet panel background for sidebars, picker surfaces, and right-rail regions), surface_2 (a slightly brighter panel background for nested layers / hover states / disabled buttons). All three are populated per-palette: Mocha picks Mauve / Mantle / Surface0, Frappe picks its Mauve / Mantle / Surface0, Dracula picks Purple / Current Line / Selection, Alucard the same palette's adjusted-for-light tone, Latte picks Mauve / Crust / Mantle.",
-      "Update every renderer that uses palette.* to also expose the new colors; specifically: crates/raul/src/tui/render/lane_lists.rs (milestone table row hover / selected highlights, the picker surface bg, the dropdown surface), crates/raul/src/tui/render/dashboard_view.rs (lane-tab focus state), crates/raul/src/tui/render/overlays.rs (modal-backdrop tint), crates/raul/src/tui/render/board.rs (selected-cell ring), crates/raul/src/tui/render/milestone_detail.rs (per-AC row focus overlay), crates/raul/src/tui/render/chrome.rs (header / footer bg), crates/raul/src/tui/path_view.rs (lane ↔ row connector), crates/raul/src/tui/modes/settings/theme_picker.rs (focused-row outline and selection chip)",
-      "Extend the synthetic status preview row (built in M243 WP2 step S2.1) to render with the new roles when they exist (focus_ring on 'selected', surface_1 behind the row).",
-      "Add a unit test in crates/raul/src/tui/palette.rs that asserts each palette's new three colors match the spec (snapshot-style), so a future palette addition fails CI if it skips the new fields.",
-      "Document the new roles in docs/raul/settings.md or a new docs/raul/theme-roles.md with a table: which renderer uses which role for what.",
-      "Add CSS-style role comments in crates/raul/src/theme.rs (e.g., on the focus_ring field: 'used for selected-row outlines in lists; bright but quiet so it doesn't compete with accent')."
+      "Add focus_ring, surface_1, surface_2 to Palette with role doc comments (focus_ring: focused chip / selected-row border and marker; surface_1: overlay, modal, and picker background; surface_2: selected-row / hover background inside a surface).",
+      "Values — latte: 0x7287fd / 0xe6e9ef / 0xccd0da; frappe: 0xbabbf1 / 0x292c3c / 0x414559; macchiato: 0xb7bdf8 / 0x1e2030 / 0x363a4f; mocha: 0xb4befe / 0x181825 / 0x313244 (Lavender / Mantle / Surface0); dracula: 0x8be9fd / 0x343746 / 0x44475a; alucard: 0x036a96 / 0xdedccf / 0xcfcfde (Cyan / Background Light / Selection per draculatheme.com/spec); monochrome: Color::Reset for all three (monochrome relies on modifiers).",
+      "Renderer adoption: lane_lists.rs and board.rs selected row → surface_2 bg + focus_ring marker; overlays.rs and modal.rs → surface_1 bg; milestone_detail.rs / detail_sections.rs focused AC row → surface_2 bg; chrome.rs header/footer → surface_1 bg; dashboard_view.rs / tab_bar.rs focused tab → focus_ring; path_view.rs connector → dim (unchanged) and selected node → focus_ring; settings theme picker (M243) → surface_1 bg, focus_ring on the highlighted row, swatch row extended to 9 roles.",
+      "Unit tests in crates/raul/src/theme.rs: exact values per palette, and a non-degenerate check that for every named palette surface_1 ≠ surface_2 ≠ foreground and focus_ring ≠ accent.",
+      "Render tests (TestBackend) proving the roles land in cells and follow a live palette swap.",
+      "docs/raul/settings.md: a role table (role → where it is used)."
     ],
     "out_of_scope": [
-      "Auto-detection of terminal capability (COLORFTERM / $TERM) and suggesting monochrome: deferred to a follow-up.",
-      "Custom user palettes (~/.config/raul/themes/*.toml): per M243 T-4 user direction, not planned.",
-      "Light/dark variants beyond what already exists (Latte, Alucard are the light variants).",
-      "Per-renderer CSS-like stylesheets or a separate theme override file format: out of scope; this milestone only adds the Palette fields and update renderers to use them.",
-      "Round-tripping the existing 6 themes — those are already correct per the audit; M244 only ADDS new colors and updates renderers."
+      "Autopilot lane surfaces from M241/M242 — they adopt the roles in their own milestones or a follow-up.",
+      "Terminal capability detection, custom user palettes, new light/dark variants.",
+      "Changing the six existing role values (Frappe dim is fixed in M243).",
+      "A stylesheet / theme override file format."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Palette struct has the three new fields focus_ring, surface_1, surface_2, all populated for each of the 6 named palettes (latte, frappe, macchiato, mocha, dracula, alucard) — values derived from each palette's official spec.",
-      "verification": "cargo test -p raul theme_palette_new_fields; cargo nextest run -p raul --no-fail-fast -E 'test(/palette_has_focus_ring|palette_has_surface_1|palette_has_surface_2/)'",
+      "description": "Palette has focus_ring, surface_1, surface_2 with the exact per-palette values in scope for all 7 palettes (6 named + monochrome).",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_match_spec/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Every renderer in scope consumes at least one of the new roles where relevant: lane_lists.rs, dashboard_view.rs, overlays.rs, board.rs, milestone_detail.rs, chrome.rs, path_view.rs, settings/theme_picker.rs.",
-      "verification": "rg -n 'palette\\.(focus_ring|surface_1|surface_2)' crates/raul/src/tui/render 2>&1 must return at least 6 hits; cargo nextest run -p raul --no-fail-fast -E 'test(/renderer_uses_new_palette_roles/)'",
+      "description": "Selected list/board rows use surface_2 bg + focus_ring marker; overlays/modals and chrome use surface_1 bg; focused detail rows use surface_2; focused tabs use focus_ring (TestBackend cell assertions).",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/selected_row|overlay|detail|chrome|tab/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "The synthetic status preview row in crates/raul/src/tui/modes/settings/theme_picker.rs renders the focused/selected row using palette.focus_ring (border) and palette.surface_1 (background); non-focused rows use foreground / dim only.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/theme_picker_preview_focus_ring|theme_picker_preview_surface_1/)'",
+      "description": "The Settings theme picker draws on surface_1, marks the highlighted row with focus_ring, and its swatch shows all 9 roles.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "A unit test asserts that adding a 7th palette without populating the new fields fails compile (via a const-fn assertion or const_assert). This prevents a future palette regression.",
-      "verification": "cargo test -p raul theme_palette_const_assert_new_fields",
+      "description": "For every named palette surface_1, surface_2, and foreground are pairwise distinct and focus_ring differs from accent.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_non_degenerate/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Switching themes in the Settings lane (M243 picker) reflects the new roles throughout the TUI live: focused chips in the picker change outline color, panel backgrounds in the sidebar shift tone, and the milestone detail's per-AC row hover state uses the focus_ring color.",
-      "verification": "Manual verification + cargo nextest run -p raul --no-fail-fast -E 'test(/theme_picker_render_with_new_roles/)'",
+      "description": "Swapping App::palette at runtime changes the role colors in the next rendered frame; docs/raul/settings.md has the role table.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/live_swap/)' && rg -q 'surface_1' docs/raul/settings.md",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "make lint + make test + make consumer-surface-lint + cargo clippy --workspace --all-targets -- -D warnings remain green.",
-      "verification": "make lint && make test && make consumer-surface-lint",
+      "description": "raul tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     }
@@ -112,8 +113,8 @@
     {
       "id": "WP2",
       "name": "Verify",
-      "goal": "Lock the new fields with const_assert; lock the theme picker preview row uses new roles; lock that 6+ renderers consume them; make lint + make test.",
-      "rollback": "Drop the const_assert and the renderer-coverage tests."
+      "goal": "Non-degenerate role test, live-swap test, docs role table, final gates",
+      "rollback": "Drop the new tests and docs table"
     }
   ],
   "steps": [
@@ -121,11 +122,11 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Extend crates/raul/src/theme.rs::Palette with three new fields focus_ring surface_1 surface_2. Populate for all 6 named palettes (latte frappe macchiato mocha dracula alucard) using each palette's official spec colors.",
+      "action": "Add focus_ring / surface_1 / surface_2 (with role doc comments) to Palette and populate all 7 palettes with the values in scope; unit test palette_roles_match_spec.",
       "files": [
         "crates/raul/src/theme.rs"
       ],
-      "tests": "cargo test -p raul theme_palette_new_fields; cargo nextest run -p raul --no-fail-fast -E test(/palette_has_focus_ring|palette_has_surface_1|palette_has_surface_2/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_match_spec/)'",
       "done_when": "AC-01 passes",
       "status": "pending",
       "covers_ac": [
@@ -141,24 +142,29 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 5,
-      "action": "Update renderers to consume focus_ring and surface_1 surface_2 where relevant: lane_lists dashboard_view overlays board milestone_detail chrome path_view settings/theme_picker.",
+      "action": "Adopt the roles per scope in lane_lists.rs, board.rs, overlays.rs, modal.rs, milestone_detail.rs, detail_sections.rs, chrome.rs, dashboard_view.rs, tab_bar.rs, path_view.rs; TestBackend tests in crates/raul/tests/tui_palette_roles.rs.",
       "files": [
         "crates/raul/src/tui/render/lane_lists.rs",
-        "crates/raul/src/tui/render/dashboard_view.rs",
-        "crates/raul/src/tui/render/overlays.rs",
         "crates/raul/src/tui/render/board.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/src/tui/render/modal.rs",
         "crates/raul/src/tui/render/milestone_detail.rs",
+        "crates/raul/src/tui/render/detail_sections.rs",
         "crates/raul/src/tui/render/chrome.rs",
+        "crates/raul/src/tui/render/dashboard_view.rs",
+        "crates/raul/src/tui/render/tab_bar.rs",
         "crates/raul/src/tui/path_view.rs",
-        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+        "crates/raul/tests/tui_palette_roles.rs"
       ],
-      "tests": "rg -n palette\\.(focus_ring|surface_1|surface_2) crates/raul/src/tui/render returns at least 6 hits; cargo nextest run -p raul --no-fail-fast -E test(/renderer_uses_new_palette_roles/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/selected_row|overlay|detail|chrome|tab/)'",
       "done_when": "AC-02 passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -168,17 +174,20 @@
       "id": "S1.2",
       "work_package": "WP1",
       "order": 4,
-      "action": "Update the synthetic status preview row in settings/theme_picker.rs to use focus_ring on the selected row and surface_1 as the row background.",
+      "action": "Theme picker (M243): surface_1 background, focus_ring on the highlighted row, 9-role swatch.",
       "files": [
-        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+        "crates/raul/src/tui/modes/settings/theme_picker.rs",
+        "crates/raul/tests/tui_theme_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_preview_focus_ring|theme_picker_preview_surface_1/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/roles/)'",
       "done_when": "AC-03 passes",
       "status": "pending",
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -188,18 +197,20 @@
       "id": "S1.3",
       "work_package": "WP2",
       "order": 3,
-      "action": "Manual verification: switching themes in the Settings lane reflects the new roles live across the TUI. Add a Theme-system integration test that exercises the picker apply path.",
+      "action": "Live-swap render test (change App::palette, assert next frame's role cells change); add the role table to docs/raul/settings.md.",
       "files": [
-        "crates/raul/tests/themes/",
-        "crates/raul/src/tui/modes/settings/theme_picker.rs"
+        "crates/raul/tests/tui_palette_roles.rs",
+        "docs/raul/settings.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/theme_picker_render_with_new_roles/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/live_swap/)' && rg -q 'surface_1' docs/raul/settings.md",
       "done_when": "AC-05 passes",
       "status": "pending",
       "covers_ac": [
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -209,17 +220,22 @@
       "id": "S1.4",
       "work_package": "WP2",
       "order": 2,
-      "action": "Run make lint plus make test plus make consumer-surface-lint plus cargo clippy --workspace --all-targets -- -D warnings. Verify all 6 ACs.",
+      "action": "Final verify: raul nextest, clippy, fmt, consumer-surface lint; CHANGELOG entry.",
       "files": [
-        "crates/raul"
+        "CHANGELOG.md"
       ],
-      "tests": "make lint; make test; make consumer-surface-lint",
+      "tests": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-06 passes",
       "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S0",
+        "S1.1",
+        "S1.2",
+        "S1.3"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -227,19 +243,21 @@
     },
     {
       "id": "S0",
-      "work_package": "WP2",
+      "work_package": "WP1",
       "order": 6,
-      "action": "Add a const_assert that enforces a future 7th palette must populate the three new fields focus_ring surface_1 surface_2. Test the assertion.",
+      "action": "Unit test palette_roles_non_degenerate over theme::ALL: surface_1, surface_2, foreground pairwise distinct; focus_ring != accent.",
       "files": [
         "crates/raul/src/theme.rs"
       ],
-      "tests": "cargo test -p raul theme_palette_const_assert_new_fields",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_non_degenerate/)'",
       "done_when": "AC-04 passes",
       "status": "pending",
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

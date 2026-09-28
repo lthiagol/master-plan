@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
+    "depends_on": [
+      "243"
+    ],
     "effort": "S",
     "risk": "low",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -36,75 +38,75 @@
     }
   },
   "intent": {
-    "outcome": "Config rows in the Settings lane render their value visually instead of as a string. Booleans become a single ●/○ dot in palette.success / palette.dim. Choices become a chip strip — one chip per allowed value, with the active chip in palette.accent. Each chip is mouse-clickable. The legend across all lanes is audited for consistency, and the per-tab footer table is updated where today's footers misrepresent the actual bindings. Bool and choice rows no longer open an editor on Enter because the live-toggle path is already complete."
+    "outcome": "Settings rows show their value visually: booleans as a ●/○ dot, choices as a clickable chip strip from the schema's allowed list (ui.theme keeps M243's picker). Enter no longer opens an editor for bool/choice rows, and the per-tab footer legend is consistent, with read-only lanes declared explicitly and covered by a test."
   },
   "problem": {
-    "description": "Two related UX gaps surfaced in the 2026-09-26 audit pass on the Settings lane: (a) every boolean config row currently renders as text '[bool] true' / '[bool] false' even though Space already toggles in place — a flag indicator would make the boolean-state visible without forcing the user to read a literal string; (b) every choice config row renders as text '[choice] mocha' even though the schema carries the full allowed-list and the renderer never reads it — a chip strip would make the choices discoverable, comparable to how the M243 theme picker lists all 7 themes on a screen. Side issue: the footer_per_tab table at crates/raul/src/tui/keybinds.rs:998 is mostly consistent across lanes but has known gaps — most visibly Milestones Detail lists Tab/Shift+Tab:section and ↑/↓:item glyphs that Backlog Detail does not, even though both detail views support the same review/approval actions. The fix is small (renderer change) but the discoverability gain is real for first-time users."
+    "description": "crates/raul/src/tui/render/overlays.rs::render_settings_list (~636, [bool]/[choice] spans ~725) renders every boolean as '[bool] true|false' and every choice as '[choice] <value>' even though Space already toggles and the schema (from mp config schema) carries the full allowed list. Enter on these rows opens the text editor, which adds nothing. The per-tab footer table (crates/raul/src/tui/keybinds.rs::footer_per_tab, ~998) shows section/item navigation for Milestones · Detail but not Backlog · Detail although both bind the same keys, and Lane::Path returns an empty row with no marker saying that is intentional."
   },
   "scope": {
     "in_scope": [
-      "Update crates/raul/src/tui/render/overlays.rs::render_settings_list so boolean rows render as a single colored dot (palette.success when on, palette.dim when off) replacing the text '[bool] true' / '[bool] false' span. Style sourced from new palette roles: focus_ring could be used for the off state per M244.",
-      "Update the same function for choice rows: read schema.allowed via the existing schema introspection path, render each allowed value as a single chip, the active chip in palette.accent + bold + reverse-video, the others in palette.foreground. Overflow becomes palette.dim ellipsis `…` after the row width is exceeded.",
-      "Wire mouse hit-test rects for every choice chip — clicking a chip sets the staged value to that name and updates the active-chip highlight. The bool flag also gets a hit-test rect (click toggles) for symmetry. Reuses the existing M221 mouse plumbing pattern.",
-      "Skip the editor-open path for bool and choice rows: when Enter is pressed on these rows, treat as no-op (Space / ← / → / click is the supported path). The per-type hint line in the description card updates accordingly: 'Space/click: toggle · s: save · Esc: back' for bool, '←/→/click: cycle · s: save · Esc: back' for choice.",
-      "Legend consistency pass: ensure Backlog · Detail footer_per_tab carries the same 'section' / 'item' navigation glyphs as Milestones · Detail if those keys are actually bound on Backlog Detail (action.rs around 1124 — verify and emit consistently); add a clarifying comment to Lane::Path → '' (empty) so the lack of a per-tab row doesn't look accidental in a future audit.",
-      "Add a test fixture that asserts every (lane, content_state) pair in Keybinds::footer_per_tab produces a non-empty string OR carries an explicit comment that the lane is read-only. Catches silent regressions when new lanes are added."
+      "Bool rows: single ● (palette.success) / ○ (palette.dim) instead of the text; click or Space toggles.",
+      "Choice rows (except ui.theme, which renders M243's picker): one chip per schema allowed value; active chip in palette.accent + bold + reversed, others palette.foreground; overflow ends in a palette.dim '…'; the description card lists all values. Click selects a chip; ←/→ cycle via the existing SettingsCycleChoice action.",
+      "Mouse hit rects for dots and chips through tui/mouse.rs.",
+      "Enter is a no-op on bool and choice rows (no SettingsFocus::Editing); the hint line reads 'Space/click: toggle · s: save · Esc: back' (bool) and '←/→/click: cycle · s: save · Esc: back' (choice).",
+      "Footer legend: Backlog · Detail shows the same section / item / annotate / menu / approve glyphs as Milestones · Detail for keys bound in both; add `const READ_ONLY_FOOTER_LANES: &[Lane] = &[Lane::Path]` in keybinds.rs, and a unit test that every (lane, content state) footer is non-empty unless its lane is in that const.",
+      "New integration tests in crates/raul/tests/tui_settings_rows.rs; footer tests as unit tests in keybinds.rs."
     ],
     "out_of_scope": [
-      "Adding new schema attribute types beyond what schema.rs already accepts — only the consumer side changes.",
-      "Refactoring SettingsFocus::Editing or other internals — bool/choice just stop opening the editor.",
-      "Mouse hit-test refactor more broadly — only the bool dot and choice chips get hit-tests; the rest of the lane keeps existing behavior.",
-      "Changing how the `mp config` CLI reads/writes or how `mp config schema` formats its output. The schema field is already there.",
-      "Refactoring the per-lane keybinds themselves (footer_per_tab is purely a renderer of existing bindings)."
+      "New schema types or changes to mp config / mp config schema.",
+      "Refactoring SettingsFocus internals beyond skipping Editing for bool/choice.",
+      "Mouse plumbing beyond the dots and chips.",
+      "Rebinding any keys (footer_per_tab only renders existing bindings).",
+      "Palette roles from M244."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Boolean config rows in the Settings list render as a single ●/○ dot in palette.success / palette.dim. No text 'true' / 'false' is rendered for these rows. Mouse click and Space both toggle in place; the dot updates immediately (live-apply on highlight-style action).",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_bool_renders_as_dot|settings_bool_click_toggles|settings_bool_space_toggles/)'",
+      "description": "Bool rows render a single ● (success) / ○ (dim) with no 'true'/'false' text; click and Space toggle in place.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/bool/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Choice config rows in the Settings list render as a chip strip — one chip per schema.allowed value, with the active chip styled in palette.accent + bold + reverse-video and the inactive chips in palette.foreground. Mouse click on a chip selects that value.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_choice_renders_as_chip_strip|settings_choice_click_selects|settings_choice_arrow_keys_cycle/)'",
+      "description": "Choice rows other than ui.theme render one chip per schema allowed value (active: accent + bold + reversed); click selects a chip; ←/→ cycle.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/choice_chip|choice_click|choice_arrows/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Choice chip strips that exceed row width render up to the width-limit, then a palette.dim ellipsis (…) takes the remaining space. The full list remains visible in the description card and on hover.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_choice_chip_strip_overflow_ellipsis/)'",
+      "description": "A chip strip wider than the row ends in a dim '…' and the description card lists every allowed value.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/overflow/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "Bool and choice rows do NOT open an editor on Enter. The corresponding SettingsFocus::Editing transition is bypassed; the description card hint line shows the new live-action verbs ('Space/click: toggle' / '←/→/click: cycle') instead of 'Enter: edit'.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/settings_bool_no_editor_on_enter|settings_choice_no_editor_on_enter|settings_hint_footer_per_type/)'",
+      "description": "Enter on bool and choice rows does not enter the editor; the hint line shows the per-type live-action verbs.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/no_editor_on_enter|hint_line/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Backlog · Detail and Milestones · Detail carry the same 'section' / 'item' / 'annotate' / 'menu' / 'approve' navigation glyphs when those keys are bound. Lane::Path's empty per-tab row carries a comment explaining it's intentional (read-only lane).",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_per_tab_backlog_detail_parity|footer_per_tab_path_is_intentional/)'",
+      "description": "Backlog · Detail's footer lists the same section / item / annotate / menu / approve glyphs as Milestones · Detail for keys bound in both.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_backlog_detail_parity/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "A test fixture iterates every (lane, content_state) pair in Keybinds::footer_per_tab and asserts the per-tab row is non-empty OR carries the documented 'read-only' comment.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_per_tab_no_empty_unexplained/)'",
+      "description": "Every (lane, content state) footer row is non-empty unless the lane is listed in READ_ONLY_FOOTER_LANES (which contains Lane::Path).",
+      "verification": "rg -q 'READ_ONLY_FOOTER_LANES' crates/raul/src/tui/keybinds.rs && cargo nextest run -p raul --no-fail-fast -E 'test(/footer_no_unexplained_empty/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
-      "description": "make lint + make test + make consumer-surface-lint + cargo clippy --workspace --all-targets -- -D warnings remain green.",
-      "verification": "make lint && make test && make consumer-surface-lint",
+      "description": "raul tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     }
@@ -140,11 +142,12 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Render bool rows in render_settings_list as a single dot. On = ● in palette.success; off = ○ in palette.dim. Replace the existing text true / false span. Width budget 1 cell.",
+      "action": "render_settings_list: bool rows render ● (palette.success) / ○ (palette.dim) instead of the text span.",
       "files": [
-        "crates/raul/src/tui/render/overlays.rs"
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_bool_renders_as_dot/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/bool_renders_dot/)'",
       "done_when": "AC-01 partial passes (visual part)",
       "status": "pending",
       "covers_ac": [
@@ -160,18 +163,21 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 9,
-      "action": "Add a mouse hit-test rect for the bool dot. Click toggles in place. Reuses the existing M221 mouse plumbing pattern. Space still toggles for keyboard users.",
+      "action": "Hit rect for the bool dot via tui/mouse.rs; click toggles; Space unchanged.",
       "files": [
         "crates/raul/src/tui/render/overlays.rs",
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_bool_click_toggles|settings_bool_space_toggles/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/bool/)'",
       "done_when": "AC-01 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -181,11 +187,12 @@
       "id": "S1.2",
       "work_package": "WP2",
       "order": 8,
-      "action": "Wire mouse hit-test rects for every choice chip. Click selects the clicked chip's value. Arrow keys Left Right cycle; the existing SettingsCycleChoice action already handles it.",
+      "action": "render_settings_list: choice rows (except ui.theme) render a chip strip from the schema allowed list; active chip accent + bold + reversed.",
       "files": [
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_choice_click_selects|settings_choice_arrow_keys_cycle/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/choice_chip/)'",
       "done_when": "AC-02 fully passes",
       "status": "pending",
       "covers_ac": [
@@ -201,17 +208,20 @@
       "id": "S1.3",
       "work_package": "WP2",
       "order": 7,
-      "action": "Add overflow handling. When chip strip exceeds row width render up to the limit then palette.dim ellipsis takes the remaining space. Description card and hover show the full list.",
+      "action": "Chip overflow: render up to the row width, then a dim '…'; description card lists all allowed values.",
       "files": [
-        "crates/raul/src/tui/render/overlays.rs"
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_choice_chip_strip_overflow_ellipsis/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/overflow/)'",
       "done_when": "AC-03 passes",
       "status": "pending",
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -221,37 +231,21 @@
       "id": "S2",
       "work_package": "WP2",
       "order": 11,
-      "action": "Wire mouse hit-test rects for every choice chip. Click selects the clicked chip. Arrow keys cycle via existing SettingsCycleChoice.",
+      "action": "Hit rects for each chip via tui/mouse.rs; click stages that value; ←/→ cycle through the existing SettingsCycleChoice.",
       "files": [
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/src/tui/view_state.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_choice_click_selects|settings_choice_arrow_keys_cycle/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/choice_click|choice_arrows/)'",
       "done_when": "AC-02 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
-      "id": "S2.1",
-      "work_package": "WP2",
-      "order": 12,
-      "action": "Add overflow handling for chip strip. When exceeds row width render up to the limit then palette.dim ellipsis takes the remaining space. Description card and hover show the full list.",
-      "files": [
-        "crates/raul/src/tui/render/overlays.rs"
+      "depends_on_steps": [
+        "S1.2"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_choice_chip_strip_overflow_ellipsis/)",
-      "done_when": "AC-03 passes",
-      "status": "pending",
-      "covers_ac": [
-        "AC-03"
-      ],
-      "depends_on_steps": [],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -261,17 +255,20 @@
       "id": "S1.4",
       "work_package": "WP3",
       "order": 6,
-      "action": "Update the per_type_hint footer string to use live-action verbs: bool = Space/click: toggle s: save Esc: back; choice = / /click: cycle s: save Esc: back.",
+      "action": "Per-type hint line: 'Space/click: toggle · s: save · Esc: back' (bool), '←/→/click: cycle · s: save · Esc: back' (choice).",
       "files": [
-        "crates/raul/src/tui/render/overlays.rs"
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_hint_footer_per_type/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/hint_line/)'",
       "done_when": "AC-04 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.5"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -281,32 +278,13 @@
       "id": "S1.5",
       "work_package": "WP3",
       "order": 5,
-      "action": "Bypass SettingsFocus::Editing on Enter for bool and choice rows. Treat Enter as no-op. Space and arrow keys remain the supported path.",
+      "action": "Enter on bool / choice rows is a no-op (skip SettingsFocus::Editing).",
       "files": [
-        "crates/raul/src/tui/modes/settings.rs"
+        "crates/raul/src/tui/modes/settings.rs",
+        "crates/raul/tests/tui_settings_rows.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_bool_no_editor_on_enter|settings_choice_no_editor_on_enter/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_settings_rows -E 'test(/no_editor_on_enter/)'",
       "done_when": "AC-04 partial passes",
-      "status": "pending",
-      "covers_ac": [
-        "AC-04"
-      ],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
-      "id": "S1.1.1",
-      "work_package": "WP3",
-      "order": 10,
-      "action": "Update the per_type_hint footer string to use live-action verbs: bool = Space/click: toggle s: save Esc: back; choice = / /click: cycle s: save Esc: back.",
-      "files": [
-        "crates/raul/src/tui/render/overlays.rs"
-      ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/settings_hint_footer_per_type/)",
-      "done_when": "AC-04 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-04"
@@ -321,11 +299,11 @@
       "id": "S1.6",
       "work_package": "WP4",
       "order": 4,
-      "action": "Add a comment on Lane::Path → footer_per_tab that empty string is intentional (read-only lane). Pin it so a future audit does not silently remove the conditional.",
+      "action": "footer_per_tab: give Backlog · Detail the same section / item / annotate / menu / approve glyphs as Milestones · Detail for keys bound in both; unit test footer_backlog_detail_parity.",
       "files": [
         "crates/raul/src/tui/keybinds.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/footer_per_tab_path_is_intentional/)",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/footer_backlog_detail_parity/)'",
       "done_when": "AC-05 fully passes",
       "status": "pending",
       "covers_ac": [
@@ -341,18 +319,19 @@
       "id": "S1.7",
       "work_package": "WP4",
       "order": 3,
-      "action": "Add a test fixture iterating every (lane, content_state) pair in Keybinds::footer_per_tab asserting the per-tab row is non-empty OR carries the documented read-only comment. Catches silent regressions when new lanes are added.",
+      "action": "Add const READ_ONLY_FOOTER_LANES: &[Lane] = &[Lane::Path] and unit test footer_no_unexplained_empty iterating every (lane, content state).",
       "files": [
-        "crates/raul/src/tui/keybinds.rs",
-        "crates/raul/tests"
+        "crates/raul/src/tui/keybinds.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/footer_per_tab_no_empty_unexplained/)",
+      "tests": "rg -q 'READ_ONLY_FOOTER_LANES' crates/raul/src/tui/keybinds.rs && cargo nextest run -p raul --no-fail-fast -E 'test(/footer_no_unexplained_empty/)'",
       "done_when": "AC-06 passes",
       "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.6"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -362,17 +341,23 @@
       "id": "S1.8",
       "work_package": "WP4",
       "order": 2,
-      "action": "Run make lint, make test, make consumer-surface-lint, cargo clippy --workspace --all-targets -- -D warnings. Verify all ACs.",
+      "action": "Final verify: raul nextest, clippy, fmt, consumer-surface lint; CHANGELOG entry.",
       "files": [
-        "crates/raul"
+        "CHANGELOG.md"
       ],
-      "tests": "make lint; make test; make consumer-surface-lint",
+      "tests": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-07 passes",
       "status": "pending",
       "covers_ac": [
         "AC-07"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1",
+        "S2",
+        "S1.3",
+        "S1.4",
+        "S1.7"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

@@ -1,0 +1,160 @@
+{
+  "milestone": {
+    "id": "248",
+    "title": "Approval integrity — full-spec drafts, a real approve gate, and needs_regrooming on post-approval spec edits",
+    "slug": "approval-integrity-full-spec-drafts-a-real-approve-gate-and-needs-regrooming-on-post-approval-spec-edits",
+    "lifecycle": "draft",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "240"
+    ],
+    "effort": "L",
+    "risk": "high",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-28",
+    "updated": "2026-09-28",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-28T02:56:13.087777+00:00"
+  },
+  "intent": {
+    "outcome": "A milestone is authored whole in draft (ACs, work packages, steps) and becomes approved only through `mp milestone approve`, which checks the spec is executable. After approval, any material spec edit flags the milestone (needs_regrooming), is recorded in the activity journal, shows up in mp validate and in raul, and blocks the start of execution until it is re-approved."
+  },
+  "problem": {
+    "description": "Approval currently means very little. (1) Nothing gates entry: milestone/spec.rs::approve_milestone is just apply_spec_status(ctx, id, \"ready\"), identical to `mp milestone set-spec-status <id> ready`, so a bare draft with no steps becomes lifecycle approved in one call (observed creating M247). (2) Decomposition is ordered backwards: wp.rs:26 and step.rs:28 refuse work packages / steps below spec_status ready, so the fragment commands only work after approval, and `mp milestone create --json` rejects work_packages and steps: CreateMilestoneInput has both fields (spec.rs ~112-114, applied ~463-470) but the CREATE_MILESTONE_KEYS allow-list (spec.rs ~190) omits them — so a full spec cannot be authored in draft at all. (3) Nothing notices changes after approval: on 2026-09-27, 16 approved milestones were materially rewritten (titles, scope, ACs, steps) with no signal; needs_regrooming stayed false. The model already has MilestoneEvent::SetNeedsRegrooming and the needs_regrooming overlay (mp-model milestone.rs ~451, ~584), and raul's milestone detail renders it (render/milestone_detail.rs ~45, ~238), but no CLI path ever sets it. Harm is both execution (a runner or autopilot executes ACs the approver never saw) and audit (no record of what changed after approval)."
+  },
+  "scope": {
+    "in_scope": [
+      "Draft decomposition: add work_packages and steps to CREATE_MILESTONE_KEYS so `mp milestone create --json` accepts a full spec; WP and step authoring commands (add / update / split / remove) work in draft; execution writers (step claim / set-status / done / fail) still require an approved milestone. `mp milestone create --example` shows work_packages and steps.",
+      "Approve gate in approve_milestone (first approval and re-approval): at least one WP; every AC has a verification and is covered by a step; every step covers an existing AC and belongs to an existing WP; depends_on_steps reference existing steps with no cycle; `mp interview gaps` clean. Failure: non-zero exit with a structured list of violations; `--dry-run` reports the gate result without writing.",
+      "Breaking: `mp milestone set-spec-status <id> ready` fails with a hint to run `mp milestone approve <id>`; other spec statuses behave as before.",
+      "Approval baseline: at approve time store an optional `approval` block in milestone meta (approved_at + one hash per material field). Material fields: intent, problem, scope, depends_on, acceptance_criteria (id, description, verification), work_packages (id, name, goal), steps (id, action, files, tests, done_when, covers_ac, depends_on_steps, work_package). Not material: statuses, evidence, claims, priority, effort, risk, comments, notes, design decisions, flow stages.",
+      "Detection in the single milestone write path (milestone/io.rs::write_milestone_synced; route any direct store::write_milestone callers for milestones through it): when the milestone is approved and every step is pending, compare material hashes with the baseline; on mismatch dispatch SetNeedsRegrooming(true) and append a `spec-revised` activity event listing the changed fields. A milestone with no baseline gets one on its first save, with no flag.",
+      "Re-approval: `mp milestone approve <id>` on a flagged milestone re-runs the gate, clears the flag, refreshes the baseline, and appends `spec-reapproved` with the fields changed since the previous approval.",
+      "mp validate emits a new warning for every milestone with needs_regrooming true; mp path shows a re-approve action for it.",
+      "Execution gate: while needs_regrooming is true, step claim / set-status (in-progress, done) / done refuse without --force, and `mp autopilot start` refuses to queue the milestone without --force; each --force use appends a `force-bypassed` activity event.",
+      "raul: `mp list milestones` rows carry needs_regrooming (additive; regenerate the json-shape golden); raul's Milestones rows and Path items show a `revised` chip in palette.warn when it is true.",
+      "Rollout: replace `set-spec-status … ready` with `mp milestone approve` across crates/mp/tests, tests/ (golden scenarios and fixtures), templates/skills, docs, and scripts; document the approve gate and the revision flow in docs/milestones/ and docs/mp/commands.md; CHANGELOG entry marked breaking."
+    ],
+    "out_of_scope": [
+      "Milestones already in execution (any step not pending): edits are not flagged.",
+      "Blocking or refusing spec edits — grooming stays unblocked.",
+      "Storing full approved snapshots or a diff-since-approval command (hashes + changed-field lists only).",
+      "Backfilling flags for milestones rewritten before this ships (first save records the baseline).",
+      "Approving from raul (raul only displays the flag).",
+      "A deprecation period for set-spec-status ready."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "In draft, WP and step add / update / split / remove succeed; step claim / set-status / done / fail are refused until the milestone is approved.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/draft_/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "mp milestone create --json with ACs, WPs, and steps produces a complete draft (lifecycle draft); --example includes work_packages and steps.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/create_full_spec/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "mp milestone approve rejects each gate violation (no WP, AC without verification, uncovered AC, step without AC, step without WP, unknown or cyclic step dependency, interview gaps) with a structured reason, approves a complete spec, and --dry-run reports the gate result without writing.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/approve_gate/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "mp milestone set-spec-status <id> ready fails with a hint naming mp milestone approve; other spec statuses are unchanged.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/set_spec_status_ready_rejected/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "On an approved, not-started milestone, a material edit sets needs_regrooming and appends spec-revised listing the changed fields; non-material edits (priority, comment, design decision, status, evidence) do not; a milestone without a baseline gets one on first save without being flagged.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/revision_/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "While flagged, mp validate warns and mp path offers re-approval; mp milestone approve re-runs the gate, clears the flag, refreshes the baseline, and appends spec-reapproved.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/reapprove|revised_warning|path_reapprove/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "While flagged, step claim / set-status / done are refused without --force and mp autopilot start refuses the milestone without --force; each --force use appends force-bypassed.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test approval_integrity -E 'test(/execution_gate/)' && cargo nextest run -p mp --no-fail-fast --test autopilot_drive_preconditions -E 'test(/needs_regrooming/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-08",
+      "description": "mp list milestones rows carry needs_regrooming (json-shape golden regenerated additively) and raul's Milestones rows and Path items show a `revised` chip when it is true.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^json_shape_baseline::/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/revised_chip/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-09",
+      "description": "No test, scenario, fixture, skill template, doc, or script relies on set-spec-status … ready to approve (the rejection test excepted); golden scenarios pass; docs describe the approve gate and revision flow.",
+      "verification": "! rg -q 'set-spec-status \\S+ ready' crates/mp/tests tests templates docs scripts --glob '!approval_integrity.rs' && make test-scenarios && rg -q 'needs_regrooming' docs/milestones",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-10",
+      "description": "mp and raul tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "creation",
+      "choice": "Milestones are authored whole in draft: intent, problem, scope, ACs, work packages and steps. Approval is the single explicit gate between a full spec and execution.",
+      "rationale": "Decomposition gated on approval forces approval of half-specs (set-spec-status ready is the only way to unlock WP/step writers), which defeats the purpose of review."
+    },
+    {
+      "area": "approve gate",
+      "choice": "mp milestone approve runs the full readiness check (interview gaps clean, every AC covered by a step, no weak verifications, refs resolve) and records an approve event; set-spec-status ready no longer implies approval (breaking change shipped now).",
+      "rationale": "A gate that can be bypassed by a status flip is not a gate; consumers are few enough that a clean break is cheaper than a deprecation window."
+    },
+    {
+      "area": "revision detection",
+      "choice": "Detect material spec edits centrally in the milestone save path by comparing a spec fingerprint against the baseline recorded at approval; the baseline is created on first save after this ships, with no backfill of historical approvals. Material = intent, problem, scope, ACs, WPs, steps (not notes, status or metadata).",
+      "rationale": "A central hook catches every writer (fragment commands, update --json, bulk) without per-command wiring; skipping backfill avoids guessing what historical approvals covered."
+    },
+    {
+      "area": "consequence",
+      "choice": "A material edit after approval sets needs_regrooming and blocks execution writers (step claim / done, autopilot drive) until mp milestone approve re-approves; --force bypasses and is journaled as recorded debt.",
+      "rationale": "Flag-and-gate keeps edits cheap while making unreviewed scope changes visible and non-executable; --force matches the repo's existing debt semantics."
+    },
+    {
+      "area": "surface",
+      "choice": "raul shows a 'revised' chip on milestones with needs_regrooming in this milestone; milestones already in flight at ship time are out of scope (no retroactive flagging).",
+      "rationale": "The human reviewer needs to see the flag where they review; retro-flagging in-flight work would stall current execution for no new information."
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

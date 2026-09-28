@@ -1,7 +1,7 @@
 {
   "milestone": {
     "id": "242",
-    "title": "Floating milestone picker: anchored overlay with multi-select, narrow-terminal modal fallback, 100ms Start-pulse",
+    "title": "Floating milestone picker: centered multi-select overlay with narrow-terminal modal fallback and a Starting… state on Start",
     "slug": "floating-milestone-picker-anchored-overlay-with-multi-select-narrow-terminal-modal-fallback-100ms-start-pulse",
     "lifecycle": "approved",
     "spec_status": "ready",
@@ -14,12 +14,12 @@
     "depends_on": [
       "241"
     ],
-    "effort": "S",
+    "effort": "M",
     "risk": "low",
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -38,108 +38,110 @@
     }
   },
   "intent": {
-    "outcome": "The milestone selection workflow becomes a floating center overlay (anchored to the middle 2/3 of the screen) with multi-select via checkboxes. On terminals narrower than 100 cols the same internal state renders as a full-screen modal. After Confirm, the Start button does a 100ms cyan pulse to register the click before the screen flips to While-Executing (M241)."
+    "outcome": "Choosing milestones for an autopilot run happens in a floating, centered overlay with checkboxes, filters, and search (full-screen modal on narrow terminals), and the Start button visibly acknowledges activation until the run goes live."
   },
   "problem": {
-    "description": "Today the milestone picker lives inside the milestone lane (M207) as a sub-pane that takes the full tab — or, in the predecessor option drafts (autopilot-draft/option01 etc.), as a modal that covers the whole screen. The 2026-09-26 audit surfaced a new requirement: pickers should be floating (not full-screen), multi-select via checkbox (not radio), and bounded by a 30% dimmed backdrop. The picker needs to share state with the run config so that Confirm commits the same selection to .mp/autopilot-state.json::setup.milestones. On narrow terminals (<100 cols), a backdrop overlay doesn't fit — the picker must collapse to a full-screen modal at the same renderer level, sharing internal state. After Confirm, the user needs feedback that the click registered before the While-Executing screen takes over (~250-500ms latency); a 100ms cyan pulse on the Start button does it without visual noise."
+    "description": "After M241 the setup form's Milestones section shows chips from app.autopilot.picker (crates/raul/src/tui/autopilot.rs::Picker { candidates, selected: Vec<String>, cursor }) but there is no way to browse and multi-select across the plan: the picker only lists drivable candidates inline, with no filtering or search. The audit asked for a floating overlay (not full-screen) with checkbox multi-select, a dimmed backdrop, filters, and search, collapsing to a full-screen modal on narrow terminals. Separately, pressing Start gives no feedback during the ~250-500ms before mp autopilot status reports the live run and M241's takeover appears."
   },
   "scope": {
     "in_scope": [
-      "Floating picker overlay widget — anchored to the middle 2/3 of the screen (horizontally and vertically); backdrop dims the surrounding setup + sidebar to 30% opacity.",
-      "Multi-select backend — checkbox toggle; selection stored as Vec<MilestoneSummary>; persists across filter changes (a milestone selected under 'ready-only' stays selected when you switch to 'all').",
-      "Filter chip row: 4 mutually-exclusive chips (all / ready-only / in-progress / complete).",
-      "Search box with '/' focus: filters by ID prefix or title substring.",
-      "Selection summary line at the bottom of the picker: 'N selected · ~N min est. · uniform harness'.",
-      "Confirm and Cancel buttons: Confirm commits to .mp/autopilot-state.json::setup.milestones and closes; Cancel closes without committing.",
-      "Narrow-terminal fallback: when the terminal width is < 100 cols, the picker renders as a full-screen modal at the SAME widget level — same internal state, different renderer (~50 LOC extra).",
-      "100ms cyan pulse on the Start button after Confirm — animation timing wrapper with a one-shot 100ms tick; renders in the idle split view's Start button before the While-Executing takeover fires.",
-      "Mouse Model B (free click + focus) — click anywhere on a row toggles, click on a checkbox toggles without row focus change, click outside dimmed-backdrop closes (with a 2-click-to-close confirmation to avoid accidental dismissals).",
-      "Keyboard: j/k move row, gg/G top/bottom, space / x toggle, 1/2/3/4 switch filter chip, / focus search, esc or click-outside cancels.",
-      "Edge cases: 0-matches shows 'No milestones match the filter' with Confirm disabled; empty selection at Confirm shows a one-line 'no milestones selected — Start will be disabled' warning requiring a second click to dismiss; in-progress milestones show a '↳ stale' badge (can't be re-picked).",
-      "Selected items disabled in completed state (cannot re-pick)."
+      "Picker state in a new crates/raul/src/tui/autopilot_picker.rs: rows from the mp list milestones data raul already loads (all milestones), each flagged drivable via mp_model::is_watch_drivable_lifecycle; draft selection (Vec<String> ids) seeded from app.autopilot.picker.selected on open; filter; search query; focus; dismiss-armed flag.",
+      "Renderer in a new crates/raul/src/tui/render/autopilot_picker.rs: overlay centered over the middle 2/3 of the frame (width and height); everything behind it rendered with the palette dim style (terminal backdrop — no alpha).",
+      "Opened from M241's [+ select] chip (click, or Enter when the Milestones section has focus).",
+      "Checkbox multi-select: space or x toggles the focused row; clicking a checkbox toggles without moving focus; clicking a row focuses it. Non-drivable rows render their lifecycle badge and cannot be selected.",
+      "Filter chips (mutually exclusive): all / drivable / in-progress / complete. Selection is kept across filter and search changes.",
+      "Search: / focuses the search box; matches id prefix or case-insensitive title substring; 'No milestones match the filter' empty state disables Confirm.",
+      "Summary line: '<n> selected · <topology> · harness: uniform <name> | mixed', live.",
+      "Confirm writes the draft into app.autopilot.picker.selected (in memory, per-run — nothing persisted) and closes; with 0 selected, the first Confirm shows 'no milestones selected — Start will be disabled' and a second Confirm closes. Cancel / Esc closes without changes.",
+      "Outside click: the first arms dismissal and shows 'click again to close'; the second closes (same as Cancel).",
+      "Modal key handling while open (overrides global/lane keys, including g, /, 1-4): j/k move, gg/G top/bottom, space/x toggle, 1-4 select filter chip, / search, Enter confirm, Esc cancel.",
+      "Narrow fallback: frame width < 100 cols renders the same state full-screen through the same renderer entry point.",
+      "Start feedback: after Start is activated, the Start button renders 'Starting…' in the accent style until mp autopilot status reports a live run (M241 takeover) or the start command returns an error (button returns to normal and the error shows in the status line).",
+      "Help overlay: add the picker's modal keys to the Autopilot section (M241)."
     ],
     "out_of_scope": [
-      "Geometry + sidebar + While-Executing takeover (M241 — comes first).",
-      "Recent-runs UI (deferred to a future milestone per Q5).",
-      "Picker animations beyond the 100ms Start-pulse (no slide-down for now; defer to a polish milestone).",
-      "Per-mile per-milestone progress search (different feature)."
+      "Persisting the selection across runs or raul restarts.",
+      "Animations (slide-in, pulses).",
+      "Recent-runs UI.",
+      "Run-time estimates in the summary line.",
+      "Changing M241's geometry, sidebar, or takeover."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Picker opens as a floating center overlay anchored to the middle 2/3 of the screen; backdrop dims the surrounding setup + sidebar regions to 30% opacity.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/floating_picker_open|floating_picker_anchor|backdrop_dim_factor/)'",
+      "description": "The picker opens as an overlay centered over the middle 2/3 of the frame, with everything behind it drawn in the palette dim style.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/overlay_geometry|backdrop_dim/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Multi-select via checkboxes toggles selection state; pressing space or x on a focused row toggles; click on a checkbox toggles without row focus change.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/floating_picker_toggle|checkbox_independent_of_focus|keyboard_toggle/)'",
+      "description": "space or x toggles the focused row; clicking a checkbox toggles without moving focus; clicking a row focuses it.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/toggle/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Selection persists across filter changes; switching from 'ready-only' to 'all' keeps the previously selected items selected.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/selection_persists_across_filters/)'",
+      "description": "Selection is kept across filter and search changes.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/selection_persists/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "4 filter chips (all / ready-only / in-progress / complete) mutually exclusive; switching updates the visible list; in-progress / complete rows are not selectable.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/filter_chip_exclusivity|in_progress_not_selectable|complete_not_selectable/)'",
+      "description": "Four mutually exclusive filter chips (all / drivable / in-progress / complete) update the list; non-drivable rows show their lifecycle badge and cannot be selected.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/filter|non_drivable/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "'/' search box focuses on '/' keypress (when picker is open); typing filters by ID prefix and title substring; empty state shown when no matches.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_search_focus|picker_search_substring|picker_empty_state/)'",
+      "description": "/ focuses search; matches id prefix or case-insensitive title substring; no matches shows the empty state and disables Confirm.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/search|empty_state/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "Selection summary line: 'N selected · ~N min est. · uniform harness' updates live as selection changes; 0 selected disables Confirm with a one-line warning.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_summary_live|picker_summary_zero_disables_confirm/)'",
+      "description": "The summary line '<n> selected · <topology> · harness: uniform <name> | mixed' updates live; with 0 selected the first Confirm warns and the second closes.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/summary|zero_selection/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
-      "description": "Confirm commits selection to .mp/autopilot-state.json::setup.milestones and closes the picker; Cancel closes without committing; both are wired to the existing planner state read on Start.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_confirm_commit|picker_cancel_no_commit|setup_milestones_round_trip/)'",
+      "description": "Confirm writes the draft into app.autopilot.picker.selected and closes; Cancel / Esc closes without changes; nothing is persisted to disk.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/confirm|cancel/)' && ! rg -q 'autopilot-state\\.json' crates/raul/src",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-08",
-      "description": "On terminal width < 100 cols, the picker renders as a full-screen modal at the SAME widget level — same internal state, different renderer; tested by passing a small terminal width fixture.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/picker_modal_fallback_narrow|modal_fallback_same_internal_state/)'",
+      "description": "Below 100 columns the same picker state renders full-screen through the same renderer entry point.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/narrow_fallback/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-09",
-      "description": "100ms cyan pulse on the Start button after Confirm — animation fires for ~100ms, then the screen transitions to While-Executing (which M241 owns); the pulse is implemented as a one-shot animation tick in view_state.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/start_pulse_animation|start_pulse_one_shot|start_pulse_with_then_transitions_to_active/)'",
+      "description": "After Start is activated the button shows 'Starting…' until mp autopilot status reports a live run or the start command errors (then it resets and the error is shown).",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/start_feedback/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-10",
-      "description": "Outside-click dismissal: first outside click dims the picker further and adds a 'click again to close' hint; second outside click closes the picker; Cancel still available.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/outside_click_two_step_dismiss/)'",
+      "description": "The first outside click arms dismissal with a 'click again to close' hint and the second closes; while open, picker keys (j/k, gg/G, space/x, 1-4, /, Enter, Esc) override global and lane bindings and are listed in the help overlay.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/outside_click|modal_keys/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/help_overlay_autopilot/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-11",
-      "description": "make lint + make test + consumer-surface-lint remain green; cargo clippy --workspace --all-targets -- -D warnings exits 0.",
-      "verification": "make lint && make test && make consumer-surface-lint",
+      "description": "raul tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     }
@@ -148,26 +150,26 @@
     {
       "id": "WP1",
       "name": "Floating picker widget",
-      "goal": "Floating center overlay anchored to middle 2/3 of screen; dimmed backdrop to 30%; multi-select backend; checkbox toggle; selection persists across filter changes; filter chips + search.",
+      "goal": "Centered overlay with dim backdrop, checkbox multi-select, filters, search, live summary",
       "rollback": "Drop the floating widget; restore the existing milestone-lane sub-pane picker."
     },
     {
       "id": "WP2",
-      "name": "Confirm cancel + state commit",
-      "goal": "Confirm commits to .mp/autopilot-state.json setup milestones and closes picker; Cancel closes without committing. Summary line live-updates. Outside-click two-step dismissal.",
-      "rollback": "Revert to a single-confirm no-state-commit behavior on Cancel."
+      "name": "Confirm / cancel + modal keys",
+      "goal": "Confirm writes app.autopilot.picker.selected (in memory); Cancel discards; two-step outside dismissal; modal key handler",
+      "rollback": "Remove the modal; keep M241's inline milestone chips"
     },
     {
       "id": "WP3",
       "name": "Narrow terminal fallback",
-      "goal": "On terminals narrower than 100 cols, the same internal state renders as a full-screen modal at the same widget level. ~50 LOC extra.",
+      "goal": "Below 100 columns the same state renders full-screen",
       "rollback": "Disable the modal fallback; picker only works on wide terminals."
     },
     {
       "id": "WP4",
-      "name": "Start-pulse animation",
-      "goal": "100ms cyan pulse on the Start button after Confirm; one-shot animation tick in view_state; transitions to While-Executing (M241) afterward.",
-      "rollback": "Disable the pulse; transition is instantaneous."
+      "name": "Start feedback + verify",
+      "goal": "Starting… state on Start until live run or error; final gates",
+      "rollback": "Drop the Starting… state; Start behaves as in M241"
     }
   ],
   "steps": [
@@ -175,13 +177,15 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement the floating picker overlay widget. Anchored to middle 2/3 of screen. Backdrop dims surrounding setup + sidebar to 30. Multi-select backend with checkbox toggle. Selection persists across filter changes.",
+      "action": "Create tui/autopilot_picker.rs (rows from loaded milestones flagged via mp_model::is_watch_drivable_lifecycle; draft selection seeded from app.autopilot.picker.selected; focus) and render/autopilot_picker.rs (centered 2/3 overlay, dim backdrop, checkbox rows, mouse hit targets); toggling + selection retention; tests in crates/raul/tests/autopilot_picker.rs.",
       "files": [
-        "crates/raul/src/tui/render/picker.rs",
-        "crates/raul/src/tui/state/autopilot_picker.rs"
+        "crates/raul/src/tui/autopilot_picker.rs",
+        "crates/raul/src/tui/render/autopilot_picker.rs",
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/floating_picker/)",
-      "done_when": "AC-01 AC-02 AC-03 pass",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/overlay_geometry|backdrop_dim|toggle|selection_persists/)'",
+      "done_when": "Overlay renders centered with dim backdrop; toggle and retention pass",
       "status": "pending",
       "covers_ac": [
         "AC-01",
@@ -198,18 +202,22 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 7,
-      "action": "Implement 4 filter chips plus search focus. Empty state. in-progress and complete not selectable.",
+      "action": "Filter chips (all / drivable / in-progress / complete), non-drivable rows unselectable with lifecycle badge, / search (id prefix + title substring), empty state disabling Confirm.",
       "files": [
-        "crates/raul/src/tui/render/picker.rs"
+        "crates/raul/src/tui/autopilot_picker.rs",
+        "crates/raul/src/tui/render/autopilot_picker.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/filter_chip|picker_search|picker_empty_state/)",
-      "done_when": "AC-04 AC-05 pass",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/filter|non_drivable|search|empty_state/)'",
+      "done_when": "Filters, search, and empty state behave per AC-04/AC-05",
       "status": "pending",
       "covers_ac": [
         "AC-04",
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -219,17 +227,20 @@
       "id": "S1.2",
       "work_package": "WP1",
       "order": 4,
-      "action": "Implement the picker summary line: N selected + N min est + uniform harness. Live-updates as selection changes. Zero selection disables Confirm with one-line warning requiring second click.",
+      "action": "Live summary line '<n> selected · <topology> · harness: uniform <name> | mixed'; zero-selection Confirm warns once, closes on the second Confirm.",
       "files": [
-        "crates/raul/src/tui/render/picker.rs"
+        "crates/raul/src/tui/render/autopilot_picker.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_summary_live|picker_summary_zero_disables_confirm/)",
-      "done_when": "AC-06 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/summary|zero_selection/)'",
+      "done_when": "Summary updates live; zero-selection two-step works",
       "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -239,19 +250,25 @@
       "id": "S1.3",
       "work_package": "WP2",
       "order": 3,
-      "action": "Implement Confirm and Cancel buttons. Confirm commits to state.json setup milestones and closes picker; Cancel closes without committing. Outside-click two-step dismissal.",
+      "action": "Open from M241's [+ select] chip; Confirm writes app.autopilot.picker.selected, Cancel/Esc discards; two-step outside-click dismissal; modal key handler in a new tui/modes/autopilot_picker.rs that overrides global/lane keys while open; add picker keys to the help overlay Autopilot section.",
       "files": [
-        "crates/raul/src/tui/render/picker.rs",
-        "crates/raul/src/tui/state/autopilot.rs"
+        "crates/raul/src/tui/modes/autopilot_picker.rs",
+        "crates/raul/src/tui/modes/mod.rs",
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_confirm_commit|picker_cancel_no_commit|outside_click_two_step_dismiss/)",
-      "done_when": "AC-07 AC-10 pass",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/confirm|cancel|outside_click|modal_keys/)' && ! rg -q 'autopilot-state\\.json' crates/raul/src",
+      "done_when": "Confirm/Cancel/dismiss and modal keys work; help lists them",
       "status": "pending",
       "covers_ac": [
         "AC-07",
         "AC-10"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1",
+        "S1.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -261,17 +278,20 @@
       "id": "S1.2.1",
       "work_package": "WP3",
       "order": 6,
-      "action": "Implement the narrow-terminal fallback renderer. When terminal width < 100 cols the picker renders as a full-screen modal at the SAME widget level. Same internal state different renderer. ~50 LOC extra.",
+      "action": "Narrow fallback: frame width < 100 renders the same picker state full-screen through the same render entry point.",
       "files": [
-        "crates/raul/src/tui/render/picker.rs"
+        "crates/raul/src/tui/render/autopilot_picker.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/picker_modal_fallback/)",
-      "done_when": "AC-08 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/narrow_fallback/)'",
+      "done_when": "Narrow frame renders full-screen with identical state",
       "status": "pending",
       "covers_ac": [
         "AC-08"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -281,13 +301,14 @@
       "id": "S1.1.1",
       "work_package": "WP4",
       "order": 8,
-      "action": "Implement the 100ms cyan pulse animation on the Start button after Confirm. One-shot animation tick in view_state.",
+      "action": "Start feedback: Start button shows 'Starting…' (accent) from activation until mp autopilot status reports a live run or the start command errors (reset + status-line error).",
       "files": [
-        "crates/raul/src/tui/view_state.rs",
-        "crates/raul/src/tui/render/lane_lists.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/tests/autopilot_picker.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/start_pulse_animation/)",
-      "done_when": "AC-09 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_picker -E 'test(/start_feedback/)'",
+      "done_when": "Starting… state clears on live run or error",
       "status": "pending",
       "covers_ac": [
         "AC-09"
@@ -302,17 +323,21 @@
       "id": "S1.2.2",
       "work_package": "WP4",
       "order": 5,
-      "action": "Run make lint plus make test plus consumer-surface-lint plus cargo clippy --workspace --all-targets -- -D warnings; ensure no regressions.",
+      "action": "Final verify: raul nextest, clippy, fmt, consumer-surface lint; CHANGELOG entry.",
       "files": [
-        "crates/raul"
+        "CHANGELOG.md"
       ],
-      "tests": "make lint; make test; make consumer-surface-lint",
-      "done_when": "AC-11 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "done_when": "All gates green",
       "status": "pending",
       "covers_ac": [
         "AC-11"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.3",
+        "S1.2.1",
+        "S1.1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

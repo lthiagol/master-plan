@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -36,51 +36,51 @@
     }
   },
   "intent": {
-    "outcome": "Touching common test helpers no longer forces 50+ integration test binaries to recompile, and the seed-handoff / git-init helpers live in one place the suites consume — not three."
+    "outcome": "Common mp test helpers are organized by domain instead of one 1,134-line file, and seed_handoff_gate / init_git are each defined once and imported by every suite that needs them."
   },
   "problem": {
-    "description": "crates/mp/tests/common/lib_api.rs is 1020+ lines (single file covering PlanContext bootstrap, milestone/step/wp/ac mutations, validate, git, JSON parsing, capture_stdio via dup2, and run_with_retry) imported by 50+ test files. Adding one helper recompiles every test binary that depends on it. The file also contains `seed_handoff_gate(env: &TestEnv)` duplicated verbatim in crates/mp/tests/suites/plan_diff.rs:33-50 and crates/mp/tests/suites/digest.rs:6-43, and `init_git` repeated in crates/mp/tests/suites/git_suggest.rs:6-23 and crates/mp/tests/suites/p12_recommendation_batch.rs:5+."
+    "description": "crates/mp/tests/common/lib_api.rs is 1,134 lines (PlanContext bootstrap, milestone/step/wp/ac mutations, validate, git, JSON parsing, dup2-based capture_stdio at :1026, run_with_retry) and is pulled into 55 test files via `mod common;`. It is hard to navigate and review. Separately, `seed_handoff_gate(env: &TestEnv)` is duplicated in crates/mp/tests/suites/plan_diff.rs:33 and suites/digest.rs:6, and `init_git(env: &TestEnv)` in suites/git_suggest.rs:6 and suites/p12_recommendation_batch.rs:5. Note: because every integration-test binary compiles its own copy of `mod common`, splitting the file does NOT reduce recompilation when a helper changes — this milestone is a readability/dedup refactor, not a build-time optimization."
   },
   "scope": {
     "in_scope": [
-      "Split crates/mp/tests/common/lib_api.rs into per-domain submodules under crates/mp/tests/common/lib_api/{ctx.rs, mutation.rs, io.rs, capture.rs, seed.rs, git.rs}. The current lib_api.rs file becomes either a thin re-export shim or is removed once every importer migrates to the submodules.",
-      "Move capture_stdio (lib_api.rs:1024-1108, dup2-based stdout helper) into its own module so it does not pull in the rest of lib_api.rs.",
-      "Extract seed_handoff_gate + init_git + capture_stdio as methods on TestEnv (or under tests/common/seed.rs / tests/common/git.rs) and update the three suite files to import from one source.",
-      "Add a no-op smoke test that asserts the new module structure compiles and the consumers still resolve (catches mistakes when one suite forgets the import path).",
-      "Add a CHANGELOG entry under the next milestone release noting the test-helper refactor; no behavior change."
+      "Split crates/mp/tests/common/lib_api.rs into crates/mp/tests/common/lib_api/{ctx.rs, mutation.rs, io.rs, capture.rs} with lib_api.rs reduced to module declarations + re-exports, so existing `common::lib_api::*` imports keep compiling.",
+      "Move seed_handoff_gate into crates/mp/tests/common/seed.rs and init_git into crates/mp/tests/common/git.rs (declared from common/mod.rs); switch suites/plan_diff.rs, suites/digest.rs, suites/git_suggest.rs, suites/p12_recommendation_batch.rs to import them.",
+      "Record the `cargo nextest list -p mp` test count before and after; the refactor must not drop tests.",
+      "CHANGELOG entry noting the test-helper refactor (no behavior change)."
     ],
     "out_of_scope": [
       "Redesigning the TestEnv or mp_bin_snapshot contract.",
       "Adding new helpers; the refactor is purely structural.",
-      "Touching crates/raul/tests/ which has its own (smaller) common test scaffold."
+      "Build-time optimization (e.g. a separate test-support crate) — splitting modules inside `common` cannot achieve it.",
+      "Touching crates/raul/tests/, which has its own smaller scaffold."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "crates/mp/tests/common/lib_api.rs is no longer a single mega-file: it either holds only re-exports or is gone in favor of crates/mp/tests/common/lib_api/<domain>.rs.",
-      "verification": "wc -l crates/mp/tests/common/lib_api.rs (must be < 100 lines OR the file is removed and 50+ consumers route to crates/mp/tests/common/lib_api/<domain>.rs).",
+      "description": "crates/mp/tests/common/lib_api.rs is under 100 lines (module declarations + re-exports) and its bodies live in crates/mp/tests/common/lib_api/{ctx,mutation,io,capture}.rs.",
+      "verification": "test \"$(wc -l < crates/mp/tests/common/lib_api.rs)\" -lt 100 && test -f crates/mp/tests/common/lib_api/ctx.rs && test -f crates/mp/tests/common/lib_api/capture.rs",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "The seed_handoff_gate / init_git / capture_stdio helpers are defined once (single source of truth) and every prior duplicate suite imports from that one path.",
-      "verification": "rg -n 'fn seed_handoff_gate|fn init_git|fn capture_stdio' crates/mp/tests/ returns one definition per helper, plus its tests.",
+      "description": "seed_handoff_gate, init_git, and capture_stdio are each defined exactly once under crates/mp/tests/.",
+      "verification": "test \"$(rg 'fn seed_handoff_gate\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn init_git\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn capture_stdio\\b' crates/mp/tests | wc -l)\" -eq 1",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Editing one helper module's body (e.g. ctx.rs) compiles only the tests that depend on it, not the full 50+ binary chain. The refactor does not increase total test compile time.",
-      "verification": "touch crates/mp/tests/common/lib_api/ctx.rs && cargo nextest run -p mp --no-fail-fast -E 'test(/lib_api/)' (only ctx-touching tests rebuild; full make test wall-clock drop vs baseline is recorded in CHANGELOG).",
+      "description": "The refactor drops no tests: the cargo nextest list -p mp count after the change is >= the baseline recorded before it (baseline recorded in step S1.2 evidence).",
+      "verification": "manual: compare 'cargo nextest list -p mp | wc -l' against the baseline recorded in S1.2 evidence",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "All previously-passing mp/raul integration tests still pass after the refactor.",
-      "verification": "make test (exit 0 on the same tests that exited 0 at baseline).",
+      "description": "All mp tests pass after the refactor; clippy and fmt are clean.",
+      "verification": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
       "status": "pending",
       "evidence": ""
     }
@@ -95,7 +95,7 @@
     {
       "id": "WP2",
       "name": "Helper dedup",
-      "goal": "seed_handoff_gate, init_git, capture_stdio helpers are defined once",
+      "goal": "seed_handoff_gate and init_git are defined once; no tests lost; suite green",
       "rollback": "Restore the duplicated helpers in each suite"
     }
   ],
@@ -112,13 +112,15 @@
         "crates/mp/tests/common/lib_api/io.rs",
         "crates/mp/tests/common/lib_api/capture.rs"
       ],
-      "tests": "wc -l crates/mp/tests/common/lib_api.rs (must be < 100) or ! test -e crates/mp/tests/common/lib_api.rs && test -e crates/mp/tests/common/lib_api/ctx.rs",
+      "tests": "test \"$(wc -l < crates/mp/tests/common/lib_api.rs)\" -lt 100 && test -f crates/mp/tests/common/lib_api/ctx.rs",
       "done_when": "AC-01 passes",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -128,17 +130,19 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 3,
-      "action": "Extract capture_stdio into crates/mp/tests/common/lib_api/capture.rs; update the 50+ consumers to import from the new path.",
+      "action": "Move capture_stdio (lib_api.rs:1026-1108) into crates/mp/tests/common/lib_api/capture.rs, re-exported from lib_api.rs so the 55 importers keep compiling unchanged.",
       "files": [
         "crates/mp/tests/common/lib_api/capture.rs"
       ],
-      "tests": "rg -n 'fn capture_stdio' crates/mp/tests/ returns exactly one definition",
+      "tests": "test \"$(rg 'fn capture_stdio\\b' crates/mp/tests | wc -l)\" -eq 1",
       "done_when": "AC-02 capture_stdio single-source passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -148,13 +152,12 @@
       "id": "S1.2",
       "work_package": "WP1",
       "order": 2,
-      "action": "Verify editing one helper module's body compiles only the tests that depend on it; record wall-clock delta in CHANGELOG.",
+      "action": "BEFORE any edit: record the baseline 'cargo nextest list -p mp | wc -l' in this step's evidence. After S1/S1.1/S2 land, re-run and confirm the count is >= baseline.",
       "files": [
-        "crates/mp/tests/common/lib_api",
-        "CHANGELOG.md"
+        "crates/mp/tests/common"
       ],
-      "tests": "touch crates/mp/tests/common/lib_api/ctx.rs && cargo nextest run -p mp --no-fail-fast -E 'test(/lib_api/)' (only ctx-touching tests rebuild)",
-      "done_when": "AC-03 passes",
+      "tests": "cargo nextest list -p mp",
+      "done_when": "Baseline recorded; post-refactor count >= baseline",
       "status": "pending",
       "covers_ac": [
         "AC-03"
@@ -169,8 +172,9 @@
       "id": "S2",
       "work_package": "WP2",
       "order": 4,
-      "action": "Extract seed_handoff_gate, init_git into crates/mp/tests/common/seed.rs and crates/mp/tests/common/git.rs (or as TestEnv methods); refactor suites/plan_diff.rs, suites/digest.rs, suites/git_suggest.rs, suites/p12_recommendation_batch.rs to import from one source.",
+      "action": "Move seed_handoff_gate into crates/mp/tests/common/seed.rs and init_git into crates/mp/tests/common/git.rs (declared in common/mod.rs); switch suites/plan_diff.rs, suites/digest.rs, suites/git_suggest.rs, suites/p12_recommendation_batch.rs to import them.",
       "files": [
+        "crates/mp/tests/common/mod.rs",
         "crates/mp/tests/common/seed.rs",
         "crates/mp/tests/common/git.rs",
         "crates/mp/tests/suites/plan_diff.rs",
@@ -178,7 +182,7 @@
         "crates/mp/tests/suites/git_suggest.rs",
         "crates/mp/tests/suites/p12_recommendation_batch.rs"
       ],
-      "tests": "rg -n 'fn seed_handoff_gate|fn init_git' crates/mp/tests/ returns exactly one definition per helper",
+      "tests": "test \"$(rg 'fn seed_handoff_gate\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn init_git\\b' crates/mp/tests | wc -l)\" -eq 1",
       "done_when": "AC-02 dedup passes",
       "status": "pending",
       "covers_ac": [
@@ -194,17 +198,22 @@
       "id": "S2.1",
       "work_package": "WP2",
       "order": 5,
-      "action": "Run the full mp/raul test suite plus a no-op smoke that asserts the new module structure compiles and the consumers still resolve.",
+      "action": "Run the mp suite, clippy, fmt; re-check the test count against the S1.2 baseline; add the CHANGELOG entry.",
       "files": [
-        "crates/mp/tests"
+        "CHANGELOG.md"
       ],
-      "tests": "make test",
+      "tests": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
       "done_when": "AC-04 passes",
       "status": "pending",
       "covers_ac": [
+        "AC-03",
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S1.1",
+        "S2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

@@ -11,13 +11,15 @@
     "cancelled": false,
     "deferred": false,
     "deferred_reason": "",
-    "depends_on": [],
-    "effort": "S",
-    "risk": "low",
+    "depends_on": [
+      "230"
+    ],
+    "effort": "L",
+    "risk": "medium",
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -36,142 +38,154 @@
     }
   },
   "intent": {
-    "outcome": "The Autopilot tab gains a control-first split view (setup-left 40%, sidebar tabs on the right 60%) and a dedicated While-Executing full-screen takeover that replaces the split when a run is live. Operators can configure a run and watch it progress on the same screen, with the State tab hidden during a run and a per-milestone peek view filling its gap."
+    "outcome": "The Autopilot tab gains a control-first split view (setup form left 40%, tabbed sidebar right 60%) and a While-Executing full-screen takeover while a run is live, so operators configure a run and watch it on one screen. Every setup choice and UI preference persists through mp config (no raul-owned state file)."
   },
   "problem": {
-    "description": "The current autopilot tab (crates/raul/src/tui/autopilot.rs, ~2,400 LOC) is a status-first view: it has no clickable buttons, no config form, no dedicated run dashboard. The 2026-09-26 audit pass surfaced ten user requirements from autopilot-draft/final-draft (M-questionnaire): (a) clickable chips with mouse + keyboard, (b) per-topology / per-harness / per-milestone setup form, (c) tabbed sidebar with Progress / Activity / State, (d) State tab hides during run; a dedicated run-mode screen takes over, (e) Pause / Stop / Resume control row always visible, (f) detached-mode confirmation pop on Detached click, (g) tooltip config drift detection, (h) topo id auto-derived from topology choice, (i) persistent .mp/autopilot-state.json reflecting user choices, (j) state inspector with read-only fields. The current code has none of these. A redrafted tab is the only way forward; this milestone scopes the geometry + run-mode changes, deferring the floating milestone picker to M242."
+    "description": "The Autopilot lane (renderer at crates/raul/src/tui/render/autopilot_lane.rs after M230; state in crates/raul/src/tui/autopilot.rs::AutopilotLaneState, ~2.4k LOC) is status-first: a picker, a lifecycle graph, a queue, and a log. There is no setup form, no clickable chips, no run dashboard. The 2026-09-26 audit collected the requirements: clickable chips (mouse + keyboard), a setup form (topology, harness per role, milestones, commit behavior, run mode), a tabbed sidebar (Progress / Activity / State), a run-mode takeover, an always-visible control row, a detached-mode confirmation, a derived topology id, and a read-only state inspector. Setup choices must round-trip through mp: topology and per-role harness/model already live under `mp autopilot config set autopilot.{topology,roles.<role>.<field>}`; commit behavior under `agent.automation.{commit_after_execute,push_after_review}`; UI preferences have no keys yet. The lane already has a rebindable keymap (keybinds.rs::AutopilotLaneKeybinds: space select, j/k, o panel, s start, P replay, r refresh, p pause, c cancel, Shift+R resume, Shift+S restart, t steer, d/Shift+D detail, Ctrl+P poll) and ? already opens the global help overlay — new bindings must not collide."
   },
   "scope": {
     "in_scope": [
-      "Replace crates/raul/src/tui/render/autopilot.rs and lane_lists.rs::render_autopilot_tab with the new geometry: setup region (left, 40%) + tabbed sidebar (right, 60%).",
-      "Setup region: six stacked sections in order — (1) Topology radio chips, (2) Harness per role (uniform toggle + 3 rows of 3 chips + advanced override link), (3) Milestones chips row with [+ select] and [only-ready] buttons, (4) Commit policy 4 chips, (5) Run mode 2 chips (normal / detached), (6) large cyan Start button with a one-line summary ('3 milestones · ~12 min est.').",
-      "Control row directly below the Start button: ⏸ Pause / ⏹ Stop / ↻ Resume / ⤴ back, all dimmed when no live run.",
-      "Sidebar tabs (right side, 60%): Progress (default), Activity, State. Clicking a tab or pressing 1/2/3 switches.",
-      "State tab is hidden while a run is live; per-milestone peek view fills its gap during run.",
-      "While-Executing full-screen takeover replaces the entire split when a run is live. Five sections: topo strip / milestone lanes / activity / telemetry / control row.",
-      "Per-milestone peek view opens when clicking a row in While Executing (read-only intent + AC list + view reviews link).",
-      "Sidebar drag handler clamps the split-percent between 25% (min) and 75% (max). Below 25% the snap-back fires; above 75% the same. Drag is enabled only when no run is live.",
-      "Topo id (in the Advanced Override panel) is auto-derived from the chosen topology + a per-plan counter stored in .mp/autopilot-state.json::setup.topo_counter. Format: 'three-agent-001' for 3-agent, 'two-agent-001' for 2-agent, 'one-agent-001' for 1-agent.",
-      "Detached-mode confirmation popover every time the user clicks Detached (Q2 user choice). Three buttons: Confirm / Configure extras / Back.",
-      "Mouse Model B (free click + focus) — every chip / button / tab independently clickable. Mouse hit-test registry populated for setup row chips (~30 targets) + control row (4 targets) + sidebar tabs (3 targets) + per-milestone rows in While Executing.",
-      "250ms telemetry refresh worker (existing pattern from M216) kept; idle when no run is live.",
-      ".mp/autopilot-state.json writer/reader. Schema (v2): setup block (topology, harness_uniform, harness per role, milestones, commit_policy, run_mode, topo_counter) + ui block (sidebar_tab, picker_open, sidebar_visible, split_pct, while_executing_last_seen) + last_run block.",
-      "Keybinds additions: 1/2/3 = sidebar tabs, [ ] = cycle tabs, : = collapse sidebar, m = jump to milestones row, c = jump to commit policy, d = cycle run mode, r = dynamic (resume when running, run-mode toggle when idle), s = Start.",
-      "Keymap overlay (press ?) with full list of bindings, including the dynamic-r context-switch note.",
-      "Animation: status dot pulse at ~1Hz on active rows; sidebar tab transition fades ~150ms; both skippable on slow terminals (auto-detected via setup.dim-allowed)."
+      "mp: add `ui.autopilot.split_pct` (int 25..=75, default 40), `ui.autopilot.sidebar_tab` (progress|activity|state, default progress), `ui.autopilot.sidebar_visible` (bool, default true) to UiConfig (crates/mp/src/config.rs), config_docs.rs, and config set validation; additive to the config.json shape (skipped when unset).",
+      "raul: rewrite render/autopilot_lane.rs into a 40/60 split — setup region left, tabbed sidebar right.",
+      "Setup region, six stacked sections: (1) Topology chips one/two/three-agent → `mp autopilot config set autopilot.topology`; (2) Harness per role (uniform toggle + one chip row per role) → `autopilot.roles.<role>.harness`, with the existing `o` override panel for model/skill/extras; (3) Milestones chips from app.autopilot.picker (selection is per-run, not persisted) with [+ select] and [only-ready]; (4) Commit behavior: two toggles bound to agent.automation.commit_after_execute and agent.automation.push_after_review via `mp config set`; (5) Run mode chips normal | detached (maps to `mp autopilot start --detach`; per-run, not persisted); (6) Start button with a one-line summary '<n> milestones · <topology> · <run mode>' (no time estimate).",
+      "Control row below Start: Pause / Stop / Resume / Back, bound to the existing lane actions (p pause, c cancel, Shift+R resume, Esc back); rendered dim and inert when no run is live.",
+      "Sidebar tabs Progress (default) / Activity (`mp activity`, newest first) / State, switched by mouse click or `v` / `Shift+V` (next/prev); `z` toggles sidebar visibility. The three bindings are new AutopilotLaneKeybinds fields (next_sidebar_tab, prev_sidebar_tab, toggle_sidebar) with defaults in both the struct Default and Keybinds::default lane_autopilot, rebindable via keybinds.toml.",
+      "Sidebar split drag via mouse (tui/mouse.rs): clamped to 25..=75%; persisted to ui.autopilot.split_pct on mouse-up; disabled while a run is live. Active tab and visibility persist to ui.autopilot.sidebar_tab / sidebar_visible on change. All three are read at lane load via `mp config get`.",
+      "State tab: read-only, pretty-printed JSON of (a) `mp autopilot config get autopilot`, (b) the ui.autopilot.* values, (c) `mp autopilot status` (run state), (d) the current session via `mp autopilot session show <id>` when one exists, (e) pending in-memory override-panel values. Refreshes on the existing autopilot poll tick and on a Refresh button.",
+      "While-Executing takeover: when `mp autopilot status` reports a live run, the split is replaced by five stacked sections — topology strip, one row per queued milestone (id, lifecycle, cycle count, lifecycle-position bar), activity tail (fills remaining height), telemetry strip (the existing health / heartbeat badge from app.autopilot.health()), control row. Esc / Back returns to the split while the run continues; in that split the State tab is hidden (click and v/V skip it).",
+      "Per-milestone peek: clicking (or Enter on) a takeover row opens a read-only modal with intent.outcome and the AC list (id + status) from `mp show milestone <id>`, plus the command hint `mp reviews show <id>`.",
+      "Topology id (read-only, in the override panel): '<topology>-<NNN>' where NNN = 1 + the number of sessions in `mp autopilot session list`, zero-padded to 3 (e.g. three-agent-004). Derived on render; nothing persisted.",
+      "Detached confirmation: every click / selection of the detached chip opens a popover with Confirm / Configure extras / Back; Configure extras opens the override panel; Back reverts to normal.",
+      "Mouse: every chip, button, tab, and takeover row is registered as a hit target in tui/mouse.rs.",
+      "Help overlay (existing `?`): add an Autopilot section generated from AutopilotLaneKeybinds so rebinds show up; update docs/raul/keybinds.md."
     ],
     "out_of_scope": [
-      "Floating milestone picker (M242 — same internal state, different milestone).",
-      "Recent-runs UI (deferred to a future milestone per Q5).",
-      "Telemetry sparkline charts (deferred).",
-      "Mid-run 'Apply' edits (Pause+Edit returns to pre-fill but does not commit until Start is clicked again).",
-      "Per-window resize animations other than the sidebar tab fade.",
-      "A brand-new button widget library (we use ratatui's Block + a small focus state)."
+      "Floating milestone picker (M242).",
+      "A raul-owned state file (.mp/autopilot-state.json) — all persistence goes through mp config.",
+      "Persisting milestone selection or run mode between runs.",
+      "Run-time estimates, animations (pulses, tab fades), and a slow-terminal detection knob.",
+      "Tooltip config-drift detection (requirement g) — deferred to a future milestone.",
+      "Recent-runs UI and telemetry sparklines.",
+      "Mid-run edits (Back returns to the split read-only; changes apply on the next Start).",
+      "Copy-to-clipboard from the State tab.",
+      "New lane keys beyond v / Shift+V / z (no m/c/d jump keys, no context-dependent r)."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Setup region renders correctly on a 132x36 terminal: six sections stacked vertically, each interactive; chips respond to click + keyboard.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/autopilot_setup_layout/)'; visual inspection of crates/raul/tests/fixtures/autopilot_setup_render.txt",
+      "description": "At 132x36 the setup region renders six stacked sections (topology, harness per role, milestones, commit behavior, run mode, Start + summary) and the control row, matching a committed golden buffer; each chip toggles on click and via keyboard focus.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "Sidebar drag handler clamps split-percent between 25% and 75%; outside range, snaps back; persisted to .mp/autopilot-state.json::ui.split_pct on debounce.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/sidebar_drag_bounds|sidebar_drag_persist/)'",
+      "description": "The sidebar split drags between 25% and 75% (clamped), persists to ui.autopilot.split_pct on mouse-up via mp config set, and is inert while a run is live.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Sidebar tabs Progress / Activity / State switchable via mouse click and via keys 1/2/3; [ ] cycle; : collapse-toggles the sidebar visibility.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/sidebar_tabs|tab_cycle|collapse_toggle/)'",
+      "description": "Sidebar tabs Progress / Activity / State switch by click and by v / Shift+V; z toggles sidebar visibility; tab and visibility persist to ui.autopilot.sidebar_tab / sidebar_visible; all three bindings are rebindable AutopilotLaneKeybinds fields that collide with no existing lane or global default.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar && cargo nextest run -p raul --no-fail-fast -E 'test(/keybind/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "State tab renders read-only dump of session.json, override-panel.json, .mp/autopilot-state.json (versions + fields) with Refresh + Copy buttons; auto-refreshes every 250ms while active.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/state_inspector_dump|state_inspector_refresh/)'",
+      "description": "The State tab shows read-only JSON for autopilot config, ui.autopilot.* values, mp autopilot status, the current session (when present), and pending override-panel values; it refreshes on the poll tick and on Refresh.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "While-Executing takeover: when a run goes live, the split view disappears; full-screen takeover shows the topo strip, three milestone lanes (status + cycle + progress bar + est time left), an activity tail auto-sized to fill, telemetry strip, and the control row.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/while_executing_takeover|while_executing_layout|while_executing_lanes/)'",
+      "description": "When mp autopilot status reports a live run, the split is replaced by the takeover: topology strip, one row per queued milestone (id, lifecycle, cycle, lifecycle-position bar), activity tail, health/heartbeat strip, control row.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "While a run is live, the State tab is hidden (mouse + key 3 do nothing); per-milestone peek view opens via click on any lane row in While Executing.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/state_tab_hidden_while_running|milestone_peek_open|peek_intent_and_acs/)'",
+      "description": "Esc / Back from the takeover returns to the split while the run continues, with the State tab hidden (click and v/V skip it); clicking or Enter on a takeover row opens a read-only peek with intent.outcome and the AC list.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-07",
-      "description": "Topo id (in Advanced Override) is auto-derived and read-only: 'one-agent-001' / 'two-agent-001' / 'three-agent-001' per the current topology; counter increments per plan, persisted in .mp/autopilot-state.json::setup.topo_counter.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/topo_id_derive|topo_id_counter_persist/)'",
+      "description": "The override panel shows a read-only topology id '<topology>-<NNN>' with NNN = 1 + mp autopilot session list count, zero-padded; nothing is persisted.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-08",
-      "description": "Detached-mode confirmation popover appears every time the Detached chip is clicked. Confirm carries through; Configure extras reveals the detached knobs; Back cancels.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/detached_confirm_every_click|detached_extras_panel|detached_back_cancels/)'",
+      "description": "Every selection of the detached chip opens Confirm / Configure extras / Back; Confirm keeps detached, Configure extras opens the override panel, Back reverts to normal.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-09",
-      "description": ".mp/autopilot-state.json (v2 schema) writes on every chip click + each cycle boundary + sidebar visibility change; read on every planner state read.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/autopilot_state_write|autopilot_state_read|cycle_boundary_persist/)'",
+      "description": "Setup chips write through mp (autopilot.topology, autopilot.roles.<role>.harness, agent.automation.commit_after_execute / push_after_review); mp accepts and validates the new ui.autopilot.* keys; no .mp/autopilot-state.json is written.",
+      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_persistence && cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_autopilot/)' && ! rg -q 'autopilot-state\\.json' crates/raul/src",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-10",
-      "description": "Keymap overlay (? or F1) renders the full key list including the dynamic-r context-switch note ('r: resume when running, run-mode when idle').",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/keymap_overlay/)'",
+      "description": "The existing ? help overlay has an Autopilot section generated from AutopilotLaneKeybinds (a rebind shows up), and docs/raul/keybinds.md lists v / Shift+V / z.",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_overlay_autopilot/)' && rg -q 'next_sidebar_tab' docs/raul/keybinds.md",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-11",
-      "description": "make lint + make test + consumer-surface-lint remain green; cargo clippy --workspace --all-targets -- -D warnings exits 0; no mp autopilot consumers break (the projection is purely additive — existing reads are unaffected).",
-      "verification": "make lint && make test && make consumer-surface-lint",
+      "description": "mp and raul tests, clippy, fmt, and consumer-surface lint are clean; existing autopilot reads are unaffected (new config keys are additive).",
+      "verification": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "persistence",
+      "choice": "All Autopilot setup choices and UI preferences persist through mp (mp autopilot config set autopilot.*, mp config set agent.automation.* and new ui.autopilot.* keys); no raul-owned state file; milestone selection and run mode are per-run",
+      "rationale": "Keeps mp the single owner of on-disk state and validation (user decision); per-run choices would otherwise go stale between runs."
+    },
+    {
+      "area": "keybinds",
+      "choice": "Sidebar tabs on v / Shift+V and collapse on z as new rebindable AutopilotLaneKeybinds fields; no m/c/d jump keys or context-dependent r; control row reuses existing p / c / Shift+R / Esc",
+      "rationale": "t, c, d, r, s are already bound in the Autopilot lane (steer, cancel, open_detail, refresh, start); v/V/z are unbound everywhere (user decision)."
     }
   ],
   "work_packages": [
     {
       "id": "WP1",
-      "name": "Geometry rewrite",
-      "goal": "Replace the render_autopilot_tab function with the new 40/60 split: setup region (left) + tabbed sidebar (right). Includes all six setup-row sections, control row, and the per-section chip + button widgets.",
-      "rollback": "Restore the original render_autopilot_tab from a tag; the new code is removed at the function level only."
+      "name": "Split geometry + setup form",
+      "goal": "40/60 split with the six setup sections and a control row reusing existing lane actions",
+      "rollback": "git revert; render/autopilot_lane.rs returns to the M230 layout"
     },
     {
       "id": "WP2",
-      "name": "Sidebar tabs and drag",
-      "goal": "Sidebar with three tabs (Progress / Activity / State). Drag handles split-percent clamp 25%/75%. Tab switching via click + keys 1/2/3. Sidebar collapse-toggle via key :.",
-      "rollback": "Disable the drag; restore single-pane progress view; tabs are still clickable but no drag."
+      "name": "Sidebar tabs, drag, and help",
+      "goal": "Progress / Activity / State tabs (v, Shift+V, z), clamped split drag, help overlay Autopilot section",
+      "rollback": "Drop the sidebar; keep the setup form full-width"
     },
     {
       "id": "WP3",
-      "name": "While-Executing + State tab hide",
-      "goal": "Full-screen takeover while a run is live: 5 sections (topo strip / milestone lanes / activity / telemetry / controls). State tab hides during run. Per-milestone peek view replaces it.",
-      "rollback": "Revert to split view during run; the takeover is the new feature and can be conditional."
+      "name": "While-Executing takeover + peek",
+      "goal": "Full-screen takeover during a live run, Back to split with State hidden, per-milestone peek",
+      "rollback": "Keep the split during runs; the takeover is gated on live-run status"
     },
     {
       "id": "WP4",
-      "name": "State, keybinds, and persistence",
-      "goal": ".mp/autopilot-state.json schema v2 (setup + ui + last_run). Topo id auto-derive. Detached confirm. Keybinds registry updates. 250ms telemetry refresh.",
-      "rollback": "Revert state.json schema to v1; drop keybind additions; topology counter falls back to literal 'three-agent' string."
+      "name": "Persistence via mp, topology id, detached confirm",
+      "goal": "ui.autopilot.* keys in mp; setup choices written through mp config; derived topology id; detached confirmation",
+      "rollback": "Remove the ui.autopilot keys (additive) and the write-through calls"
     }
   ],
   "steps": [
@@ -179,13 +193,16 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Rewrite render_autopilot_tab to draw the 40/60 split. Setup region on the left (Topology, Harness per role, Milestones, Commit policy, Run mode, Start button + summary + control row). Mouse Model B + keymap wired.",
+      "action": "Rewrite render/autopilot_lane.rs as the 40/60 split; draw the six setup sections (topology, harness per role, milestones, commit behavior, run mode, Start + '<n> milestones · <topology> · <run mode>' summary) with keyboard focus + mouse hit targets in tui/mouse.rs; golden buffer test at 132x36.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs",
-        "crates/raul/src/tui/keybinds.rs"
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/tests/autopilot_setup_layout.rs",
+        "crates/raul/tests/fixtures/autopilot_setup_render.txt"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/autopilot_setup_layout/)",
-      "done_when": "AC-01 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout",
+      "done_when": "Setup region matches the committed golden; chips toggle by click and keyboard",
       "status": "pending",
       "covers_ac": [
         "AC-01"
@@ -200,17 +217,21 @@
       "id": "S1.1",
       "work_package": "WP2",
       "order": 8,
-      "action": "Implement the split-percent drag handler. Clamp between 25% and 75%. Snap back if dragged outside; debounced persist to .mp/autopilot-state.json::ui.split_pct. Drag enabled only when no run is live.",
+      "action": "Mouse drag on the split border: clamp 25..=75%, persist ui.autopilot.split_pct on mouse-up, disabled while a run is live.",
       "files": [
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/src/tui/mouse.rs",
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_sidebar.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/sidebar_drag_bounds/)",
-      "done_when": "AC-02 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar -E 'test(/drag/)'",
+      "done_when": "Drag clamps, persists on release, inert during a run",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S0"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -220,18 +241,21 @@
       "id": "S1.2",
       "work_package": "WP2",
       "order": 7,
-      "action": "Implement the State tab read-only dump (session.json, override-panel.json, .mp/autopilot-state.json). Auto-refresh at 250ms cadence when the State tab is the active tab. Refresh + Copy buttons.",
+      "action": "State tab: read-only pretty JSON of autopilot config, ui.autopilot.*, mp autopilot status, current session (mp autopilot session show), and pending override-panel values; refresh on poll tick + Refresh button.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs",
-        "crates/raul/src/tui/runner_helpers.rs"
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/src/tui/runner_helpers.rs",
+        "crates/raul/tests/autopilot_state_tab.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/state_inspector/)",
-      "done_when": "AC-04 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab",
+      "done_when": "State tab renders all five sources read-only",
       "status": "pending",
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S0"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -241,18 +265,22 @@
       "id": "S1.3",
       "work_package": "WP3",
       "order": 6,
-      "action": "Hide the State tab while a run is live (mouse and key 3 do nothing during run). Implement per-milestone peek view: click any milestone row in While Executing opens a read-only modal showing intent + AC list + view reviews link.",
+      "action": "Esc / Back from the takeover returns to the split with the State tab hidden while the run is live (click and v/V skip it); Enter or click on a takeover row opens a read-only peek (intent.outcome + AC ids/status from mp show milestone, hint mp reviews show <id>).",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs",
-        "crates/raul/src/tui/dashboard.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/autopilot_while_executing.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/state_tab_hidden_while_running|milestone_peek_open/)",
-      "done_when": "AC-06 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek/)'",
+      "done_when": "Back + hidden State tab + peek modal work during a live run",
       "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S2",
+        "S1.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -262,17 +290,23 @@
       "id": "S0",
       "work_package": "WP2",
       "order": 9,
-      "action": "Implement the tabbed sidebar right side. Three tabs Progress default Activity State. Mouse click switches; keys 1 2 3 same; sidebar collapse-toggle via key ; and a small arrow icon.",
+      "action": "Tabbed sidebar: Progress (default) / Activity (mp activity) / State; click or v / Shift+V switch; z toggles visibility; tab + visibility persist via ui.autopilot.*.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs"
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_sidebar.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/sidebar_tabs/)",
-      "done_when": "AC-03 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar",
+      "done_when": "Tabs switch by click and keys; prefs persist",
       "status": "pending",
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2.2",
+        "S1.8"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -282,17 +316,22 @@
       "id": "S2",
       "work_package": "WP3",
       "order": 10,
-      "action": "Implement the While-Executing full-screen takeover function. Replace the entire split view when a run is live. Five sections: topo strip top, milestone lanes, activity tail auto-sized, telemetry strip, control row Pause Stop Resume Edit and re-run.",
+      "action": "While-Executing takeover when mp autopilot status reports a live run: topology strip, per-milestone rows (id, lifecycle, cycle, lifecycle-position bar), activity tail, health/heartbeat strip, control row.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs"
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_while_executing.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/while_executing_takeover/)",
-      "done_when": "AC-05 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/takeover|layout|rows/)'",
+      "done_when": "Takeover replaces the split during a live run",
       "status": "pending",
       "covers_ac": [
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S2.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -302,17 +341,20 @@
       "id": "S1.4",
       "work_package": "WP4",
       "order": 5,
-      "action": "Implement the topo id auto-derive in the Advanced Override panel: one-agent-001 two-agent-001 three-agent-001 from the chosen topology + a per-plan counter stored in state.json setup.topo_counter. Field is read-only.",
+      "action": "Read-only topology id in the override panel: '<topology>-<NNN>', NNN = 1 + mp autopilot session list count, zero-padded to 3; derived on render, nothing persisted.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/tests/autopilot_topo_id.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/topo_id_derive|topo_id_counter_persist/)",
-      "done_when": "AC-07 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id",
+      "done_when": "Topology id derives from topology + session count",
       "status": "pending",
       "covers_ac": [
         "AC-07"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -322,17 +364,21 @@
       "id": "S1.5",
       "work_package": "WP4",
       "order": 4,
-      "action": "Implement the detached-mode confirmation popover: every click on Detached chip pops a Confirm Configure extras Back modal. Confirm carries through; Configure reveals detached knobs; Back cancels.",
+      "action": "Detached confirmation popover on every detached-chip selection: Confirm keeps detached, Configure extras opens the override panel, Back reverts to normal.",
       "files": [
-        "crates/raul/src/tui/render/lane_lists.rs"
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/render/overlays.rs",
+        "crates/raul/tests/autopilot_detached_confirm.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/detached_confirm_every_click|detached_extras_panel|detached_back_cancels/)",
-      "done_when": "AC-08 passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm",
+      "done_when": "Popover appears every time with all three outcomes",
       "status": "pending",
       "covers_ac": [
         "AC-08"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -342,51 +388,15 @@
       "id": "S1.6",
       "work_package": "WP4",
       "order": 3,
-      "action": "Wire S2.1 and S2.2 into the keymap resolver. This step becomes a placeholder for the orchestration only — the actual keymap registry additions live in S2.2 and the dynamic-r context-switch lives in S2.1.",
+      "action": "mp: add ui.autopilot.split_pct (25..=75, default 40), ui.autopilot.sidebar_tab (progress|activity|state), ui.autopilot.sidebar_visible (bool) to UiConfig, config_docs.rs, and config set validation; tests in suites/config_keys.rs (valid set/get, out-of-range and bad-enum rejection).",
       "files": [
-        "crates/raul/src/tui/keybinds.rs",
-        "crates/raul/src/tui/view_state.rs"
+        "crates/mp/src/config.rs",
+        "crates/mp/src/config_docs.rs",
+        "crates/mp/src/commands/config_cmd.rs",
+        "crates/mp/tests/suites/config_keys.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_overlay/)",
-      "done_when": "AC-10 passes",
-      "status": "pending",
-      "covers_ac": [],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
-      "id": "S1.7",
-      "work_package": "WP4",
-      "order": 2,
-      "action": "Run make lint plus make test plus consumer-surface-lint plus cargo clippy --workspace --all-targets -- -D warnings; ensure no regressions.",
-      "files": [
-        "crates/raul"
-      ],
-      "tests": "make lint; make test; make consumer-surface-lint",
-      "done_when": "AC-11 passes",
-      "status": "pending",
-      "covers_ac": [
-        "AC-11"
-      ],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
-      "id": "S1.8",
-      "work_package": "WP4",
-      "order": 14,
-      "action": "Implement the .mp/autopilot-state.json schema v2 reader/writer. Setup block topology harness_uniform harness per role milestones commit_policy run_mode topo_counter plus UI block plus last_run block. Write on every chip click plus each cycle boundary plus sidebar visibility change.",
-      "files": [
-        "crates/raul/src/tui/state/autopilot.rs"
-      ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/autopilot_state_write|autopilot_state_read/)",
-      "done_when": "AC-09 passes",
+      "tests": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_autopilot/)'",
+      "done_when": "mp config set/get round-trips the three ui.autopilot keys and rejects invalid values",
       "status": "pending",
       "covers_ac": [
         "AC-09"
@@ -398,21 +408,80 @@
       "evidence": ""
     },
     {
-      "id": "S2.1",
+      "id": "S1.7",
       "work_package": "WP4",
-      "order": 13,
-      "action": "Implement the dynamic-r binding context-switch via view_state. r means resume when running; run-mode toggle when idle. Touches the resolver that picks the active handler for r.",
+      "order": 2,
+      "action": "Final verify: mp + raul nextest, clippy, fmt, consumer-surface lint; CHANGELOG entry.",
       "files": [
-        "crates/raul/src/tui/view_state.rs",
-        "crates/raul/src/tui/action.rs"
+        "CHANGELOG.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/dynamic_r_binding/)",
-      "done_when": "AC-10 partial 2 passes",
+      "tests": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "done_when": "All gates green",
       "status": "pending",
       "covers_ac": [
-        "AC-10"
+        "AC-11"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S0",
+        "S1.1",
+        "S1.2",
+        "S1.3",
+        "S1.4",
+        "S1.5",
+        "S1.8",
+        "S2",
+        "S2.1",
+        "S3"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S1.8",
+      "work_package": "WP4",
+      "order": 14,
+      "action": "Persistence through mp: topology / harness chips → mp autopilot config set; commit toggles → mp config set agent.automation.*; sidebar prefs → mp config set ui.autopilot.*; read all on lane load via mp config get. Fake-runner test asserts the exact set calls and that no .mp/autopilot-state.json is written.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/runner_helpers.rs",
+        "crates/raul/tests/autopilot_persistence.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_persistence && ! rg -q 'autopilot-state\\.json' crates/raul/src",
+      "done_when": "Every persisted choice round-trips through mp",
+      "status": "pending",
+      "covers_ac": [
+        "AC-09"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S1.6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2.1",
+      "work_package": "WP1",
+      "order": 13,
+      "action": "Control row under Start: Pause / Stop / Resume / Back dispatch the existing lane actions (pause, cancel, resume, close); dim + inert when no run is live.",
+      "files": [
+        "crates/raul/src/tui/render/autopilot_lane.rs",
+        "crates/raul/src/tui/action.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout -E 'test(/control_row/)'",
+      "done_when": "Control row reuses existing lane actions and is inert when idle",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01",
+        "AC-05"
+      ],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -420,18 +489,17 @@
     },
     {
       "id": "S2.2",
-      "work_package": "WP4",
+      "work_package": "WP2",
       "order": 12,
-      "action": "Add the keymap registry additions for the autopilot tab: 1 2 3 for sidebar tabs; open and close brackets for tab cycle; colon for sidebar collapse; m jump to milestones row; c jump to commit policy; d cycle run mode. Wired into App::handle_key and view_state.",
+      "action": "Add next_sidebar_tab (v), prev_sidebar_tab (Shift+V), toggle_sidebar (z) to AutopilotLaneKeybinds with defaults in both the struct Default and Keybinds::default lane_autopilot; keybinds.toml parsing; collision test against lane + global defaults.",
       "files": [
-        "crates/raul/src/tui/keybinds.rs",
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/src/tui/keybinds.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_registry_additions/)",
-      "done_when": "AC-10 fully passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybind/)'",
+      "done_when": "Three new rebindable lane bindings with no default collisions",
       "status": "pending",
       "covers_ac": [
-        "AC-10"
+        "AC-03"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
@@ -441,19 +509,22 @@
     },
     {
       "id": "S3",
-      "work_package": "WP4",
+      "work_package": "WP2",
       "order": 15,
-      "action": "Build the keymap overlay (? or F1). Renders the full binding list as a centered Block with palette.accent border. Includes the dynamic-r context-switch note inline.",
+      "action": "Extend the existing ? help overlay (render_help_overlay) with an Autopilot section generated from AutopilotLaneKeybinds; update docs/raul/keybinds.md with next_sidebar_tab / prev_sidebar_tab / toggle_sidebar.",
       "files": [
-        "crates/raul/src/tui/render/overlays.rs"
+        "crates/raul/src/tui/render/overlays.rs",
+        "docs/raul/keybinds.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/keymap_overlay/)",
-      "done_when": "AC-10 fully passes",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_overlay_autopilot/)' && rg -q 'next_sidebar_tab' docs/raul/keybinds.md",
+      "done_when": "Help overlay reflects rebinds; docs list the new keys",
       "status": "pending",
       "covers_ac": [
         "AC-10"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S2.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

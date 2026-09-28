@@ -12,12 +12,12 @@
     "deferred": false,
     "deferred_reason": "",
     "depends_on": [],
-    "effort": "S",
+    "effort": "M",
     "risk": "low",
     "change_kind": "",
     "priority": "normal",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -39,59 +39,57 @@
     "outcome": "The raul Path tab and the raul Milestones tab each render a ↳ preview second line under the title, sourced from milestone.intent.outcome (first non-empty line, truncated). Operators can read what each milestone is about without opening the detail panel."
   },
   "problem": {
-    "description": "M206 (raul Path tab rework) shipped the 2-line preview renderer in crates/raul/src/tui/path_view.rs at line 226 — outcome_first_line reads item[\"milestone\"][\"intent\"][\"outcome\"] and the path_view emits a ↳ <preview> line. But crates/mp/src/path_engine.rs, where every PathAction.milestone is constructed via json!(), never includes the intent field. Eight sites (lines 120, 419, 453, 684, 854, 931, 1007, 1052) emit only id / display / title / lifecycle / priority / depends_on — so the preview is always empty and the user sees a dangling ↳ glyph. Compounding this, the raul Milestones tab is single-line by design: MilestoneSummary (crates/raul/src/tui/app.rs:438) carries title only, parse_milestone_summaries (runner_helpers.rs:197) reads m[\"title\"] and nothing else, and render_milestones_table (lane_lists.rs:551-558) builds rows with a single Cell::from(Span::styled(title, …)) per row. Both tabs share intent.outcome as the source — they should ship together so the data convention (field name, budget, truncation) lands once."
+    "description": "raul already renders a `↳ <preview>` line under Path items (crates/raul/src/tui/path_view.rs::outcome_first_line reads item.milestone.intent.outcome and trims to the first non-empty line), but mp never sends it: the 10 `milestone: json!` sites in crates/mp/src/path_engine.rs (lines ~120, 419, 453, 684, 741, 854, 931, 1007, 1052, 1076) omit intent, so every preview is blank. The Milestones tab has the same gap one layer down: `mp list milestones` (crates/mp/src/commands/list.rs) emits no intent and `--include intent` is silently ignored, so MilestoneSummary (crates/raul/src/tui/app.rs:438, parsed in runner_helpers.rs:197) has nothing to show, and render_milestones_table (lane_lists.rs:429) draws 1-line rows."
   },
   "scope": {
     "in_scope": [
-      "WP1: patch every PathAction.milestone json!() site in crates/mp/src/path_engine.rs to include intent.outcome — the first non-empty line of the on-disk milestone.intent.outcome string. Update or add a single helper (e.g. milestone_intent_outcome_first_line(&MilestoneMeta)) and call it from all 8 sites so the implementation is not copy-pasted.",
-      "WP1: pin a golden test in crates/mp/tests/path_engine.rs that asserts the milestone JSON includes the intent.outcome key for every PathAction variant (step / grooming / coverage-gap / milestone-head / etc.).",
-      "WP2: extend MilestoneSummary (crates/raul/src/tui/app.rs) with intent_outcome: String. Default empty for milestones predating the field.",
-      "WP2: parse m[\"intent\"][\"outcome\"] in parse_milestone_summaries (crates/raul/src/tui/runner_helpers.rs:197). Tolerate missing keys (older payloads) by defaulting to empty string.",
-      "WP2: switch render_milestones_table row height from 1 to 2 and emit a ↳ <preview> line under the title cell (same shape build_title_cell uses for the Backlog lane at lane_lists.rs:309). Truncate to the title column width with ` ` prefix.",
-      "WP2: refresh depends_on_depths indent math (lane_lists.rs:607) and the scrollbar accounting (view_state::compute_*_list_rects) so a 2-line row still divides the available data height correctly with hit-area sizes doubling.",
-      "WP2: pin golden tests in crates/raul/tests/ covering: (a) milestone row with preview renders both lines; (b) milestone row without preview renders one empty line so the row height contract is preserved; (c) depends_on indent math now correctly counts 2 lines per ancestor; (d) scrollbar thumb math holds."
+      "WP1: add `\"intent\": {\"outcome\": <full outcome string or \"\">}` to all 10 milestone json! blocks in path_engine.rs via one shared helper (raul does the first-line trim).",
+      "WP1: add the same additive `intent.outcome` key to each `mp list milestones` row in commands/list.rs.",
+      "WP1: regenerate tests/fixtures/json-shape/path.json and list-milestones.json with `make regen-goldens` and review the diff (additive key only).",
+      "WP2: MilestoneSummary.intent_outcome: String parsed from the list row; render_milestones_table rows become 2 lines (title, then dim `↳ <first line>`), reusing path_view::outcome_first_line.",
+      "WP2: depends_on_depths indentation applies to both lines; cursor/scrollbar math counts 2-line rows.",
+      "New tests: crates/mp/tests/path_engine_intent.rs, crates/raul/tests/tui_path_preview.rs, tui_milestone_subtitle.rs, milestone_indent.rs, milestone_scrollbar.rs."
     ],
     "out_of_scope": [
-      "Adding a subtitle/subtitle field to the on-disk mp-model; the second line is derived from intent.outcome only.",
-      "Touching the dashboard lane, settings lane, autopilot lane, or any other lane renderers — only Path and Milestones change.",
-      "Migrating any historical milestone JSON predating the intent.outcome field (their preview will simply be empty).",
-      "Changing the truncation rules or content budget for the Preview line in path_view.rs — M206 / M207 budgets stay; we only plug the data.",
-      "Any CLI surface beyond what mp path / mp list milestones already emit."
+      "Changing the preview truncation rules in path_view.rs.",
+      "Honoring `--include intent` generically (the key is emitted unconditionally; the silent-ignore of unknown --include values is logged separately).",
+      "Emitting any other intent sub-fields.",
+      "Row-height changes on tabs other than Milestones."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "WP1: every PathAction.milestone JSON emitted by mp path contains an intent.outcome key whose value is the first non-empty line of the on-disk milestone.intent.outcome. Empty outcomes emit empty strings, not absent keys.",
-      "verification": "rg -n '\"intent\"' crates/mp/src/path_engine.rs (returns 8+ matches — every milestone: json! block now includes \"intent\": { \"outcome\": … }). A new test crates/mp/tests/path_engine_intent.rs asserts the key is present for each PathAction variant.",
+      "description": "Every PathAction kind emitted by mp path (all 10 path_engine sites) and every mp list milestones row carries milestone intent.outcome (full string, \"\" when absent); shape goldens are regenerated additively.",
+      "verification": "cargo nextest run -p mp --test path_engine_intent --no-fail-fast && cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^json_shape_baseline::/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "WP1: the existing path tree renderer in raul now shows the ↳ <preview> line populated for milestones with non-empty outcomes. Milestones whose outcome is empty render only the ↳ prefix in dim color (no `(no description)` placeholder).",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/path_view_preview/)'. A new golden test in crates/raul/tests/tui_path_preview.rs feeds a hand-built JSON with intent.outcome = 'Solve the M225-R5 audit-trail gap' and asserts the rendered Line contains ↳ Solve the M225-R5 audit-trail gap.",
+      "description": "raul's Path tree shows the ↳ preview populated from mp's intent.outcome for a fixture plan.",
+      "verification": "cargo nextest run -p raul --test tui_path_preview --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "WP2: MilestoneSummary has a new intent_outcome: String field; parse_milestone_summaries reads it from the projection; render_milestones_table row height is 2 and the title cell carries both the title (line 1) and the ↳ preview line (line 2). Missing or empty outcome renders one empty line so the row-height contract holds.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/tui_milestone_subtitle/)'. A new crate-level unit test exercises parse_milestone_summaries against a hand-built JSON and asserts intent_outcome is populated for milestones with intent.outcome; for those without it (legacy payloads), the field is empty string.",
+      "description": "MilestoneSummary carries intent_outcome parsed from mp list milestones and the Milestones table renders a 2-line row (title + dim ↳ first line; bare ↳ when empty).",
+      "verification": "cargo nextest run -p raul --test tui_milestone_subtitle --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "WP2: depends_on_depths indent math + view_state scrollbar accounting remain correct under the new 2-line rows. A milestone with a depth-N parent still indents the correct number of visual spaces, and the hit-area scrollbar thumb height still maps to the right number of data rows.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/(milestone_indent|milestone_scrollbar)/)'. The tests at crates/raul/tests/milestone_indent.rs and milestone_scrollbar.rs are extended for 2-line rows.",
+      "description": "depends_on indentation applies to both row lines and cursor/scrollbar math stays correct with 2-line rows.",
+      "verification": "cargo nextest run -p raul --test milestone_indent --test milestone_scrollbar --test tui_milestones_table_cursor --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "make lint + make test + make consumer-surface-lint remain green; cargo clippy --workspace --all-targets -- -D warnings exits 0; no mp list milestones / mp path consumers break (the projection is purely additive).",
-      "verification": "make lint && make test && make consumer-surface-lint.",
+      "description": "mp and raul tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     }
@@ -115,11 +113,12 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Add a private helper milestone_intent_outcome_first_line in crates/mp/src/path_engine.rs that reads the milestone record and returns the first non-empty line of intent.outcome (empty string on missing or whitespace-only). Call it from all 8 PathAction.milestone json! sites so we never copy-paste the truncation rules.",
+      "action": "Add a shared helper in crates/mp/src/path_engine.rs that returns {\"outcome\": <milestone intent.outcome or \"\">} and include it as \"intent\" in all 10 milestone json! blocks; add the same key to each row in crates/mp/src/commands/list.rs.",
       "files": [
-        "crates/mp/src/path_engine.rs"
+        "crates/mp/src/path_engine.rs",
+        "crates/mp/src/commands/list.rs"
       ],
-      "tests": "rg -c 'intent' crates/mp/src/path_engine.rs (>= 8); unit test in the same file asserts empty / whitespace-only / multi-line outcomes all return the right shape",
+      "tests": "cargo nextest run -p mp --test path_engine_intent --no-fail-fast",
       "done_when": "AC-01 source-pin passes",
       "status": "pending",
       "covers_ac": [
@@ -135,17 +134,21 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 6,
-      "action": "Add crates/mp/tests/path_engine_intent.rs to pin the golden output: every PathAction.milestone variant (step, grooming, coverage-gap, milestone-head, blocked head) emits the intent.outcome key with the right value. Empty outcomes emit empty strings not absent keys.",
+      "action": "Add crates/mp/tests/path_engine_intent.rs: a fixture plan that triggers every PathAction kind asserts milestone.intent.outcome on each, plus an mp list milestones row assertion; run make regen-goldens and review the additive diff in tests/fixtures/json-shape/{path,list-milestones}.json.",
       "files": [
-        "crates/mp/tests/path_engine_intent.rs"
+        "crates/mp/tests/path_engine_intent.rs",
+        "tests/fixtures/json-shape/path.json",
+        "tests/fixtures/json-shape/list-milestones.json"
       ],
-      "tests": "cargo nextest run -p mp --test path_engine_intent --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test path_engine_intent --no-fail-fast && cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^json_shape_baseline::/)'",
       "done_when": "AC-01 goldens pass",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -155,17 +158,19 @@
       "id": "S1.2",
       "work_package": "WP1",
       "order": 2,
-      "action": "Pin a raul golden test in crates/raul/tests/tui_path_preview.rs that feeds a hand-built JSON with intent.outcome Solve the M225-R5 audit-trail gap, renders the path tree, and asserts the output Line contains ↳ Solve the M225-R5 audit-trail gap; another test with empty outcome asserts only the ↳ prefix is emitted in dim color.",
+      "action": "Add crates/raul/tests/tui_path_preview.rs: feed a path JSON carrying intent.outcome and assert the ↳ preview line renders.",
       "files": [
         "crates/raul/tests/tui_path_preview.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/path_view_preview/)",
+      "tests": "cargo nextest run -p raul --test tui_path_preview --no-fail-fast",
       "done_when": "AC-02 passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -175,18 +180,20 @@
       "id": "S1.2.1",
       "work_package": "WP2",
       "order": 5,
-      "action": "Add intent_outcome field to MilestoneSummary and parse it from the projection.",
+      "action": "Add intent_outcome: String to MilestoneSummary (crates/raul/src/tui/app.rs) and parse it in parse_milestone_summaries (runner_helpers.rs), defaulting to \"\".",
       "files": [
         "crates/raul/src/tui/app.rs",
         "crates/raul/src/tui/runner_helpers.rs"
       ],
-      "tests": "rg intent_outcome crates/raul/src/tui/ shows field plus parser plus at least one test",
+      "tests": "cargo nextest run -p raul --test tui_milestone_subtitle --no-fail-fast",
       "done_when": "AC-03 source-pin passes",
       "status": "pending",
       "covers_ac": [
         "AC-03"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -196,19 +203,21 @@
       "id": "S1.1.1",
       "work_package": "WP2",
       "order": 7,
-      "action": "Switch render_milestones_table row height from 1 to 2 and emit a preview line under the title cell using the same shape as build_title_cell for backlog. Refresh depends_on_depths indent math and view_state scrollbar accounting so 2-line rows divide the data height correctly with hit-area sizes doubling.",
+      "action": "Make render_milestones_table rows 2 lines (title, then dim ↳ + path_view::outcome_first_line); apply depends_on_depths indent to both lines; add crates/raul/tests/tui_milestone_subtitle.rs.",
       "files": [
         "crates/raul/src/tui/render/lane_lists.rs",
-        "crates/raul/src/tui/view_state.rs"
+        "crates/raul/tests/tui_milestone_subtitle.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/tui_milestone_subtitle/)",
+      "tests": "cargo nextest run -p raul --test tui_milestone_subtitle --no-fail-fast",
       "done_when": "AC-03 AC-04 pass",
       "status": "pending",
       "covers_ac": [
         "AC-03",
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.2.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -218,18 +227,21 @@
       "id": "S1.2.2",
       "work_package": "WP2",
       "order": 3,
-      "action": "Add golden tests for the new 2-line milestone row in crates/raul/tests/milestone_indent.rs and crates/raul/tests/milestone_scrollbar.rs; covers a row with preview, a row without preview, the depth math under 2-line rows, and the thumb-height calculation.",
+      "action": "Fix cursor/scrollbar accounting for 2-line rows; add new crates/raul/tests/milestone_indent.rs and milestone_scrollbar.rs; keep tui_milestones_table_cursor green.",
       "files": [
+        "crates/raul/src/tui/render/lane_lists.rs",
         "crates/raul/tests/milestone_indent.rs",
         "crates/raul/tests/milestone_scrollbar.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E test(/(milestone_indent|milestone_scrollbar)/)",
+      "tests": "cargo nextest run -p raul --test milestone_indent --test milestone_scrollbar --test tui_milestones_table_cursor --no-fail-fast",
       "done_when": "AC-04 passes",
       "status": "pending",
       "covers_ac": [
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -239,17 +251,21 @@
       "id": "S1.2.2.1",
       "work_package": "WP2",
       "order": 4,
-      "action": "Run make lint plus make test plus make consumer-surface-lint plus cargo clippy --workspace --all-targets -- -D warnings; ensure no regressions.",
+      "action": "Final verify: mp + raul nextest, clippy, fmt, consumer-surface lint.",
       "files": [
-        "crates/raul"
+        "Cargo.toml"
       ],
-      "tests": "make lint; make test; make consumer-surface-lint",
+      "tests": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-05 passes",
       "status": "pending",
       "covers_ac": [
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1",
+        "S1.2",
+        "S1.2.2"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

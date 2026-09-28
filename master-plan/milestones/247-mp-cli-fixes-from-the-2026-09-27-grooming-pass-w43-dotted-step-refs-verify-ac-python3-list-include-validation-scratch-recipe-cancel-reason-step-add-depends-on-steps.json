@@ -1,0 +1,302 @@
+{
+  "milestone": {
+    "id": "247",
+    "title": "mp CLI fixes from the 2026-09-27 grooming pass — W43 dotted step refs, verify-ac python3, list --include validation, scratch recipe, cancel --reason, step add --depends-on-steps",
+    "slug": "mp-cli-fixes-from-the-2026-09-27-grooming-pass-w43-dotted-step-refs-verify-ac-python3-list-include-validation-scratch-recipe-cancel-reason-step-add-depends-on-steps",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [
+      "240"
+    ],
+    "effort": "M",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-09-28",
+    "updated": "2026-09-28",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-09-28T02:37:57.857061+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-09-28T02:37:57.857063+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-09-28T02:37:57.857063+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Six defects hit while grooming M230-M246 are gone: mp validate stops flagging valid dotted step ids, mp plan verify-ac understands python3 and inline code, mp list rejects unknown --include values, the documented scratch recipe works as written, cancelled milestones can record why, and step add accepts the same dependency flag as step update."
+  },
+  "problem": {
+    "description": "Grooming 16 milestones on 2026-09-27 surfaced six small mp defects (mp-dogfood-log.md, 2026-09-27 entries). (1) W43 false positives: crates/mp/src/validate/milestone_warnings.rs::extract_milestone_refs builds `cleaned` with is_alphanumeric(), dropping '.', so `S1.2` is checked as `S12` (the dot branch at ~234 is dead). (2) crates/mp/src/commands/plan_verify_ac.rs::resolve_python_script passes prefixes [\"python\", \"python3\"]; `python` matches first, so `python3 -c '…'` resolves the script path `3` and reports 'python script not found: 3'; inline `-c` / `-m` forms are not scripts at all. (3) mp list (crates/mp/src/cli/list_show.rs `include: Vec<String>`, consumed in commands/list.rs ~50-53) silently ignores values other than steps / acceptance_criteria / evidence / findings. (4) The scratch recipe `SCRATCH=$(mp scratch new m-update)` in AGENTS.md:240, docs/agent-guide/config-and-profiles.md:93, and docs/agent-guide/core-principles.md:120 captures JSON, not a path. (5) `mp milestone set-status <id> cancelled` has no way to write the existing cancel_reason field (mp-model milestone.rs:678). (6) `mp milestone step add` lacks --depends-on-steps, which step update has (cli/milestone.rs ~521), forcing a second call."
+  },
+  "scope": {
+    "in_scope": [
+      "W43: keep '.' when extracting S-refs so dotted step ids resolve; unit tests for S1.2 / S2.2.1 resolving and a real typo still warning.",
+      "verify-ac: match the longest interpreter prefix first (python3 before python); treat `python/python3 -c …` and `-m …` as inline commands (resolved, no file check); `python3 path/to/script.py` still checks the file.",
+      "mp list --include: reject unknown values with a non-zero exit and an error listing the accepted values (steps, acceptance_criteria, evidence, findings).",
+      "Scratch recipe: change the three doc sites to `SCRATCH=$(mp scratch new m-update | jq -r .path)` (jq is already used in the agent guide); no CLI change.",
+      "`mp milestone set-status <id> cancelled --reason <text>` writes cancel_reason (also in --dry-run output); --reason with any other status is an error; mp show surfaces cancel_reason.",
+      "`mp milestone step add … --depends-on-steps S1,S1.1` with the same validation as step update (unknown step ids error).",
+      "Document --reason and step add --depends-on-steps in docs/mp/commands.md; CHANGELOG; point the six dogfood entries at this milestone."
+    ],
+    "out_of_scope": [
+      "A step --order flag (dependencies already express order; wontfix).",
+      "Validating --include on commands other than mp list (mp search --include object is a different contract).",
+      "A --path-only / raw output mode for mp scratch new.",
+      "Detecting rewrites of approved specs (separate milestone after spec-grill).",
+      "Backfilling cancel_reason for already-cancelled milestones."
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "W43 resolves dotted step ids (S1.2, S2.2.1) against the milestone's steps and still warns on a genuinely missing step.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/w43_dotted_step_refs/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "mp plan verify-ac treats python3/python -c and -m verifications as inline commands and resolves `python3 <script>` against the file (no 'script not found: 3').",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/verify_ac_python/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "mp list milestones --include <unknown> exits non-zero with an error naming the accepted values; the four accepted values keep working.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/list_include_/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Every documented scratch recipe extracts the path with jq and the pipeline yields a directory.",
+      "verification": "! rg -q 'SCRATCH=\\$\\(mp scratch new [a-z-]+\\)' AGENTS.md docs && rg -q 'mp scratch new m-update \\| jq -r \\.path' AGENTS.md && bash -c 'S=$(mp scratch new ac-check | jq -r .path) && test -d \"$S\" && rm -rf \"$S\"'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "set-status cancelled --reason writes cancel_reason (and shows it in --dry-run); --reason with another status errors.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/set_status_cancel_reason/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "step add accepts --depends-on-steps with the same unknown-id validation as step update.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/step_add_depends_on_steps/)'",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-07",
+      "description": "docs/mp/commands.md documents set-status --reason and step add --depends-on-steps; mp tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "rg -q 'cancelled --reason' docs/mp/commands.md && rg -q 'step add.*--depends-on-steps' docs/mp/commands.md && cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "list --include",
+      "choice": "Unknown --include values on mp list are a hard error, not a warning",
+      "rationale": "No caller passes unsupported values (raul passes none; documented --include object belongs to mp search), and hard errors match the --fields contract."
+    },
+    {
+      "area": "scratch recipe",
+      "choice": "Fix the docs (| jq -r .path) instead of adding a raw-path mode to mp scratch new",
+      "rationale": "Keeps the JSON-by-default read contract; jq is already used in the agent guide."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Correctness bugs",
+      "goal": "W43 dotted refs, verify-ac python3/inline, list --include validation, scratch recipe docs",
+      "rollback": "Revert per-fix commits; each fix is independent"
+    },
+    {
+      "id": "WP2",
+      "name": "Authoring ergonomics + docs",
+      "goal": "set-status cancelled --reason, step add --depends-on-steps, commands.md, CHANGELOG, dogfood pointers",
+      "rollback": "Remove the two flags (additive)"
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "extract_milestone_refs: keep '.' for S-refs so dotted ids resolve; unit tests w43_dotted_step_refs_resolve (S1.2, S2.2.1) and w43_dotted_step_refs_typo_still_warns.",
+      "files": [
+        "crates/mp/src/validate/milestone_warnings.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/w43_dotted_step_refs/)'",
+      "done_when": "Dotted refs resolve; real typos still warn",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 2,
+      "action": "resolve_python_script: longest prefix first (python3 before python); -c / -m forms resolve as inline commands; script form still checks the file; tests verify_ac_python3_script, verify_ac_python_inline_c, verify_ac_python_module_m.",
+      "files": [
+        "crates/mp/src/commands/plan_verify_ac.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/verify_ac_python/)'",
+      "done_when": "python3 -c no longer reports script '3'",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP1",
+      "order": 3,
+      "action": "mp list: validate --include against steps / acceptance_criteria / evidence / findings; unknown → non-zero exit with the accepted list; tests list_include_unknown_errors and list_include_known_values_ok.",
+      "files": [
+        "crates/mp/src/commands/list.rs",
+        "crates/mp/src/cli/list_show.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/list_include_/)'",
+      "done_when": "Unknown include values fail loudly",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S4",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "Change the scratch recipe to SCRATCH=$(mp scratch new m-update | jq -r .path) in AGENTS.md, docs/agent-guide/config-and-profiles.md, docs/agent-guide/core-principles.md.",
+      "files": [
+        "AGENTS.md",
+        "docs/agent-guide/config-and-profiles.md",
+        "docs/agent-guide/core-principles.md"
+      ],
+      "tests": "! rg -q 'SCRATCH=\\$\\(mp scratch new [a-z-]+\\)' AGENTS.md docs && rg -q 'mp scratch new m-update \\| jq -r \\.path' AGENTS.md && make consumer-surface-lint",
+      "done_when": "All three recipes extract the path",
+      "status": "pending",
+      "covers_ac": [
+        "AC-04"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S5",
+      "work_package": "WP2",
+      "order": 5,
+      "action": "set-status: add --reason (cli/milestone.rs SetStatus); write cancel_reason when status is cancelled (include in --dry-run fields); error on --reason with any other status; test set_status_cancel_reason_written / _rejected_for_other_status.",
+      "files": [
+        "crates/mp/src/cli/milestone.rs",
+        "crates/mp/src/commands/milestone.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/set_status_cancel_reason/)'",
+      "done_when": "cancel_reason is writable via CLI",
+      "status": "pending",
+      "covers_ac": [
+        "AC-05"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S6",
+      "work_package": "WP2",
+      "order": 6,
+      "action": "step add: add --depends-on-steps (StepCmd::Add in cli/milestone.rs) reusing step update's validation; test step_add_depends_on_steps_sets / _unknown_errors.",
+      "files": [
+        "crates/mp/src/cli/milestone.rs",
+        "crates/mp/src/commands/step.rs"
+      ],
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/step_add_depends_on_steps/)'",
+      "done_when": "step add sets dependencies in one call",
+      "status": "pending",
+      "covers_ac": [
+        "AC-06"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S7",
+      "work_package": "WP2",
+      "order": 7,
+      "action": "Docs + verify: document set-status cancelled --reason and step add --depends-on-steps in docs/mp/commands.md; CHANGELOG; add 'fixed in M247' pointers to the six 2026-09-27 dogfood entries; run mp nextest, clippy, fmt, consumer-surface lint.",
+      "files": [
+        "docs/mp/commands.md",
+        "CHANGELOG.md",
+        "mp-dogfood-log.md"
+      ],
+      "tests": "rg -q 'cancelled --reason' docs/mp/commands.md && rg -q 'step add.*--depends-on-steps' docs/mp/commands.md && cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "done_when": "Docs updated; all gates green",
+      "status": "pending",
+      "covers_ac": [
+        "AC-07"
+      ],
+      "depends_on_steps": [
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}

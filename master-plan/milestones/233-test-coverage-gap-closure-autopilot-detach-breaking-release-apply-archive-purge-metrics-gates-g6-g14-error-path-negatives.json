@@ -14,12 +14,12 @@
     "depends_on": [
       "232"
     ],
-    "effort": "S",
+    "effort": "M",
     "risk": "low",
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -41,21 +41,22 @@
     "outcome": "Each handler and validate gate that ships in `crates/mp` has at least one direct integration test covering both happy and error paths, so a regression in any of them surfaces in CI instead of dogfood."
   },
   "problem": {
-    "description": "Several handler modules and validate gates have thin or zero direct coverage:\n- crates/mp/src/commands/autopilot_detach.rs: zero functional tests; the M178 S3 detach-via-setsid contract is unverified (only help-text check).\n- crates/mp/src/commands/breaking_release.rs:58-93 (apply arm): the `.mp/breaking_release.json` write and `anyhow::bail!` error branch are uncovered; only preflight has a test.\n- crates/mp/src/commands/metrics.rs (entire file): no dedicated test file, only taxonomy / single smoke.\n- crates/mp/src/commands/archive.rs: cmd_archive's list-archived / restore / purge arms not exercised (suite_milestone_archive.rs covers archive-milestone only).\n- crates/mp/src/validate/plan.rs:214-232 (G6 — all-AC-passed at spec=verified): no direct unit test.\n- crates/mp/src/validate/gates.rs (check_g14_approval_requests): only golden scenario covers it.\n- Error paths in commands/config.rs, git.rs, archive.rs, digest.rs that bubble up via `?` have no negative integration tests."
+    "description": "Handler modules with thin or zero direct coverage (verified 2026-09-27):\n- crates/mp/src/commands/autopilot_detach.rs: no functional test; only help-text checks (autopilot_cli_tree.rs, watch_cli.rs) mention --detach.\n- crates/mp/src/commands/breaking_release.rs apply arm: the .mp/breaking_release.json write and the bail! branch are uncovered; only preflight is exercised (suites/ws3_ws4_batch.rs).\n- crates/mp/src/commands/metrics.rs (`mp plan metrics show|set`): only a --help / taxonomy smoke.\n- crates/mp/src/commands/archive.rs: the milestone arm is well covered (suites/milestone_archive.rs: restore, purge, list-archived); the TrackItem arm (`mp track archive track-item`) is only exercised on its failure-rollback path (mutation_transactions.rs:568).\n- Gates G6 and G14 are covered in suites/gate_matrix.rs, but g6_fires_when_ac_not_passed_at_verified asserts `stderr.contains(\"G6\") || !status.success()` — it passes on ANY failure, so a regression that fails for another reason stays green.\n- ?-propagated error paths in commands/config.rs, git.rs, archive.rs, digest.rs have no negative integration tests (suites/digest.rs:119 `--since not-a-duration` is the only template)."
   },
   "scope": {
     "in_scope": [
-      "Add crates/mp/tests/autopilot_drive_detach.rs covering: detached child survives parent exit (setsid); state file written to v2 path; SIGTERM triggers killpg; preflight refusals return exit code 2.",
-      "Add crates/mp/tests/breaking_release_apply.rs covering: apply-after-clean-preflight writes .mp/breaking_release.json; apply-after-blocked-preflight returns exit code and the bailout message survives unchanged.",
-      "Add crates/mp/tests/suites/metrics.rs covering: MetricsCmd::Show happy path after MetricsCmd::Set (round-trip); error branch for an unknown metric field.",
-      "Extend crates/mp/tests/suites/milestone_archive.rs with restore, purge, list-archived coverage.",
-      "Add crates/mp/tests/suites/gate_g6_unit.rs and gate_g14_unit.rs: direct unit tests for the G6 (verified-with-pending-AC) and G14 (open approval requests) branches.",
-      "Add at least three negative integration tests across config.rs, git.rs, archive.rs, digest.rs covering existing `bail!`/`with_context` error branches (use mp digest --since not-a-duration as the template).",
-      "Add a CHANGELOG entry grouping the coverage gains; no behavior change."
+      "New top-level test binary crates/mp/tests/autopilot_drive_detach.rs: detached child survives parent exit (setsid); run state file written to .mp/autopilot-run.state.json; SIGTERM to the recorded pid triggers killpg; preflight refusal returns exit 2. Uses common/fake_herdr.rs.",
+      "New top-level test binary crates/mp/tests/breaking_release_apply.rs: apply after clean preflight writes .mp/breaking_release.json; apply after blocked preflight exits non-zero with the bail message unchanged.",
+      "New crates/mp/tests/suites/metrics.rs, included from crates/mp/tests/suite_misc.rs via #[path]: `mp plan metrics set` then `show` round-trips; unknown metric field errors.",
+      "Extend crates/mp/tests/suites/track_lifecycle.rs (or add a module to suite_track.rs) with a positive `mp track archive track-item` test.",
+      "Tighten suites/gate_matrix.rs G6 so it requires the G6 code specifically (not `|| !success`), and add a G6 negative case (all ACs passed → no G6).",
+      "At least three negative integration tests (new top-level binaries config_cmd_negative.rs, archive_negative.rs, digest_negative.rs) driving existing bail!/with_context branches to non-zero exits with the expected message.",
+      "CHANGELOG entry grouping the coverage gains; no behavior change."
     ],
     "out_of_scope": [
-      "Refactoring the implementations under test — only add tests in this milestone.",
-      "Re-doing the unrelated tests that already pass."
+      "Refactoring the implementations under test — tests only. If a test exposes a real bug, file a backlog item instead of fixing it here.",
+      "Re-doing tests that already pass (milestone archive/restore/purge, G14).",
+      "Moving existing suites between binaries."
     ]
   },
   "acceptance_criteria": [
@@ -75,22 +76,22 @@
     },
     {
       "id": "AC-03",
-      "description": "metrics.rs has a dedicated suite covering Show / Set round-trip and an error branch.",
-      "verification": "cargo nextest run -p mp --test metrics --no-fail-fast.",
+      "description": "mp plan metrics has a dedicated suite covering set→show round-trip and an unknown-field error.",
+      "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^metrics::/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "archive.rs restore, purge, and list-archived arms each have at least one positive integration test.",
-      "verification": "cargo nextest run -p mp --test milestone_archive --no-fail-fast (existing plus new tests).",
+      "description": "The TrackItem arm of archive.rs has a positive integration test (a track item is archived and no longer listed as active).",
+      "verification": "cargo nextest run -p mp --test suite_track --no-fail-fast -E 'test(/track_archive/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "Validate gates G6 (verified-with-pending-AC) and G14 (open approval requests) each have at least one direct unit test in a dedicated suite file.",
-      "verification": "cargo nextest run -p mp --test gate_g6_unit --no-fail-fast && cargo nextest run -p mp --test gate_g14_unit --no-fail-fast.",
+      "description": "gate_matrix G6 test requires the G6 code specifically (no '|| !success' escape) and has a negative case; G14 tests keep passing.",
+      "verification": "! rg -q 'contains\\(\"G6\"\\) \\|\\| !out.status.success' crates/mp/tests/suites/gate_matrix.rs && cargo nextest run -p mp --test suite_validate --no-fail-fast -E 'test(/^gate_matrix::g(6|14)_/)'",
       "status": "pending",
       "evidence": ""
     },
@@ -103,8 +104,8 @@
     },
     {
       "id": "AC-07",
-      "description": "make test remains green and the new tests do not introduce flakes.",
-      "verification": "make test (3 consecutive runs, each exit 0; if any run fails, the milestone is not verified).",
+      "description": "The new tests are not flaky: three consecutive runs of the new/changed tests all pass, and the full mp suite is green.",
+      "verification": "for i in 1 2 3; do cargo nextest run -p mp --no-fail-fast -E 'binary(autopilot_drive_detach) | binary(breaking_release_apply) | binary(config_cmd_negative) | binary(archive_negative) | binary(digest_negative) | test(/^metrics::|track_archive|^gate_matrix::g6_/)' || exit 1; done && cargo nextest run -p mp --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -128,7 +129,7 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Add crates/mp/tests/autopilot_drive_detach.rs covering: detached child survives parent exit (setsid); state file written to v2 path; SIGTERM triggers killpg; preflight refusals return exit code 2.",
+      "action": "Add crates/mp/tests/autopilot_drive_detach.rs: detached child survives parent exit (setsid); run state written to .mp/autopilot-run.state.json; SIGTERM to the recorded pid triggers killpg; preflight refusal exits 2.",
       "files": [
         "crates/mp/tests/autopilot_drive_detach.rs",
         "crates/mp/tests/common/fake_herdr.rs"
@@ -169,11 +170,12 @@
       "id": "S3",
       "work_package": "WP1",
       "order": 5,
-      "action": "Add crates/mp/tests/suites/metrics.rs covering MetricsCmd::Show happy path after MetricsCmd::Set (round-trip) and an error branch for an unknown metric field.",
+      "action": "Add crates/mp/tests/suites/metrics.rs and include it from crates/mp/tests/suite_misc.rs (#[path]); cover mp plan metrics set→show round-trip and an unknown-field error.",
       "files": [
-        "crates/mp/tests/suites/metrics.rs"
+        "crates/mp/tests/suites/metrics.rs",
+        "crates/mp/tests/suite_misc.rs"
       ],
-      "tests": "cargo nextest run -p mp --test metrics --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^metrics::/)'",
       "done_when": "AC-03 passes",
       "status": "pending",
       "covers_ac": [
@@ -189,11 +191,12 @@
       "id": "S4",
       "work_package": "WP1",
       "order": 6,
-      "action": "Extend crates/mp/tests/suites/milestone_archive.rs with restore, purge, list-archived coverage.",
+      "action": "Add a positive 'mp track archive track-item' integration test (name contains track_archive) to the suite_track binary.",
       "files": [
-        "crates/mp/tests/suites/milestone_archive.rs"
+        "crates/mp/tests/suites/track_lifecycle.rs",
+        "crates/mp/tests/suite_track.rs"
       ],
-      "tests": "cargo nextest run -p mp --test milestone_archive --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test suite_track --no-fail-fast -E 'test(/track_archive/)'",
       "done_when": "AC-04 passes",
       "status": "pending",
       "covers_ac": [
@@ -231,17 +234,24 @@
       "id": "S1.2",
       "work_package": "WP2",
       "order": 2,
-      "action": "Run make test three consecutive times and verify no flakes; record CHANGELOG entry.",
+      "action": "Run the new/changed tests three times back-to-back plus the full mp suite; add the CHANGELOG entry.",
       "files": [
         "CHANGELOG.md"
       ],
-      "tests": "make test (3 consecutive runs, all exit 0)",
+      "tests": "cargo nextest run -p mp --no-fail-fast",
       "done_when": "AC-07 passes",
       "status": "pending",
       "covers_ac": [
         "AC-07"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S0",
+        "S1",
+        "S1.1",
+        "S2",
+        "S3",
+        "S4"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -251,12 +261,11 @@
       "id": "S0",
       "work_package": "WP2",
       "order": 7,
-      "action": "Add crates/mp/tests/suites/gate_g6_unit.rs and gate_g14_unit.rs: direct unit tests for the G6 (verified-with-pending-AC) and G14 (open approval requests) branches.",
+      "action": "Tighten suites/gate_matrix.rs: g6_fires_when_ac_not_passed_at_verified must require the G6 code (drop the '|| !success' escape); add g6_clears_when_all_acs_passed.",
       "files": [
-        "crates/mp/tests/suites/gate_g6_unit.rs",
-        "crates/mp/tests/suites/gate_g14_unit.rs"
+        "crates/mp/tests/suites/gate_matrix.rs"
       ],
-      "tests": "cargo nextest run -p mp --test gate_g6_unit --no-fail-fast && cargo nextest run -p mp --test gate_g14_unit --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast -E 'test(/^gate_matrix::g(6|14)_/)'",
       "done_when": "AC-05 passes",
       "status": "pending",
       "covers_ac": [

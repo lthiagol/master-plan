@@ -127,6 +127,18 @@
       "source": "conversation",
       "created": "2026-08-01",
       "promoted_to": ""
+    },
+    {
+      "id": "ID-11",
+      "title": "M238 cancelled",
+      "body": "Cancelled during 2026-09-27 grooming pass (user decision). Slug/title drift (e.g. M211's filename) is cosmetic: ids are the stable key everywhere. The parse_rfc3339_ms dedup premise was also false (single definition at autopilot/cycle.rs:755). No cancel_reason writer exists in mp, so the reason is recorded here.",
+      "status": "open",
+      "tags": [
+        "meeting"
+      ],
+      "source": "meeting",
+      "created": "2026-09-28",
+      "promoted_to": ""
     }
   ]
 }

@@ -36,7 +36,7 @@
   "execution": {
     "strategy": "resume_then_ready",
     "interleave": "milestone",
-    "mode": "autonomous",
+    "mode": "planning",
     "handoff_at": "2026-07-15T15:43:02.784187+00:00",
     "handoff_by": "runner",
     "focus_milestone": "",
@@ -8930,7 +8930,7 @@
     },
     {
       "id": "230",
-      "title": "post-M229 raul TUI Watch lane collapse — remove tui::watch duplicate state and Watch* actions",
+      "title": "raul Autopilot lane: retire the legacy Watch model — migrate live readers to app.autopilot, rename render/watch.rs, delete tui::watch",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
@@ -8958,14 +8958,14 @@
     },
     {
       "id": "234",
-      "title": "fixture/scenario hygiene — drop orphan brownfield-api, flip p3.1-hybrid phase, re-letter code-review lessons",
+      "title": "fixture/scenario hygiene — drop orphan brownfield-api, fix stale p3.1 scenario note, index code-review lessons",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
     },
     {
       "id": "235",
-      "title": "consumer-surface hygiene for repo-internal skill — relocate mp-code-review into docs/internal or make paths relative",
+      "title": "consumer-surface hygiene for repo-internal skill — move mp-code-review out of templates/ and drop the lint carve-out",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
@@ -8979,7 +8979,7 @@
     },
     {
       "id": "237",
-      "title": "mp autopilot activity reconcile + per-write activity events — close the M200/M207/M228 audit-trail gap",
+      "title": "activity journal completeness — step-done / criterion-pass events + `mp activity reconcile <id>`",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
@@ -8988,12 +8988,12 @@
       "id": "238",
       "title": "M211 stale file slug correction + M213 parse_rfc3339_ms dedup — small hygiene batch from herdr-log backlog",
       "spec_status": "ready",
-      "execution_status": "planned",
+      "execution_status": "cancelled",
       "blocked_by": ""
     },
     {
       "id": "239",
-      "title": "mp autopilot design-input migration — move mp-herdr-log design input into master-plan and ship `mp autopilot design-input` (per R15)",
+      "title": "herdr-log retirement — recover R1-R15 + session lessons into mp decisions and delete the repo-root logs",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
@@ -9014,7 +9014,7 @@
     },
     {
       "id": "242",
-      "title": "Floating milestone picker: anchored overlay with multi-select, narrow-terminal modal fallback, 100ms Start-pulse",
+      "title": "Floating milestone picker: centered multi-select overlay with narrow-terminal modal fallback and a Starting… state on Start",
       "spec_status": "ready",
       "execution_status": "planned",
       "blocked_by": ""
@@ -9042,8 +9042,22 @@
     },
     {
       "id": "246",
-      "title": "Autopilot prompt-delivery stability — runner readiness gate + lifecycle stall threshold + chat-driven ergonomics",
+      "title": "Autopilot prompt-delivery stability — readiness settle window, working-aware stall detection, and `mp autopilot wait` / `tail`",
       "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "247",
+      "title": "mp CLI fixes from the 2026-09-27 grooming pass — W43 dotted step refs, verify-ac python3, list --include validation, scratch recipe, cancel --reason, step add --depends-on-steps",
+      "spec_status": "ready",
+      "execution_status": "planned",
+      "blocked_by": ""
+    },
+    {
+      "id": "248",
+      "title": "Approval integrity — full-spec drafts, a real approve gate, and needs_regrooming on post-approval spec edits",
+      "spec_status": "draft",
       "execution_status": "planned",
       "blocked_by": ""
     }

@@ -1,7 +1,7 @@
 {
   "milestone": {
     "id": "246",
-    "title": "Autopilot prompt-delivery stability — runner readiness gate + lifecycle stall threshold + chat-driven ergonomics",
+    "title": "Autopilot prompt-delivery stability — readiness settle window, working-aware stall detection, and `mp autopilot wait` / `tail`",
     "slug": "autopilot-prompt-delivery-stability-runner-readiness-gate-lifecycle-stall-threshold-chat-driven-ergonomics",
     "lifecycle": "approved",
     "spec_status": "ready",
@@ -14,12 +14,12 @@
     "depends_on": [
       "236"
     ],
-    "effort": "S",
-    "risk": "low",
+    "effort": "M",
+    "risk": "medium",
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -38,85 +38,97 @@
     }
   },
   "intent": {
-    "outcome": "The autopilot pipeline (mp autopilot start) reliably drives a runner through to AC verification end-to-end, with three concrete defects fixed: (1) the runner readiness gate waits for the harness to be idle before delivering the prompt; (2) the lifecycle poller's stall threshold no longer trips while the runner is still working; (3) chat operators get a wait verb that blocks until complete and a tail --follow verb that streams the runner's recent activity."
+    "outcome": "mp autopilot start reliably drives a runner to its target lifecycle: prompts are delivered only after the harness has been idle continuously for a settle window, a slow-but-working runner is never declared stalled, and chat operators can block on a run (`mp autopilot wait <id>`) and stream its activity (`mp autopilot tail <id> --follow`)."
   },
   "problem": {
-    "description": "M236 dogfood (chat-driven autopilot emulation, commit 2646458) and the parallel herdr-orc cycle in pane w18:t2 surfaced three concrete defects that prevent the autopilot from driving a milestone to complete from the chat. (1) The orchestrator's runner-prompt dispatch does not wait for the harness to be interactive_ready: true — the prompt can land while OpenCode's TUI is still booting, where the harness never sees it. (2) The lifecycle poller's stall threshold is too tight — a slow-but-working runner (e.g., a 5-minute cargo build) trips the stalled lifecycle before the work is done. (3) Chat operators have no clean wait / tail verbs: the current mp autopilot status is a snapshot, not a stream, and watching the activity.json file by hand is fragile. Without these, the autopilot's chat-driven workflow is bounded by real-time race conditions rather than being a stable, observable execution."
+    "description": "M236's chat-driven dogfood surfaced three defects. (1) The readiness gate exists (drive/herdr.rs::send_prompt = wait_for_readiness + deliver_prompt) but is too eager: wait_for_readiness_with returns on the FIRST 'idle' read, and read_agent_status falls back to 'idle' whenever `herdr agent wait --timeout 0` exits 0 — so a freshly spawned pane whose harness TUI is still booting passes the gate and the prompt is lost. (2) Stall detection (drive/state_machine.rs ~663-680, drive/herdr.rs ~870-895) bails when agent_status is unchanged for stall_timeout_ms (default 1_800_000 at herdr.rs ~819, `--stall-timeout-ms` on start) — an unchanged 'working' status counts, so a long build or test run is declared stalled. (3) There is no blocking or streaming verb: mp autopilot status is a snapshot and operators poll activity.json by hand."
   },
   "scope": {
     "in_scope": [
-      "WP1 — Runner-readiness gate. In crates/mp/src/autopilot/drive/bridge.rs (or wherever the runner prompt is dispatched), insert a wait_for_runner_idle(grace_ms) call before delivering the prompt. Default grace is 5000 ms; configurable via the existing mp autopilot start config. Add a unit test that proves the gate fires before delivery by stubbing the runner's interactive_ready response. Add a regression test that runs the full pipeline on a fake runner and asserts the prompt is queued, not yet sent, until the gate clears.",
-      "WP2 — Lifecycle poller stall threshold. In crates/mp/src/autopilot/drive/state_machine.rs, tune the default stall window from 30 min to a more reasonable value (proposed: 5 min default, 15 min ceiling). Add a config knob agent.automation.stall_timeout_minutes so projects can override per their runner's typical cycle time. Add a regression test that proves a slow-but-working runner (5 minutes of agent_status: working with lifecycle: in-progress) does NOT trip the stalled lifecycle.",
-      "WP3 — Chat-driven autopilot ergonomics. Add mp autopilot wait <id> that blocks until the milestone reaches complete (or failed / cancelled), with a configurable timeout (default 30 min). Add mp autopilot tail <id> --follow --since=<ts> that streams recent activity events (from master-plan/activity.json) for the given session, optionally following in real time. Both surface the existing live-detached session without requiring a fresh mp autopilot start. The two new verbs round out the chat-friendly workflow alongside the existing mp autopilot status snapshot."
+      "WP1: add settle_ms to ReadinessOptions (default 5000; 0 = legacy first-idle behavior). wait_for_readiness_with returns only after idle has held continuously for settle_ms; any non-idle read resets the window; the existing timeout_ms still bounds the whole wait. Plumb `--prompt-settle-ms <ms>` on mp autopilot start.",
+      "WP2: stall rule — the stall timer accrues only while agent_status != working and the milestone lifecycle has not advanced; a working status pauses it. Hard ceiling: no lifecycle advance for 4 × stall_timeout (any status) still stalls, so a hung 'working' runner is caught. Default stall_timeout stays 30 min.",
+      "WP2: config knob agent.automation.stall_timeout_minutes (int 1..=240) in config.rs / config_docs.rs / config set validation. Precedence: --stall-timeout-ms > config > 30 min default.",
+      "WP3: `mp autopilot wait <id> [--timeout <sec>]` (default 1800) polls the run state (.mp/autopilot-run.state.json) and the milestone lifecycle; exit 0 with {reached: true, lifecycle} when the run's target lifecycle (or complete) is reached; exit 1 with {reached: false, reason: timeout | run-stopped | run-failed, lifecycle} otherwise.",
+      "WP3: `mp autopilot tail <id> [--follow] [--since <rfc3339>] [--idle <sec>]` prints activity events whose subject == <id> (oldest first, JSON lines); --follow keeps polling activity.json and exits after --idle seconds (default 5) without new events.",
+      "Tests use the existing fake-herdr pattern in crates/mp/tests/autopilot_drive_herdr_wait.rs and deterministic clocks (the *_with(now) seams); new binaries crates/mp/tests/autopilot_wait.rs and autopilot_tail.rs.",
+      "Docs: docs/autopilot/README.md and docs/mp/commands.md; `mp autopilot status --help` cross-references wait / tail; CHANGELOG."
     ],
     "out_of_scope": [
-      "A full chat-side tool integration (i.e., exposing the autopilot as a tool that the chat agent can call as a function). That's a separate feature milestone, not M246.",
-      "Re-architecting the runner pane management (herdr pane split / agent start timing). The 6 herdr-0.9.x drift patches in commit ebe1cfc are the right baseline; M246 is what the orchestrator does once panes are running.",
-      "Adding a new harness (claude, codex, etc.) to the autopilot. The harness registry's V1 set is opencode / cursor / pi; a new entry is a follow-up.",
-      "Changing the autopilot's UI in raul (the M241 / M242 / M245 milestones cover that). M246 is server-side only — pure autopilot, no UI surface."
+      "Exposing autopilot as a chat tool/function.",
+      "Pane management or herdr spawn timing (herdr 0.9.x drift patches are the baseline).",
+      "New harnesses.",
+      "raul UI changes (M241 / M242).",
+      "Changing the 30-minute default stall timeout."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "Runner-readiness gate fires before the prompt is delivered. After mp autopilot start <id>, the orchestrator's send_prompt call to the runner blocks until agent_status == idle (with the configured grace). A unit test stubs the runner's interactive_ready response and asserts the prompt queue depth is non-zero before the gate clears and zero after.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/runner_readiness_gate/)'",
+      "description": "The readiness gate delivers the prompt only after idle has held continuously for settle_ms (default 5000); a non-idle read resets the window; timeout_ms still bounds the wait; settle_ms=0 keeps first-idle behavior; --prompt-settle-ms is accepted by mp autopilot start.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_drive_herdr_wait -E 'test(/settle/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "A slow-but-working runner does NOT trip the stalled lifecycle. A test simulates agent_status: working + lifecycle: in-progress for 5 minutes; the poller must keep the lifecycle in in-progress, not transition to stalled.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_threshold_slow_runner/)'",
+      "description": "A runner reporting working with no lifecycle advance is not stalled before 4 × stall_timeout; idle/unknown with no advance stalls at stall_timeout; any status with no advance stalls at the 4× ceiling (deterministic clock).",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_working_runner_not_stalled|stall_idle_runner_stalls|stall_hard_ceiling/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "mp autopilot wait <id> blocks until the milestone reaches complete. A test runs the autopilot on a fake milestone; the wait subprocess returns exit 0 within the configured timeout when the milestone completes, and exit 1 with a structured error when the timeout elapses.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/autopilot_wait/)'",
+      "description": "mp autopilot wait <id> exits 0 with reached=true when the run's target lifecycle (or complete) is reached, and exits 1 with reached=false and reason timeout | run-stopped | run-failed otherwise.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_wait",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "mp autopilot tail <id> --follow streams recent activity events. A test seeds activity.json with a known sequence, invokes tail (without --follow so it terminates after the existing entries), and asserts the output matches the seed in order. A second test with --follow against an in-process appender runs the loop and exits when no new events arrive for 500 ms.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/autopilot_tail/)'",
+      "description": "mp autopilot tail <id> prints only subject==<id> activity events oldest-first (respecting --since); --follow prints newly appended events and exits after --idle seconds without new ones.",
+      "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_tail",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
-      "description": "stall_timeout_minutes config knob is honored. The test sets agent.automation.stall_timeout_minutes = 1 and asserts the configured value is what the state-machine reads. A second test sets it to 60 and confirms the read.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_timeout_minutes_config/)'",
+      "description": "agent.automation.stall_timeout_minutes (1..=240) is validated by mp config set, and the effective timeout follows --stall-timeout-ms > config > 30 min.",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_timeout_minutes_config|stall_timeout_precedence/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
-      "description": "make lint, make test, and consumer-surface-lint all stay green; cargo clippy --workspace --all-targets -- -D warnings exits 0.",
-      "verification": "make lint && make test && make consumer-surface-lint",
+      "description": "mp tests, clippy, fmt, and consumer-surface lint are clean; wait / tail are documented in docs/autopilot/README.md and docs/mp/commands.md.",
+      "verification": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint && rg -q 'autopilot wait' docs/autopilot/README.md && rg -q 'autopilot tail' docs/mp/commands.md",
       "status": "pending",
       "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "stall detection",
+      "choice": "Stall timer accrues only while agent_status != working and the lifecycle has not advanced; a 4 × stall_timeout no-advance ceiling applies regardless of status; default stays 30 min",
+      "rationale": "Status-unchanged detection flagged long builds as stalls; pausing on working fixes that, and the ceiling still catches a runner hung in working. Keeping 30 min avoids changing behavior for idle-without-progress cases."
     }
   ],
   "work_packages": [
     {
       "id": "WP1",
-      "name": "Runner-readiness gate",
-      "goal": "Before the orchestrator dispatches the runner prompt, wait for the runner's interactive_ready: true plus a configurable grace period. The gate is a single wait_for_runner_idle(grace_ms) call in the prompt-dispatch path.",
-      "rollback": "Revert the gate call; the dispatcher sends the prompt immediately as before."
+      "name": "Readiness settle window",
+      "goal": "Prompts are delivered only after continuous idle for settle_ms (default 5000), configurable via --prompt-settle-ms",
+      "rollback": "Set settle_ms default to 0 (first-idle behavior)"
     },
     {
       "id": "WP2",
       "name": "Lifecycle poller stall threshold",
-      "goal": "Tune the default stall window from 30 min to 5 min, with a config override agent.automation.stall_timeout_minutes (range 1..120, default 5). A slow-but-working runner must not trip the stalled lifecycle.",
-      "rollback": "Revert the default to 30 min and drop the config knob; the test that asserts the timeout is honored still passes because the absolute value is irrelevant to the test."
+      "goal": "Working runners never stall before a 4× hard ceiling; idle-without-progress stalls at stall_timeout (default 30 min, config agent.automation.stall_timeout_minutes)",
+      "rollback": "Revert to status-unchanged stall detection; drop the config knob"
     },
     {
       "id": "WP3",
       "name": "Chat-driven autopilot ergonomics (wait / tail)",
-      "goal": "Add two new subcommands under mp autopilot: wait <id> blocks until the milestone reaches a terminal lifecycle (complete / failed / cancelled) with a configurable timeout; tail <id> [--follow] [--since <ts>] streams recent activity events for the named session.",
+      "goal": "mp autopilot wait <id> blocks to target lifecycle with structured exit; mp autopilot tail <id> [--follow] streams subject-filtered activity; documented",
       "rollback": "Drop both new subcommands; mp autopilot status and reading activity.json by hand remain the only way to observe a detached session."
     }
   ],
@@ -125,11 +137,12 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Implement wait_for_runner_idle(grace_ms) in crates/mp/src/autopilot/drive/bridge.rs. The function calls herdr agent get <runner_pane> and waits for agent_status == idle (with interactive_ready: true), polling at the configured poll interval. Default grace is 5000 ms; a negative grace disables the post-idle delay.",
+      "action": "Add settle_ms (default 5000) to ReadinessOptions in drive/herdr.rs; wait_for_readiness_with returns only after continuous idle for settle_ms (non-idle resets; timeout_ms bounds the whole wait; 0 = first-idle).",
       "files": [
-        "crates/mp/src/autopilot/drive/bridge.rs"
+        "crates/mp/src/autopilot/drive/herdr.rs",
+        "crates/mp/tests/autopilot_drive_herdr_wait.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/runner_readiness_gate/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast --test autopilot_drive_herdr_wait -E 'test(/settle/)'",
       "done_when": "AC-01 partial (unit test)",
       "status": "pending",
       "covers_ac": [
@@ -145,16 +158,20 @@
       "id": "S4",
       "work_package": "WP2",
       "order": 4,
-      "action": "Add the agent.automation.stall_timeout_minutes config knob in crates/mp/src/config.rs (default 5, range 1..120). Read the value in crates/mp/src/autopilot/drive/state_machine.rs and use it in the stall transition. Update the default from 30 min to 5 min.",
+      "action": "Stall rule in drive/state_machine.rs + drive/herdr.rs (wait_for_lifecycle_with): timer accrues only while agent_status != working and lifecycle unchanged; hard ceiling 4 × stall_timeout with no lifecycle advance regardless of status. Add agent.automation.stall_timeout_minutes (1..=240) to config.rs / config_docs.rs / config_cmd.rs validation; precedence --stall-timeout-ms > config > 30 min.",
       "files": [
+        "crates/mp/src/autopilot/drive/state_machine.rs",
+        "crates/mp/src/autopilot/drive/herdr.rs",
         "crates/mp/src/config.rs",
-        "crates/mp/src/autopilot/drive/state_machine.rs"
+        "crates/mp/src/config_docs.rs",
+        "crates/mp/src/config_cmd.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_threshold_slow_runner|stall_timeout_minutes_config/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_/)'",
       "done_when": "AC-02 + AC-05 partial",
       "status": "pending",
       "covers_ac": [
-        "AC-02 AC-05"
+        "AC-02",
+        "AC-05"
       ],
       "depends_on_steps": [],
       "claimed_by": "",
@@ -166,11 +183,13 @@
       "id": "S6",
       "work_package": "WP3",
       "order": 8,
-      "action": "Add mp autopilot wait <id> subcommand. Reads the run-state file in a poll loop; exits 0 when the milestone reaches complete, exit 1 with a structured error when the timeout elapses (default 30 min, override via --timeout <sec>). Print the final lifecycle on success.",
+      "action": "mp autopilot wait <id> [--timeout <sec>] (default 1800): poll .mp/autopilot-run.state.json + milestone lifecycle; exit 0 {reached:true, lifecycle} at target lifecycle or complete; exit 1 {reached:false, reason, lifecycle} on timeout / run-stopped / run-failed. Tests in crates/mp/tests/autopilot_wait.rs with seeded run state.",
       "files": [
-        "crates/mp/src/commands/autopilot.rs"
+        "crates/mp/src/cli/autopilot.rs",
+        "crates/mp/src/commands/autopilot.rs",
+        "crates/mp/tests/autopilot_wait.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/autopilot_wait|/)' ",
+      "tests": "cargo nextest run -p mp --no-fail-fast --test autopilot_wait",
       "done_when": "AC-03 partial",
       "status": "pending",
       "covers_ac": [
@@ -186,11 +205,13 @@
       "id": "S7",
       "work_package": "WP3",
       "order": 10,
-      "action": "Add mp autopilot tail <id> [--follow] [--since <ts>] subcommand. Without --follow, reads the run's recent activity events from master-plan/activity.json and prints them. With --follow, polls activity.json for new events (per the lane's last_id) and prints them as they're appended, exiting after --idle <sec> of no new events (default 5 sec).",
+      "action": "mp autopilot tail <id> [--follow] [--since <rfc3339>] [--idle <sec>] (default idle 5): JSON-lines activity events with subject == <id>, oldest first; --follow polls activity.json for appends. Tests in crates/mp/tests/autopilot_tail.rs (seeded journal; follow with an in-process appender).",
       "files": [
-        "crates/mp/src/commands/autopilot.rs"
+        "crates/mp/src/cli/autopilot.rs",
+        "crates/mp/src/commands/autopilot.rs",
+        "crates/mp/tests/autopilot_tail.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/autopilot_wait|/)' ",
+      "tests": "cargo nextest run -p mp --no-fail-fast --test autopilot_tail",
       "done_when": "AC-04 fully passes",
       "status": "pending",
       "covers_ac": [
@@ -206,17 +227,21 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 2,
-      "action": "Wire the readiness gate into the prompt-dispatch path in crates/mp/src/autopilot/drive/state_machine.rs. Replace the immediate send_prompt call with a wait_for_runner_idle(grace_ms); send_prompt sequence. Default grace is read from the existing mp autopilot start config.",
+      "action": "Plumb --prompt-settle-ms on mp autopilot start (cli/autopilot.rs → commands/autopilot.rs → the ReadinessOptions built in drive/state_machine.rs).",
       "files": [
+        "crates/mp/src/cli/autopilot.rs",
+        "crates/mp/src/commands/autopilot.rs",
         "crates/mp/src/autopilot/drive/state_machine.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/runner_readiness_gate/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast --test autopilot_drive_herdr_wait -E 'test(/settle/)'",
       "done_when": "AC-01 partial (integration test)",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -226,17 +251,19 @@
       "id": "S4.1",
       "work_package": "WP2",
       "order": 5,
-      "action": "Add a regression test that simulates a runner at agent_status: working + lifecycle: in-progress for 5 minutes and asserts the poller does NOT transition to stalled. Use a deterministic clock injection so the test runs in milliseconds, not minutes.",
+      "action": "Deterministic-clock tests: stall_working_runner_not_stalled (working 2h, no advance, timeout 30m → not stalled) and stall_idle_runner_stalls (idle 31m, no advance → stalled).",
       "files": [
-        "crates/mp/src/autopilot/drive/state_machine.rs"
+        "crates/mp/src/autopilot/drive/herdr.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_threshold_slow_runner/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_working_runner_not_stalled|stall_idle_runner_stalls/)'",
       "done_when": "AC-02 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S4"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -246,19 +273,28 @@
       "id": "S6.1",
       "work_package": "WP3",
       "order": 9,
-      "action": "Update the existing mp autopilot status help text to cross-reference the new wait and tail verbs, and update docs/commands/autopilot.md to document both. Add CHANGELOG entry under Unreleased: mp autopilot: new wait / tail verbs; runner-readiness gate; configurable stall window (default 5 min).",
+      "action": "Docs + final verify: document wait / tail / --prompt-settle-ms / stall_timeout_minutes in docs/autopilot/README.md and docs/mp/commands.md; cross-reference from mp autopilot status --help; CHANGELOG; run mp nextest, clippy, fmt, consumer-surface lint.",
       "files": [
-        "crates/mp/src/commands/autopilot.rs",
-        "docs/commands/autopilot.md",
+        "docs/autopilot/README.md",
+        "docs/mp/commands.md",
+        "crates/mp/src/cli/autopilot.rs",
         "CHANGELOG.md"
       ],
-      "tests": "make test",
+      "tests": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint && rg -q 'autopilot wait' docs/autopilot/README.md && rg -q 'autopilot tail' docs/mp/commands.md",
       "done_when": "AC-06 partial",
       "status": "pending",
       "covers_ac": [
         "AC-06"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1.1",
+        "S1.1.1",
+        "S4.1",
+        "S4.1.1",
+        "S4.1.1.1",
+        "S6",
+        "S7"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -268,17 +304,19 @@
       "id": "S1.1.1",
       "work_package": "WP1",
       "order": 3,
-      "action": "Add a regression test that runs the full pipeline on a fake runner (a stub herdr agent get that reports agent_status: busy for the first 3 polls, then idle after a simulated 2-second build). Asserts the prompt is queued (not delivered) during the busy window and delivered after the gate clears.",
+      "action": "Fake-herdr regression in autopilot_drive_herdr_wait.rs: status sequence idle, working, idle... proves the prompt is delivered only after the settle window of continuous idle, and a mid-window non-idle resets it.",
       "files": [
-        "crates/mp/src/autopilot/drive/herdr_wait.rs"
+        "crates/mp/tests/autopilot_drive_herdr_wait.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/runner_readiness_gate/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast --test autopilot_drive_herdr_wait -E 'test(/settle/)'",
       "done_when": "AC-01 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-01"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -288,39 +326,19 @@
       "id": "S4.1.1",
       "work_package": "WP2",
       "order": 6,
-      "action": "Add a regression test that simulates a runner at agent_status: working + lifecycle: in-progress for 5 minutes and asserts the poller does NOT transition to stalled. Use a deterministic clock injection so the test runs in milliseconds, not minutes.",
+      "action": "Deterministic-clock test stall_hard_ceiling: working with no lifecycle advance for > 4 × stall_timeout → stalled.",
       "files": [
-        "crates/mp/src/autopilot/drive/state_machine.rs"
+        "crates/mp/src/autopilot/drive/herdr.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_threshold_slow_runner/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_hard_ceiling/)'",
       "done_when": "AC-02 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-02"
       ],
-      "depends_on_steps": [],
-      "claimed_by": "",
-      "claimed_at": "",
-      "lease_expires_at": "",
-      "evidence": ""
-    },
-    {
-      "id": "S7.1",
-      "work_package": "WP3",
-      "order": 11,
-      "action": "Update the existing mp autopilot status help text to cross-reference the new wait and tail verbs, and update docs/commands/autopilot.md to document both. Add CHANGELOG entry under Unreleased: mp autopilot: new wait / tail verbs; runner-readiness gate; configurable stall window (default 5 min).",
-      "files": [
-        "crates/mp/src/commands/autopilot.rs",
-        "docs/commands/autopilot.md",
-        "CHANGELOG.md"
+      "depends_on_steps": [
+        "S4"
       ],
-      "tests": "make test",
-      "done_when": "AC-06 partial",
-      "status": "pending",
-      "covers_ac": [
-        "AC-06"
-      ],
-      "depends_on_steps": [],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
@@ -330,18 +348,20 @@
       "id": "S4.1.1.1",
       "work_package": "WP2",
       "order": 7,
-      "action": "Add the AC-05 config-knob test: set agent.automation.stall_timeout_minutes = 1 and assert the state-machine reads that exact value. A second test sets it to 60 and confirms the read. Both tests are deterministic (no real waiting).",
+      "action": "Config tests: stall_timeout_minutes_config (1 and 240 accepted, 0 and 241 rejected by mp config set) and stall_timeout_precedence (flag > config > default).",
       "files": [
-        "crates/mp/src/autopilot/drive/state_machine.rs",
-        "crates/mp/src/config.rs"
+        "crates/mp/tests/suites/config_keys.rs",
+        "crates/mp/src/autopilot/drive/state_machine.rs"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_timeout_minutes_config/)'",
+      "tests": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_timeout_minutes_config|stall_timeout_precedence/)'",
       "done_when": "AC-05 fully passes",
       "status": "pending",
       "covers_ac": [
         "AC-05"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S4"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",

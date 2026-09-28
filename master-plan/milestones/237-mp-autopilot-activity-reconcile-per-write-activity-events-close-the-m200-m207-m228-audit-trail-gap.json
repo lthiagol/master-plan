@@ -1,7 +1,7 @@
 {
   "milestone": {
     "id": "237",
-    "title": "mp autopilot activity reconcile + per-write activity events — close the M200/M207/M228 audit-trail gap",
+    "title": "activity journal completeness — step-done / criterion-pass events + `mp activity reconcile <id>`",
     "slug": "mp-autopilot-activity-reconcile-per-write-activity-events-close-the-m200-m207-m228-audit-trail-gap",
     "lifecycle": "approved",
     "spec_status": "ready",
@@ -12,12 +12,12 @@
     "deferred": false,
     "deferred_reason": "",
     "depends_on": [],
-    "effort": "S",
+    "effort": "M",
     "risk": "low",
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-27",
+    "updated": "2026-09-28",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -36,51 +36,53 @@
     }
   },
   "intent": {
-    "outcome": "Every mp milestone lifecycle write produces an activity.json event by default, and a recovery command exists for milestones that lost events to historical truncations."
+    "outcome": "Every per-step and per-AC write lands in activity.json alongside the lifecycle transitions that already do, and `mp activity reconcile <id>` backfills events that a milestone's on-disk state proves happened but the journal lost."
   },
   "problem": {
-    "description": "Three autopilot milestones (M200, M207, M228) lost their audit trail in activity.json — M200's review-pass event, M207's lifecycle events, plus reproducibly the runner's `mp milestone step done` / `mp milestone criterion pass` / `mp milestone complete` calls did not add an event entry. The R-late finding in mp-herdr-log.txt notes that `mp reviews pass` writes to milestone JSON and reviews.json but does NOT write to activity.json by default. The orchestrator's R5 verification protocol catches the absence for new milestones, but legacy milestones remain partly undocumented and the CLI surfaces the data inconsistency. Closed by two changes: (a) make every lifecycle-writing subcommand emit an activity event by default (`--events` flag remains for explicit opt-out in tests), and (b) ship `mp autopilot activity reconcile <id>` that reads the canonical milestone JSON + reviews.json and emits synthetic events to activity.json for any transition not already recorded."
+    "description": "activity.json (crates/mp/src/activity.rs, retention cap ACTIVITY_RETENTION_CAP = 500) already records lifecycle transitions from `mp milestone complete` (milestone/complete.rs:78), spec transitions (milestone/spec.rs:626), and `mp reviews pass` / finding transitions (reviews.rs:967, :1034). Two per-item writers record nothing: `mp milestone step done` (commands/step.rs) and `mp milestone criterion pass` (commands/milestone.rs). Autopilot's orchestrator verification (the R5 cross-check: 'len(activity entries for <id>) > 0') therefore can't see step/AC progress, and M200/M207/M228 lost events to earlier journal truncation — the milestone JSON and reviews.json survived, so the missing events are recoverable from disk."
   },
   "scope": {
     "in_scope": [
-      "Extend crates/mp/src/milestone/ (or whatever the current home of the lifecycle writers is) so `mp milestone step done`, `mp milestone criterion pass`, `mp milestone complete` each write an activity.json event entry in addition to the milestone JSON.",
-      "Add a hidden `--quiet-events` (or `--skip-events`) flag so tests that assert on activity.json can opt out; default is events ON.",
-      "Add a new subcommand `mp autopilot activity reconcile <id>` that scans the milestone JSON + reviews.json for transitions present on disk but absent from activity.json, and writes the missing events with `event_kind=reconcile` so the audit trail is recoverable.",
-      "Ensure `mp reviews pass` / `mp reviews finding resolve` emit activity events on the canonical path (already in M228 scope; verify not regressed).",
-      "Regression: M207 (replayed via mp autopilot activity reconcile 207) ends with at least one activity.json entry per lifecycle transition."
+      "Add step_done_event(milestone_id, step_id) and criterion_passed_event(milestone_id, ac_id) constructors in crates/mp/src/activity.rs (new event types `step-done` and `criterion-passed`; additive — existing event shapes unchanged) and emit them from `mp milestone step done` and `mp milestone criterion pass` via the existing best-effort append path.",
+      "No opt-out flag: tests that assert exact activity.json contents are updated to expect the new events.",
+      "Add `mp activity reconcile <id> [--dry-run]`: derive expected events from the milestone JSON (lifecycle_at, flow_stages timestamps, done steps, passed ACs) and reviews.json (review passes); append only the ones missing from activity.json, each tagged data.source = \"reconcile\" with its original timestamp. Idempotent: a second run appends nothing. Output JSON lists appended events.",
+      "Regression tests that `mp milestone complete` and `mp reviews pass` still emit their lifecycle events.",
+      "After ship: run `mp activity reconcile` for 200, 207, 228 on this repo's plan and record the appended counts in the milestone evidence.",
+      "Document both in docs/mp/commands.md; CHANGELOG entry."
     ],
     "out_of_scope": [
-      "Rewriting activity.json wholesale; the reconcile command is additive only.",
-      "Changing consumer-visible JSON shapes for activity events.",
-      "Backfilling ancient milestones (M1-M174); the reconcile command works on any milestone id but the milestone only auto-applies to the three named as backlog."
+      "Raising or removing the 500-event retention cap — reconciled events are subject to it like any other.",
+      "Changing existing event shapes or types.",
+      "Backfilling every historical milestone automatically; reconcile runs per id on demand.",
+      "Autopilot-specific commands (this is a general journal capability, not `mp autopilot …`)."
     ]
   },
   "acceptance_criteria": [
     {
       "id": "AC-01",
-      "description": "A new milestone driven through `mp milestone step done` / `criterion pass` / `complete` produces ≥1 activity.json entry per call.",
-      "verification": "Bash: mp scratch new m237-evt; cd \"$SCRATCH\"; mp init; mp milestone create --title M237-test --intent / -; set AC + step; mp milestone step done M237-test S1; rg '\"subject\": \"M237-test\"' master-plan/activity.json (≥1 match).",
+      "description": "mp milestone step done and mp milestone criterion pass each append exactly one activity event (step-done / criterion-passed) with subject = milestone id; complete and reviews pass still emit their lifecycle events.",
+      "verification": "cargo nextest run -p mp --test activity_writes --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-02",
-      "description": "mp autopilot activity reconcile <id> backfills missing events for a milestone whose canonical state on disk (milestone JSON + reviews.json) disagrees with activity.json.",
-      "verification": "Integration test takes M207's milestone JSON + reviews.json + empty activity.json, runs the reconcile command, and asserts activity.json gains entries for the missing lifecycle transitions.",
+      "description": "mp activity reconcile <id> appends the events a milestone's on-disk state proves but the journal lacks (tagged data.source=reconcile), --dry-run writes nothing, and a second run appends zero events.",
+      "verification": "cargo nextest run -p mp --test activity_reconcile --no-fail-fast",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-03",
-      "description": "Existing tests that monitored the old 'no activity event' behavior are updated to opt into the new default, OR they explicitly pass --quiet-events / --skip-events.",
-      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/activity/)' (full test suite passes; the new code path is exercised; no test exits red because of an unexpected activity event).",
+      "description": "Existing activity-related tests pass after being updated for the new default events (no opt-out flag was added).",
+      "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/activity/)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-04",
-      "description": "make test and consumer-surface-lint remain green.",
-      "verification": "make test && make consumer-surface-lint.",
+      "description": "mp crate tests, clippy, fmt, and consumer-surface lint are clean.",
+      "verification": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     }
@@ -89,7 +91,7 @@
     {
       "id": "WP1",
       "name": "Implementation",
-      "goal": "Ship the documented fix or subcommand; pass the AC verifications.",
+      "goal": "Per-step / per-AC events emitted; mp activity reconcile backfills lost events idempotently; applied to M200/M207/M228",
       "rollback": "Revert the source change; restored behavior matches the prior baseline."
     }
   ],
@@ -98,11 +100,14 @@
       "id": "S1",
       "work_package": "WP1",
       "order": 1,
-      "action": "Make mp milestone step done, mp milestone criterion pass, mp milestone complete emit activity.json events by default; add --quiet-events opt-out.",
+      "action": "Add step_done_event / criterion_passed_event to crates/mp/src/activity.rs and emit them from mp milestone step done (commands/step.rs) and mp milestone criterion pass (commands/milestone.rs); add crates/mp/tests/activity_writes.rs covering both plus complete / reviews pass regressions.",
       "files": [
-        "crates/mp/src/milestone/mod.rs"
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/commands/step.rs",
+        "crates/mp/src/commands/milestone.rs",
+        "crates/mp/tests/activity_writes.rs"
       ],
-      "tests": "rg -n 'subject' master-plan/activity.json after a single milestone complete cycle",
+      "tests": "cargo nextest run -p mp --test activity_writes --no-fail-fast",
       "done_when": "AC-01 passes",
       "status": "pending",
       "covers_ac": [
@@ -118,11 +123,14 @@
       "id": "S1.1",
       "work_package": "WP1",
       "order": 2,
-      "action": "Add the mp autopilot activity reconcile subcommand that ingests canonical state and backfills missing events.",
+      "action": "Add mp activity reconcile <id> [--dry-run] (cli + commands/activity.rs): derive expected events from milestone JSON + reviews.json, append the missing ones tagged data.source=reconcile, idempotent; add crates/mp/tests/activity_reconcile.rs using a fixture milestone with a truncated journal.",
       "files": [
-        "crates/mp/src/commands/autopilot_activity_reconcile.rs"
+        "crates/mp/src/commands/activity.rs",
+        "crates/mp/src/activity.rs",
+        "crates/mp/src/cli/mod.rs",
+        "crates/mp/tests/activity_reconcile.rs"
       ],
-      "tests": "cargo nextest run -p mp --test autopilot_activity_reconcile --no-fail-fast",
+      "tests": "cargo nextest run -p mp --test activity_reconcile --no-fail-fast",
       "done_when": "AC-02 passes",
       "status": "pending",
       "covers_ac": [
@@ -138,18 +146,45 @@
       "id": "S1.1.1",
       "work_package": "WP1",
       "order": 3,
-      "action": "Update existing tests, add the new test file; ensure full mp test suite passes; lint clean.",
+      "action": "Update existing tests that assert exact activity.json contents; document step-done / criterion-passed / reconcile in docs/mp/commands.md; CHANGELOG; run the mp suite + clippy + fmt + consumer-surface lint.",
       "files": [
-        "crates/mp/tests/activity_writes.rs"
+        "crates/mp/tests",
+        "docs/mp/commands.md",
+        "CHANGELOG.md"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast -E test(/activity/); make lint; make consumer-surface-lint",
+      "tests": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-03 AC-04 pass",
       "status": "pending",
       "covers_ac": [
         "AC-03",
         "AC-04"
       ],
-      "depends_on_steps": [],
+      "depends_on_steps": [
+        "S1",
+        "S1.1"
+      ],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP1",
+      "order": 4,
+      "action": "After ship (installed mp updated): run mp activity reconcile 200, 207, 228 on this repo's plan; record appended event counts in this step's evidence; mp validate.",
+      "files": [
+        "master-plan/activity.json"
+      ],
+      "tests": "manual: mp activity reconcile 200 && mp activity reconcile 207 && mp activity reconcile 228 && mp validate (record counts)",
+      "done_when": "Reconcile run for 200/207/228 with counts recorded",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [
+        "S1.1.1"
+      ],
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
