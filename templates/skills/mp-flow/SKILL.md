@@ -14,18 +14,18 @@ stage to the role that owns it.
 
 | Stage | Name | Owner |
 |-------|------|-------|
-| 1 | Define outcome | coordinator |
-| 2 | Interview & shape | coordinator |
-| 3 | Write acceptance | coordinator |
-| 4 | Approve spec | coordinator |
+| 1 | Draft | coordinator |
+| 2 | Groom | coordinator |
+| 3 | Specify | coordinator |
+| 4 | Approve | coordinator |
 | 5 | Claim & execute | runner |
 | 6 | Self-review | runner |
-| 7 | Mark complete | runner |
+| 7 | Complete | runner |
 | 8 | External review | coordinator |
-| 9 | Remediate findings | runner |
+| 9 | Remediate | runner |
 | 10 | Re-review | coordinator |
 | 11 | Document | coordinator |
-| 12 | Hand-off | coordinator |
+| 12 | Hand off | coordinator |
 
 Stages 1–4 are the coordinator's spec-authoring domain. Stages 5–7 are the
 runner's execution domain. Stages 8–10 form the review loop: if stage 10
