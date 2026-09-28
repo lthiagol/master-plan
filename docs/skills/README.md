@@ -58,13 +58,46 @@ The meta-skill. Loads the **12-stage timeline** of a milestone's life and binds
 each stage to the role that owns it. Any agent (coordinator or runner) loads
 this first; it is the map both roles share.
 
-| Stages 1–4 | Spec authoring (coordinator): Define outcome, Interview & shape, Write acceptance, Approve spec |
-|------------|--------------------------------------------------------------|
-| Stages 5–7 | Execution (runner): Claim & execute, Self-review, Mark complete |
+| Stages 1–4 | Spec authoring (coordinator): Draft, Groom, Specify, Approve |
+|------------|----------------------------------------------------------|
+| Stages 5–7 | Execution (runner): Claim & execute, Self-review, Complete |
 | Stage 8 | External review (coordinator) |
-| Stage 9 | Remediate findings (runner) |
+| Stage 9 | Remediate (runner) |
 | Stage 10 | Re-review (coordinator) |
-| Stages 11–12 | Document, Hand-off (coordinator) |
+| Stages 11–12 | Document, Hand off (coordinator) |
+
+#### The role-binding table is lint-locked to the stage manifest
+
+`mp-flow` ships a **stage manifest** (`stages.toml`) alongside its `SKILL.md`.
+The manifest is the single source of truth: it defines each stage's number,
+name, owning role, and the `mp` commands that stage runs. The `SKILL.md` is
+the agent-facing rendering of it, and its **role-binding table** (the
+`Stage | Name | Owner` table near the top) must mirror the manifest exactly.
+
+| Cell | Must equal |
+|------|-----------|
+| `Stage` | the stage's `number` in the manifest |
+| `Name`  | the stage's `name` in the manifest — verbatim, not a rewording |
+| `Owner` | the stage's `role` in the manifest (`coordinator` or `runner`) |
+
+`make mp-flow-lint` enforces this. It also checks that every manifest stage has
+a `## <name>` section in `SKILL.md` containing that stage's commands, and that
+the manifest's own per-role stage lists agree with the per-stage roles.
+
+The reason the check is exact rather than approximate: a stage can be called
+one thing in the manifest and a near-synonym in the table — `Draft` vs
+`Define outcome`, `Complete` vs `Mark complete`, `Hand off` vs `Hand-off` — and
+an agent reading only the table will use the wrong name when it looks up the
+stage. A rename in the manifest should therefore be a rename in *both* files,
+or neither. If a `Name mismatch` / `Owner mismatch` diagnostic ever surfaces,
+copy the manifest's value into the table rather than paraphrasing it.
+
+This repository enforces the contract with `make mp-flow-lint`, which checks
+the table against the manifest and can print a machine-readable report of every
+parsed row next to the value the manifest expects. The fixture pair under
+`tests/fixtures/mp-flow-lint/` pins both directions — an in-sync table passes,
+a drifted one is rejected with a per-row diagnostic.
+
 
 ### `mp-runner` — executing + fixing (runner role)
 Owns the execution domain (stages 5–7) and remediation (stage 9). When a session
