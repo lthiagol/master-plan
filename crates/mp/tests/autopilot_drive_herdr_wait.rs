@@ -17,7 +17,7 @@
 
 mod common;
 
-use crate::common::fake_herdr::FakeHerdrBuilder;
+use crate::common::fake_herdr::{FakeHerdr, FakeHerdrBuilder};
 use crate::common::TestEnv;
 use mp::autopilot::drive::{
     deliver_prompt, lifecycle_advanced_past, read_agent_status, read_lifecycle_via_mp, send_prompt,
@@ -25,7 +25,7 @@ use mp::autopilot::drive::{
     ReadinessOptions, WaitOptions, WaitOutcome,
 };
 use std::fs;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 fn pane(id: &str) -> PaneHandle {
     PaneHandle {
@@ -428,5 +428,251 @@ fn read_lifecycle_via_mp_returns_current_state() {
     assert_eq!(
         lifecycle, "draft",
         "a freshly-created milestone should be in draft lifecycle"
+    );
+}
+
+// ─── M246 WP1 / AC-01: settle window before prompt delivery ────────────────
+//
+// `read_agent_status` falls back to `idle` whenever `herdr agent wait
+// --timeout 0` exits 0 — including the window where a freshly
+// spawned pane's harness TUI is still booting. The pre-M246 gate
+// returned on the *first* idle read, so a booting harness passed the
+// gate and the prompt was silently dropped on the floor.
+//
+// These tests script the fake herdr with a *sequence* of `agent wait`
+// responses and drive `wait_for_readiness_with` through its injected
+// `now` closure. The closure reads the fake's call counter, so virtual
+// time advances one `TICK` per loop iteration and no test sleeps in
+// real time: `agent wait` is the only subprocess inside the loop, so
+// the counter is constant within an iteration and `now()` is stable
+// between reads.
+
+/// Virtual milliseconds per readiness-loop iteration. The injected
+/// clock advances by this much for each `agent wait` call.
+const TICK_MS: u64 = 100;
+
+/// Build a `now` closure whose virtual clock is `TICK_MS` per
+/// `agent wait` call observed in the fake's counter file.
+///
+/// `now()` is called several times per loop iteration but
+/// `read_agent_status` (which bumps the counter) runs exactly once,
+/// so every `now()` inside one iteration returns the same instant.
+fn clock_from_counter(fake: &FakeHerdr) -> impl FnMut() -> Instant {
+    let path = fake
+        .agent_wait_calls_path()
+        .expect("scripted fake must expose a counter path")
+        .to_path_buf();
+    let base = Instant::now();
+    move || {
+        let calls = fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(0);
+        base + Duration::from_millis(calls * TICK_MS)
+    }
+}
+
+/// Count the `agent wait` invocations in the fake's argv log — the
+/// number of status reads the gate performed.
+fn status_reads(fake: &FakeHerdr) -> usize {
+    fake.read_log()
+        .lines()
+        .filter(|l| l.contains("agent wait"))
+        .count()
+}
+
+#[test]
+fn settle_delivers_only_after_continuous_idle_window() {
+    // Sequence `idle, working, idle…`: the first read says idle (the
+    // pre-M246 false positive during harness boot), the second says
+    // working, and every read after that is idle.
+    //
+    // A first-idle gate would deliver after ONE status read. The
+    // settle gate must instead read past the `working` blip and then
+    // hold a full window. With TICK_MS = 100 and settle = 1000ms the
+    // uninterrupted-idle case needs 10 reads; this sequence needs
+    // more, because the streak only starts on the third read.
+    let env = TestEnv::new();
+    let bin_dir = env.tmp.path().join("fake-bin");
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_sequence(&[
+            r#"{"status":"idle"}"#,
+            r#"{"status":"working"}"#,
+            r#"{"status":"idle"}"#,
+        ])
+        .install(&bin_dir);
+
+    let p = pane("%11");
+    let opts = ReadinessOptions {
+        // Generous: the virtual clock only advances on reads, so a
+        // 60s budget can never trip before the streak matures.
+        timeout_ms: 60_000,
+        poll_interval_ms: 1,
+        settle_ms: 1_000,
+    };
+    wait_for_readiness_with(fake.path(), &p, &opts, clock_from_counter(&fake)).unwrap();
+
+    let reads = status_reads(&fake);
+    assert!(
+        reads > 10,
+        "must read past the first idle AND the working blip, then hold \
+         a full {settle}ms window; only {reads} status reads were made",
+        settle = opts.settle_ms,
+    );
+}
+
+#[test]
+fn settle_resets_window_on_mid_window_non_idle() {
+    // The discriminator between "reads N times" and "re-serves the
+    // whole window after a non-idle read".
+    //
+    // Run A: idle forever → the streak starts on read 1 and
+    //        matures after settle/TICK reads.
+    // Run B: idle, working, idle… → the streak starts on read 3,
+    //        so delivery needs strictly more reads than run A.
+    //
+    // A settle implementation that failed to reset would report the
+    // SAME count for both runs, and this test fails.
+    let settle_ms = 1_000u64;
+    let runs: [(&str, &[&str]); 2] = [
+        ("uninterrupted", &[r#"{"status":"idle"}"#]),
+        (
+            "mid-window-working",
+            &[
+                r#"{"status":"idle"}"#,
+                r#"{"status":"working"}"#,
+                r#"{"status":"idle"}"#,
+            ],
+        ),
+    ];
+
+    let mut counts: Vec<(&str, usize)> = Vec::new();
+    for (label, seq) in &runs {
+        let env = TestEnv::new();
+        let bin_dir = env.tmp.path().join("fake-bin");
+        let fake = FakeHerdrBuilder::new()
+            .agent_wait_sequence(seq)
+            .install(&bin_dir);
+
+        let p = pane("%12");
+        let opts = ReadinessOptions {
+            timeout_ms: 60_000,
+            poll_interval_ms: 1,
+            settle_ms,
+        };
+        wait_for_readiness_with(fake.path(), &p, &opts, clock_from_counter(&fake)).unwrap();
+        counts.push((label, status_reads(&fake)));
+    }
+
+    let base = counts[0].1;
+    let reset = counts[1].1;
+    // The streak starts when the first idle read is *served*, so an
+    // uninterrupted run matures on read `settle/TICK + 1` (one read
+    // to open the window, then settle/TICK ticks to fill it).
+    assert_eq!(
+        base,
+        (settle_ms / TICK_MS) as usize + 1,
+        "an uninterrupted idle streak should mature after exactly \
+         settle/TICK + 1 reads; got {base}"
+    );
+    assert!(
+        reset > base,
+        "a mid-window non-idle read must reset the settle window, so \
+         the flaky sequence needs more reads than the uninterrupted \
+         one: reset={reset} base={base}"
+    );
+}
+
+#[test]
+fn settle_zero_preserves_legacy_first_idle_behavior() {
+    // `settle_ms = 0` is the documented escape hatch: it must return
+    // on the FIRST idle read, exactly as the pre-M246 gate did.
+    let env = TestEnv::new();
+    let bin_dir = env.tmp.path().join("fake-bin");
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_sequence(&[r#"{"status":"idle"}"#])
+        .install(&bin_dir);
+
+    let p = pane("%13");
+    let opts = ReadinessOptions {
+        timeout_ms: 60_000,
+        poll_interval_ms: 1,
+        settle_ms: 0,
+    };
+    wait_for_readiness_with(fake.path(), &p, &opts, clock_from_counter(&fake)).unwrap();
+
+    assert_eq!(
+        status_reads(&fake),
+        1,
+        "settle_ms=0 must deliver on the first idle read"
+    );
+}
+
+#[test]
+fn settle_timeout_still_bounds_the_whole_wait() {
+    // `timeout_ms` bounds the WHOLE wait, including a streak that is
+    // accruing but has not matured. Here the harness reports idle
+    // forever while settle (10s) exceeds timeout (2s) — the gate must
+    // time out rather than wait out the settle window.
+    let env = TestEnv::new();
+    let bin_dir = env.tmp.path().join("fake-bin");
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_sequence(&[r#"{"status":"idle"}"#])
+        .install(&bin_dir);
+
+    let p = pane("%14");
+    let opts = ReadinessOptions {
+        timeout_ms: 2_000,
+        poll_interval_ms: 1,
+        settle_ms: 10_000,
+    };
+    let err =
+        wait_for_readiness_with(fake.path(), &p, &opts, clock_from_counter(&fake)).unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("readiness timeout"),
+        "a settle window longer than timeout_ms must still time out: {msg}"
+    );
+    assert_eq!(
+        status_reads(&fake),
+        (2_000 / TICK_MS) as usize,
+        "the wait must stop at timeout_ms even mid-settle"
+    );
+}
+
+#[test]
+fn settle_delays_prompt_delivery_until_window_matures() {
+    // End-to-end through `send_prompt` (the composite the state
+    // machine actually calls): with a flaky boot sequence the send
+    // must not appear until the streak has matured.
+    let env = TestEnv::new();
+    let bin_dir = env.tmp.path().join("fake-bin");
+    let fake = FakeHerdrBuilder::new()
+        .agent_wait_sequence(&[
+            r#"{"status":"idle"}"#,
+            r#"{"status":"working"}"#,
+            r#"{"status":"idle"}"#,
+        ])
+        .install(&bin_dir);
+
+    let p = pane("%15");
+    let opts = ReadinessOptions {
+        timeout_ms: 60_000,
+        poll_interval_ms: 1,
+        settle_ms: 500,
+    };
+    send_prompt(fake.path(), &p, "go", &opts).unwrap();
+
+    let log = fake.read_log();
+    let wait_idx = log
+        .find("agent wait %15 --status idle")
+        .expect("readiness gate must run");
+    let send_idx = log
+        .find("agent send %15 go")
+        .expect("prompt must be delivered");
+    assert!(wait_idx < send_idx, "readiness must precede delivery");
+    assert!(
+        status_reads(&fake) > 1,
+        "send_prompt must not deliver on the first (boot-time) idle read"
     );
 }

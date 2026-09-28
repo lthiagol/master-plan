@@ -88,6 +88,10 @@ use std::path::{Path, PathBuf};
 pub struct FakeHerdr {
     pub path: PathBuf,
     pub log_path: PathBuf,
+    /// Path to the `agent wait` call counter written by a scripted
+    /// `agent_wait_sequence` fake. `None` for the static-response
+    /// fakes, which never touch a counter file.
+    pub wait_count_path: Option<PathBuf>,
 }
 
 impl FakeHerdr {
@@ -97,6 +101,35 @@ impl FakeHerdr {
 
     pub fn log_path(&self) -> &Path {
         &self.log_path
+    }
+
+    /// M246 WP1 / AC-01: path to the `agent wait` call counter.
+    /// Exposed so a test can drive an injected clock from the call
+    /// count (the counter is the only clock source that advances in
+    /// lockstep with the readiness loop's status reads).
+    pub fn agent_wait_calls_path(&self) -> Option<&Path> {
+        self.wait_count_path.as_deref()
+    }
+
+    /// M246 WP1 / AC-01: how many `agent wait` calls this fake has
+    /// served. Returns 0 when the fake uses the static response
+    /// (no counter file) or nothing has been read yet.
+    pub fn agent_wait_calls(&self) -> u32 {
+        self.wait_count_path
+            .as_ref()
+            .and_then(|p| fs::read_to_string(p).ok())
+            .and_then(|s| s.trim().parse::<u32>().ok())
+            .unwrap_or(0)
+    }
+
+    /// Count the `agent wait` invocations recorded in the argv log.
+    /// Independent of the counter file, so a test can cross-check
+    /// the two.
+    pub fn agent_wait_log_lines(&self) -> usize {
+        self.read_log()
+            .lines()
+            .filter(|l| l.contains("agent wait"))
+            .count()
     }
 
     /// Read back the full argv log (one `argv: $*` line per
@@ -144,6 +177,15 @@ pub struct FakeHerdrBuilder {
     agent_start_help_response: String,
     pane_split_help_response: String,
     agent_wait_response: String,
+    /// M246 WP1 / AC-01: a *scripted* sequence of `agent wait`
+    /// responses, one per call. `None` = the single static
+    /// `agent_wait_response`. The final entry repeats for every
+    /// call past the end of the sequence, so
+    /// `["idle", "working", "idle"]` means "idle, working, then
+    /// idle forever" — the shape the settle-window regression
+    /// needs to prove a mid-window non-idle read resets the
+    /// window.
+    agent_wait_sequence: Option<Vec<String>>,
 
     pane_split_failure: Option<(i32, String)>,
     pane_split_sleep_ms: u64,
@@ -184,6 +226,7 @@ impl FakeHerdrBuilder {
             pane_split_help_response:
                 "Usage: pane split [OPTIONS]\n\nOptions:\n  --cwd <PATH>  Pane cwd\n".to_string(),
             agent_wait_response: r#"{"status":"idle"}"#.to_string(),
+            agent_wait_sequence: None,
 
             pane_split_failure: None,
             pane_split_sleep_ms: 0,
@@ -294,6 +337,31 @@ impl FakeHerdrBuilder {
 
     pub fn agent_wait_response(&mut self, r: impl Into<String>) -> &mut Self {
         self.agent_wait_response = r.into();
+        self.agent_wait_sequence = None;
+        self
+    }
+
+    /// M246 WP1 / AC-01: script a *sequence* of `agent wait`
+    /// responses — one per call, in order. The last entry repeats
+    /// once the sequence is exhausted, so callers can express
+    /// "idle, working, then idle forever" without writing a
+    /// bespoke shell script (the harness's documented reuse
+    /// contract).
+    ///
+    /// Each call increments a counter file next to the argv log;
+    /// the response for call `n` is `seq[min(n, len-1)]`. The
+    /// counter path is returned so a test can read the call count
+    /// back off disk (or drive an injected clock from it) rather
+    /// than scraping the argv log.
+    ///
+    /// Passing an empty sequence falls back to the static
+    /// `agent_wait_response`.
+    pub fn agent_wait_sequence(&mut self, seq: &[&str]) -> &mut Self {
+        self.agent_wait_sequence = if seq.is_empty() {
+            None
+        } else {
+            Some(seq.iter().map(|s| s.to_string()).collect())
+        };
         self
     }
 
@@ -330,13 +398,18 @@ impl FakeHerdrBuilder {
         fs::create_dir_all(dir).expect("create fake-herdr install dir");
         let path = dir.join("herdr");
         let log_path = dir.join("herdr-calls.log");
-        let script = self.render(&log_path);
+        let wait_count_path = dir.join("agent-wait.count");
+        let script = self.render(&log_path, &wait_count_path);
         fs::write(&path, script).expect("write fake-herdr script");
         set_executable(&path);
-        FakeHerdr { path, log_path }
+        FakeHerdr {
+            path,
+            log_path,
+            wait_count_path: Some(wait_count_path),
+        }
     }
 
-    fn render(&self, log_path: &Path) -> String {
+    fn render(&self, log_path: &Path, wait_count_path: &Path) -> String {
         let mut out = String::new();
         out.push_str("#!/bin/sh\n");
         out.push_str(&format!(
@@ -509,10 +582,33 @@ impl FakeHerdrBuilder {
         out.push_str("        ;;\n");
 
         out.push_str("      wait)\n");
-        out.push_str(&format!(
-            "        printf '%s\\n' {}\n",
-            shell_quote(&self.agent_wait_response)
-        ));
+        match &self.agent_wait_sequence {
+            None => {
+                out.push_str(&format!(
+                    "        printf '%s\\n' {}\n",
+                    shell_quote(&self.agent_wait_response)
+                ));
+            }
+            Some(seq) => {
+                // M246 WP1 / AC-01: counter-driven response
+                // selection. The counter is bumped once per
+                // `agent wait` call and the response for call `n`
+                // is `seq[min(n, len-1)]`; the last entry repeats
+                // for every call past the end.
+                out.push_str(&format!(
+                    "        N=0\n        if [ -f {cnt} ]; then N=$(cat {cnt}); fi\n        echo $((N+1)) > {cnt}\n        LAST={last}\n        if [ \"$N\" -ge \"$LAST\" ]; then N=$LAST; fi\n",
+                    cnt = shell_quote(&wait_count_path.display().to_string()),
+                    last = seq.len().saturating_sub(1),
+                ));
+                for (idx, response) in seq.iter().enumerate() {
+                    out.push_str(&format!(
+                        "        if [ \"$N\" -eq {idx} ]; then printf '%s\\n' {resp}; exit 0; fi\n",
+                        idx = idx,
+                        resp = shell_quote(response),
+                    ));
+                }
+            }
+        }
         out.push_str("        exit 0\n");
         out.push_str("        ;;\n");
 
