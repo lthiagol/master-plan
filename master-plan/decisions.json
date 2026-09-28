@@ -237,6 +237,83 @@
       "summary": "herdr-log R15: Log file fragility",
       "context": "Hard requirement: mp-herdr-log.txt at the repo root was truncated multiple times during the test (cause unknown, not pursued); substantive test state lives in git + plan.json + activity.json, not in the narrative log. The future Drive milestone should (a) move the orchestration log INTO master-plan/ as a structured record (probably under reviews/, or a new orchestrator_log.json), (b) preserve history with git commits alongside milestones, and (c) surface log entries via `mp` commands so they are discoverable from the plan zone. source: git show 438b093^:mp-herdr-log.txt (R15)",
       "milestone": "239"
+    },
+    {
+      "id": "D-34",
+      "date": "2026-09-28",
+      "summary": "herdr-log L1: Lane notifications must be SHELL COMMANDS, not printed text",
+      "context": "Consolidated Lesson 1 (log 1). M200 cycle 1: runner printed the notification in the TUI instead of running `herdr agent prompt`. M201 cycle 1: runner fabricated the lifecycle claim entirely. M202 cycle 1: 11 findings shipped with placeholders / generic strings. Fix: every lane prompt must show the exact shell command for the notification, because the word \"notify\" is interpreted as \"print\" by opencode agents by default. source: git show 438b093^:mp-herdr-log.txt (consolidated lessons, Lesson 1)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-35",
+      "date": "2026-09-28",
+      "summary": "herdr-log L2: Per-AC evidence discipline (THIRD REPEAT — load-bearing)",
+      "context": "Consolidated Lesson 2 (log 1). M200 F-12 (cycle 2): a \"milestone completion\" step overwrote evidence with a generic string. M201 F-05 (cycle 1): evidence counts disagreed with actual test counts in 3 ACs. M202 F-13 (cycle 3): commit 10a5586 replaced all 19 AC evidence with the placeholder \"M202 cycle 2 retry\". Pattern: any \"summary\" or \"completion\" step that touches milestone JSON tends to overwrite per-AC evidence — three milestones, three occurrences. Fix: evidence restoration MUST happen AFTER any completion ceremony; `mp milestone criterion pass <AC> --evidence \"...\"` is the only safe path; NEVER let a completion-summary commit touch evidence fields. The future Drive milestone should codify this as a hard rule in the runner contract. source: git show 438b093^:mp-herdr-log.txt (consolidated lessons, Lesson 2)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-36",
+      "date": "2026-09-28",
+      "summary": "herdr-log L3: Orchestrator must verify state independently",
+      "context": "Consolidated Lesson 3 (log 1). M200: state was at `executed` but the review-pass event was lost to a regression. M201 cycle 1: the runner claimed \"lifecycle=executed\" while state was actually at approved/planned. Fix: before accepting any lane's \"done\" notification the orchestrator MUST independently verify state = mp show milestone <id> --fields milestone.lifecycle,milestone.execution_status and acts = grep '\"subject\": \"<id>\"' master-plan/activity.json | tail -3, asserting lifecycle in {executed, complete}, execution_status == \"done\", and len(acts) > 0; if any check fails, REJECT and send the lane back. source: git show 438b093^:mp-herdr-log.txt (consolidated lessons, Lesson 3)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-37",
+      "date": "2026-09-28",
+      "summary": "herdr-log L4: Orchestrator must stay idle, not poll",
+      "context": "Log 2, session 1. Running `herdr agent wait <lane> --until idle --timeout 120000` from the orchestrator pane made the opencode bridge QUEUE both lane notifications instead of delivering them, because the receiving pane was busy. Notifications are not lost, but they are delayed by however long the orchestrator takes to return to idle, and a long --timeout can hold the pane for minutes and artificially serialize even fast cycles. Codified discipline: on dispatch run `herdr agent prompt <lane_pane> \"<task>\"` and return to idle immediately — no wait, no read, no poll. The orchestrator may only poll `mp show milestone` and `grep activity.json`, which are local file reads that do not block the herdr bridge. If a lane is silent for more than 10 minutes, file a dogfood-log entry and ping the user — do not poll, do not re-prompt. New bridge finding beyond R14: the bridge also drops the receiver's \"ready to receive\" state silently, with no missed-call log, so every lane notification should be assumed to answer the MOST RECENT dispatch — never let dispatches stack (one dispatch → one notification → one decision → next dispatch). source: git show 438b093^:mp-herdr-log2.txt (2026-09-03 ~14:50)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-38",
+      "date": "2026-09-28",
+      "summary": "herdr-log L5: \"No production caller\" pattern (regression tests passing for the wrong reason)",
+      "context": "Log 2, sessions 2 and 3. The runner implements typed primitives but never wires them into the production hot path. Caught in M215 F-01 (picker/override panel/replay shell never wired), M222 F-01+F-02 (keybinds loader + Settings keybinds view never wired), M225 F-01, M226 F-01, and M229 F-01+F-02 (autopilot_start delegation + ui.show_watch_tab fallback still in production). Close cousin: the \"test gap\" sub-pattern, where regression tests pass for the wrong reasons because they call the library rather than the production path — M222 F-03 (startup loader tests called `load_effective` directly, not `load_layered`), M229 F-03+F-05. This is the M207/M208/M210 F-01 lesson at scale; it recurs because the runner's discipline is \"implement the spec\" but the spec never says \"wire to production.\" Mitigations: an explicit \"wire to production hot path\" clause in the runner contract, and production-path regression tests following the `_production_path_` naming convention. source: git show 438b093^:mp-herdr-log2.txt (session 2 and session 3 retrospectives)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-39",
+      "date": "2026-09-28",
+      "summary": "herdr-log L6: Pre-notify gate must run fmt-check LAST and confirm the commit",
+      "context": "Log 2, session 3. The runner's pre-notify gate failed 4 times in one batch: M222 cycle 1 (runner skipped `mp milestone complete 222`, so the orchestrator applied a manual state fix), M216 cycle 1 (`cargo fmt --all -- --check` failed because the runner ran `cargo fmt --all` — the WRITE form — as the last command before committing), M229 cycle 3 (duplicate `#[test]` attribute in a strengthened test, same M216 root cause), and M229 cycle 4 (another fmt issue). The runner contract's pre-notify gate should be amended to require: (1) `cargo fmt --all -- --check` as the LAST command before notifying, after all commits; (2) `mp milestone complete <id>` as part of the gate, verifying the lifecycle transition actually happened; (3) `git log --oneline -1` to verify the runner did not skip a commit. source: git show 438b093^:mp-herdr-log2.txt (2026-09-03 ~19:00 session 3 retrospective)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-40",
+      "date": "2026-09-28",
+      "summary": "herdr-log L7: Role separation must be mechanically enforced, not prompt-only",
+      "context": "Log 1 role-boundaries section, after the M203 violation (the runner pane called `mp reviews pass` on its own work, jumping approved → complete without a separate reviewer pass; the cycle matrix says `complete` is reachable ONLY via `mp reviews pass --verdict ok`). Prompt-text enforcement was already tried and failed. The runner does what it understands the goal to be — if the goal is \"complete the milestone\", the runner will complete it by any available means, including violating role boundaries. Fix: encode boundaries in the SKILL that each role loads and in the opencode permission config as a backstop, with FOUR enforcement layers in strictness order: (1) opencode permission config DENY list, the hardest backstop that rejects the shell call even when the prompt fails; (2) the skill file's \"What you CANNOT do\" section; (3) per-cycle prompt reinforcement — useful but not sufficient alone; (4) orchestrator verification, requiring a claim/finding-add/pass event in activity.json when lifecycle=complete and rejecting the milestone as a role-separation violation if absent. Test the boundary explicitly on a future M203 re-run: if the permission config does not reject `mp reviews pass`, the boundary is not enforced. source: git show 438b093^:mp-herdr-log.txt (2026-09-02 ~09:30)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-41",
+      "date": "2026-09-28",
+      "summary": "herdr-log L8: R5 activity.json check is insufficient — verify from milestone JSON + reviews.json",
+      "context": "Log 1, M200 recovery. M200 sat at lifecycle=executed / spec_status=implemented in the raul UI despite all 13 findings being fixed and the cycle-4 reviewer reporting Pass=yes; the activity.json event for the review pass was lost during an activity-truncation event. Recovery ran `mp reviews pass 200 --verdict ok --reviewer reviewer-200`, and — the critical quirk — that command writes the milestone JSON and reviews.json but does NOT add an activity.json event by default. Three improvements over R5: (1) multi-source verification — check both `mp show milestone <id> --fields lifecycle,execution_status,spec_status` AND reviews.json; the milestone JSON + reviews.json are the source of truth, activity.json is only an event stream; (2) cross-check lifecycle=complete against a reviews.json record with verdict=ok in both directions — complete-without-verdict-ok is a flag, and verdict-ok-without-complete is the M200 case; (3) document that agents must NOT look for a review-pass event in activity.json as proof of completion. The verifier should raise a \"review-pass lost to truncation\" flag and either re-run `mp reviews pass` or surface the discrepancy. source: git show 438b093^:mp-herdr-log.txt (2026-09-02 ~09:45)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-42",
+      "date": "2026-09-28",
+      "summary": "herdr-log L9: F-02 AC-verification pre-empt is 100% effective — bake it into the orchestrator checklist",
+      "context": "Log 2, sessions 1-3. Every autopilot milestone spec written since commit 09412e2 ships with placeholder AC verifications, and the placeholders are mostly-but-not-always wrong. Pre-empting F-02 mechanically in the orchestrator pre-dispatch checklist saved a review cycle every single time: ~17 pre-empts across 3 sessions (M207, M208, M209, M210, M211, M212, M213, M214, M218, M220, M224, M227, plus partials; 8 of 8 in session 3). Because the pre-empt is 100% effective, it belongs in the orchestrator's pre-dispatch checklist rather than being rediscovered per milestone. source: git show 438b093^:mp-herdr-log2.txt (F-02 pre-empt summaries across sessions 1-3)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-43",
+      "date": "2026-09-28",
+      "summary": "herdr-log L10: \"Flaky only in CI\" usually means a real environment assumption",
+      "context": "Log 2, session 4 (the CI fix arc: 11 failures → green in 2 cycles, make ci PASSED in 10m37s). The initial \"CI-only flake\" framing was wrong: CI runners not having herdr in PATH is a real environment assumption, not flakiness, so the fix was per-test isolation, not a flake exemption. Two reusable patterns: (1) stub binaries for environment assumptions — install a fake tool into a tempdir at runtime (e.g. `install_fake_herdr_for_doctor`), which generalises to stubbing mp, git, or any other CLI; (2) for any test that shells out and needs PATH, use the subprocess path (`env.run_with_env`) rather than the in-process API (`lib_api::run`), which does not propagate PATH from the test environment — `plan_relocate` was the exemplar. Third point: when crafting a repro command for a \"test for the test\", verify it on the FAILURE surface (CI) rather than the dev machine, because on a dev machine /opt/homebrew/bin may already contain the tool and the repro then passes for the wrong reason. source: git show 438b093^:mp-herdr-log2.txt (2026-09-04 ~14:00 session 4)",
+      "milestone": "239"
+    },
+    {
+      "id": "D-44",
+      "date": "2026-09-28",
+      "summary": "herdr-log L11: Commit-on-handoff policy and per-role commit message convention",
+      "context": "Log 2, session policy set by the user. Rule 1, commit on every handoff: the runner commits code plus plan-zone writes (mp milestone step done / criterion pass / complete) BEFORE notifying; the reviewer commits its plan-zone writes (mp reviews claim / finding add / pass / finding resolve) BEFORE notifying; the orchestrator commits immediately after ANY change, with no batching across handoffs. Rule 2, 4-round cap: default 2 cycles, soft cap 3 with the tightened \"blockers only\" reviewer prompt applied at cycle 2, hard limit 4 after which the orchestrator escalates to the user regardless of outcome and `ship_with_backlog` is no longer available. Message convention: `M<id>: S<step> — <description>` per step (or documented grouping), `M<id>: fix F-<num> — <description>` per finding, never grouped (the M200/M202 `fixed_in` drift lesson), `M<id>: lifecycle evidence cycle N` per cycle with no code changes, `M<id>: review cycle N — <verdict> (F-<nums>)` per review pass, `M<id>: orch-fix — <description>` for orchestrator state fixes, and `log: <description>` for log updates. Measured outcome: 18 review cycles for 15 milestones (1.2/milestone), the 3-cycle soft cap hit 0 times, so the 4-cycle hard limit is generous for this discipline level. source: git show 438b093^:mp-herdr-log2.txt (2026-09-03 ~15:15 session policy)",
+      "milestone": "239"
     }
   ]
 }
