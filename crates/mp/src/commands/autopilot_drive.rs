@@ -68,6 +68,26 @@ const DRY_RUN_PANE_ID_PLACEHOLDER: &str = "%pane-id%";
 /// itself emits one `Watch` variant that maps directly to these
 /// fields). Bundling them into a struct here would force a
 /// parallel shape across `cli/mod.rs` + `app.rs` for no win.
+/// M246 / AC-05: resolve the effective stall timeout in
+/// milliseconds.
+///
+/// Precedence, highest first:
+/// 1. the `--stall-timeout-ms` flag,
+/// 2. `agent.automation.stall_timeout_minutes` (whole minutes),
+/// 3. the 30-minute default.
+///
+/// A config value of `0` is impossible — `mp config set` rejects it
+/// — so "set" unambiguously means "the operator asked for this".
+pub fn resolve_stall_timeout_ms(flag_ms: Option<u64>, cfg: &ProjectConfig) -> u64 {
+    if let Some(ms) = flag_ms {
+        return ms;
+    }
+    match cfg.agent.automation.stall_timeout_minutes {
+        Some(minutes) => u64::from(minutes) * 60_000,
+        None => u64::from(crate::config::DEFAULT_STALL_TIMEOUT_MINUTES) * 60_000,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_autopilot_drive(
     ctx: &PlanContext,
@@ -619,12 +639,15 @@ fn cmd_autopilot_drive_execute(opts: DriveOpts<'_>) -> Result<()> {
             ..ops.wait_options()
         });
     }
-    if let Some(stall) = stall_timeout_ms {
-        ops.set_wait_options(crate::autopilot::drive::WaitOptions {
-            stall_timeout_ms: stall,
-            ..ops.wait_options()
-        });
-    }
+    // M246 / AC-05: precedence is flag > config > 30 min default.
+    // `resolve_stall_timeout_ms` is the single place that decides,
+    // so the documented order cannot drift between the CLI and any
+    // future caller.
+    let stall_ms = resolve_stall_timeout_ms(stall_timeout_ms, cfg);
+    ops.set_wait_options(crate::autopilot::drive::WaitOptions {
+        stall_timeout_ms: stall_ms,
+        ..ops.wait_options()
+    });
     // M246 WP1 / AC-01: the settle window lives on ReadinessOptions,
     // not WaitOptions — it gates the *prompt delivery* path, not
     // the lifecycle poll. `0` is a meaningful value here (legacy

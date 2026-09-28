@@ -225,6 +225,46 @@ pub struct AgentAutomationConfig {
     /// [`SeverityRank`] and [`AgentAutomationConfig::should_remediate`].
     /// The coordinator skill applies the threshold at stage 8 review.
     pub auto_remediate: Option<String>,
+    /// How long the autopilot drive loop waits for a stalled runner,
+    /// in whole minutes. The stall timer only accrues while the
+    /// runner is not working, so this bounds genuinely idle time;
+    /// a working runner is still caught by a hard ceiling of
+    /// [`STALL_HARD_CEILING_MULTIPLE`]x this value.
+    ///
+    /// Must be within 1..=240 — below 1 minute the loop would flag
+    /// healthy runners, above 240 minutes a hung pane would pin a
+    /// run for hours. `None` means "unset" and resolves to
+    /// [`DEFAULT_STALL_TIMEOUT_MINUTES`].
+    pub stall_timeout_minutes: Option<u32>,
+}
+
+/// Default stall timeout in minutes when neither the
+/// `--stall-timeout-ms` flag nor the config key is set. The
+/// millisecond flag default matches ([`DEFAULT_STALL_TIMEOUT_MS`]).
+pub const DEFAULT_STALL_TIMEOUT_MINUTES: u32 = 30;
+
+/// Hard-ceiling multiple: no lifecycle advance for this many
+/// stall timeouts stalls the run regardless of agent status, so
+/// pausing the timer while a runner is working cannot make a hung
+/// runner immortal.
+pub const STALL_HARD_CEILING_MULTIPLE: u64 = 4;
+
+/// Inclusive bounds for `agent.automation.stall_timeout_minutes`.
+pub const STALL_TIMEOUT_MINUTES_RANGE: std::ops::RangeInclusive<u32> = 1..=240;
+
+/// Validate a `stall_timeout_minutes` value against
+/// [`STALL_TIMEOUT_MINUTES_RANGE`]. Shared by `mp config set` and
+/// `mp config validate` so both surfaces reject the same values.
+pub fn validate_stall_timeout_minutes(minutes: u32) -> Result<(), String> {
+    if STALL_TIMEOUT_MINUTES_RANGE.contains(&minutes) {
+        Ok(())
+    } else {
+        Err(format!(
+            "agent.automation.stall_timeout_minutes must be between {} and {} inclusive (got {minutes})",
+            STALL_TIMEOUT_MINUTES_RANGE.start(),
+            STALL_TIMEOUT_MINUTES_RANGE.end()
+        ))
+    }
 }
 
 /// M147: known `automation.branch_strategy` values. Mirroring
@@ -652,6 +692,17 @@ impl ProjectConfig {
     // --- M147: [agent.automation] accessors -------------------------------
     // Defaults intentionally mirror the legacy ad-hoc behavior so a fresh
     // config is a no-op; agents opt INTO automation by setting the knobs.
+
+    /// Stall timeout in whole minutes. Unset resolves to
+    /// [`DEFAULT_STALL_TIMEOUT_MINUTES`]. Values outside
+    /// 1..=240 are rejected by `mp config set` and `mp config
+    /// validate`, so a value read here is always in range.
+    pub fn automation_stall_timeout_minutes(&self) -> u32 {
+        self.agent
+            .automation
+            .stall_timeout_minutes
+            .unwrap_or(DEFAULT_STALL_TIMEOUT_MINUTES)
+    }
 
     /// M147: should the runner commit at the (b) hand-off (after `complete`)?
     pub fn commit_after_execute(&self) -> bool {

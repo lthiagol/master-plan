@@ -20,6 +20,12 @@
 
 use crate::config::{ConfigSchemaReport, SchemaEntry, CONFIG_SCHEMA_VERSION};
 
+/// Accepted values for `agent.automation.stall_timeout_minutes`,
+/// rendered by `mp config schema` so operators see the range without
+/// reading the source. The full integer range is validated in
+/// `crate::config::validate_stall_timeout_minutes`.
+pub const STALL_TIMEOUT_MINUTES_RANGE_CHOICES: &[&str] = &["1..=240"];
+
 /// M201: 45 per-key rows. The list is the single source of truth that
 /// `mp config schema` projects into the `keys` array (sorted by key at
 /// emit time).
@@ -53,6 +59,13 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "false",
         None,
         "When true, the runner pushes the review branch automatically once it lands cleanly.",
+    ),
+    (
+        "agent.automation.stall_timeout_minutes",
+        "int",
+        "30",
+        Some(STALL_TIMEOUT_MINUTES_RANGE_CHOICES),
+        "How many minutes the autopilot drive loop waits for a stalled runner. The timer pauses while the runner is working, so a long build is never treated as a stall.",
     ),
     (
         "git.auto_commit",
@@ -387,6 +400,9 @@ pub fn build_schema_report() -> ConfigSchemaReport {
                 "ui.color" => cfg.ui.color.unwrap_or(true).to_string(),
                 "ui.hide_done" => cfg.ui.hide_done.unwrap_or(false).to_string(),
                 "ui.show_autopilot_tab" => cfg.ui.show_autopilot_tab.unwrap_or(false).to_string(),
+                "agent.automation.stall_timeout_minutes" => {
+                    cfg.automation_stall_timeout_minutes().to_string()
+                }
                 "git.auto_commit" => cfg.git.auto_commit.unwrap_or(false).to_string(),
                 "git.auto_push" => cfg.git.auto_push.unwrap_or(false).to_string(),
                 "git.commit_on_milestone_complete" => cfg

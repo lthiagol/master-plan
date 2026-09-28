@@ -24,7 +24,7 @@ use crate::autopilot::drive::{
     read_agent_status, read_custom_status_bounded, read_lifecycle_via_mp, send_prompt,
     sentinel_matches, AutopilotRunState, LifecycleTarget, PaneHandle, PromptStage,
     ReadinessOptions, Role, RunOutcome, WaitOptions, WaitOutcome, DEFAULT_BRIDGE_POLL_TIMEOUT_MS,
-    DEFAULT_PANE_N,
+    DEFAULT_PANE_N, HARD_CEILING_STALL_MULTIPLE,
 };
 use crate::model::MilestoneFile;
 use crate::paths::PlanContext;
@@ -633,8 +633,15 @@ impl SystemDriveOps {
 
         let mut next_sentinel = Instant::now() + sentinel_poll;
         let mut next_lifecycle = Instant::now();
-        let mut last_status_change = Instant::now();
+        // M246 WP2 / AC-02: same two-timer rule as
+        // `wait_for_lifecycle_with` — see that function for the
+        // rationale. `last_progress` moves on an agent-status change
+        // or a non-terminal lifecycle change; `non_working_accrued`
+        // only grows while the runner is not `working`.
+        let mut last_progress = Instant::now();
         let mut prev_status = String::new();
+        let mut prev_lifecycle = String::new();
+        let mut non_working_accrued = Duration::ZERO;
 
         self.log_event(
             "wait_lifecycle",
@@ -676,11 +683,31 @@ impl SystemDriveOps {
                     let status = read_agent_status(&self.herdr_bin, pane)
                         .unwrap_or_else(|_| "unknown".to_string());
                     if status != prev_status {
-                        prev_status = status;
-                        last_status_change = Instant::now();
-                    } else if self.wait.stall_timeout_ms > 0 {
-                        let elapsed = last_status_change.elapsed();
-                        if elapsed >= Duration::from_millis(self.wait.stall_timeout_ms) {
+                        prev_status = status.clone();
+                        last_progress = Instant::now();
+                        non_working_accrued = Duration::ZERO;
+                    } else if lifecycle != prev_lifecycle {
+                        prev_lifecycle = lifecycle.clone();
+                        last_progress = Instant::now();
+                        non_working_accrued = Duration::ZERO;
+                    }
+                    if self.wait.stall_timeout_ms > 0 {
+                        // M246 WP2 / AC-02: `working` pauses the
+                        // stall timer; the 4x ceiling still fires on
+                        // a hung working runner.
+                        let now_instant = Instant::now();
+                        if status != "working" {
+                            non_working_accrued +=
+                                now_instant.saturating_duration_since(last_progress);
+                        }
+                        let since_progress = now_instant.saturating_duration_since(last_progress);
+                        let stall_limit = Duration::from_millis(self.wait.stall_timeout_ms);
+                        let hard_ceiling = Duration::from_millis(
+                            self.wait
+                                .stall_timeout_ms
+                                .saturating_mul(HARD_CEILING_STALL_MULTIPLE),
+                        );
+                        if non_working_accrued >= stall_limit || since_progress >= hard_ceiling {
                             bail!(
                                 "agent appears hung: agent-status='{}' unchanged for {}ms, \
                                  lifecycle='{}' (target='{}')",

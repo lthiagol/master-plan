@@ -841,8 +841,21 @@ pub struct WaitOptions {
     /// Stall timeout: if the agent-status string does not change for
     /// this many milliseconds, flag the agent as hung and return Err.
     /// 0 = disable stall detection (tests, infinite waits).
+    ///
+    /// M246 WP2 / AC-02: the timer now accrues **only while the
+    /// agent is not `working`**. A runner sitting in a long build or
+    /// test run reports an unchanged `working` status, which the
+    /// pre-M246 rule counted as a stall. [`HARD_CEILING_STALL_MULTIPLE`]
+    /// bounds the total wait regardless of status so a genuinely hung
+    /// `working` runner is still caught.
     pub stall_timeout_ms: u64,
 }
+
+/// M246 WP2 / AC-02: the stall timer pauses while the runner reports
+/// `working`, which on its own would make a hung runner immortal.
+/// This multiple of `stall_timeout_ms` is the hard ceiling on the
+/// total time with **no lifecycle advance**, at *any* status.
+pub const HARD_CEILING_STALL_MULTIPLE: u64 = 4;
 
 impl Default for WaitOptions {
     fn default() -> Self {
@@ -876,8 +889,14 @@ where
     let target_str = target.as_str();
     let poll = Duration::from_millis(opts.poll_interval_ms.max(1));
 
-    let mut last_status_change = now();
+    let mut last_progress = now();
     let mut prev_status = String::new();
+    let mut prev_lifecycle = String::new();
+    // M246 WP2 / AC-02: time accrued since the last progress marker
+    // during which the runner was NOT reporting `working`. Working
+    // time is excluded, so a long build does not trip the stall
+    // rule; a status or lifecycle change zeroes it.
+    let mut non_working_accrued = Duration::ZERO;
 
     loop {
         // M152 S4: at the top of each iteration (and just before the
@@ -912,11 +931,37 @@ where
 
         let status = read_agent_status().unwrap_or_else(|_| "unknown".to_string());
         if status != prev_status {
-            prev_status = status;
-            last_status_change = now();
-        } else if opts.stall_timeout_ms > 0 {
-            let elapsed = now().duration_since(last_status_change);
-            if elapsed >= Duration::from_millis(opts.stall_timeout_ms) {
+            prev_status = status.clone();
+            last_progress = now();
+            non_working_accrued = Duration::ZERO;
+        } else if !lifecycle_advanced_past(&lifecycle, target) && lifecycle != prev_lifecycle {
+            // A lifecycle change (that is not a completion) is
+            // progress: the runner moved the milestone forward even
+            // though its agent-status string did not change.
+            prev_lifecycle = lifecycle.clone();
+            last_progress = now();
+            non_working_accrued = Duration::ZERO;
+        }
+        if opts.stall_timeout_ms > 0 {
+            // M246 WP2 / AC-02. Two independent timers:
+            //
+            // 1. `non_working_accrued` — grows only while the runner
+            //    is NOT `working`. A long build or test run reports a
+            //    steady `working` and must never be declared stalled.
+            // 2. `since_progress` — the hard ceiling, which applies at
+            //    ANY status so pausing on `working` cannot make a
+            //    hung runner immortal.
+            let now_instant = now();
+            if status != "working" {
+                non_working_accrued += now_instant.saturating_duration_since(last_progress);
+            }
+            let since_progress = now_instant.saturating_duration_since(last_progress);
+            let stall_limit = Duration::from_millis(opts.stall_timeout_ms);
+            let hard_ceiling = Duration::from_millis(
+                opts.stall_timeout_ms
+                    .saturating_mul(HARD_CEILING_STALL_MULTIPLE),
+            );
+            if non_working_accrued >= stall_limit || since_progress >= hard_ceiling {
                 bail!(
                     "agent appears hung: agent-status='{}' unchanged for {}ms, \
                      lifecycle='{}' (target='{}')",

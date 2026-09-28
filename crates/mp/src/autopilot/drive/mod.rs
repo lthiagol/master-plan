@@ -60,7 +60,7 @@ pub use herdr::{
 pub use herdr::{
     ensure_pane, find_existing_pane, list_panes, pane_label_for, parse_pane_id_from_start_output,
     resolve_harness_kind, spawn_pane, which_herdr, LifecycleTarget, PaneHandle, ReadinessOptions,
-    Role, WaitOptions, WaitOutcome, DEFAULT_PANE_N,
+    Role, WaitOptions, WaitOutcome, DEFAULT_PANE_N, HARD_CEILING_STALL_MULTIPLE,
 };
 pub use herdr_version::{
     detect_herdr_cli, detect_herdr_cli_default, HerdrCliShape, VersionFloor, EXPECTED_START_FLAGS,

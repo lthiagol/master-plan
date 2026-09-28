@@ -679,6 +679,17 @@ fn collect_semantic_issues(
             });
         }
     }
+    // M246: a hand-edited config with an out-of-range stall timeout
+    // is rejected by the same `errors` channel as `set`, so the two
+    // surfaces never disagree about what is valid.
+    if let Some(minutes) = cfg.agent.automation.stall_timeout_minutes {
+        if let Err(msg) = crate::config::validate_stall_timeout_minutes(minutes) {
+            errors.push(ConfigFieldIssue {
+                field: "agent.automation.stall_timeout_minutes".to_string(),
+                message: msg,
+            });
+        }
+    }
 }
 
 fn parse_bool(value: &str) -> Result<bool> {
@@ -876,6 +887,7 @@ fn config_get_automation(cfg: &ProjectConfig, field: &str) -> Result<Value> {
         "push_after_review" => json!(cfg.push_after_review()),
         "branch_strategy" => json!(cfg.automation_branch_strategy()),
         "auto_remediate" => json!(cfg.automation_auto_remediate()),
+        "stall_timeout_minutes" => json!(cfg.automation_stall_timeout_minutes()),
         _ => bail!("unknown automation field: agent.automation.{field}"),
     })
 }
@@ -910,6 +922,19 @@ fn set_automation_field(cfg: &mut ProjectConfig, field: &str, value: &str) -> Re
             }
             cfg.agent.automation.auto_remediate = Some(value.to_string());
         }
+        "stall_timeout_minutes" => {
+            // Integer with an inclusive 1..=240 range. Parsed as i64
+            // first so a non-numeric value gets the "expected integer"
+            // message rather than an out-of-range one, and a negative
+            // value is rejected by the same range check.
+            let minutes: i64 = value
+                .parse()
+                .map_err(|_| anyhow::anyhow!("expected integer, got {value:?}"))?;
+            let minutes = u32::try_from(minutes).unwrap_or(0);
+            crate::config::validate_stall_timeout_minutes(minutes)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            cfg.agent.automation.stall_timeout_minutes = Some(minutes);
+        }
         _ => bail!("unknown automation field: agent.automation.{field}"),
     }
     Ok(())
@@ -923,9 +948,10 @@ fn validate_automation_field(field: &str) -> Result<()> {
         "commit_after_execute"
         | "push_after_review"
         | "branch_strategy"
-        | "auto_remediate" => Ok(()),
+        | "auto_remediate"
+        | "stall_timeout_minutes" => Ok(()),
         other => bail!(
-            "unknown automation field: agent.automation.{other} (expected one of: commit_after_execute, push_after_review, branch_strategy, auto_remediate)"
+            "unknown automation field: agent.automation.{other} (expected one of: commit_after_execute, push_after_review, branch_strategy, auto_remediate, stall_timeout_minutes)"
         ),
     }
 }
