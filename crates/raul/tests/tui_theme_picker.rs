@@ -550,3 +550,121 @@ fn status_preview_absent_when_the_picker_is_collapsed() {
         "the status preview belongs to the expansion only:\n{out}"
     );
 }
+
+// --- live apply (AC-06) ----------------------------------------------------
+
+/// Route a key through the Settings handler the way the runner does:
+/// `handle_key` → actions → `App::move_*`.
+fn press(app: &mut App, code: ratatui::crossterm::event::KeyCode) {
+    use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
+    use raul::tui::action::Action;
+    let actions =
+        raul::tui::modes::settings::handle_key(KeyEvent::new(code, KeyModifiers::NONE), app);
+    for a in actions {
+        match a {
+            Action::Up => app.move_up(),
+            Action::Down => app.move_down(),
+            other => panic!("unexpected action {other:?} for {code:?}"),
+        }
+    }
+}
+
+fn palette_name(app: &App) -> &'static str {
+    app.effective_palette().name
+}
+
+#[test]
+fn arrows_live_apply_the_highlighted_palette() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    assert_eq!(palette_name(&app), "mocha");
+
+    for _ in 0..5 {
+        press(&mut app, ratatui::crossterm::event::KeyCode::Down);
+    }
+    // Five rows down from mocha is the reset row, which previews mocha.
+    // Walk to alucard explicitly instead.
+    let mut app = app_with_open_picker("mocha");
+    let target = theme_picker::row_for_name("alucard").unwrap();
+    let cur = app.settings.as_ref().unwrap().theme.cursor();
+    for _ in 0..(target as i32 - cur as i32) {
+        press(&mut app, ratatui::crossterm::event::KeyCode::Down);
+    }
+    assert_eq!(
+        palette_name(&app),
+        "alucard",
+        "the highlight must set App::palette immediately"
+    );
+}
+
+#[test]
+fn vim_keys_live_apply_too() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    // `k` / `j` are the default aliases for up / down, so the picker
+    // must honor them exactly as it honors the arrows. `theme::ALL` is
+    // alphabetical, so one `j` from mocha lands on dracula.
+    press(&mut app, ratatui::crossterm::event::KeyCode::Char('j'));
+    assert_eq!(palette_name(&app), "dracula");
+    press(&mut app, ratatui::crossterm::event::KeyCode::Char('k'));
+    assert_eq!(palette_name(&app), "mocha");
+}
+
+#[test]
+fn mouse_live_applies_the_highlighted_palette() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("dracula").unwrap();
+    assert!(click_picker_row(&mut app, 120, 44, n));
+    assert_eq!(palette_name(&app), "dracula");
+}
+
+#[test]
+fn the_next_frame_repaints_in_the_new_palette() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    let n = theme_picker::row_for_name("alucard").unwrap();
+    assert!(click_picker_row(&mut app, 120, 44, n));
+
+    // The very next render — no other state change — must already be
+    // in the new palette.
+    let backend = TestBackend::new(120, 44);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            let v = view_state::compute_view(&app, f.area());
+            render::render(f, &app, &v);
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert!(
+        has_fg(buffer, rgb(theme::ALUCARD.accent)),
+        "the next frame must repaint in the highlighted palette"
+    );
+}
+
+#[test]
+fn closed_picker_does_not_live_apply() {
+    raul::config::set_color_enabled(true);
+    let mut app = settings_app("mocha");
+    // Not expanded: the arrows navigate the flat key list and the
+    // palette must not move.
+    app.move_down();
+    app.move_down();
+    assert_eq!(palette_name(&app), "mocha");
+    assert!(!app.settings.as_ref().unwrap().theme_picker_open());
+}
+
+#[test]
+fn live_apply_is_a_noop_outside_settings() {
+    raul::config::set_color_enabled(true);
+    let mut app = app_with_open_picker("mocha");
+    app.select_lane(Lane::Milestones);
+    let before = palette_name(&app);
+    app.apply_theme_preview();
+    assert_eq!(
+        palette_name(&app),
+        before,
+        "apply_theme_preview must not repaint when the picker is not the open editor"
+    );
+}
