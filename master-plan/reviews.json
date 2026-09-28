@@ -2111,6 +2111,14 @@
       "reviewed_at": "2026-09-27",
       "notes": "M236: 5-line doc reformat in milestone.rs:155-158 closes the recurring clippy::doc_overindented_list_items lint (4× backlog in M209/M212/M220/M222). cargo clippy --workspace --all-targets -- -D warnings exits 0 from a clean tree. AC evidence recorded via milestone ac update; CHANGELOG entry added under Unreleased.",
       "milestone_completed_at": "2026-09-27"
+    },
+    {
+      "milestone_id": "235",
+      "verdict": "ok",
+      "reviewer": "herdr-orc reviewer lane (w19:p9)",
+      "reviewed_at": "2026-09-28",
+      "notes": "Cycle 1 review via herdr-orc: verdict ok, 0 findings. All 4 ACs independently re-verified by the orchestrator. R5 gate passed. Reviewer findings commit 3f32d8d.",
+      "milestone_completed_at": "2026-09-28"
     }
   ],
   "comments": [

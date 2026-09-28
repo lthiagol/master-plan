@@ -3,9 +3,9 @@
     "id": "235",
     "title": "consumer-surface hygiene for repo-internal skill — move mp-code-review out of templates/ and drop the lint carve-out",
     "slug": "consumer-surface-hygiene-for-repo-internal-skill-relocate-mp-code-review-into-docs-internal-or-make-paths-relative",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,11 +23,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T02:53:31.082779+00:00",
+    "lifecycle_at": "2026-09-28T03:53:16.894943+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:31.082781+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-28T03:53:21.858282+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-28T03:53:21.858282+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-28T03:53:21.891543+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-28T03:53:21.858282+00:00"
       },
       "specify": {
         "status": "done",
@@ -62,29 +78,29 @@
       "id": "AC-01",
       "description": "The skill lives at internal/skills/mp-code-review/ with a PROVENANCE: REPO-ONLY header; templates/skills/mp-code-review is gone.",
       "verification": "test ! -e templates/skills/mp-code-review && test -f internal/skills/mp-code-review/SKILL.md && head -10 internal/skills/mp-code-review/SKILL.md | rg -q 'PROVENANCE: REPO-ONLY'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 801a1ac (S1), 4bd34ad (S1.1), 5a56ee4 (S1.1.1); reviewer verdict ok with 0 findings (commit 3f32d8d). Orchestrator R5 re-ran all 4 AC verification commands independently: AC-01/02/03 exit 0; AC-04 cargo nextest install_skills_v2 45/45 passed + make lint exit 0. SkillRegistry::load scan-root claim confirmed at crates/mp/src/install.rs:750-784. MP_VERIFY_ALLOW_SHELL=1 used because the AC commands are shell one-liners (&& / !) that the argv-only verifier rejects; every command was reviewed and executed by the orchestrator before opting in."
     },
     {
       "id": "AC-02",
       "description": "scripts/check-consumer-surface.sh has no mp-code-review carve-out and the lint passes.",
       "verification": "! rg -q 'mp-code-review' scripts/check-consumer-surface.sh && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 801a1ac (S1), 4bd34ad (S1.1), 5a56ee4 (S1.1.1); reviewer verdict ok with 0 findings (commit 3f32d8d). Orchestrator R5 re-ran all 4 AC verification commands independently: AC-01/02/03 exit 0; AC-04 cargo nextest install_skills_v2 45/45 passed + make lint exit 0. SkillRegistry::load scan-root claim confirmed at crates/mp/src/install.rs:750-784. MP_VERIFY_ALLOW_SHELL=1 used because the AC commands are shell one-liners (&& / !) that the argv-only verifier rejects; every command was reviewed and executed by the orchestrator before opting in."
     },
     {
       "id": "AC-03",
       "description": "No adopter-facing tree (templates/, docs/) contains the skill or links to its old path.",
       "verification": "! rg -q 'templates/skills/mp-code-review' templates docs crates/mp/src",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 801a1ac (S1), 4bd34ad (S1.1), 5a56ee4 (S1.1.1); reviewer verdict ok with 0 findings (commit 3f32d8d). Orchestrator R5 re-ran all 4 AC verification commands independently: AC-01/02/03 exit 0; AC-04 cargo nextest install_skills_v2 45/45 passed + make lint exit 0. SkillRegistry::load scan-root claim confirmed at crates/mp/src/install.rs:750-784. MP_VERIFY_ALLOW_SHELL=1 used because the AC commands are shell one-liners (&& / !) that the argv-only verifier rejects; every command was reviewed and executed by the orchestrator before opting in."
     },
     {
       "id": "AC-04",
       "description": "The installer still refuses mp-code-review and never lists it; lint is clean.",
       "verification": "cargo nextest run -p mp --test install_skills_v2 --no-fail-fast && make lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 801a1ac (S1), 4bd34ad (S1.1), 5a56ee4 (S1.1.1); reviewer verdict ok with 0 findings (commit 3f32d8d). Orchestrator R5 re-ran all 4 AC verification commands independently: AC-01/02/03 exit 0; AC-04 cargo nextest install_skills_v2 45/45 passed + make lint exit 0. SkillRegistry::load scan-root claim confirmed at crates/mp/src/install.rs:750-784. MP_VERIFY_ALLOW_SHELL=1 used because the AC commands are shell one-liners (&& / !) that the argv-only verifier rejects; every command was reviewed and executed by the orchestrator before opting in."
     }
   ],
   "work_packages": [
@@ -114,7 +130,7 @@
       ],
       "tests": "test ! -e templates/skills/mp-code-review && test -f internal/skills/mp-code-review/SKILL.md && head -10 internal/skills/mp-code-review/SKILL.md | rg -q 'PROVENANCE: REPO-ONLY'",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -134,7 +150,7 @@
       ],
       "tests": "! rg -q 'mp-code-review' scripts/check-consumer-surface.sh && ! rg -q 'templates/skills/mp-code-review' templates docs crates/mp/src && make consumer-surface-lint",
       "done_when": "AC-02 AC-03 pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-03"
@@ -158,7 +174,7 @@
       ],
       "tests": "cargo nextest run -p mp --test install_skills_v2 --no-fail-fast && make lint",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -173,8 +189,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-28",
     "branch": "",
-    "evidence": ""
+    "evidence": "herdr-orc cycle 1: runner commits 801a1ac (S1), 4bd34ad (S1.1), 5a56ee4 (S1.1.1); reviewer verdict ok with 0 findings (commit 3f32d8d). Orchestrator R5 re-ran all 4 AC verification commands independently: AC-01/02/03 exit 0; AC-04 cargo nextest install_skills_v2 45/45 passed + make lint exit 0. SkillRegistry::load scan-root claim confirmed at crates/mp/src/install.rs:750-784. MP_VERIFY_ALLOW_SHELL=1 used because the AC commands are shell one-liners (&& / !) that the argv-only verifier rejects; every command was reviewed and executed by the orchestrator before opting in."
   }
 }

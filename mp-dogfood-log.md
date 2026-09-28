@@ -190,3 +190,16 @@ milestone (or a successor), not by reverting the work that closed them.
 - Suspected cause / code path: `CreateMilestoneInput` carries both fields and the create path applies them (`milestone/spec.rs` ~463-470), but the `CREATE_MILESTONE_KEYS` allow-list (~190) omits them, so the JSON path can never create a decomposed draft.
 - Verdict: **bug**.
 - Status: scheduled in M248 (S1).
+
+---
+
+## Entry — 2026-09-28 — `milestone complete` leaves the index `spec_status` out of sync with the file
+
+- Date / when: 2026-09-28, closing M235 after a herdr-orc cycle.
+- Command attempted: `MP_VERIFY_ALLOW_SHELL=1 mp milestone complete 235 --evidence "…"` (ACs passed, all steps done, zero open findings).
+- Observed output: `complete` exits 0 and reports `lifecycle: complete`, `spec_status: verified`, `execution_status: done`. A following `mp validate` then emits `W03: milestone 235 index spec_status="implemented" does not match file spec_status="verified"`.
+- Observed scope: W03 fires on M235 only; no other milestone in the plan reports it.
+- Suspected cause / code path: the `complete` writer derives the index entry's `spec_status` from the execution transition (yielding `implemented`) while the milestone file's own `spec_status` is derived from the canonical `lifecycle: complete` (yielding `verified`). Two derivations of the same legacy alias disagree, and `plan.json` is written without a consistency check against the file it mirrors.
+- Workaround: none found. `mp validate` does not self-heal, and no reindex command was located. The mismatch is only visible as a warning, so it does not block work — but it makes the plan permanently non-clean until someone hand-edits `plan.json`, which the plan zone forbids.
+- Verdict: **bug**.
+- Status: backlog.
