@@ -851,6 +851,26 @@ pub struct WaitOptions {
     pub stall_timeout_ms: u64,
 }
 
+/// M246 / AC-05: resolve the effective stall timeout in
+/// milliseconds.
+///
+/// Precedence, highest first:
+/// 1. the `--stall-timeout-ms` flag,
+/// 2. `agent.automation.stall_timeout_minutes` (whole minutes),
+/// 3. the 30-minute default.
+///
+/// Lives here, next to the stall policy it feeds, so the precedence
+/// order and the [`WaitOptions`] default cannot drift apart.
+pub fn resolve_stall_timeout_ms(flag_ms: Option<u64>, cfg: &crate::config::ProjectConfig) -> u64 {
+    if let Some(ms) = flag_ms {
+        return ms;
+    }
+    match cfg.agent.automation.stall_timeout_minutes {
+        Some(minutes) => u64::from(minutes) * 60_000,
+        None => u64::from(crate::config::DEFAULT_STALL_TIMEOUT_MINUTES) * 60_000,
+    }
+}
+
 /// M246 WP2 / AC-02: the stall timer pauses while the runner reports
 /// `working`, which on its own would make a hung runner immortal.
 /// This multiple of `stall_timeout_ms` is the hard ceiling on the

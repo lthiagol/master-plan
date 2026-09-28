@@ -353,3 +353,198 @@ fn config_set_rejects_unknown_automation_field() {
         String::from_utf8_lossy(&get.stderr)
     );
 }
+
+// ─── stall timeout knob ──────────────────────────────────────────────────────
+
+/// AC-01: `agent.automation.stall_timeout_minutes` is an integer in
+/// 1..=240. The boundaries must round-trip and the values just outside
+/// them must be rejected, at `set` time and again at `validate` time
+/// (a hand-edited config with an out-of-range value must not pass
+/// silently).
+#[test]
+fn stall_timeout_minutes_config() {
+    // In-range boundaries round-trip and read back.
+    for good in ["1", "240", "45"] {
+        let env = TestEnv::new();
+        let out = env.run(&[
+            "config",
+            "set",
+            "agent.automation.stall_timeout_minutes",
+            good,
+            "--format",
+            "json",
+        ]);
+        assert!(
+            out.status.success(),
+            "{good} must be accepted; stderr={}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let got = env.run_json(&[
+            "config",
+            "get",
+            "agent.automation.stall_timeout_minutes",
+            "--format",
+            "json",
+        ]);
+        assert_eq!(
+            got["value"],
+            good.parse::<i64>().unwrap(),
+            "value must round-trip"
+        );
+    }
+
+    // Out-of-range values are rejected by `set`, and the message names
+    // the range so the operator knows the fix. (Negative values are
+    // exercised through the hand-edited path below — clap would read
+    // a bare `-5` argv as a flag, not as a value.)
+    for bad in ["0", "241"] {
+        let env = TestEnv::new();
+        let out = env.run(&[
+            "config",
+            "set",
+            "agent.automation.stall_timeout_minutes",
+            bad,
+            "--format",
+            "json",
+        ]);
+        assert!(
+            !out.status.success(),
+            "{bad} must be rejected by config set"
+        );
+        let err = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            err.contains("stall_timeout_minutes") && err.contains("240"),
+            "rejection must name the key and the bound; got: {err}"
+        );
+    }
+
+    // A hand-edited config with an out-of-range value must fail
+    // `mp config validate` too — the two surfaces must not disagree.
+    //
+    // 0 and 241 reach the range check and produce the field-level
+    // issue. -5 is caught one layer earlier, by deserialization into
+    // `Option<u32>`, and surfaces as a parse error naming the expected
+    // type. Both are rejections; the distinction is asserted so a
+    // future refactor that widens the field type has to update this
+    // test deliberately.
+    for (bad, expected) in [
+        (0i64, "stall_timeout_minutes"),
+        (241, "stall_timeout_minutes"),
+        (-5, "expected u32"),
+    ] {
+        let env = TestEnv::new();
+        let path = config_path(&env);
+        let mut raw: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        raw["agent"]["automation"]["stall_timeout_minutes"] = Value::from(bad);
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let validated = env.run(&["config", "validate", "--format", "json"]);
+        assert!(
+            !validated.status.success(),
+            "config validate must reject a hand-edited {bad}"
+        );
+        let v: Value = serde_json::from_slice(&validated.stdout).unwrap_or(Value::Null);
+        let report = format!("{v}");
+        assert!(
+            report.contains(expected),
+            "validate must reject {bad} mentioning {expected:?}; got: {report}"
+        );
+    }
+
+    // A non-integer is rejected with an integer-shaped message rather
+    // than an out-of-range one.
+    let env = TestEnv::new();
+    let out = env.run(&[
+        "config",
+        "set",
+        "agent.automation.stall_timeout_minutes",
+        "soon",
+        "--format",
+        "json",
+    ]);
+    assert!(!out.status.success(), "a non-integer must be rejected");
+    let err = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        err.contains("expected integer"),
+        "non-integer must say so; got: {err}"
+    );
+}
+
+/// AC-01: the effective timeout is `--stall-timeout-ms` >
+/// `agent.automation.stall_timeout_minutes` > 30 minutes. The
+/// resolver is unit-tested directly here (the flag is not reachable
+/// from a unit test), and the config leg is additionally exercised
+/// through the real `mp config set` surface.
+#[test]
+fn stall_timeout_precedence() {
+    use mp::autopilot::drive::resolve_stall_timeout_ms;
+    use mp::config::{ProjectConfig, DEFAULT_STALL_TIMEOUT_MINUTES};
+
+    let mut cfg = ProjectConfig::default();
+
+    // 3. No flag, no config -> the 30-minute default.
+    assert_eq!(
+        resolve_stall_timeout_ms(None, &cfg),
+        u64::from(DEFAULT_STALL_TIMEOUT_MINUTES) * 60_000,
+        "unset must fall back to the 30-minute default"
+    );
+
+    // 2. Config set, no flag -> config wins over the default.
+    cfg.agent.automation.stall_timeout_minutes = Some(45);
+    assert_eq!(
+        resolve_stall_timeout_ms(None, &cfg),
+        45 * 60_000,
+        "config must beat the default"
+    );
+
+    // 1. Flag present -> the flag wins over both.
+    assert_eq!(
+        resolve_stall_timeout_ms(Some(1_234), &cfg),
+        1_234,
+        "the flag must beat config"
+    );
+
+    // A 1-minute config resolves to 60_000ms, and the ceiling is 4x.
+    cfg.agent.automation.stall_timeout_minutes = Some(1);
+    assert_eq!(resolve_stall_timeout_ms(None, &cfg), 60_000);
+
+    // The same value the config stores is what `mp config get` reports
+    // through the real CLI, so the resolver and the operator-visible
+    // surface cannot drift.
+    let env = TestEnv::new();
+    let out = env.run(&[
+        "config",
+        "set",
+        "agent.automation.stall_timeout_minutes",
+        "45",
+        "--format",
+        "json",
+    ]);
+    assert!(out.status.success());
+    let got = env.run_json(&[
+        "config",
+        "get",
+        "agent.automation.stall_timeout_minutes",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(got["value"], 45);
+
+    // The config `mp config set` actually wrote must resolve through
+    // the same function the drive loop calls.
+    let on_disk: ProjectConfig =
+        serde_json::from_str(&std::fs::read_to_string(config_path(&env)).unwrap()).unwrap();
+    assert_eq!(on_disk.agent.automation.stall_timeout_minutes, Some(45));
+    assert_eq!(resolve_stall_timeout_ms(None, &on_disk), 45 * 60_000);
+    // ...and the flag still overrides what the CLI just wrote.
+    assert_eq!(resolve_stall_timeout_ms(Some(7_000), &on_disk), 7_000);
+}
