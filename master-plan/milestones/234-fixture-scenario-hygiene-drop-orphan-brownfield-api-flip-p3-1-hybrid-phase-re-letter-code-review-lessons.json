@@ -3,9 +3,9 @@
     "id": "234",
     "title": "fixture/scenario hygiene — drop orphan brownfield-api, fix stale p3.1 scenario note, index code-review lessons",
     "slug": "fixture-scenario-hygiene-drop-orphan-brownfield-api-flip-p3-1-hybrid-phase-re-letter-code-review-lessons",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,11 +23,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T02:53:31.042781+00:00",
+    "lifecycle_at": "2026-09-28T04:48:33.336153+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:31.042783+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-28T04:48:34.333544+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-28T04:48:34.333544+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-28T04:48:34.370472+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-28T04:48:34.333544+00:00"
       },
       "specify": {
         "status": "done",
@@ -61,29 +77,29 @@
       "id": "AC-01",
       "description": "tests/fixtures/projects/brownfield-api is gone and nothing in the repo references it.",
       "verification": "test ! -e tests/fixtures/projects/brownfield-api && ! rg -q 'brownfield-api' crates tests scripts Makefile docs",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 84b86ae (S1), 078cd4c (S2), 05c34b9 (S3), 685cb03 (S4); reviewer verdict ok with 0 findings, commit b00b177, after a cold build. Orchestrator R5 re-ran all 4 ACs independently and mutation-tested all three new tests (each correctly fails on broken input). Both substantive files are additions-only, proving no lesson was renumbered, reordered, moved or rewritten. Out-of-scope staleness disclosed by the runner and confirmed by the reviewer: M28 AC-05 text claims six fixture projects while the Makefile validates five -- needs its own follow-up milestone, not a history rewrite. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/02/04 are shell one-liners; every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-02",
       "description": "The p3.1 scenario notes describe what it asserts (no 'not in Rust path yet' claim) and the scenario still passes.",
       "verification": "! rg -q 'not in Rust path yet' tests/scenarios/p3.1-hybrid-work-next-track/scenario.json && cargo nextest run -p mp --test scenarios_runner --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 84b86ae (S1), 078cd4c (S2), 05c34b9 (S3), 685cb03 (S4); reviewer verdict ok with 0 findings, commit b00b177, after a cold build. Orchestrator R5 re-ran all 4 ACs independently and mutation-tested all three new tests (each correctly fails on broken input). Both substantive files are additions-only, proving no lesson was renumbered, reordered, moved or rewritten. Out-of-scope staleness disclosed by the runner and confirmed by the reviewer: M28 AC-05 text claims six fixture projects while the Makefile validates five -- needs its own follow-up milestone, not a history rewrite. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/02/04 are shell one-liners; every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-03",
       "description": "Lesson IDs are unique and the catalog's numeric index lists every '### L<n>.' heading exactly once in ascending order.",
       "verification": "cargo nextest run -p mp --test code_review_patterns --no-fail-fast -E 'test(/lessons_ids_are_unique|lessons_index_is_complete_and_sorted/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 84b86ae (S1), 078cd4c (S2), 05c34b9 (S3), 685cb03 (S4); reviewer verdict ok with 0 findings, commit b00b177, after a cold build. Orchestrator R5 re-ran all 4 ACs independently and mutation-tested all three new tests (each correctly fails on broken input). Both substantive files are additions-only, proving no lesson was renumbered, reordered, moved or rewritten. Out-of-scope staleness disclosed by the runner and confirmed by the reviewer: M28 AC-05 text claims six fixture projects while the Makefile validates five -- needs its own follow-up milestone, not a history rewrite. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/02/04 are shell one-liners; every command was reviewed and executed before opting in."
     },
     {
       "id": "AC-04",
       "description": "The lessons file opens with a paragraph explaining its dual role (pattern fixture + mp-code-review syllabus); consumer-surface lint stays clean.",
       "verification": "cargo nextest run -p mp --test code_review_patterns --no-fail-fast -E 'test(/lessons_header_states_dual_role/)' && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits 84b86ae (S1), 078cd4c (S2), 05c34b9 (S3), 685cb03 (S4); reviewer verdict ok with 0 findings, commit b00b177, after a cold build. Orchestrator R5 re-ran all 4 ACs independently and mutation-tested all three new tests (each correctly fails on broken input). Both substantive files are additions-only, proving no lesson was renumbered, reordered, moved or rewritten. Out-of-scope staleness disclosed by the runner and confirmed by the reviewer: M28 AC-05 text claims six fixture projects while the Makefile validates five -- needs its own follow-up milestone, not a history rewrite. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/02/04 are shell one-liners; every command was reviewed and executed before opting in."
     }
   ],
   "work_packages": [
@@ -111,7 +127,7 @@
       ],
       "tests": "test ! -e tests/fixtures/projects/brownfield-api && ! rg -q 'brownfield-api' crates tests scripts Makefile docs",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -131,7 +147,7 @@
       ],
       "tests": "! rg -q 'not in Rust path yet' tests/scenarios/p3.1-hybrid-work-next-track/scenario.json && cargo nextest run -p mp --test scenarios_runner --no-fail-fast",
       "done_when": "AC-02 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -152,7 +168,7 @@
       ],
       "tests": "cargo nextest run -p mp --test code_review_patterns --no-fail-fast",
       "done_when": "AC-03 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -173,7 +189,7 @@
       ],
       "tests": "cargo nextest run -p mp --test code_review_patterns --no-fail-fast && make consumer-surface-lint",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -187,8 +203,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-28",
     "branch": "",
-    "evidence": ""
+    "evidence": "herdr-orc cycle 1: runner commits 84b86ae (S1), 078cd4c (S2), 05c34b9 (S3), 685cb03 (S4); reviewer verdict ok with 0 findings, commit b00b177, after a cold build. Orchestrator R5 re-ran all 4 ACs independently and mutation-tested all three new tests (each correctly fails on broken input). Both substantive files are additions-only, proving no lesson was renumbered, reordered, moved or rewritten. Out-of-scope staleness disclosed by the runner and confirmed by the reviewer: M28 AC-05 text claims six fixture projects while the Makefile validates five -- needs its own follow-up milestone, not a history rewrite. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/02/04 are shell one-liners; every command was reviewed and executed before opting in."
   }
 }
