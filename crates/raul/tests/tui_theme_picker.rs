@@ -1,13 +1,16 @@
 //! M243: the Settings `ui.theme` picker.
 //!
 //! Covers the picker's model and its rendering: the 7-row expansion
-//! (6 named palettes + `Default (mocha)`), the 6-role swatch drawn in
+//! (6 named palettes + `Default (mocha)`), the 9-role swatch drawn in
 //! each palette, the keyboard highlight, and the live apply that
 //! repaints the frame in the highlighted theme.
 //!
-//! The swatch is deliberately **6 roles**, not 9 — `focus_ring`,
-//! `surface_1` and `surface_2` are background layers, not text colors,
-//! and read as mud in a one-line strip. `SWATCH_ROLES` pins the six.
+//! The swatch is all **9 roles**: the six text/lifecycle roles
+//! (`accent`, `success`, `warn`, `danger`, `dim`, `foreground`) plus
+//! the three layering roles M244 added (`focus_ring`, `surface_1`,
+//! `surface_2`). A theme's backgrounds are as much a part of its
+//! identity as its accent, and the operator picks a theme by looking.
+//! `SWATCH_ROLES` pins the set.
 
 use std::collections::BTreeMap;
 
@@ -92,7 +95,9 @@ fn app_with_open_picker(saved_theme: &str) -> App {
     app
 }
 
-fn render_full(app: &App, width: u16, height: u16) -> String {
+/// Draw one frame and hand back the raw buffer, so a test can assert on
+/// styles and not only on text.
+fn render_buffer(app: &App, width: u16, height: u16) -> Buffer {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -101,7 +106,23 @@ fn render_full(app: &App, width: u16, height: u16) -> String {
             render::render(frame, app, &view);
         })
         .unwrap();
-    buffer_text(terminal.backend().buffer())
+    terminal.backend().buffer().clone()
+}
+
+fn render_full(app: &App, width: u16, height: u16) -> String {
+    buffer_text(&render_buffer(app, width, height))
+}
+
+/// The hit rect published for picker row `n` — one rendered row, spanning
+/// the list's full inner width.
+fn picker_row_rect(app: &App, width: u16, height: u16, n: usize) -> ratatui::layout::Rect {
+    let view = view_state::compute_view(app, ratatui::layout::Rect::new(0, 0, width, height));
+    let id = format!("settings.theme.{n}");
+    view.list_item_rects
+        .iter()
+        .find(|h| h.id == id)
+        .unwrap_or_else(|| panic!("no hit rect for {id}"))
+        .rect
 }
 
 fn buffer_text(buffer: &Buffer) -> String {
@@ -174,16 +195,84 @@ fn picker_rows_carry_a_one_line_description() {
 }
 
 #[test]
-fn swatch_is_six_roles() {
-    assert_eq!(theme_picker::SWATCH_ROLES.len(), 6);
+fn swatch_is_nine_roles() {
+    assert_eq!(theme_picker::SWATCH_ROLES.len(), 9);
     let sw = theme_picker::swatch(&theme::ALUCARD);
-    assert_eq!(sw.len(), 6);
+    assert_eq!(sw.len(), 9);
+    // The original six keep their indices, so every pre-existing
+    // `swatch[i] == palette.<role>` assertion still means something.
     assert_eq!(sw[0], theme::ALUCARD.accent);
     assert_eq!(sw[1], theme::ALUCARD.success);
     assert_eq!(sw[2], theme::ALUCARD.warn);
     assert_eq!(sw[3], theme::ALUCARD.danger);
     assert_eq!(sw[4], theme::ALUCARD.dim);
     assert_eq!(sw[5], theme::ALUCARD.foreground);
+    // M244's three layering roles, appended after them.
+    assert_eq!(sw[6], theme::ALUCARD.focus_ring);
+    assert_eq!(sw[7], theme::ALUCARD.surface_1);
+    assert_eq!(sw[8], theme::ALUCARD.surface_2);
+    assert_eq!(
+        theme_picker::SWATCH_ROLES,
+        [
+            "accent",
+            "success",
+            "warn",
+            "danger",
+            "dim",
+            "foreground",
+            "focus_ring",
+            "surface_1",
+            "surface_2"
+        ]
+    );
+}
+
+/// The swatch is drawn, not just modeled: every palette row paints two
+/// blocks per role, and the reset row pads the gap so the descriptions
+/// stay in one column.
+#[test]
+fn swatch_field_draws_nine_roles_and_keeps_the_reset_row_aligned() {
+    let app = app_with_open_picker("mocha");
+    let out = render_full(&app, 140, 44);
+
+    let block = "█".repeat(2 * theme_picker::SWATCH_ROLES.len());
+    let mocha_row = out
+        .lines()
+        .find(|l| l.contains("Catppuccin Mocha"))
+        .expect("mocha row renders");
+    assert!(
+        mocha_row.contains(&block),
+        "a palette row must paint {} blocks (9 roles x 2): {mocha_row:?}",
+        2 * theme_picker::SWATCH_ROLES.len()
+    );
+
+    // The column the description starts in, in CHARACTERS. `find`
+    // returns a byte offset and the swatch is made of 3-byte glyphs, so
+    // a raw byte index would compare the wrong thing.
+    let desc_col = |row: &str, needle: &str| -> usize {
+        let byte = row
+            .find(needle)
+            .unwrap_or_else(|| panic!("{needle:?} missing from {row:?}"));
+        row[..byte].chars().count()
+    };
+    let reset_row = out
+        .lines()
+        .find(|l| l.contains("Default (mocha)"))
+        .expect("reset row renders");
+    // The reset row's pad must come from `SWATCH_ROLES`, not a
+    // hardcoded width that a widened swatch would desync.
+    //
+    // 1 column for the block border, 2 for the marker, then this row's
+    // label, then the pad. (The label field is `{label:<14}` and
+    // "Default (mocha)" is 15 wide, so this row already sat one column
+    // right of the palette rows before the swatch widened — measured
+    // from the actual label, not the 14 it is padded to.)
+    let expected = 1 + 2 + "Default (mocha)".chars().count() + theme_picker::SWATCH_FIELD_WIDTH;
+    assert_eq!(
+        desc_col(reset_row, "Reset to the default"),
+        expected,
+        "the reset row's pad must track the swatch width"
+    );
 }
 
 #[test]
@@ -287,14 +376,7 @@ fn swatch_draws_each_palette_in_its_own_colors() {
         .unwrap();
     let buffer = terminal.backend().buffer();
 
-    for role_color in [
-        theme::ALUCARD.accent,
-        theme::ALUCARD.success,
-        theme::ALUCARD.warn,
-        theme::ALUCARD.danger,
-        theme::ALUCARD.dim,
-        theme::ALUCARD.foreground,
-    ] {
+    for role_color in theme_picker::swatch(&theme::ALUCARD) {
         assert!(
             has_fg(buffer, rgb(role_color)),
             "alucard swatch must paint its own {role_color:?} somewhere in the buffer"
@@ -313,6 +395,97 @@ fn highlighted_row_carries_the_cursor_marker() {
     assert!(
         out.contains('▼'),
         "the expanded ui.theme row must show the ▼ expand marker:\n{out}"
+    );
+}
+
+/// AC-03 (S1.2): the highlighted row marks itself with the `focus_ring`
+/// role — "where is the cursor", deliberately not a lifecycle color.
+///
+/// The background assertion is the load-bearing half: the highlight is
+/// a background-only layer one step above `surface_1`, and the
+/// `focus_ring` foreground survives on the marker. A row highlight that
+/// carried its own foreground would patch over this cell's `fg` and
+/// wipe the ring (ratatui's `row_highlight_style` / `Cell::set_style`
+/// both overwrite an existing fg), so these two assertions together
+/// guard the shape.
+#[test]
+fn highlighted_picker_row_marks_itself_with_the_focus_ring() {
+    let app = app_with_open_picker("mocha");
+    let buffer = render_buffer(&app, 120, 44);
+    let cursor = app.settings.as_ref().unwrap().theme.cursor();
+    let rect = picker_row_rect(&app, 120, 44, cursor);
+    let marker = &buffer[(rect.x, rect.y)];
+
+    assert_eq!(marker.symbol(), "▶", "the highlighted row owns the cursor");
+    assert_eq!(
+        marker.fg,
+        theme::MOCHA.focus_ring,
+        "the cursor marker is the focus_ring role, not accent"
+    );
+    assert_eq!(
+        marker.bg,
+        theme::MOCHA.surface_2,
+        "the selected row is a background layer, one step above surface_1"
+    );
+}
+
+/// AC-03 (S1.2): the picker list paints the `surface_1` role, so the
+/// expansion reads as a panel above the lane content rather than a hole
+/// in it. Probing the last inner column of every picker row — empty
+/// list surface, not rendered text — covers the whole expansion.
+#[test]
+fn picker_list_paints_the_surface_1_background() {
+    let app = app_with_open_picker("mocha");
+    let buffer = render_buffer(&app, 120, 44);
+
+    for n in 0..theme_picker::ROW_COUNT {
+        let rect = picker_row_rect(&app, 120, 44, n);
+        let probe = &buffer[(rect.x + rect.width - 1, rect.y)];
+        assert_eq!(
+            probe.symbol(),
+            " ",
+            "row {n}: the probe cell is empty list surface, got {:?}",
+            probe.symbol()
+        );
+        assert_eq!(
+            probe.bg,
+            theme::MOCHA.surface_1,
+            "row {n}: the picker list must paint surface_1, not the terminal default"
+        );
+    }
+    assert_ne!(
+        theme::MOCHA.surface_1,
+        theme::MOCHA.surface_2,
+        "the two layers must stay distinct, or the selection is invisible"
+    );
+}
+
+/// `monochrome` has no layering to show — its three layering roles
+/// collapse to `Color::Reset` — so the check is that the swatch still
+/// DRAWS (nine roles' worth of blocks) and the picker keeps its marker,
+/// rather than pinning the collapsed color as a literal.
+#[test]
+fn monochrome_swatch_still_draws_all_nine_roles() {
+    let mut app = app_with_open_picker("mocha");
+    // `effective_palette` hands out MONOCHROME whenever color output is
+    // off. Set the palette directly rather than flipping the
+    // process-global color toggle, so this test cannot leak into others.
+    app.palette = &theme::MONOCHROME;
+    assert_eq!(app.effective_palette().name, theme::MONOCHROME.name);
+
+    let buffer = render_buffer(&app, 120, 44);
+    let rect = picker_row_rect(&app, 120, 44, 3); // mocha
+    let row: String = (0..buffer.area().width)
+        .map(|x| buffer[(x, rect.y)].symbol())
+        .collect();
+
+    assert!(
+        row.contains(&"█".repeat(2 * theme_picker::SWATCH_ROLES.len())),
+        "a no-color swatch must still draw every role: {row:?}"
+    );
+    assert!(
+        row.contains('▶'),
+        "the highlight marker must survive without color: {row:?}"
     );
 }
 

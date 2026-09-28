@@ -796,12 +796,20 @@ fn render_settings_list(
     } else {
         format!(" {LANE_SETTINGS} ")
     };
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain)
-            .title(title),
-    );
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain)
+                .title(title),
+        )
+        // M244: the picker sits on its own `surface_1` layer, so the
+        // expansion reads as a panel floating above the lane content
+        // instead of a hole in it. `overlay_backdrop` is the single
+        // mapping for that role, and its doc already names the picker.
+        // Selection stays a layer up from here (`surface_2` on the
+        // cursor row), so the two roles cannot collide.
+        .style(Style::default().bg(crate::tui::palette::overlay_backdrop(&palette)));
     let list_selected = selected_row_idx
         .saturating_sub(view_offset)
         .min(view_end.saturating_sub(view_offset).saturating_sub(1));
@@ -815,12 +823,14 @@ fn render_settings_list(
 /// M243: render one row of the `ui.theme` picker.
 ///
 /// Layout: `<marker> <label> <swatch> <description>`, e.g.
-/// `▶ mocha      ██████  Catppuccin Mocha — deep dark (default)`.
+/// `▶ mocha      ██████████████████  Catppuccin Mocha — deep dark (default)`.
 ///
-/// The swatch is the row's selling point: six blocks, one per role in
-/// `theme_picker::SWATCH_ROLES`, each drawn in the color that role
-/// would have *under the palette this row previews*. The operator
-/// picks a theme by looking at it, not by reading its name.
+/// The swatch is the row's selling point: two blocks per role, one
+/// role per entry in `theme_picker::SWATCH_ROLES` (all nine — the six
+/// text/lifecycle roles plus the three layering ones), each drawn in
+/// the color that role would have *under the palette this row
+/// previews*. The operator picks a theme by looking at it, not by
+/// reading its name.
 ///
 /// The `Default (mocha)` reset row carries no swatch — it is an
 /// action, not a palette, and repeating mocha's swatch beside
@@ -856,8 +866,9 @@ fn render_theme_picker_row(
         spans.push(Span::raw("  "));
     } else {
         // Reset row: pad the missing swatch so the descriptions in the
-        // two blocks stay column-aligned.
-        spans.push(Span::raw(" ".repeat(14)));
+        // blocks stay column-aligned. Derived from `SWATCH_ROLES` so a
+        // widened swatch cannot silently desync this pad.
+        spans.push(Span::raw(" ".repeat(theme_picker::SWATCH_FIELD_WIDTH)));
     }
 
     let desc_style = if is_cursor {
@@ -871,7 +882,7 @@ fn render_theme_picker_row(
 
 /// M243: the one-row status preview drawn under the palette rows.
 ///
-/// The palette rows show each theme's six-role swatch. This row shows
+/// The palette rows show each theme's nine-role swatch. This row shows
 /// what the TUI's *lifecycle* colors look like under the theme the
 /// operator currently has highlighted — in-progress, done, ready,
 /// blocked, plus accent and dim as the two non-lifecycle roles the

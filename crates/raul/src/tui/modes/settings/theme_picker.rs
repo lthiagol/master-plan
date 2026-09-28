@@ -9,12 +9,12 @@
 //! The expansion is **7 rows**:
 //!
 //! ```text
-//!   ▾ latte      ██████  Catppuccin Latte — light
-//!     frappe     ██████  Catppuccin Frappé — dim and soft
-//!     macchiato  ██████  Catppuccin Macchiato — mid-dark
-//!     mocha      ██████  Catppuccin Mocha — deep dark (default)
-//!     dracula    ██████  Dracula — classic dark
-//!     alucard    ██████  Alucard Classic — Dracula's light counterpart
+//!   ▾ latte      ██████████████████  Catppuccin Latte — light
+//!     frappe     ██████████████████  Catppuccin Frappé — dim and soft
+//!     macchiato  ██████████████████  Catppuccin Macchiato — mid-dark
+//!     mocha      ██████████████████  Catppuccin Mocha — deep dark (default)
+//!     dracula    ██████████████████  Dracula — classic dark
+//!     alucard    ██████████████████  Alucard Classic — Dracula's light counterpart
 //!     Default (mocha)    Reset to the default palette
 //! ```
 //!
@@ -23,15 +23,24 @@
 //! `monochrome` is deliberately absent — it is the `ui.color=false`
 //! no-color fallback, not a selectable `ui.theme` value.
 //!
-//! ## Swatch: 6 roles
+//! ## Swatch: 9 roles
 //!
-//! The swatch draws exactly six roles — `accent`, `success`, `warn`,
-//! `danger`, `dim`, `foreground` — each in the palette it previews, so
-//! the row is a self-portrait of what the rest of the TUI would look
-//! like. It is deliberately **6, not 9**: the layering roles
-//! (`focus_ring`, `surface_1`, `surface_2`) are background layers
-//! rather than text colors and would read as mud in a one-line strip.
-//! [`SWATCH_ROLES`] is the single place that decision is pinned.
+//! The swatch draws all nine palette roles — `accent`, `success`,
+//! `warn`, `danger`, `dim`, `foreground`, `focus_ring`, `surface_1`,
+//! `surface_2` — each in the palette it previews, so the row is a
+//! self-portrait of what the rest of the TUI would look like. The six
+//! text/lifecycle roles come first (their indices predate the layering
+//! roles and are asserted by index), then the three layering roles, so
+//! the strip ends on the surfaces a theme repaints. A theme's
+//! backgrounds are as much a part of its identity as its accent, and
+//! picking a theme by eye means seeing them.
+//! [`SWATCH_ROLES`] is the single place that set is pinned.
+//!
+//! `monochrome` is the no-color palette: every role except `dim` is
+//! `Color::Reset`, layering roles included, so all nine blocks render
+//! in the terminal's own colors rather than inventing a hue the
+//! palette does not have. That is the point of the collapse, not a
+//! rendering bug.
 //!
 //! ## Save / cancel
 //!
@@ -54,12 +63,29 @@ pub const ROW_COUNT: usize = 7;
 /// The reset row's index — it always sorts after the palettes.
 pub const RESET_ROW: usize = theme::ALL.len();
 
-/// The six roles a swatch draws, in render order.
+/// The nine roles a swatch draws, in render order.
 ///
-/// Pinned here (not in the renderer) so the count is a testable
-/// contract rather than a `for` loop's accident. See the module docs
-/// for why it is six and not nine.
-pub const SWATCH_ROLES: [&str; 6] = ["accent", "success", "warn", "danger", "dim", "foreground"];
+/// The six text/lifecycle roles keep their original indices; the three
+/// layering roles are appended, so every existing `swatch[i] ==
+/// palette.<role>` assertion stays meaningful. Pinned here (not in the
+/// renderer) so the count is a testable contract rather than a `for`
+/// loop's accident.
+pub const SWATCH_ROLES: [&str; 9] = [
+    "accent",
+    "success",
+    "warn",
+    "danger",
+    "dim",
+    "foreground",
+    "focus_ring",
+    "surface_1",
+    "surface_2",
+];
+
+/// The rendered width of the swatch field: two blocks per role plus
+/// the two-space gap before the description. The `Default` reset row
+/// pads with this so the descriptions of every row stay in one column.
+pub const SWATCH_FIELD_WIDTH: usize = SWATCH_ROLES.len() * 2 + 2;
 
 /// One-line description shown next to each palette's swatch.
 pub const fn describe(name: &str) -> &'static str {
@@ -138,7 +164,7 @@ pub fn rows() -> Vec<Row> {
 }
 
 /// The swatch colors for a palette, in [`SWATCH_ROLES`] order.
-pub fn swatch(palette: &Palette) -> [Color; 6] {
+pub fn swatch(palette: &Palette) -> [Color; 9] {
     [
         palette.accent,
         palette.success,
@@ -146,6 +172,9 @@ pub fn swatch(palette: &Palette) -> [Color; 6] {
         palette.danger,
         palette.dim,
         palette.foreground,
+        palette.focus_ring,
+        palette.surface_1,
+        palette.surface_2,
     ]
 }
 
@@ -356,17 +385,63 @@ mod tests {
     }
 
     #[test]
-    fn swatch_is_six_roles_in_spec_order() {
-        assert_eq!(SWATCH_ROLES.len(), 6);
+    fn swatch_is_nine_roles_in_spec_order() {
+        assert_eq!(SWATCH_ROLES.len(), 9);
         assert_eq!(
             SWATCH_ROLES,
-            ["accent", "success", "warn", "danger", "dim", "foreground"]
+            [
+                "accent",
+                "success",
+                "warn",
+                "danger",
+                "dim",
+                "foreground",
+                "focus_ring",
+                "surface_1",
+                "surface_2"
+            ]
         );
         let p = &theme::DRACULA;
         assert_eq!(
             swatch(p),
-            [p.accent, p.success, p.warn, p.danger, p.dim, p.foreground]
+            [
+                p.accent,
+                p.success,
+                p.warn,
+                p.danger,
+                p.dim,
+                p.foreground,
+                p.focus_ring,
+                p.surface_1,
+                p.surface_2,
+            ]
         );
+        // Two blocks per role plus the gap before the description.
+        assert_eq!(SWATCH_FIELD_WIDTH, 20);
+    }
+
+    /// `monochrome` is the no-color palette: every role except `dim`
+    /// is `Color::Reset`, layering roles included. The contract worth
+    /// pinning is that the swatch does not *invent* a hue the palette
+    /// does not have — the blocks still draw (in the terminal's own
+    /// colors), so the row keeps its shape with color output off.
+    #[test]
+    fn monochrome_swatch_roles_stay_hue_free() {
+        let sw = swatch(&theme::MONOCHROME);
+        assert_eq!(sw.len(), SWATCH_ROLES.len());
+        assert_eq!(
+            sw[6..],
+            [Color::Reset, Color::Reset, Color::Reset],
+            "focus_ring / surface_1 / surface_2 have no color to show"
+        );
+        assert!(
+            sw.iter().all(|c| !matches!(c, Color::Rgb(..))),
+            "a no-color palette must not leak an RGB into the swatch: {sw:?}"
+        );
+        // `dim` is the one role that keeps a real value, so the row
+        // still has one distinguishable block rather than nine identical
+        // ones.
+        assert_eq!(sw[4], Color::DarkGray);
     }
 
     #[test]

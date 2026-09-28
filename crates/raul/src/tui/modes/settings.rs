@@ -165,7 +165,7 @@ pub fn settings_rows(picker_expanded: bool) -> Vec<SettingsRow> {
             // M243: one status-preview row under the palette rows, so
             // the operator sees what the TUI's lifecycle colors look
             // like under the theme they are considering — not just the
-            // six-swatch portrait the palette rows already show.
+            // nine-role swatch portrait the palette rows already show.
             rows.push(SettingsRow::ThemeStatus);
         }
     }
