@@ -60,7 +60,7 @@
     {
       "id": "AC-01",
       "description": "Both repo-root herdr logs are deleted and untracked.",
-      "verification": "test ! -e mp-herdr-log.txt && test ! -e mp-herdr-log2.txt && ! git ls-files | rg -q 'mp-herdr-log'",
+      "verification": "test ! -e mp-herdr-log.txt && test ! -e mp-herdr-log2.txt && ! git ls-files -- 'mp-herdr-log*' | rg -q .",
       "status": "pending",
       "evidence": ""
     },
