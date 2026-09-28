@@ -230,3 +230,15 @@ milestone (or a successor), not by reverting the work that closed them.
 - Related: the underlying M239 AC-01 problem itself -- `! git ls-files | rg -q 'mp-herdr-log'` matching M239's own milestone slug -- is a spec-gap in the milestone, recorded in that milestone's evidence and resolved by anchoring the pathspec.
 - Verdict: **spec-gap** (repair ergonomics: no way to see, from an AC edit, that a step carries the same command).
 - Status: backlog.
+
+---
+
+## Entry — 2026-09-28 — a milestone cannot record partial progress while a dependency is pending (G8)
+
+- Date / when: 2026-09-28, closing out a herdr-orc run of M244.
+- Command attempted: `mp milestone ac pass 244 AC-01` (and the other passing ACs), `mp milestone step done 244 S0…S1.4`, then `mp milestone set-status 244 in-progress`.
+- Observed output: the AC and step writes succeed; `set-status` fails with `Error: G8: dependency 243 is not done`. M244 declares `depends_on: ['243']`, and M243 is still `approved`/`planned`, so the milestone is pinned at `lifecycle: approved / execution_status: planned` even though 5 of its 6 steps are done and 5 of its 6 ACs have passed.
+- Suspected cause / code path: the G8 dependency gate guards every `execution_status` transition, not just the terminal ones. The result is that genuinely in-flight work under an unfinished dependency can be recorded at fragment level (steps, ACs) but not at milestone level, so the dashboard and any lifecycle-derived report still show the milestone as not started.
+- Workaround: none. `--force` would record bypass debt for a gate that is behaving correctly — the real remedy is to finish M243 first, which is the correct ordering anyway. Left the milestone at `planned` with its per-step and per-AC progress recorded.
+- Verdict: **spec-gap** (no way to express "blocked on a dependency but partly executed" in the lifecycle; fragment-level state carries the truth while the milestone-level state does not).
+- Status: backlog.

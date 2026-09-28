@@ -64,15 +64,15 @@
       "id": "AC-01",
       "description": "Palette has focus_ring, surface_1, surface_2 with the exact per-palette values in scope for all 7 palettes (6 named + monochrome).",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_match_spec/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1. palette_roles_match_spec 1/1. Per-palette literals genuinely pinned: reviewer mutated 0x7287fd to 0x7287fe and the test failed as predicted. SCOPE CAVEAT: the AC says 7 palettes (6 named + monochrome); ALUCARD does not exist yet and is owned by M243, so this test pins the 6 that exist and needs one row added when Alucard lands. palette_roles_non_degenerate iterates ALL, so Alucard is already covered there."
     },
     {
       "id": "AC-02",
       "description": "Selected list/board rows use surface_2 bg + focus_ring marker; overlays/modals and chrome use surface_1 bg; focused detail rows use surface_2; focused tabs use focus_ring (TestBackend cell assertions).",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/selected_row|overlay|detail|chrome|tab/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1. 5/5. Load-bearing design confirmed against ratatui 0.30.2 source: Cell::set_style only updates fg when style.fg.is_some(), so a foreground in row_highlight_style wipes the focus_ring marker. The runners background-only highlight with fg on row/cell styles is correct; the reviewer reproduced the bad state and the marker test failed as predicted. The three rewritten existing tests were verified to preserve their original intent."
     },
     {
       "id": "AC-03",
@@ -85,22 +85,22 @@
       "id": "AC-04",
       "description": "For every named palette surface_1, surface_2, and foreground are pairwise distinct and focus_ring differs from accent.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_non_degenerate/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1. palette_roles_non_degenerate 1/1 over theme::ALL."
     },
     {
       "id": "AC-05",
       "description": "Swapping App::palette at runtime changes the role colors in the next rendered frame; docs/raul/settings.md has the role table.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/live_swap/)' && rg -q 'surface_1' docs/raul/settings.md",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1. live_swap 1/1 plus rg -q surface_1 docs/raul/settings.md exit 0; the 24-line role table was reviewed and matches the implementation."
     },
     {
       "id": "AC-06",
       "description": "raul tests, clippy, fmt, and consumer-surface lint are clean.",
       "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1. 1462/1462 pass, clippy -D warnings exit 0, fmt exit 0, consumer-surface lint clean. The six existing role values were not changed and M241/M242 autopilot surfaces are untouched, both per out_of_scope."
     }
   ],
   "work_packages": [
@@ -128,7 +128,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_match_spec/)'",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -158,7 +158,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/selected_row|overlay|detail|chrome|tab/)'",
       "done_when": "AC-02 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -204,7 +204,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_palette_roles -E 'test(/live_swap/)' && rg -q 'surface_1' docs/raul/settings.md",
       "done_when": "AC-05 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -226,7 +226,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-06 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -251,7 +251,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/palette_roles_non_degenerate/)'",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
