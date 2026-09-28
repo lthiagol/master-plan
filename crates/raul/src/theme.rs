@@ -169,10 +169,11 @@ mod tests {
     /// | dracula    | `0x8be9fd` | `0x343746` | `0x44475a` | draculatheme.com/spec Cyan/Background Light/Selection |
     ///
     /// `alucard` is intentionally absent — it ships with the ALUCARD
-    /// palette in M243 (M244 `depends_on: [243]`). Its spec values
-    /// are `0x036a96` / `0xdedccf` / `0xcfcfde` (Cyan / Background
-    /// Light / Selection) and the test below picks it up for free
-    /// once M243 adds the static to `ALL`.
+    /// palette in M243 (M244 `depends_on: [243]`). Its spec values are
+    /// `0x036a96` / `0xdedccf` / `0xcfcfde` (Cyan / Background Light /
+    /// Selection); add a `(&ALUCARD, ...)` row to `cases` when M243
+    /// lands. (`palette_roles_non_degenerate` below iterates `ALL`, so
+    /// it covers alucard with no edit.)
     ///
     /// `monochrome` pins the `Color::Reset` collapse.
     #[test]
