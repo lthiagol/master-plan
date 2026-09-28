@@ -87,7 +87,12 @@ pub static FRAPPE: Palette = Palette {
     success: rgb(0xa6d189),
     warn: rgb(0xe5c890),
     danger: rgb(0xe78284),
-    dim: rgb(0x949cbb),
+    // Frappé Subtext0 (`#a5adce`) — matches the secondary-text role
+    // in the other three Catppuccin flavors (macchiato `0xa5adcb`,
+    // mocha `0xa6adc8`). The old `0x949cbb` is Subtext1, a step
+    // brighter than the role intended, which made Frappé's dim text
+    // read louder than its siblings'.
+    dim: rgb(0xa5adce),
     foreground: rgb(0xc6d0f5),
     focus_ring: rgb(0xbabbf1),
     surface_1: rgb(0x292c3c),
@@ -211,6 +216,14 @@ mod tests {
             assert_eq!(p.surface_1, *s1, "{} surface_1", p.name);
             assert_eq!(p.surface_2, *s2, "{} surface_2", p.name);
         }
+    }
+
+    /// Frappé's secondary text is Catppuccin Subtext0 (`#a5adce`).
+    /// It was previously Subtext1 (`#949cbb`), which read a step
+    /// brighter than the role and out-shouted macchiato / mocha.
+    #[test]
+    fn frappe_dim_matches_spec() {
+        assert_eq!(FRAPPE.dim, rgb(0xa5adce), "frappe dim is Subtext0");
     }
 
     /// Alucard Classic ships as a first-class named palette. Pin the
