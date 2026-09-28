@@ -27,6 +27,27 @@ pub struct Palette {
     pub dim: Color,
     /// Primary text.
     pub foreground: Color,
+    /// Focused chip / selected-row border and marker.
+    ///
+    /// The "where is the cursor right now" color. Renderers use it
+    /// for the selected row's border and its leading marker glyph,
+    /// the focused tab, and the selected Path node. It is
+    /// deliberately distinct from `accent` so focus does not read
+    /// as a lifecycle color.
+    pub focus_ring: Color,
+    /// Overlay, modal, and picker background.
+    ///
+    /// The first layer above the terminal background. Overlays,
+    /// modals, and the app's own chrome (header / footer) paint
+    /// with this so a panel reads as floating above the lane
+    /// content instead of blending into it.
+    pub surface_1: Color,
+    /// Selected-row / hovered background inside a surface.
+    ///
+    /// The second layer up: a selected or hovered row *within* a
+    /// `surface_1` panel (a list row, a board box, a picker
+    /// cursor). Paired with `foreground` as its text color.
+    pub surface_2: Color,
 }
 
 impl Palette {
@@ -54,6 +75,9 @@ pub static LATTE: Palette = Palette {
     danger: rgb(0xd20f39),
     dim: rgb(0x6c6f85),
     foreground: rgb(0x4c4f69),
+    focus_ring: rgb(0x7287fd),
+    surface_1: rgb(0xe6e9ef),
+    surface_2: rgb(0xccd0da),
 };
 
 pub static FRAPPE: Palette = Palette {
@@ -64,6 +88,9 @@ pub static FRAPPE: Palette = Palette {
     danger: rgb(0xe78284),
     dim: rgb(0x949cbb),
     foreground: rgb(0xc6d0f5),
+    focus_ring: rgb(0xbabbf1),
+    surface_1: rgb(0x292c3c),
+    surface_2: rgb(0x414559),
 };
 
 pub static MACCHIATO: Palette = Palette {
@@ -74,6 +101,9 @@ pub static MACCHIATO: Palette = Palette {
     danger: rgb(0xed8796),
     dim: rgb(0xa5adcb),
     foreground: rgb(0xcad3f5),
+    focus_ring: rgb(0xb7bdf8),
+    surface_1: rgb(0x1e2030),
+    surface_2: rgb(0x363a4f),
 };
 
 pub static MOCHA: Palette = Palette {
@@ -84,6 +114,9 @@ pub static MOCHA: Palette = Palette {
     danger: rgb(0xf38ba8),
     dim: rgb(0xa6adc8),
     foreground: rgb(0xcdd6f4),
+    focus_ring: rgb(0xb4befe),
+    surface_1: rgb(0x181825),
+    surface_2: rgb(0x313244),
 };
 
 pub static DRACULA: Palette = Palette {
@@ -94,6 +127,9 @@ pub static DRACULA: Palette = Palette {
     danger: rgb(0xff5555),
     dim: rgb(0x6272a4),
     foreground: rgb(0xf8f8f2),
+    focus_ring: rgb(0x8be9fd),
+    surface_1: rgb(0x343746),
+    surface_2: rgb(0x44475a),
 };
 
 /// Neutral palette when `color_enabled()` is false — no theme accent RGB.
@@ -105,6 +141,54 @@ pub static MONOCHROME: Palette = Palette {
     danger: Color::Reset,
     dim: Color::DarkGray,
     foreground: Color::Reset,
+    // The layering roles collapse to Reset on purpose: with color
+    // disabled the *only* remaining layer signal is the modifier
+    // pair (BOLD for the selected row, REVERSED for an overlay
+    // cursor). `Palette::all()` excludes this palette, so the
+    // named-palette distinctness checks skip it too.
+    focus_ring: Color::Reset,
+    surface_1: Color::Reset,
+    surface_2: Color::Reset,
 };
 
 pub static ALL: [Palette; 5] = [LATTE, FRAPPE, MACCHIATO, MOCHA, DRACULA];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The layering roles are only useful if they actually separate
+    /// the layers they name. A palette that reuses one color for
+    /// `surface_1`, `surface_2`, and `foreground` would collapse
+    /// every panel back onto the text color — the exact problem the
+    /// layering roles were added to fix.
+    ///
+    /// Scoped to `ALL` (the named, user-selectable palettes).
+    /// `MONOCHROME` is deliberately excluded: with color disabled it
+    /// sets every role to `Reset` and leans on modifiers instead.
+    #[test]
+    fn palette_roles_non_degenerate() {
+        for p in ALL.iter() {
+            assert_ne!(
+                p.surface_1, p.surface_2,
+                "{}: surface_1 and surface_2 must differ (surface_2 is a layer above surface_1)",
+                p.name
+            );
+            assert_ne!(
+                p.surface_2, p.foreground,
+                "{}: surface_2 must differ from foreground (a selected row needs readable text)",
+                p.name
+            );
+            assert_ne!(
+                p.surface_1, p.foreground,
+                "{}: surface_1 must differ from foreground (an overlay needs readable text)",
+                p.name
+            );
+            assert_ne!(
+                p.focus_ring, p.accent,
+                "{}: focus_ring must differ from accent (focus is not a lifecycle color)",
+                p.name
+            );
+        }
+    }
+}
