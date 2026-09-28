@@ -642,6 +642,10 @@ impl SystemDriveOps {
         let mut prev_status = String::new();
         let mut prev_lifecycle = String::new();
         let mut non_working_accrued = Duration::ZERO;
+        // Previous sample point, so the accrual below adds only the
+        // per-iteration delta rather than re-adding the whole window
+        // since the last progress marker on every pass.
+        let mut last_sample = last_progress;
 
         self.log_event(
             "wait_lifecycle",
@@ -696,10 +700,11 @@ impl SystemDriveOps {
                         // stall timer; the 4x ceiling still fires on
                         // a hung working runner.
                         let now_instant = Instant::now();
+                        let delta = now_instant.saturating_duration_since(last_sample);
                         if status != "working" {
-                            non_working_accrued +=
-                                now_instant.saturating_duration_since(last_progress);
+                            non_working_accrued += delta;
                         }
+                        last_sample = now_instant;
                         let since_progress = now_instant.saturating_duration_since(last_progress);
                         let stall_limit = Duration::from_millis(self.wait.stall_timeout_ms);
                         let hard_ceiling = Duration::from_millis(

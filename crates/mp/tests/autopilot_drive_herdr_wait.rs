@@ -676,3 +676,204 @@ fn settle_delays_prompt_delivery_until_window_matures() {
         "send_prompt must not deliver on the first (boot-time) idle read"
     );
 }
+
+// ─── M246 WP2 / AC-02: stall rule (deterministic clock) ────────────────────
+//
+// These tests drive `wait_for_lifecycle_with` through its injected
+// `now` closure. Virtual time advances one whole minute per clock
+// read, so a 90-minute working run costs a few milliseconds of real
+// time and the assertions never depend on iteration counts (the loop
+// reads the clock a variable number of times per iteration).
+//
+// Pre-M246 the rule was "agent_status unchanged for stall_timeout",
+// so a build longer than the timeout was reported as hung even while
+// the runner was demonstrably working. That regression is pinned
+// here.
+
+/// Virtual time per clock read: one minute.
+const STALL_TICK: Duration = Duration::from_secs(60);
+
+/// Monotonic virtual clock. Each [`Self::tick`] advances by
+/// [`STALL_TICK`]; tests read [`Self::minutes`] to decide when the
+/// scripted agent status should change.
+struct VirtualClock {
+    elapsed: std::cell::Cell<Duration>,
+}
+
+impl VirtualClock {
+    fn new() -> Self {
+        Self {
+            elapsed: std::cell::Cell::new(Duration::ZERO),
+        }
+    }
+    fn tick(&self) -> Instant {
+        let next = self.elapsed.get() + STALL_TICK;
+        self.elapsed.set(next);
+        Instant::now() + next
+    }
+    fn minutes(&self) -> u64 {
+        self.elapsed.get().as_secs() / 60
+    }
+}
+
+/// A 30-minute stall timeout in milliseconds — the production
+/// default, spelled out so the arithmetic in these tests is readable.
+const STALL_30_MIN_MS: u64 = 30 * 60 * 1_000;
+
+#[test]
+fn stall_working_runner_not_stalled() {
+    // The headline regression. A runner that reports `working`
+    // continuously — a long build or test run — while the lifecycle
+    // stays at `in-progress` must not be declared stalled just
+    // because it outlasts the stall timeout. 90 minutes of working is
+    // 3x the 30-minute timeout and still under the 4x hard ceiling,
+    // so this isolates the working rule from the ceiling.
+    let opts = WaitOptions {
+        poll_interval_ms: 1,
+        stall_timeout_ms: STALL_30_MIN_MS,
+    };
+    let clock = VirtualClock::new();
+    let working_for = 90u64;
+    let outcome = wait_for_lifecycle_with(
+        // The target is a LIFECYCLE state, so the scripted change has
+        // to happen on the lifecycle reader: the runner works for 90
+        // virtual minutes, then completes the milestone.
+        || {
+            if clock.minutes() < working_for {
+                Ok("in-progress".to_string())
+            } else {
+                Ok("self-reviewed".to_string())
+            }
+        },
+        // (The ceiling test carries the hang-guard; this one reaches
+        // its target at 90m, so it always terminates.)
+        LifecycleTarget::SelfReviewed,
+        // Agent status never changes for the whole run.
+        || Ok("working".to_string()),
+        &opts,
+        || clock.tick(),
+    )
+    .expect("a working runner must not be declared stalled");
+
+    assert_eq!(outcome, WaitOutcome::Reached);
+    assert!(
+        clock.minutes() >= working_for,
+        "the loop should have run the full {working_for}m of virtual time; got {}m",
+        clock.minutes()
+    );
+}
+
+#[test]
+fn stall_idle_runner_stalls() {
+    // The other half, and the guarantee the old rule gave us: a
+    // runner that is NOT working and does not advance the lifecycle
+    // past the stall timeout IS stalled. 31 minutes of idle against a
+    // 30-minute timeout.
+    let opts = WaitOptions {
+        poll_interval_ms: 1,
+        stall_timeout_ms: STALL_30_MIN_MS,
+    };
+    let clock = VirtualClock::new();
+    let err = wait_for_lifecycle_with(
+        || Ok("in-progress".to_string()),
+        LifecycleTarget::SelfReviewed,
+        || Ok("idle".to_string()),
+        &opts,
+        || clock.tick(),
+    )
+    .unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("hung") && msg.contains("idle"),
+        "an idle runner past the stall timeout must be flagged: {msg}"
+    );
+    // The stall must fire *at* the configured 30m, not before it
+    // (an early fire would mean a healthy runner is flagged) and not
+    // anywhere near the 120m hard ceiling. The window is a few
+    // minutes wide because the virtual clock advances one tick per
+    // loop iteration.
+    let fired_at = clock.minutes();
+    assert!(
+        (30..=35).contains(&fired_at),
+        "must stall at ~30m (the configured timeout), not before and not near the 120m ceiling; got {fired_at}m"
+    );
+}
+
+#[test]
+fn stall_hard_ceiling_catches_hung_working_runner() {
+    // The ceiling half. Pausing the timer on `working` would make a
+    // hung working runner immortal, so an independent ceiling fires at
+    // 4 x stall_timeout (120 min) with no progress at any status.
+    let opts = WaitOptions {
+        poll_interval_ms: 1,
+        stall_timeout_ms: STALL_30_MIN_MS,
+    };
+    let clock = VirtualClock::new();
+    let err = wait_for_lifecycle_with(
+        // Safety net: if the ceiling ever regresses, the wait would
+        // spin forever (a working status never accrues stall time), so
+        // the lifecycle completes after 10 virtual hours. That turns a
+        // hang in CI into an ordinary assertion failure below.
+        || {
+            if clock.minutes() >= 600 {
+                Ok("self-reviewed".to_string())
+            } else {
+                Ok("in-progress".to_string())
+            }
+        },
+        LifecycleTarget::SelfReviewed,
+        || Ok("working".to_string()),
+        &opts,
+        || clock.tick(),
+    )
+    .expect_err("a hung working runner must be caught by the hard ceiling, not run forever");
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("hung") && msg.contains("working"),
+        "a hung working runner must still be caught by the hard ceiling: {msg}"
+    );
+    // The loop reads the clock once per iteration, so the ceiling can
+    // be observed up to a few minutes past the deadline; what matters
+    // is that it fires at ~120m (4 x 30m) rather than never.
+    let fired_at = clock.minutes();
+    assert!(
+        (120..=125).contains(&fired_at),
+        "the ceiling must fire at ~120m (4 x 30m); got {fired_at}m"
+    );
+}
+
+#[test]
+fn stall_lifecycle_advance_resets_the_timer() {
+    // Progress is progress: a lifecycle change that is not a
+    // completion resets the accrued stall time, so a runner that
+    // advances the milestone every 20 minutes is never flagged even
+    // though its agent-status string never changes.
+    let opts = WaitOptions {
+        poll_interval_ms: 1,
+        stall_timeout_ms: STALL_30_MIN_MS,
+    };
+    let clock = VirtualClock::new();
+    let outcome = wait_for_lifecycle_with(
+        || {
+            if clock.minutes() < 90 {
+                // Advance every 20 virtual minutes. Both values sit
+                // below the target, so neither short-circuits the
+                // wait — this is genuine forward movement, not a
+                // disguised completion.
+                if (clock.minutes() / 20) % 2 == 0 {
+                    Ok("approved".to_string())
+                } else {
+                    Ok("in-progress".to_string())
+                }
+            } else {
+                Ok("self-reviewed".to_string())
+            }
+        },
+        LifecycleTarget::SelfReviewed,
+        || Ok("idle".to_string()),
+        &opts,
+        || clock.tick(),
+    )
+    .expect("an idle runner whose lifecycle keeps advancing is not stalled");
+    assert_eq!(outcome, WaitOutcome::Reached);
+}

@@ -897,6 +897,9 @@ where
     // time is excluded, so a long build does not trip the stall
     // rule; a status or lifecycle change zeroes it.
     let mut non_working_accrued = Duration::ZERO;
+    // Previous clock sample, used to accrue only the per-iteration
+    // delta of non-working time.
+    let mut last_sample = last_progress;
 
     loop {
         // M152 S4: at the top of each iteration (and just before the
@@ -952,9 +955,17 @@ where
             //    ANY status so pausing on `working` cannot make a
             //    hung runner immortal.
             let now_instant = now();
+            // Accrue only the *delta* since the previous sample, and
+            // only while the runner is not `working`. Adding the full
+            // `now - last_progress` on every iteration would
+            // double-count (each iteration re-adds the whole window
+            // since the last progress marker) and fire quadratically
+            // too early.
+            let delta = now_instant.saturating_duration_since(last_sample);
             if status != "working" {
-                non_working_accrued += now_instant.saturating_duration_since(last_progress);
+                non_working_accrued += delta;
             }
+            last_sample = now_instant;
             let since_progress = now_instant.saturating_duration_since(last_progress);
             let stall_limit = Duration::from_millis(opts.stall_timeout_ms);
             let hard_ceiling = Duration::from_millis(
