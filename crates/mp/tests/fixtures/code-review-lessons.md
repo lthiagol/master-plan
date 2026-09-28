@@ -8,6 +8,78 @@ The intent is to seed a code review skill with patterns that actually caught
 real bugs, not generic advice. Add new entries at the bottom of the relevant
 section, or create a new section if the lesson doesn't fit an existing one.
 
+## Lesson index
+
+Lessons are grouped thematically below, so the `### L<n>.` headings are **not**
+in numeric order — L47 sits between L11 and L12, L26 between L14 and L15, and so
+on. Use this index to look a lesson up by ID. (L44–L46 were never used.)
+
+**IDs are stable.** They are referenced by `crates/mp/tests/code_review_patterns.rs`,
+the mp-code-review skill, the CHANGELOG, and completed milestones. Never
+renumber, re-letter, or physically reorder a lesson to "fix" the document order —
+append new lessons at the end of their section and add their index row here.
+
+- L1. Green tests do not imply correct behavior
+- L2. Reproducers catch what test suites miss
+- L3. Read the committed code, not the diff
+- L4. Multiple review passes have uncorrelated findings
+- L5. The author should not be the only reviewer
+- L6. New bulk paths that bypass single-path validation
+- L7. Dry-run paths that don't actually preview what would happen
+- L8. Operation-level args that re-validate per target
+- L9. New code inheriting pre-existing bugs
+- L10. Idempotent operations that reject non-existent references
+- L11. Cycle or graph checks using stale snapshots
+- L12. "before" / "after" fields that misrepresent failures
+- L13. Dead code sneaking in via refactors
+- L14. Awkward control flow left over from earlier iterations
+- L15. Tests written against the implementation, not the spec
+- L16. Smoke tests without negative cases
+- L17. Tests that don't reproduce the documented bug
+- L18. Findings belong in the plan, not in chat
+- L19. Reviewer verdict should reflect the evidence, not the goal
+- L20. Commit remediation as `fix`, original as `feat`
+- L21. Spec lists "narrow filter" — is it a partition or a strict subset?
+- L22. Spec lists field groups — wire every one
+- L23. Symmetry between flags — validate every enum the same way
+- L24. Refactors surface latent bugs in adjacent code
+- L25. Silent empty results mask typos — always error on invalid enums
+- L26. Docstring lists the fields a function handles — diff against it
+- L27. Narrow ⊆ broad test invariant
+- L28. Extracted helper tested in isolation, call site still unprotected
+- L29. Sentinel-prefixed flags that collide with legitimate content
+- L30. Path arguments that skip shell conventions (tilde, env)
+- L31. Review carry-overs belong in tracked files, not just in commit messages
+- L32. Schema fields the CLI doesn't expose persist as hidden state
+- L33. Tag-pointer drift at release time
+- L34. A collation fix at one site doesn't fix its siblings
+- L35. A serde-default sentinel collides with a real "empty" value
+- L36. Layering a derived view over a removed field breaks show-parity
+- L37. Tooling-bridged tests fail when the installed binary is stale
+- L38. Four-milestone scope-down is honest, but flag it loudly
+- L39. A `max()` derivation over multiple inputs masks single-input bugs when both inputs happen to agree
+- L40. Mixed-read during a migration window: every sibling read path must move together
+- L41. Render and hit-test must share the same layout
+- L42. Unit-test the unit; CLI-test the entry
+- L43. Test fixture writes to the same wrong path as production code — test and bug are mutually reinforcing
+- L47. Atomicity in batch processing: write the result BEFORE deleting the inputs
+- L48. CLI surface changes are a contract — emit legacy fields as deprecation aliases during a transition window
+- L49. Extract the formatter as a pure function so unit tests don't depend on dev-binary-vs-installed-mp coupling
+- L50. Frozen-contract pin = hand-crafted JSON fixture + typed deserialize struct
+- L51. AC integrity under deferred scope: re-scope ACs to match what shipped; never mark `passed` with copy-pasted evidence across multiple ACs
+- L52. When a probe tightens, every test fixture that drives the probe must be updated to match the new strictness
+- L53. A milestone that ships a lint must lint its own spec — and re-call to `mp milestone complete` overwrites per-AC evidence
+- L54. A high warning count is data, not noise — verify the lint's contract before declaring findings "false positives"
+- L55. `--evidence ""` is not "skip the flag" — it overwrites per-AC evidence with empty strings
+- L56. Auto-increment ids must derive from `max(suffix)+1`, never `len()+1` — a removal breaks the len formula
+- L57. The AC-step status contract is a 2-tuple, not a singleton — a `passed` AC with a `pending` covering step is the same integrity bug as L51's copy-pasted evidence
+- L58. Spec verifications that point at one-off shell scripts in /tmp are unverifiable after the artifact is deleted; verifications must be reproducible from a deterministic source in the repo
+- L59. Value-parser ACs need an exercise-the-parser verification, not just a help-text grep
+- L60. Process-prompting docs live in two places — both must point at the current truth, not the one the author happened to look at
+- L61. When injecting a helper between two doc-bearing functions, manually verify the adjacent doc blocks are still attached to the correct function
+- L62. When a doc-comment promises "same X as the sibling path," the assertion surface must pin BOTH paths
+- L63. Agent-enforced policy needs one vocabulary across config, parser, and skill instructions
+
 ---
 
 ## Methodology

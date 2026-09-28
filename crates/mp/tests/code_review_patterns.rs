@@ -4,6 +4,10 @@
 //! `**Pattern:**` block with three sections: Pattern (description), Positive
 //! fixture (must match), Negative fixture (must not match). These tests pin
 //! the catalog structure and drive the greps that surface matches/violations.
+//!
+//! The same file is also the catalog's numeric index: the lessons are grouped
+//! thematically, so `## Lesson index` is what lets a reader look one up by ID
+//! without renumbering (IDs are cited externally and must stay stable).
 
 mod common;
 
@@ -47,6 +51,58 @@ fn split_lessons(text: &str) -> Vec<(String, String)> {
     }
     if let Some((prev_id, prev_lines)) = current.take() {
         out.push((prev_id, prev_lines.join("\n")));
+    }
+    out
+}
+
+/// Parse the numeric ID and title out of every `### L<n>. <title>` heading,
+/// in document order. Document order is thematic rather than numeric (L47
+/// sits between L11 and L12), which is the reason the numeric index exists.
+/// Lines that only *look* like headings (e.g. prose mentioning
+/// `` `### L<n>.` ``) are rejected by the `u32` parse.
+fn lesson_headings(text: &str) -> Vec<(u32, String)> {
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("### L") else {
+            continue;
+        };
+        let Some(id_end) = rest.find('.') else {
+            continue;
+        };
+        let Ok(id) = rest[..id_end].parse::<u32>() else {
+            continue;
+        };
+        out.push((id, rest[id_end + 1..].trim().to_string()));
+    }
+    out
+}
+
+/// Parse the numeric ID and title of every `- L<n>. <title>` row inside the
+/// `## Lesson index` section. Scoped to that section so ordinary lesson-body
+/// bullets (e.g. `- Line 82: ...`, `- Library API ...`) can never be
+/// mistaken for index rows, and so the test fails loudly if the section
+/// itself goes missing.
+fn lesson_index_rows(text: &str) -> Vec<(u32, String)> {
+    let mut out: Vec<(u32, String)> = Vec::new();
+    let mut in_index = false;
+    for line in text.lines() {
+        if line.starts_with("## ") {
+            in_index = line.trim() == "## Lesson index";
+            continue;
+        }
+        if !in_index {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("- L") else {
+            continue;
+        };
+        let Some(id_end) = rest.find('.') else {
+            continue;
+        };
+        let Ok(id) = rest[..id_end].parse::<u32>() else {
+            continue;
+        };
+        out.push((id, rest[id_end + 1..].trim().to_string()));
     }
     out
 }
@@ -140,6 +196,113 @@ fn read_tests_tree_into(dir: &std::path::Path, out: &mut String) {
                 out.push('\n');
             }
         }
+    }
+}
+
+/// T-08: every `### L<n>.` heading ID appears exactly once in the catalog.
+/// Lesson IDs are referenced from outside this file (the mp-code-review
+/// skill, the CHANGELOG, completed milestones), so a duplicated ID is an
+/// ambiguous citation — a reader who follows "see L26" cannot tell which
+/// lesson they landed on. The catalog is grouped thematically, so
+/// duplicates are easy to introduce when a lesson is filed into the
+/// wrong section.
+#[test]
+fn lessons_ids_are_unique() {
+    let path = lessons_path();
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let headings = lesson_headings(&text);
+    assert!(
+        !headings.is_empty(),
+        "no `### L<n>.` headings parsed from {}",
+        path.display()
+    );
+
+    let mut ids: Vec<u32> = headings.iter().map(|(id, _)| *id).collect();
+    ids.sort_unstable();
+    let dupes: Vec<u32> = ids
+        .windows(2)
+        .filter(|w| w[0] == w[1])
+        .map(|w| w[0])
+        .collect();
+
+    assert!(
+        dupes.is_empty(),
+        "duplicate lesson IDs in {}: {:?} — each ID must be cited unambiguously",
+        path.display(),
+        dupes
+    );
+}
+
+/// T-09: the `## Lesson index` section lists every `### L<n>.` heading
+/// exactly once, in strictly ascending numeric order, with a title that
+/// matches the heading it points at. The catalog is thematically grouped
+/// (L47 sits between L11 and L12), so the index is the only way to look a
+/// lesson up by number — and renumbering is off-limits because IDs are
+/// cited externally, which makes the index the load-bearing artifact
+/// rather than a convenience.
+#[test]
+fn lessons_index_is_complete_and_sorted() {
+    let path = lessons_path();
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let headings = lesson_headings(&text);
+    let rows = lesson_index_rows(&text);
+    assert!(
+        !headings.is_empty(),
+        "no `### L<n>.` headings parsed from {}",
+        path.display()
+    );
+    assert!(
+        !rows.is_empty(),
+        "no `- L<n>.` index rows parsed — is the `## Lesson index` section missing from {}?",
+        path.display()
+    );
+
+    let ids: Vec<u32> = rows.iter().map(|(id, _)| *id).collect();
+    let mut sorted = ids.clone();
+    sorted.sort_unstable();
+    assert_eq!(
+        ids,
+        sorted,
+        "lesson index is not in ascending order in {}",
+        path.display()
+    );
+    let strictly_ascending = ids.windows(2).all(|w| w[0] < w[1]);
+    assert!(
+        strictly_ascending,
+        "lesson index repeats an ID in {}: {ids:?}",
+        path.display()
+    );
+
+    let mut heading_ids: Vec<u32> = headings.iter().map(|(id, _)| *id).collect();
+    heading_ids.sort_unstable();
+    let missing: Vec<u32> = heading_ids
+        .iter()
+        .copied()
+        .filter(|id| !ids.contains(id))
+        .collect();
+    let extra: Vec<u32> = ids
+        .iter()
+        .copied()
+        .filter(|id| !heading_ids.contains(id))
+        .collect();
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "lesson index is out of sync with the `### L<n>.` headings in {} — missing: {missing:?}, extra: {extra:?}",
+        path.display()
+    );
+
+    for (id, heading_title) in &headings {
+        let row_title = rows
+            .iter()
+            .find(|(row_id, _)| row_id == id)
+            .map(|(_, title)| title.as_str())
+            .unwrap_or_else(|| panic!("L{id} has no index row"));
+        assert_eq!(
+            heading_title, row_title,
+            "index title for L{id} does not match its `### L{id}.` heading"
+        );
     }
 }
 
