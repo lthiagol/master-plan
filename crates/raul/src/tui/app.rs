@@ -997,6 +997,18 @@ impl App {
                 if matches!(state.focus, SettingsFocus::Editing) {
                     return;
                 }
+                // M243: an expanded `ui.theme` picker owns the
+                // highlight. Moving it live-applies the palette
+                // (AC-06), so the very next frame repaints in the
+                // newly highlighted theme.
+                if state.theme_picker_open() {
+                    if state.theme.move_cursor(-1) {
+                        let palette = state.theme.preview_palette();
+                        self.palette = palette;
+                        self.touch();
+                    }
+                    return;
+                }
                 if state.selected_idx > 0 {
                     state.selected_idx -= 1;
                     self.touch();
@@ -1157,6 +1169,16 @@ impl App {
         if self.active_lane == Lane::Settings {
             if let Some(state) = self.settings.as_mut() {
                 if matches!(state.focus, SettingsFocus::Editing) {
+                    return;
+                }
+                // M243: an expanded `ui.theme` picker owns the
+                // highlight; moving it live-applies the palette.
+                if state.theme_picker_open() {
+                    if state.theme.move_cursor(1) {
+                        let palette = state.theme.preview_palette();
+                        self.palette = palette;
+                        self.touch();
+                    }
                     return;
                 }
                 let max = super::modes::settings::SETTINGS_KEYS

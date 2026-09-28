@@ -1139,6 +1139,27 @@ fn apply_settings_enter(app: &mut App, runner: &MpRunner) -> Result<()> {
         return Ok(());
     };
 
+    // M243: while the picker is expanded, Enter closes the expansion
+    // and leaves the live preview in place — the operator keeps
+    // looking at the highlighted theme and commits (or Escs) from the
+    // flat list. Checked BEFORE the `ui.theme` branch below, or
+    // closing would immediately re-expand.
+    if state.theme_picker_open() {
+        state.theme.collapse();
+        app.touch();
+        return Ok(());
+    }
+
+    // M243: `ui.theme` is a `choice` key, so Enter expands the theme
+    // picker (6 named palettes + Default) instead of opening the
+    // caret editor — a free-text editor is the wrong affordance for a
+    // fixed set of palettes, and the picker previews live.
+    if key == crate::tui::modes::settings::theme_picker::THEME_KEY {
+        state.theme.expand();
+        app.touch();
+        return Ok(());
+    }
+
     // M201: route by type ONLY for explicit in-place actions
     // (SettingsToggleBool / SettingsCycleChoice). Enter continues to
     // open the caret-edit editor for all types — that preserves the

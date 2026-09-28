@@ -20,6 +20,8 @@ fn schema_one_of_each_type() -> SettingsSchema {
         "keys": [
             {"key": "git.auto_commit", "type": "bool", "default": "false",
              "description": "Auto-commit."},
+            {"key": "ui.icons", "type": "choice", "default": "unicode",
+             "allowed": ["none", "ascii", "unicode"], "description": "Icon set."},
             {"key": "ui.theme", "type": "choice", "default": "mocha",
              "allowed": ["mocha", "latte", "frappe"], "description": "Theme."},
             {"key": "workflow.plan.location", "type": "path", "default": "master-plan",
@@ -51,6 +53,7 @@ fn app_with_schema() -> App {
         edit: None,
         staged_edits: BTreeMap::new(),
         schema_warning: None,
+        theme: raul::tui::modes::settings::ThemePicker::default(),
     });
     app
 }
@@ -237,13 +240,37 @@ fn settings_editor_choice_on_non_choice_key_is_noop() {
 fn settings_editor_choice_enter_opens_editor() {
     // Enter on a choice key still opens the editor (M169 compat);
     // ← / → cycle in place via SettingsCycleChoice.
+    //
+    // Exercised on `ui.icons`, not `ui.theme`: `ui.theme` is the one
+    // documented exception — Enter expands the live-preview theme
+    // picker instead (see tui_theme_picker.rs). The M169 compat
+    // contract itself is unchanged for every other choice key.
     let mut app = app_with_schema();
-    select_key(&mut app, "ui.theme");
+    select_key(&mut app, "ui.icons");
     apply_action(&mut app, &runner(), Action::Enter).unwrap();
     let state = app.settings.as_ref().unwrap();
     assert!(
         state.edit.is_some(),
         "Enter on a choice key still opens the editor (M169 compat)"
+    );
+}
+
+#[test]
+fn settings_editor_choice_enter_on_ui_theme_expands_the_picker() {
+    // The `ui.theme` exception to the rule above: Enter expands the
+    // picker rather than opening a free-text editor for what is a
+    // fixed set of palettes.
+    let mut app = app_with_schema();
+    select_key(&mut app, "ui.theme");
+    apply_action(&mut app, &runner(), Action::Enter).unwrap();
+    let state = app.settings.as_ref().unwrap();
+    assert!(
+        state.edit.is_none(),
+        "ui.theme must not open the caret editor"
+    );
+    assert!(
+        state.theme.is_expanded(),
+        "Enter on ui.theme must expand the theme picker"
     );
 }
 

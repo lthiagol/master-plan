@@ -902,6 +902,7 @@ pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         Err(e) => (None, Some(e)),
     };
 
+    let theme = super::mode::theme_from_config(&config);
     app.settings = Some(SettingsState {
         config,
         schema: cached_schema,
@@ -910,6 +911,9 @@ pub fn load_settings_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         edit: None,
         staged_edits: std::collections::BTreeMap::new(),
         schema_warning: warning,
+        // M243: the picker starts collapsed with the cursor on the
+        // saved theme. Enter on the `ui.theme` row expands it.
+        theme: super::modes::settings::ThemePicker::new(theme),
     });
     app.content = super::app::ContentState::List;
     app.touch();

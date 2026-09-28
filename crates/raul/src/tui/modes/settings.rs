@@ -11,6 +11,9 @@ use crate::tui::keybinds::any_matches;
 use crate::tui::mode::SettingsFocus;
 
 pub mod schema;
+pub mod theme_picker;
+
+pub use theme_picker::ThemePicker;
 
 /// Flat list of configurable keys. Each row is `(section, key)`.
 pub const SETTINGS_KEYS: &[(&str, &str)] = &[
@@ -74,6 +77,51 @@ pub const SETTINGS_KEYS: &[(&str, &str)] = &[
     ("keybinds", "keybinds.cycle_sort"),
 ];
 
+/// M243: key mapping while the `ui.theme` picker is expanded.
+///
+/// Pure — returns actions. The cursor moves and the live-apply side
+/// effect live in `App::move_up` / `App::move_down`, which the
+/// returned `Up` / `Down` actions reach.
+///
+/// ```text
+///   Up / k / Left    highlight the row above        → Action::Up
+///   Down / j / Right highlight the row below        → Action::Down
+///   s                save the highlighted palette   → Action::SettingsSave
+///   Esc              drop the preview, close       → Action::Esc
+///   Enter            close, keep previewing live   → Action::Enter
+/// ```
+///
+/// Left/Right move the highlight vertically rather than cycling the
+/// `choice` value: with the picker open the rows *are* the choice
+/// list, so the M201 in-place cycle has nothing left to do. Enter
+/// closes without saving so the operator can inspect the live
+/// repaint and then commit (or Esc away) from the flat list.
+fn theme_picker_key(
+    key: KeyEvent,
+    state: &crate::tui::mode::SettingsState,
+    kb: &crate::tui::keybinds::Keybinds,
+) -> Vec<Action> {
+    if any_matches(&kb.escape, &key) {
+        return vec![Action::Esc];
+    }
+    if let KeyCode::Char('s') = key.code {
+        if key.modifiers == KeyModifiers::empty() || key.modifiers == KeyModifiers::SHIFT {
+            return vec![Action::SettingsSave];
+        }
+    }
+    if any_matches(&kb.enter, &key) {
+        return vec![Action::Enter];
+    }
+    let _ = state;
+    if any_matches(&kb.up, &key) || matches!(key.code, KeyCode::Left) {
+        return vec![Action::Up];
+    }
+    if any_matches(&kb.down, &key) || matches!(key.code, KeyCode::Right) {
+        return vec![Action::Down];
+    }
+    Vec::new()
+}
+
 /// `(section, key)` for the row at `idx`, or `None` if out of range.
 pub fn flat_key(idx: usize) -> Option<(&'static str, &'static str)> {
     SETTINGS_KEYS.get(idx).copied()
@@ -87,6 +135,15 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
         return Vec::new();
     };
     let kb = &app.keybinds;
+
+    // M243: while the `ui.theme` picker is expanded it owns Up/Down
+    // (arrows and the `j`/`k` aliases, which emit the same actions),
+    // ←/→, `s`, Esc and Enter. Checked before the `h` / `s` /
+    // ←→ / Space blocks below so the picker's keys cannot be stolen
+    // by the flat-list bindings.
+    if state.theme_picker_open() {
+        return theme_picker_key(key, state, kb);
+    }
 
     // `h` (default hide_done) is a no-op on Settings so list-pane state
     // behind the lane is not toggled accidentally.
@@ -179,6 +236,10 @@ pub fn handle_key(key: KeyEvent, app: &App) -> Vec<Action> {
         return vec![Action::PageDown];
     }
     if any_matches(&kb.enter, &key) {
+        // M243: Enter on the `ui.theme` row expands the theme picker
+        // instead of opening the caret editor — `ui.theme` is a
+        // `choice` key, so the editor popup is the wrong affordance
+        // for it. `apply_settings_enter` does the branching.
         return vec![Action::Enter];
     }
     Vec::new()

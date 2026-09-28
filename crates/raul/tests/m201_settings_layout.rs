@@ -451,6 +451,7 @@ fn settings_app_with_schema() -> App {
         edit: None,
         staged_edits: BTreeMap::new(),
         schema_warning: None,
+        theme: raul::tui::modes::settings::ThemePicker::default(),
     });
     app
 }
@@ -553,6 +554,7 @@ fn settings_layout_schema_unavailable_replaces_list_with_error_block() {
         edit: None,
         staged_edits: BTreeMap::new(),
         schema_warning: Some("mp config schema unavailable: unknown subcommand".to_string()),
+        theme: raul::tui::modes::settings::ThemePicker::default(),
     });
     let out = render_full(&app, 120, 40);
     // AC-08: error block replaces the framed list.

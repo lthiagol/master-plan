@@ -9,6 +9,7 @@ use crate::tui::app::{App, CoApprovalAction, CoApprovalState};
 use crate::tui::key_combo::{format_key_combo, KeyCombo};
 use crate::tui::keybinds::KeybindsViewRow;
 use crate::tui::mode::Mode;
+use crate::tui::modes::settings::theme_picker;
 #[allow(unused_imports)]
 // keybind_default_label + value_for_key are used inside nested fns below
 use crate::tui::modes::settings::{keybind_default_label, value_for_key, SETTINGS_KEYS};
@@ -666,6 +667,9 @@ fn render_settings_list(
     enum RowKind {
         Section(&'static str),
         Key(usize, &'static str, &'static str), // (SETTINGS_KEYS index, section, key)
+        /// M243: one row of the expanded `ui.theme` picker, carrying
+        /// its index into `theme_picker::rows()`.
+        Theme(usize),
     }
     let mut rows: Vec<RowKind> = Vec::new();
     let mut last_section: Option<&'static str> = None;
@@ -675,20 +679,35 @@ fn render_settings_list(
             last_section = Some(*section);
         }
         rows.push(RowKind::Key(i, section, key));
+        // M243: the `ui.theme` row expands in place into 7 picker
+        // rows (6 named palettes + Default) directly beneath it.
+        if *key == theme_picker::THEME_KEY && state.theme.is_expanded() {
+            for r in 0..theme_picker::ROW_COUNT {
+                rows.push(RowKind::Theme(r));
+            }
+        }
     }
 
     // Map selected_idx (a SETTINGS_KEYS index) onto the rendered row
-    // index for cursor math.
+    // index for cursor math. While the picker is expanded the cursor
+    // sits on the highlighted picker row, not on the `ui.theme` key
+    // row — the key row keeps its `▼` expand marker instead.
     let selected = state
         .selected_idx
         .min(SETTINGS_KEYS.len().saturating_sub(1));
+    let picker_open = state.theme.is_expanded();
     let mut selected_row_idx: usize = 0;
     for (i, r) in rows.iter().enumerate() {
-        if let RowKind::Key(idx, _, _) = r {
-            if *idx == selected {
+        match r {
+            RowKind::Key(idx, _, _) if *idx == selected && !picker_open => {
                 selected_row_idx = i;
                 break;
             }
+            RowKind::Theme(idx) if *idx == state.theme.cursor() && picker_open => {
+                selected_row_idx = i;
+                break;
+            }
+            _ => {}
         }
     }
 
@@ -739,13 +758,24 @@ fn render_settings_list(
                     Some("keybind") => "[key]",
                     _ => "[str]",
                 };
-                let is_cursor = *idx == selected;
+                let is_cursor = *idx == selected && !picker_open;
+                // M243: while the picker is expanded the `ui.theme`
+                // key row carries a `▼` expand marker instead of the
+                // `▶` cursor — the cursor has moved into the picker.
+                let is_expanded_parent = *key == theme_picker::THEME_KEY && picker_open;
                 let line = if is_cursor {
                     Line::from(vec![
                         Span::styled("▶ ", cursor_marker_style),
                         Span::styled(format!("{key} "), cursor_style),
                         Span::styled(badge, cursor_style),
                         Span::styled(format!("  {val}"), cursor_style),
+                    ])
+                } else if is_expanded_parent {
+                    Line::from(vec![
+                        Span::styled("▼ ", Style::default().fg(palette.focus_ring)),
+                        Span::styled(format!("{key} "), Style::default()),
+                        Span::styled(format!("{badge} "), badge_style),
+                        Span::styled(format!(" {val}"), Style::default()),
                     ])
                 } else {
                     Line::from(vec![
@@ -756,6 +786,15 @@ fn render_settings_list(
                     ])
                 };
                 items.push(ListItem::new(line));
+            }
+            RowKind::Theme(idx) => {
+                items.push(ListItem::new(render_theme_picker_row(
+                    theme_picker::row_at(*idx),
+                    *idx == state.theme.cursor(),
+                    palette,
+                    &cursor_style,
+                    &cursor_marker_style,
+                )));
             }
         }
     }
@@ -774,6 +813,63 @@ fn render_settings_list(
         area,
         &mut ratatui::widgets::ListState::default().with_selected(Some(list_selected)),
     );
+}
+
+/// M243: render one row of the `ui.theme` picker.
+///
+/// Layout: `<marker> <label> <swatch> <description>`, e.g.
+/// `▶ mocha      ██████  Catppuccin Mocha — deep dark (default)`.
+///
+/// The swatch is the row's selling point: six blocks, one per role in
+/// `theme_picker::SWATCH_ROLES`, each drawn in the color that role
+/// would have *under the palette this row previews*. The operator
+/// picks a theme by looking at it, not by reading its name.
+///
+/// The `Default (mocha)` reset row carries no swatch — it is an
+/// action, not a palette, and repeating mocha's swatch beside
+/// mocha's own row would read as a duplicate entry.
+fn render_theme_picker_row(
+    row: theme_picker::Row,
+    is_cursor: bool,
+    palette: ThemePalette,
+    cursor_style: &Style,
+    cursor_marker_style: &Style,
+) -> Line<'static> {
+    let label = row.label();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+
+    spans.push(if is_cursor {
+        Span::styled("▶ ", *cursor_marker_style)
+    } else {
+        Span::raw("  ")
+    });
+
+    let label_cell = format!("{label:<14}");
+    spans.push(if is_cursor {
+        Span::styled(label_cell, *cursor_style)
+    } else {
+        Span::styled(label_cell, Style::default().fg(palette.foreground))
+    });
+
+    if let theme_picker::Row::Named(_) = row {
+        // Two blocks per role, in the palette's own colors.
+        for c in theme_picker::swatch(row.palette()) {
+            spans.push(Span::styled("██", Style::default().fg(c)));
+        }
+        spans.push(Span::raw("  "));
+    } else {
+        // Reset row: pad the missing swatch so the descriptions in the
+        // two blocks stay column-aligned.
+        spans.push(Span::raw(" ".repeat(14)));
+    }
+
+    let desc_style = if is_cursor {
+        *cursor_style
+    } else {
+        Style::default().fg(palette.dim)
+    };
+    spans.push(Span::styled(row.description(), desc_style));
+    Line::from(spans)
 }
 
 /// M201: render the framed description card UNDER the list. The title

@@ -130,10 +130,18 @@ pub struct SettingsState {
     /// keys and shows the warning in the description card footer.
     /// `None` when the schema parsed cleanly.
     pub schema_warning: Option<String>,
+    /// M243: the `ui.theme` picker's highlight + saved value.
+    ///
+    /// The expansion is off by default: the flat key list must stay
+    /// navigable, and `ui.theme` sits third in a 42-row list, so an
+    /// auto-expanding picker would trap the operator before key 4.
+    /// Enter on the `ui.theme` row opens it; Esc closes it.
+    pub theme: crate::tui::modes::settings::ThemePicker,
 }
 
 impl SettingsState {
     pub fn new(config: serde_json::Value) -> Self {
+        let theme = theme_from_config(&config);
         Self {
             config,
             schema: None,
@@ -142,6 +150,7 @@ impl SettingsState {
             edit: None,
             staged_edits: std::collections::BTreeMap::new(),
             schema_warning: None,
+            theme: crate::tui::modes::settings::ThemePicker::new(theme),
         }
     }
 
@@ -149,6 +158,7 @@ impl SettingsState {
         config: serde_json::Value,
         schema: Option<crate::tui::modes::settings::schema::SettingsSchema>,
     ) -> Self {
+        let theme = theme_from_config(&config);
         Self {
             config,
             schema,
@@ -157,11 +167,47 @@ impl SettingsState {
             edit: None,
             staged_edits: std::collections::BTreeMap::new(),
             schema_warning: None,
+            theme: crate::tui::modes::settings::ThemePicker::new(theme),
         }
     }
 
     pub fn has_staged_edits(&self) -> bool {
         !self.staged_edits.is_empty()
+    }
+
+    /// Is the focused key the theme picker, and is its expansion open?
+    ///
+    /// The single predicate every picker path (keyboard, mouse,
+    /// renderer) gates on, so they can never disagree about whether
+    /// the picker owns the input.
+    pub fn theme_picker_open(&self) -> bool {
+        self.theme.is_expanded()
+            && crate::tui::modes::settings::flat_key(self.selected_idx)
+                .is_some_and(|(_, key)| key == crate::tui::modes::settings::theme_picker::THEME_KEY)
+    }
+
+    /// The `ui.theme` index into `SETTINGS_KEYS`, or `None` when the
+    /// key is not in the flat list.
+    pub fn theme_idx() -> Option<usize> {
+        crate::tui::modes::settings::SETTINGS_KEYS
+            .iter()
+            .position(|(_, key)| *key == crate::tui::modes::settings::theme_picker::THEME_KEY)
+    }
+}
+
+/// Read `ui.theme` out of the `mp config show` payload for the
+/// picker's initial saved value. `pub(crate)` because
+/// `runner_helpers::load_settings` builds `SettingsState` as a struct
+/// literal (it threads a fetched schema through) and must seed the
+/// picker from the same config rather than the default palette. Missing / non-string falls back to
+/// the default palette name rather than an empty string, so the
+/// cursor never starts on a row that writes nothing.
+pub(crate) fn theme_from_config(config: &serde_json::Value) -> String {
+    let raw = crate::tui::modes::settings::value_for_key(config, "ui.theme");
+    if crate::tui::modes::settings::theme_picker::row_for_name(&raw).is_some() {
+        raw
+    } else {
+        crate::theme::Palette::DEFAULT_NAME.to_string()
     }
 }
 

@@ -46,6 +46,7 @@ fn app_with_no_schema(warning: Option<String>) -> App {
         edit: None,
         staged_edits: BTreeMap::new(),
         schema_warning: warning,
+        theme: raul::tui::modes::settings::ThemePicker::default(),
     });
     app
 }
