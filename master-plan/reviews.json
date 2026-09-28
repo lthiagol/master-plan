@@ -2143,6 +2143,14 @@
       "reviewed_at": "2026-09-28",
       "notes": "Cycle 1 via herdr-orc: verdict ok, 1 low finding (F-01, against the orchestrator: commit 2da4df0 silently flipped M234's plan.json index spec_status from implemented to verified -- legitimate cleanup but undisclosed). Reviewer ruled the AC-01 reword a faithful repair, confirmed the recovery is faithful and complete, the plan-zone carve-out held, the deletion is recoverable from git, .gitignore was untouched, and the open decisions remain undecided as-recorded.",
       "milestone_completed_at": "2026-09-28"
+    },
+    {
+      "milestone_id": "243",
+      "verdict": "ok",
+      "reviewer": "herdr-orc reviewer lane (w19:pN)",
+      "reviewed_at": "2026-09-28",
+      "notes": "Cycle 1 via herdr-orc: verdict ok, 1 low finding. Cold build enabled and reproduced (1523 raul tests, clippy clean on dev and release, fmt, consumer-surface). Reviewer proved the catalog-parity guarantee has teeth via three independent mutations (extra UI_THEMES name, extra theme::ALL palette, duplicate) each breaking a different test, and confirmed the runner loop watches app.version() so apply_theme_preview's touch() does drive the next frame. F-01 (low): the_next_frame_repaints_in_the_new_palette does not actually pin live-apply, because the picker swatch paints each palette's own accent in its own row so ALUCARD.accent lands in the buffer regardless. Behaviour is correct; the test is weaker than its name.",
+      "milestone_completed_at": "2026-09-28"
     }
   ],
   "comments": [

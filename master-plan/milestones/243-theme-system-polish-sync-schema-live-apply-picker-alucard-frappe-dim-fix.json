@@ -3,9 +3,9 @@
     "id": "243",
     "title": "Theme system polish — sync schema, live-apply picker, Alucard, Frappe-dim fix",
     "slug": "theme-system-polish-sync-schema-live-apply-picker-alucard-frappe-dim-fix",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -23,11 +23,27 @@
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T16:20:45.302646+00:00",
+    "lifecycle_at": "2026-09-28T16:41:16.352392+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T16:20:45.302651+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-28T16:41:25.973865+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-28T16:41:25.973865+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-28T16:41:26.014486+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-28T16:41:25.973865+00:00"
       },
       "specify": {
         "status": "done",
@@ -67,71 +83,71 @@
       "id": "AC-01",
       "description": "UI_THEMES is defined once (mp_model) with 6 names including alucard; mp config set ui.theme accepts alucard; raul's palette names match it exactly (parity test).",
       "verification": "test \"$(rg -l 'pub const UI_THEMES' crates | wc -l | tr -d ' ')\" = 1 && cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_theme/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/theme_catalog_parity/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-02",
       "description": "ALUCARD is in theme::ALL with the official Alucard Classic values mapped like DRACULA; Palette::by_name(\"alucard\") resolves without fallback.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/alucard_matches_spec|palette_by_name_alucard/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-03",
       "description": "FRAPPE.dim is 0xa5adce (Subtext0), consistent with the other Catppuccin palettes.",
       "verification": "rg -q 'dim: rgb\\(0xa5adce\\)' crates/raul/src/theme.rs && cargo nextest run -p raul --no-fail-fast -E 'test(/frappe_dim_matches_spec/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-04",
       "description": "The ui.theme row expands to 7 picker rows (6 named palettes with swatch + description, then 'Default (mocha)'); MONOCHROME is not listed; keyboard and mouse move the highlight.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/rows|swatch|keyboard|mouse/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-05",
       "description": "A one-row status preview under the picker renders in-progress / done / ready / blocked / accent / dim using the highlighted palette.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/preview_row/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-06",
       "description": "Moving the highlight sets App::palette immediately and the next frame paints with it.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/live_apply/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-07",
       "description": "s saves the highlighted theme via mp config set ui.theme; Esc restores the saved palette; the ui.theme description no longer says relaunch.",
-      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/save|esc_reverts/)' && ! rg -q 'relaunch to apply' crates/mp/src/config_docs.rs",
-      "status": "pending",
-      "evidence": ""
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/save|esc_restores/)' && ! rg -q 'relaunch to apply' crates/mp/src/config_docs.rs",
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-08",
       "description": "The reset row previews mocha; saving it writes ui.theme=mocha.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/reset_row/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-09",
       "description": "The Settings header chip shows 'saved: <name>' or 'preview: <name> (saved: <name>)'.",
-      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/status_chip/)'",
-      "status": "pending",
-      "evidence": ""
+      "verification": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/header_chip/)'",
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     },
     {
       "id": "AC-10",
       "description": "mp and raul tests, clippy, fmt, and consumer-surface lint are clean; the config-schema golden is regenerated additively.",
       "verification": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
     }
   ],
   "work_packages": [
@@ -165,7 +181,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/alucard_matches_spec|palette_by_name_alucard/)'",
       "done_when": "AC-02 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -185,7 +201,7 @@
       ],
       "tests": "rg -q 'dim: rgb\\(0xa5adce\\)' crates/raul/src/theme.rs && cargo nextest run -p raul --no-fail-fast -E 'test(/frappe_dim_matches_spec/)'",
       "done_when": "AC-03 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -212,7 +228,7 @@
       ],
       "tests": "test \"$(rg -l 'pub const UI_THEMES' crates | wc -l | tr -d ' ')\" = 1 && cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_theme/)' && cargo nextest run -p raul --no-fail-fast -E 'test(/theme_catalog_parity/)'",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -237,7 +253,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/rows|swatch|keyboard/)'",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -260,7 +276,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/preview_row/)'",
       "done_when": "AC-05 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -283,7 +299,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/live_apply/)'",
       "done_when": "AC-06 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -304,9 +320,9 @@
         "crates/raul/src/tui/modes/settings.rs",
         "docs/raul/settings.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/save|esc_reverts/)' && ! rg -q 'relaunch to apply' crates/mp/src/config_docs.rs",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/save|esc_restores/)' && ! rg -q 'relaunch to apply' crates/mp/src/config_docs.rs",
       "done_when": "AC-07 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -328,7 +344,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/reset_row/)'",
       "done_when": "AC-08 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -348,9 +364,9 @@
       "files": [
         "crates/raul/src/tui/render/overlays.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/status_chip/)'",
+      "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/header_chip/)'",
       "done_when": "AC-09 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-09"
       ],
@@ -372,7 +388,7 @@
       ],
       "tests": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
       "done_when": "AC-10 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-10"
       ],
@@ -400,7 +416,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test tui_theme_picker -E 'test(/mouse/)'",
       "done_when": "AC-04 partial 2 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -414,8 +430,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-28",
     "branch": "",
-    "evidence": ""
+    "evidence": "herdr-orc cycle 1: runner commits cf205dd (S1), cd18330 (S1.1), 6565968 (S1.2), 52ffa97 (S2), eacc660 (S2b), 87ce388 (S2.1), c364883 (S2.2), 59f81c6 (S2.3), 7c1cae6 (S2.4), 8da4aee (S2.5), fad9b3d (S2.6), a6ae0ab (S2.7 fix-up); reviewer verdict ok with 1 low finding. R5 rejected the first report on one item -- the runner filed a whole-file test run as evidence for AC-09 whose specified filter matched zero tests -- and accepted a single-commit fix-up deleting an orphan golden it had itself flagged. Orchestrator reworded AC-07 and AC-09 in both the ACs and the step tests fields (S2.3, S2.5), the same stale-regex duplication that broke M239's completion, and proved both reworded filters non-vacuous by mutation. Reviewer proved the catalog parity test has teeth via three independent mutations. MP_VERIFY_ALLOW_SHELL=1 required because AC-01/AC-07/AC-10 are shell pipelines; every command was reviewed and executed before opting in. MP_VERIFY_TIMEOUT_SECS=1800 because the default 300s per-AC deadline cannot fit AC-10, whose verification is a full two-crate nextest run plus clippy, fmt and the consumer-surface lint -- the first attempt failed with 'verification timed out after 300s' on AC-10 alone, with every AC passing when run by hand."
   }
 }

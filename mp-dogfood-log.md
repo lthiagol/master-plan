@@ -242,3 +242,16 @@ milestone (or a successor), not by reverting the work that closed them.
 - Workaround: none. `--force` would record bypass debt for a gate that is behaving correctly — the real remedy is to finish M243 first, which is the correct ordering anyway. Left the milestone at `planned` with its per-step and per-AC progress recorded.
 - Verdict: **spec-gap** (no way to express "blocked on a dependency but partly executed" in the lifecycle; fragment-level state carries the truth while the milestone-level state does not).
 - Status: backlog.
+
+---
+
+## Entry — 2026-09-28 — an AC whose verification is a full multi-crate build cannot complete under the default 300s verifier deadline
+
+- Date / when: 2026-09-28, closing M243 after a herdr-orc cycle.
+- Command attempted: `MP_VERIFY_ALLOW_SHELL=1 mp milestone complete 243 --evidence "…"`.
+- Observed output: exit 2, single failure — `AC-10: verification command did not run: verification timed out after 300s`. The milestone stayed `in-progress`; every AC passed when the orchestrator ran it by hand. Retried with `MP_VERIFY_TIMEOUT_SECS=1800` and it completed with no failures.
+- Suspected cause / code path: `verify_timeout_dur_override` (`crates/mp/src/ac_verify.rs:1734`) defaults to `DEFAULT_VERIFY_TIMEOUT_SECS` (300) and is overridden by the `MP_VERIFY_TIMEOUT_SECS` environment variable. M243's AC-10 is `cargo nextest run -p mp -p raul` (measured at 227.7s on its own) chained with clippy, fmt and the consumer-surface lint, so it cannot fit in 300s. The same command is also step S2.6's `tests`, so the suite runs twice inside one completion.
+- Not a bug — the knob is documented in the code and works. The trap is that the default is unreachable for this AC shape, and the failure reads identically to a genuinely failing test: `verification command did not run`.
+- Workaround: export `MP_VERIFY_TIMEOUT_SECS` (e.g. 1800) alongside `MP_VERIFY_ALLOW_SHELL=1` when completing any milestone whose AC is a full multi-crate build plus test plus lint chain. Never reach for `--force` here — the command was never run, so forcing would record completion on unverified work.
+- Verdict: **spec-gap** (plan ergonomics: AC authors write natural full-suite verifications that exceed the default deadline, and nothing in the milestone hints that the deadline must be raised).
+- Status: backlog.
