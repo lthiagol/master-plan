@@ -241,7 +241,8 @@ mod tests {
         assert_eq!(ALUCARD.danger, rgb(0xcb3a2a), "alucard danger #CB3A2A");
         assert_eq!(ALUCARD.dim, rgb(0x6c664b), "alucard dim #6C664B");
         assert_eq!(
-            ALUCARD.foreground, rgb(0x1f1f1f),
+            ALUCARD.foreground,
+            rgb(0x1f1f1f),
             "alucard foreground #1F1F1F"
         );
     }

@@ -42,6 +42,35 @@ fn ui_set_get_roundtrips() {
 }
 
 #[test]
+fn ui_theme_accepts_every_advertised_palette() {
+    let env = TestEnv::new();
+    // Every name in the single source of truth must round-trip through
+    // `mp config set` — the Settings picker writes exactly these. A
+    // name that validates in the schema but is rejected here would
+    // make the picker's save path fail at the last step.
+    for theme in mp_model::UI_THEMES {
+        env.run(&["config", "set", "ui.theme", theme]);
+        assert_eq!(
+            get(&env, "ui.theme"),
+            json!(theme),
+            "ui.theme = {theme} must round-trip"
+        );
+    }
+    // The default is one of the advertised values.
+    assert!(mp_model::UI_THEMES.contains(&"mocha"));
+}
+
+#[test]
+fn ui_theme_rejects_unknown_value() {
+    let env = TestEnv::new();
+    let out = env.run(&["config", "set", "ui.theme", "moxha", "--format", "json"]);
+    assert!(
+        !out.status.success(),
+        "ui.theme must reject a name outside UI_THEMES"
+    );
+}
+
+#[test]
 fn ui_icons_rejects_invalid_value() {
     let env = TestEnv::new();
     let out = env.run(&["config", "set", "ui.icons", "emoji", "--format", "json"]);

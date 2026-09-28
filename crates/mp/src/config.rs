@@ -337,13 +337,13 @@ pub struct RoleConfig {
 /// so both lists land together at compile time.
 pub const WATCH_HARNESSES: &[&str] = crate::harness::SUPPORTED_NAMES;
 
-/// M156 ext-review F-14: known `ui.theme` values. Mirrors the
-/// `Palette::ALL` list in `raul::theme` (mp cannot depend on raul,
-/// so the names are duplicated here deliberately — same rationale
-/// as `KEYBIND_ACTIONS`). A typo like `moxha` would otherwise pass
-/// validate and silently no-op at runtime via
+/// Known `ui.theme` values. Re-export of [`mp_model::UI_THEMES`] —
+/// that const is the single source of truth for the theme catalog,
+/// shared with raul so the names mp validates are exactly the
+/// palettes raul can render. A typo like `moxha` is rejected here
+/// instead of silently no-opping at runtime via
 /// `Palette::by_name(name)` returning `None`.
-pub const UI_THEMES: &[&str] = &["mocha", "macchiato", "frappe", "latte", "dracula"];
+pub use mp_model::UI_THEMES;
 
 /// The keybindable action names accepted under the `[keybinds]` section.
 ///

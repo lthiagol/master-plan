@@ -304,7 +304,7 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "choice",
         "mocha",
         Some(UI_THEMES),
-        "Theme palette name. Picked up at startup; relaunch to apply.",
+        "Theme palette name. raul's Settings picker previews live; s saves.",
     ),
     (
         "workflow.gates.strictness",
@@ -344,7 +344,9 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
 ];
 
 /// M201: enum values that the user-facing descriptions reference.
-pub const UI_THEMES: &[&str] = &["mocha", "macchiato", "frappe", "latte", "dracula"];
+/// `UI_THEMES` is re-exported from [`mp_model::UI_THEMES`] — the single
+/// source of truth shared with raul's palette catalog.
+pub use mp_model::UI_THEMES;
 pub const UI_ICONS: &[&str] = &["none", "ascii", "unicode"];
 pub const BRANCH_STRATEGIES: &[&str] = &["per-milestone", "current", "none"];
 pub const AUTO_REMEDIATE: &[&str] = &["none", "low", "medium", "high", "all"];

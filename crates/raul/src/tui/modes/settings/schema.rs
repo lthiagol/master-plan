@@ -14,12 +14,18 @@
 //!   "keys": [
 //!     { "key": "ui.color", "type": "bool", "default": "true", "description": "..." },
 //!     { "key": "ui.theme", "type": "choice", "default": "mocha",
-//!       "allowed": ["mocha", "macchiato", "frappe", "latte", "dracula"],
+//!       "allowed": ["mocha", "macchiato", "frappe", "latte", "dracula", "alucard"],
 //!       "description": "..." },
 //!     ...
 //!   ]
 //! }
 //! ```
+//!
+//! The `allowed` list above is `mp_model::UI_THEMES` — the single
+//! source of truth for the theme catalog, shared with raul's
+//! `theme::ALL`. The test fixture below builds its payload from that
+//! same const so this module's sample can never drift from what
+//! `mp config schema` actually emits.
 
 use std::collections::BTreeMap;
 
@@ -110,18 +116,26 @@ pub fn parse_schema(raw: &[u8]) -> Result<SettingsSchema, String> {
 mod tests {
     use super::*;
 
-    fn sample_payload() -> &'static str {
-        r#"{
+    /// The sample's `ui.theme` `allowed` list is built from
+    /// `mp_model::UI_THEMES` rather than hardcoded, so this fixture
+    /// tracks the real `mp config schema` payload instead of drifting
+    /// behind it. The parse path is exercised on the exact catalog the
+    /// Settings theme picker reads its rows from.
+    fn sample_payload() -> String {
+        let themes = serde_json::to_string(mp_model::UI_THEMES).unwrap();
+        format!(
+            r#"{{
             "$schema_version": "1.0",
             "keys": [
-                {"key": "ui.color", "type": "bool", "default": "true",
-                 "description": "ANSI color."},
-                {"key": "ui.theme", "type": "choice", "default": "mocha",
-                 "allowed": ["mocha", "latte"], "description": "Theme."},
-                {"key": "keybinds.refresh", "type": "keybind",
-                 "default": "Ctrl-R", "description": "Refresh."}
+                {{"key": "ui.color", "type": "bool", "default": "true",
+                 "description": "ANSI color."}},
+                {{"key": "ui.theme", "type": "choice", "default": "mocha",
+                 "allowed": {themes}, "description": "Theme."}},
+                {{"key": "keybinds.refresh", "type": "keybind",
+                 "default": "Ctrl-R", "description": "Refresh."}}
             ]
-        }"#
+        }}"#
+        )
     }
 
     #[test]
@@ -135,15 +149,35 @@ mod tests {
         assert_eq!(refresh.default, "Ctrl-R");
 
         let theme = schema.get("ui.theme").unwrap();
-        assert_eq!(
-            theme.allowed.as_deref(),
-            Some(&["mocha".to_string(), "latte".to_string()][..])
-        );
+        let expected: Vec<String> = mp_model::UI_THEMES.iter().map(|s| s.to_string()).collect();
+        assert_eq!(theme.allowed.as_deref(), Some(expected.as_slice()));
 
         let color = schema.get("ui.color").unwrap();
         assert!(color.allowed.is_none(), "bool row must not carry `allowed`");
 
         assert!(schema.get("nonexistent.key").is_none());
+    }
+
+    /// The parsed `ui.theme` `allowed` set is exactly the palette
+    /// catalog raul can render — the contract the Settings theme
+    /// picker depends on when it builds its rows.
+    ///
+    /// Compared as sets: the two lists deliberately order
+    /// differently (`UI_THEMES` is default-first, `theme::ALL` is
+    /// alphabetical so the picker reads in one direction). Only
+    /// membership is part of the contract.
+    #[test]
+    fn theme_allowed_matches_raul_palette_catalog() {
+        let schema = SettingsSchema::from_json(sample_payload().as_bytes()).unwrap();
+        let allowed = schema.get("ui.theme").unwrap().allowed.clone().unwrap();
+        let mut from_mp = allowed.clone();
+        from_mp.sort();
+        let mut from_raul: Vec<String> = crate::theme::ALL
+            .iter()
+            .map(|p| p.name.to_string())
+            .collect();
+        from_raul.sort();
+        assert_eq!(from_mp, from_raul);
     }
 
     #[test]

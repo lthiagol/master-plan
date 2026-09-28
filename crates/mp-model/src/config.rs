@@ -219,3 +219,31 @@ pub struct DomainRequirement {
     #[serde(default)]
     pub scenarios: Vec<String>,
 }
+
+// ── Shared config enums ─────────────────────────────────────────────────────
+
+/// The `ui.theme` palette names accepted by `mp config set ui.theme`
+/// and advertised by `mp config schema`.
+///
+/// This is the single source of truth for the theme catalog. Both
+/// consumers derive from it:
+///
+/// * `mp` validates `ui.theme` against this list and publishes it in
+///   the schema `allowed` set (raul's Settings lane reads that).
+/// * `raul` resolves the name to a `Palette` in its own `theme` module
+///   and its `theme_catalog_parity` test asserts the two sets are
+///   equal — so a name here that raul cannot render, or a palette
+///   raul ships that mp rejects, fails the build rather than
+///   silently falling back at runtime.
+///
+/// `monochrome` is deliberately absent: it is raul's no-color
+/// fallback (`App::effective_palette`), selected by `ui.color=false`,
+/// not a `ui.theme` value.
+pub const UI_THEMES: &[&str] = &[
+    "mocha",
+    "macchiato",
+    "frappe",
+    "latte",
+    "dracula",
+    "alucard",
+];
