@@ -109,10 +109,12 @@ just-built release bin first (same as CI / `make dev-env`):
 
 ```bash
 make build
-env -i HOME=$HOME PATH=$PWD/target/release:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+# /opt/homebrew/bin is on PATH for `rg`, which `make consumer-surface-lint`
+# requires. Drop it and the run dies with "ripgrep is required".
+env -i HOME=$HOME PATH=$PWD/target/release:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin \
   NEXTTEST=1 make ci
 # Or full surface without make:
-env -i HOME=$HOME PATH=$PWD/target/release:$HOME/.cargo/bin:/usr/bin:/bin \
+env -i HOME=$HOME PATH=$PWD/target/release:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/bin:/bin \
   cargo nextest run --profile ci --no-fail-fast
 ```
 
