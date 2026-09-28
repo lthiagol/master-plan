@@ -389,12 +389,19 @@ pub fn trunk_item_rows(
     let detail = model::trunk_detail(item);
 
     // ── Title line ──
+    // M244: the focused node (the "next" one, `is_next`) wears the
+    // `focus_ring` role on its marker glyph and label — where the
+    // operator's attention is, not a lifecycle color. The tree
+    // connectors around it stay in `dim` (unchanged), so the ring
+    // reads against a recessive spine.
+    let node_fg = if is_next {
+        palette_helpers.focus_ring
+    } else {
+        palette::header_color(palette_helpers)
+    };
     let mut title_spans = vec![
-        Span::raw(format!("  {marker}  ")),
-        Span::styled(
-            label,
-            Style::default().fg(palette::header_color(palette_helpers)),
-        ),
+        Span::styled(format!("  {marker}  "), Style::default().fg(node_fg)),
+        Span::styled(label, Style::default().fg(node_fg)),
     ];
     // M206 S1.1: stage chip (S1.1 adds it; placeholder until S1.1 lands
     // so this step's tests can pin the title-line shape without

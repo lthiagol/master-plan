@@ -1095,6 +1095,10 @@ fn selected_index_addresses_logical_rows() {
 
     // The selected row (index 1) must carry the highlight. The
     // `First row` (index 0) must NOT carry the highlight.
+    //
+    // M244: the selected row's bg is the `surface_2` role (it used to
+    // be the accent); the unselected row's bg stays the default
+    // panel bg (Reset).
     let r0_cell = (0..buf.area().width)
         .map(|x| buf[(x, r0_title_y)].clone())
         .find(|c| c.symbol() == "F")
@@ -1105,12 +1109,12 @@ fn selected_index_addresses_logical_rows() {
         .expect("second-row S cell");
     let r0_bg = r0_cell.style().bg.unwrap_or(ratatui::style::Color::Reset);
     let r1_bg = r1_cell.style().bg.unwrap_or(ratatui::style::Color::Reset);
-    // The selected row's bg must equal the accent; the unselected
+    // The selected row's bg must equal surface_2; the unselected
     // row's bg must be the default panel bg (Reset).
     assert_eq!(
         r1_bg,
-        app.effective_palette().accent,
-        "row at selected_index=1 must be highlighted"
+        app.effective_palette().surface_2,
+        "row at selected_index=1 must be highlighted with surface_2"
     );
     assert_ne!(
         r0_bg, r1_bg,

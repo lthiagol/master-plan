@@ -235,23 +235,27 @@ fn m186_f05_selected_index_clamped_after_search_narrows() {
         })
         .unwrap();
     let buf = terminal.backend().buffer();
-    let mut alpha_row_reversed = false;
+    let surface_2 = app.effective_palette().surface_2;
+    // M244: the clamped selection is marked with the `surface_2`
+    // background (it used to be REVERSED). Assert on the background
+    // so the test tracks the current selection contract.
+    let mut alpha_row_highlighted = false;
     for y in 0..buf.area().height {
         let mut row = String::new();
-        let mut any_reversed = false;
+        let mut any_surface_2 = false;
         for x in 0..buf.area().width {
             let cell = &buf[(x, y)];
             row.push_str(cell.symbol());
-            if cell.modifier.contains(ratatui::style::Modifier::REVERSED) {
-                any_reversed = true;
+            if cell.style().bg == Some(surface_2) {
+                any_surface_2 = true;
             }
         }
-        if row.contains("alpha") && any_reversed {
-            alpha_row_reversed = true;
+        if row.contains("alpha") && any_surface_2 {
+            alpha_row_highlighted = true;
         }
     }
     assert!(
-        alpha_row_reversed,
-        "selected row must be clamped to the single visible item (alpha) with REVERSED"
+        alpha_row_highlighted,
+        "selected row must be clamped to the single visible item (alpha) and painted with surface_2"
     );
 }

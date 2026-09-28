@@ -232,11 +232,22 @@ pub(super) fn render_footer(frame: &mut Frame, app: &App, view: &ViewState) {
     // footer_area first so short flash/globals never leave prior
     // chrome (dashboard borders, etc.) on unpainted cells.
     frame.render_widget(Clear, area);
-    let dim = Style::default().fg(app.effective_palette().dim);
+    // The footer is app chrome: it gets the `surface_1` role so the
+    // key-hint rail reads as a panel above the lane content instead
+    // of floating on the bare terminal background. Every Paragraph
+    // below carries the fill so short messages (quit / flash) keep
+    // the same band.
+    let chrome_bg = Style::default().bg(app.effective_palette().surface_1);
+    let dim = Style::default()
+        .fg(app.effective_palette().dim)
+        .bg(app.effective_palette().surface_1);
 
     if app.quitting {
         let msg = centered_plain(" Quitting... ", area.width);
-        frame.render_widget(Paragraph::new(Span::styled(msg, dim)), area);
+        frame.render_widget(
+            Paragraph::new(Span::styled(msg, dim)).style(chrome_bg),
+            area,
+        );
         return;
     }
     if let Some(ref msg) = app.flash_message {
@@ -246,13 +257,16 @@ pub(super) fn render_footer(frame: &mut Frame, app: &App, view: &ViewState) {
             app.last_action_error.is_some(),
         );
         let centered = centered_plain(&footer_text, area.width);
-        frame.render_widget(Paragraph::new(Span::styled(centered, dim)), area);
+        frame.render_widget(
+            Paragraph::new(Span::styled(centered, dim)).style(chrome_bg),
+            area,
+        );
         return;
     }
 
     if area.height < 2 {
         let globals = footer_globals_line(app, area.width);
-        frame.render_widget(Paragraph::new(globals), area);
+        frame.render_widget(Paragraph::new(globals).style(chrome_bg), area);
         return;
     }
 
@@ -280,10 +294,13 @@ pub(super) fn render_footer(frame: &mut Frame, app: &App, view: &ViewState) {
     let per_tab = right_truncate_with_ellipsis(&per_tab_text, area.width);
     let per_tab = centered_plain(&per_tab, area.width);
     frame.render_widget(
-        Paragraph::new(footer_globals_line(app, area.width)),
+        Paragraph::new(footer_globals_line(app, area.width)).style(chrome_bg),
         globals_area,
     );
-    frame.render_widget(Paragraph::new(Span::styled(per_tab, dim)), per_tab_area);
+    frame.render_widget(
+        Paragraph::new(Span::styled(per_tab, dim)).style(chrome_bg),
+        per_tab_area,
+    );
 }
 
 /// M199: right-truncate `text` to fit within `width` columns, appending

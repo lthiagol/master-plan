@@ -645,10 +645,20 @@ fn render_settings_list(
     let section_header_style = Style::default()
         .fg(palette.accent)
         .add_modifier(Modifier::BOLD);
+    // Cursor row: `surface_2` fill with `foreground` text — the same
+    // selected-row treatment the list lanes use, so the operator
+    // reads one selection language across lanes and modals. The
+    // accent fill this replaced was the loudest thing on the screen.
     let cursor_style = Style::default()
-        .fg(crate::tui::palette::on_accent_fg(&palette))
-        .bg(palette.accent)
-        .add_modifier(Modifier::BOLD | Modifier::REVERSED);
+        .fg(crate::tui::palette::overlay_selected_fg(&palette))
+        .bg(crate::tui::palette::overlay_selected_bg(&palette))
+        .add_modifier(Modifier::BOLD);
+    // The `▶` glyph is the row's marker: `focus_ring`, the "where is
+    // the cursor" color.
+    let cursor_marker_style = Style::default()
+        .fg(palette.focus_ring)
+        .bg(crate::tui::palette::overlay_selected_bg(&palette))
+        .add_modifier(Modifier::BOLD);
     let badge_style = Style::default().fg(palette.dim);
 
     // Build the full rendered row sequence: section headers + Key rows.
@@ -732,7 +742,7 @@ fn render_settings_list(
                 let is_cursor = *idx == selected;
                 let line = if is_cursor {
                     Line::from(vec![
-                        Span::styled("▶ ", cursor_style),
+                        Span::styled("▶ ", cursor_marker_style),
                         Span::styled(format!("{key} "), cursor_style),
                         Span::styled(badge, cursor_style),
                         Span::styled(format!("  {val}"), cursor_style),
@@ -1059,7 +1069,11 @@ pub(super) fn render_lifecycle_filter_overlay(frame: &mut Frame, app: &App, over
                 // bleed through empty cells.
                 .style(Style::default().bg(crate::tui::palette::overlay_backdrop(palette))),
         )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        .highlight_style(
+            Style::default()
+                .fg(crate::tui::palette::overlay_selected_fg(palette))
+                .bg(crate::tui::palette::overlay_selected_bg(palette)),
+        );
     frame.render_widget(Clear, overlay_area);
     frame.render_stateful_widget(
         list,
@@ -1101,7 +1115,8 @@ pub(super) fn render_sort_rebind_overlay(frame: &mut Frame, app: &App, overlay_a
         let extra = if is_active_sort { "  (current)" } else { "" };
         let style = if i == app.sort_rebind_index {
             Style::default()
-                .fg(palette.accent)
+                .fg(palette.focus_ring)
+                .bg(crate::tui::palette::overlay_selected_bg(palette))
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(palette.foreground)
@@ -1111,16 +1126,17 @@ pub(super) fn render_sort_rebind_overlay(frame: &mut Frame, app: &App, overlay_a
             style,
         ))));
     }
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Sort · ↑↓ cycle · ⏎ bind · Esc cancel ")
-                .border_type(BorderType::Plain)
-                .border_style(Style::default().fg(palette.accent))
-                .style(Style::default().bg(crate::tui::palette::overlay_backdrop(palette))),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Sort · ↑↓ cycle · ⏎ bind · Esc cancel ")
+            .border_type(BorderType::Plain)
+            .border_style(Style::default().fg(palette.accent))
+            .style(Style::default().bg(crate::tui::palette::overlay_backdrop(palette))),
+    );
+    // No `highlight_style`: the focused row is styled per-item above
+    // (`focus_ring` on `surface_2`). Leaving the old REVERSED
+    // highlight on top would invert video over the quiet surface.
     // Clear behind the modal so the underlying list does not bleed
     // through (M186 F-05 pattern).
     frame.render_widget(Clear, overlay_area);

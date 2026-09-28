@@ -157,25 +157,47 @@ fn render_box(
     // M172 external review (F-16): pass the *effective* palette (not
     // a hardcoded MOCHA) so on_accent_fg honors the accent/Reset branch
     // for monochrome themes instead of forcing a black foreground.
-    let border_color = if is_selected {
-        palette::selection_border(palette)
+    //
+    // Selected box: `surface_2` fill + `focus_ring` border. The box
+    // used to keep its lifecycle fill and only swap the border, so
+    // "which box is selected" and "what stage is it" both read as
+    // the same loud accent color. Now the selection is a quiet
+    // background + ring, and the id/title text stays readable on
+    // `surface_2` via `selection_fg`.
+    let (border_color, box_bg, box_fg) = if is_selected {
+        (
+            palette::selection_border(palette),
+            palette::selection_bg(palette),
+            palette::selection_fg(palette),
+        )
     } else {
-        bg
+        (bg, bg, palette::on_accent_fg(palette))
     };
-    let on_bg = palette::on_accent_fg(palette);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
-        .style(Style::default().bg(bg));
+        .style(Style::default().bg(box_bg));
     let inner = block.inner(area);
     frame.render_widget(Clear, area);
     frame.render_widget(block, area);
 
+    let on_bg = box_fg;
+
     let mut lines: Vec<Line> = Vec::new();
+    // The id acts as the box's marker: on the selected box it wears
+    // the `focus_ring` so the ring color appears inside the box too,
+    // not only on its border.
+    let id_style = if is_selected {
+        Style::default()
+            .fg(palette::selection_border(palette))
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(on_bg).add_modifier(Modifier::BOLD)
+    };
     lines.push(Line::from(vec![Span::styled(
         format!("M{}", ms.id),
-        Style::default().fg(on_bg).add_modifier(Modifier::BOLD),
+        id_style,
     )]));
     lines.push(Line::from(vec![Span::styled(
         truncate_title(&ms.title, inner.width as usize),

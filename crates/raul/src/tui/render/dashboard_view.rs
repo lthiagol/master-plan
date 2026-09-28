@@ -475,10 +475,13 @@ pub(super) fn render_dashboard(frame: &mut Frame, app: &App, view: &ViewState) {
                     continue;
                 }
                 let selected = focus && flat_idx == app.selected_index;
+                // Focused inbox row: `surface_2` fill, `foreground`
+                // text, and the row id in `focus_ring` as the marker —
+                // the same selection language as the list lanes.
                 let row_style = if selected {
                     Style::default()
-                        .fg(crate::tui::palette::on_accent_fg(palette))
-                        .bg(palette.accent)
+                        .fg(crate::tui::palette::selection_fg(palette))
+                        .bg(crate::tui::palette::selection_bg(palette))
                         .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(palette.dim)
@@ -488,8 +491,16 @@ pub(super) fn render_dashboard(frame: &mut Frame, app: &App, view: &ViewState) {
                 } else {
                     item.display.clone()
                 };
+                let id_span_style = if selected {
+                    Style::default()
+                        .fg(palette.focus_ring)
+                        .bg(crate::tui::palette::selection_bg(palette))
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    row_style
+                };
                 inbox_lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", item.id), row_style),
+                    Span::styled(format!("  {} ", item.id), id_span_style),
                     Span::styled(label, row_style),
                 ]));
                 inbox_lines.push(Line::from(vec![
@@ -518,8 +529,8 @@ pub(super) fn render_dashboard(frame: &mut Frame, app: &App, view: &ViewState) {
             let selected = focus && flat_idx == app.selected_index;
             let row_style = if selected {
                 Style::default()
-                    .fg(crate::tui::palette::on_accent_fg(palette))
-                    .bg(palette.accent)
+                    .fg(crate::tui::palette::selection_fg(palette))
+                    .bg(crate::tui::palette::selection_bg(palette))
                     .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()

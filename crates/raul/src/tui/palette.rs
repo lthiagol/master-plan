@@ -4,7 +4,10 @@
 //! Contract:
 //! - `status_color(role)` → palette accent (in-progress), success (complete),
 //!   danger (blocked), warn (approved/ready), dim (other).
-//! - `selection_fg()` / `selection_bg()` → high-contrast selection row pair.
+//! - `selection_fg()` / `selection_bg()` → selected-row pair: `foreground` on
+//!   `surface_2`.
+//! - `selection_border()` → `focus_ring`, the selected row's border/marker.
+//! - `overlay_backdrop()` → `surface_1`, the panel a modal floats on.
 //! - `branch_marker()` / `branch_continuation()` → tree branch glyphs in dim.
 
 use ratatui::style::Color;
@@ -40,6 +43,18 @@ pub fn on_accent_fg(palette: &Palette) -> Color {
     }
 }
 
+/// Text color that reads on top of a `focus_ring` fill (the focused
+/// tab, the selected-row border). The ring is a light, desaturated
+/// color in every named palette, so black is the contrast partner;
+/// monochrome leans on the terminal default instead.
+pub fn on_focus_ring_fg(palette: &Palette) -> Color {
+    if palette.focus_ring == Color::Reset {
+        palette.foreground
+    } else {
+        Color::Black
+    }
+}
+
 /// Cursor/caret block style for the input overlay. Convention is a
 /// white-bg / black-fg block with BOLD — readable on every palette.
 /// Returns `(background, foreground)` so callers can build their own
@@ -48,25 +63,26 @@ pub fn caret_block(_palette: &Palette) -> (Color, Color) {
     (Color::White, Color::Black)
 }
 
-/// M172 S4 (F-04): the selected-row highlight color in the Board view.
-/// White has the highest contrast against every palette so a
-/// selected box stands out regardless of theme. Centralized here so
-/// the audit grep stays at zero hits outside this module — every
-/// other render path uses palette helpers.
-pub fn selection_border(_palette: &Palette) -> Color {
-    Color::White
+/// Border color for the selected row / selected board box. This is
+/// the `focus_ring` role: where the cursor is, not a lifecycle color.
+pub fn selection_border(palette: &Palette) -> Color {
+    palette.focus_ring
 }
 
-/// Background color for the selected row in a list (Backlog /
-/// Milestones). Mirrors `effective_palette().accent`.
+/// Background for the selected row in a list (Backlog / Milestones /
+/// the dashboard inbox). The `surface_2` role — one layer above the
+/// lane background, deliberately *not* the accent: a full-bleed
+/// accent row was the loud, undifferentiated look the layering roles
+/// replace.
 pub fn selection_bg(palette: &Palette) -> Color {
-    palette.accent
+    palette.surface_2
 }
 
-/// Foreground color for the selected row (high contrast against the
-/// selection bg).
-pub fn selection_fg(_palette: &Palette) -> Color {
-    Color::Black
+/// Foreground for text sitting on `surface_2`. `surface_2` is a quiet
+/// near-background tone in every named palette, so the readable
+/// partner is the palette's own `foreground`, not a hardcoded black.
+pub fn selection_fg(palette: &Palette) -> Color {
+    palette.foreground
 }
 
 /// Tree-branch glyph used as the "last sibling" marker (`└─`) in dim
@@ -112,22 +128,27 @@ pub fn placeholder_color(palette: &Palette) -> Color {
     palette.dim
 }
 
-/// Review-menu overlay backdrop. Distinct from the lane content so
-/// the modal visually floats above the lane chrome.
-pub fn overlay_backdrop(_palette: &Palette) -> Color {
-    Color::DarkGray
+/// Review-menu / modal / picker backdrop — the `surface_1` role.
+/// The panel a modal floats on: one layer above the terminal
+/// background, so the overlay reads as a panel instead of a hole
+/// punched in the lane content.
+pub fn overlay_backdrop(palette: &Palette) -> Color {
+    palette.surface_1
 }
 
-/// Review-menu selected-item foreground (white on the accent bg).
-pub fn overlay_selected_fg(_palette: &Palette) -> Color {
-    Color::Black
+/// Selected-item foreground inside an overlay. `surface_2` sits on
+/// `surface_1`, so the text partner is `foreground`.
+pub fn overlay_selected_fg(palette: &Palette) -> Color {
+    palette.foreground
 }
 
-/// Review-menu selected-item background (the accent — same color as
-/// row selection so a reviewer switches between modes without
-/// re-learning colors).
+/// Selected-item background inside an overlay: the `surface_2`
+/// role, one layer above the overlay's own `surface_1` backdrop.
+/// Keeping the nested row on the same quiet family as the list
+/// rows means the operator re-learns one selection language
+/// everywhere.
 pub fn overlay_selected_bg(palette: &Palette) -> Color {
-    palette.accent
+    palette.surface_2
 }
 
 /// Map a milestone lifecycle to a tree-view id color. Mirrors

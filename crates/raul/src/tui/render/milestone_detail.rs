@@ -10,7 +10,7 @@ use crate::tui::markdown::{self, MarkdownStyles};
 use crate::tui::progress::{ac_status_style, status_badge_style};
 use crate::tui::status::{effective_execution_status, effective_lifecycle, effective_spec_status};
 
-use super::detail_sections::{push_item_header, push_kv_indented, section_header};
+use super::detail_sections::{push_item_header_on_surface, push_kv_indented, section_header};
 
 pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) {
     let detail = match &app.milestone_detail {
@@ -505,7 +505,18 @@ pub(super) fn render_milestone_detail(frame: &mut Frame, app: &App, area: Rect) 
                     "○"
                 };
                 let badge_style = ac_status_style(ac_status, palette).add_modifier(Modifier::BOLD);
-                push_item_header(&mut lines, badge, ac_id, ac_desc, badge_style, app);
+                // M244: AC rows are the detail view's nested panel —
+                // painted on `surface_2` so they read as a distinct
+                // layer instead of inheriting the bare background.
+                push_item_header_on_surface(
+                    &mut lines,
+                    badge,
+                    ac_id,
+                    ac_desc,
+                    badge_style,
+                    app,
+                    md_width,
+                );
                 if !ac_verification.is_empty() {
                     push_kv_indented(&mut lines, "verify", ac_verification, app);
                 }

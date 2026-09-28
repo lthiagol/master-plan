@@ -7,10 +7,14 @@
 //! `style` with a non-Reset `bg` bleeds the background across the
 //! whole bar and washes out the selected tab. The pre-M167 manual
 //! renderer renders each tab label as its own span with a per-tab
-//! `fg=Black, bg=accent, BOLD` for the active lane, which is the look
-//! the user is used to. We keep the manual renderer unchanged for
-//! BOTH wide and narrow modes; the only thing we gain from the
-//! migration was a third-party dependency, not visible behavior.
+//! fill for the active lane, which is the look the user is used to.
+//! We keep the manual renderer unchanged for BOTH wide and narrow
+//! modes; the only thing we gain from the migration was a
+//! third-party dependency, not visible behavior.
+//!
+//! The active tab's fill is the palette's `focus_ring` role (it used
+//! to be `accent`, which made the focused tab read as a lifecycle
+//! color rather than as focus).
 //!
 //! Module still exports `render_tab_bar` and consumes the
 //! `TabBarLayout` produced by `view_state::compute_tab_bar_layout`
@@ -40,11 +44,13 @@ pub(super) fn render_tab_bar(frame: &mut Frame, app: &App, area: Rect, layout: &
         .unwrap_or(0);
 
     let palette = app.effective_palette();
-    // Active tab: black text on the bright accent background,
-    // bold. This is the "highlighted tab" look the user expects.
+    // Active tab: the `focus_ring` fill — the "where is the cursor"
+    // color, deliberately distinct from the lane-header `accent` so
+    // the focused tab doesn't read as a status color. Text on the
+    // ring is black (the ring is light in every named palette).
     let active_style = Style::default()
-        .fg(crate::tui::palette::on_accent_fg(palette))
-        .bg(palette.accent)
+        .fg(crate::tui::palette::on_focus_ring_fg(palette))
+        .bg(palette.focus_ring)
         .add_modifier(Modifier::BOLD);
     let inactive_style = Style::default().fg(palette.dim);
     let indicator_style = Style::default().fg(palette.dim);

@@ -74,28 +74,59 @@ pub fn push_kv_indented(lines: &mut Vec<Line>, label: &str, value: &str, app: &A
     ]));
 }
 
-/// Push a 2-line item header (used by Steps / ACs / Findings).
+/// Push an item header painted as a `surface_2` band — the AC row
+/// treatment (M244).
 ///
-/// Layout: `  <badge> <id> — <text>` on the header row; the caller is
-/// responsible for any context line(s) following.
-pub fn push_item_header(
+/// The detail document is a flat list of lines, so the AC row is
+/// given a quiet panel background instead of a loud accent fill: the
+/// row is padded to `width` so the background spans the full
+/// interior and the ACs read as a nested panel inside the detail
+/// surface. `width` is the paragraph interior width so the padding
+/// is only appended, never truncated.
+///
+/// Note: raul's detail view has no AC cursor (no per-AC navigation
+/// state exists), so this band is applied to every AC row rather
+/// than only a focused one.
+///
+/// Layout: `  <badge> <id> — <text>` on the header row; the caller
+/// pushes any context line(s) after.
+pub fn push_item_header_on_surface(
     lines: &mut Vec<Line>,
     badge: &str,
     id: &str,
     text: &str,
     badge_style: Style,
     app: &App,
+    width: usize,
 ) {
     let palette = app.effective_palette();
-    lines.push(Line::from(vec![
-        Span::raw("  "),
-        Span::styled(format!("{badge} "), badge_style),
-        Span::styled(id.to_string(), badge_style.add_modifier(Modifier::BOLD)),
+    let surface = Style::default()
+        .bg(palette.surface_2)
+        .add_modifier(Modifier::BOLD);
+    let head = Line::from(vec![
+        Span::styled("  ", surface),
+        Span::styled(
+            format!("{badge} "),
+            surface.fg(badge_style.fg.unwrap_or(palette.dim)),
+        ),
+        Span::styled(
+            id.to_string(),
+            surface.fg(badge_style.fg.unwrap_or(palette.dim)),
+        ),
         Span::styled(
             format!(" — {text}"),
-            Style::default().fg(palette.foreground),
+            surface
+                .fg(palette.foreground)
+                .remove_modifier(Modifier::BOLD),
         ),
-    ]));
+    ]);
+    let used = 2 + badge.chars().count() + 1 + id.chars().count() + 3 + text.chars().count();
+    let pad = width.saturating_sub(used);
+    let mut spans = head.spans;
+    if pad > 0 {
+        spans.push(Span::styled(" ".repeat(pad), surface));
+    }
+    lines.push(Line::from(spans));
 }
 
 #[cfg(test)]

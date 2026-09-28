@@ -87,7 +87,14 @@ pub fn render(frame: &mut Frame, app: &App, view: &ViewState) {
         }
         ratatui::text::Line::from(spans)
     };
-    frame.render_widget(Paragraph::new(header_line), view.header_area);
+    // The header is app chrome and shares the footer's `surface_1`
+    // fill, so the two rails read as one frame around the lane
+    // content. (The header band is composed here rather than in
+    // `chrome.rs`, which owns the footer + scrollbars.)
+    frame.render_widget(
+        Paragraph::new(header_line).style(Style::default().bg(app.effective_palette().surface_1)),
+        view.header_area,
+    );
 
     render_tab_bar(frame, app, view.tab_bar_area, &view.tab_layout);
 

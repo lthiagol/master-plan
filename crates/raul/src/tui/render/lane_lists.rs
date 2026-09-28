@@ -208,10 +208,15 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         // Side cells: ID, Priority, Status — single line. The Table
         // row height is 2 so the second visual line below the side
         // cells stays empty (matches the title cell's preview).
+        // Selected row: `surface_2` background with the id cell as the
+        // `focus_ring` marker. The row used to be a full-bleed accent
+        // block, which read louder than the lifecycle colors it sat
+        // next to and made the selected row indistinguishable from a
+        // status-colored row.
         let id_cell = if is_selected {
             Cell::from(Span::styled(
                 b.id.clone(),
-                Style::default().fg(crate::tui::palette::on_accent_fg(app.effective_palette())),
+                Style::default().fg(app.effective_palette().focus_ring),
             ))
         } else {
             Cell::from(Span::styled(
@@ -237,8 +242,8 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
         let row = if is_selected {
             row.style(
                 Style::default()
-                    .fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
-                    .bg(app.effective_palette().accent)
+                    .fg(crate::tui::palette::selection_fg(app.effective_palette()))
+                    .bg(crate::tui::palette::selection_bg(app.effective_palette()))
                     .add_modifier(Modifier::BOLD),
             )
         } else {
@@ -274,7 +279,11 @@ pub(super) fn render_backlog_list(frame: &mut Frame, app: &App, area: Rect, view
                 .title(title)
                 .border_type(BorderType::Plain),
         )
-        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        // M244: the selected row already paints its own `surface_2`
+        // background (see the row build above). REVERSED video on top
+        // of that would re-introduce the loud inverted highlight the
+        // layering roles replace, so the highlight carries BOLD only.
+        .row_highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
     // Clamp stale selection indices after filtering changes the visible list.
     let clamped = app.selected_index.min(visible.len().saturating_sub(1));
@@ -316,7 +325,7 @@ fn build_title_cell(
     let title_str = truncate_for_col(&b.title, title_w);
     let title_style = if is_selected {
         Style::default()
-            .fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
+            .fg(crate::tui::palette::selection_fg(app.effective_palette()))
             .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
@@ -325,7 +334,7 @@ fn build_title_cell(
     };
     let preview_text = b.preview.trim();
     let preview_style = if is_selected {
-        Style::default().fg(crate::tui::palette::on_accent_fg(app.effective_palette()))
+        Style::default().fg(crate::tui::palette::selection_fg(app.effective_palette()))
     } else {
         Style::default().fg(app.effective_palette().dim)
     };
@@ -505,8 +514,14 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
 
     let depths = depends_on_depths(&visible);
 
+    // Selection is resolved before the row loop so the marker glyph
+    // can be emitted per-row. Mirrors the `clamped` math used for
+    // `TableState` below (same visible list, same scroll offset).
+    let clamped = app.selected_index.min(visible.len().saturating_sub(1));
+
     let mut rows: Vec<Row> = Vec::new();
     for (i, m) in visible.iter().enumerate().skip(scroll) {
+        let is_selected = i == clamped;
         let row_color = progress::status_row_color(&m.lifecycle, app.effective_palette());
         let depth = depths.get(i).copied().unwrap_or(0).min(4);
         let indent = " ".repeat(depth);
@@ -548,14 +563,39 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
         // canonical-order helper).
         let stage = progress::stage_cell_line(&m.flow_stages, app.effective_palette());
 
-        rows.push(Row::new(vec![
-            Cell::from(indent),
+        let mut row = Row::new(vec![
+            // Marker column. The selected row gets a `focus_ring`
+            // glyph pinned to the left edge; unselected rows keep
+            // their dependency-depth indent. The column is a fixed
+            // INDENT_W wide, so the marker costs no layout width and
+            // the table's other columns are untouched.
+            if is_selected {
+                Cell::from(Span::styled(
+                    "▌".to_string(),
+                    Style::default().fg(app.effective_palette().focus_ring),
+                ))
+            } else {
+                Cell::from(indent)
+            },
             Cell::from(format!("M{}", m.id)),
             Cell::from(Span::styled(title, title_style)),
             Cell::from(Span::styled(priority, priority_style(&m.priority, app))),
             Cell::from(stage),
             Cell::from(Span::styled(since, Style::default().fg(row_color))),
-        ]));
+        ]);
+        // The row-level style carries the selection background. It is
+        // applied *before* the cell styles so a cell that names its own
+        // foreground (the `focus_ring` marker, the status-colored
+        // `Since` column) keeps it.
+        if is_selected {
+            row = row.style(
+                Style::default()
+                    .fg(crate::tui::palette::selection_fg(app.effective_palette()))
+                    .bg(crate::tui::palette::selection_bg(app.effective_palette()))
+                    .add_modifier(Modifier::BOLD),
+            );
+        }
+        rows.push(row);
     }
 
     let widths = [
@@ -577,10 +617,17 @@ pub(super) fn render_milestones_table(frame: &mut Frame, app: &App, area: Rect, 
                 .title(title)
                 .border_type(BorderType::Plain),
         )
-        .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        // Background only, no `fg`: ratatui patches `row_highlight_style`
+        // over the cells it highlights, so naming a foreground here would
+        // overwrite the `focus_ring` marker and the status colors. The
+        // selected row's foregrounds come from its own row/cell styles.
+        .row_highlight_style(
+            Style::default()
+                .bg(crate::tui::palette::selection_bg(app.effective_palette()))
+                .add_modifier(Modifier::BOLD),
+        );
 
     // Filtering can leave a stale selection index; clamp it to the visible window.
-    let clamped = app.selected_index.min(visible.len().saturating_sub(1));
     let table_selected = clamped.saturating_sub(scroll);
     frame.render_stateful_widget(
         table,
