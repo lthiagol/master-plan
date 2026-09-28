@@ -58,6 +58,30 @@ An unknown theme name falls back to `mocha`.
 > `ui.theme = monochrome` falls back to `mocha` like any other unknown
 > value. Disable color via `ui.color = false` instead.
 
+### Color roles
+
+Each palette maps nine semantic roles to concrete colors. Renderers
+consume the role, never a literal color, so switching `ui.theme`
+recolors the whole surface.
+
+| Role | Used for |
+|------|----------|
+| `accent` | Headers, active items, the in-progress lifecycle color |
+| `success` | Done / verified / passed |
+| `warn` | Ready / pending, cancelled milestones |
+| `danger` | Blocked / failure |
+| `dim` | Secondary text, tree connectors, inactive tabs |
+| `foreground` | Primary body text, and the text drawn on `surface_1` / `surface_2` |
+| `focus_ring` | Where the cursor is: the focused tab's fill, the selected row's border and marker glyph, the selected board box, the focused Path node |
+| `surface_1` | The panel a surface floats on: overlay / modal backdrops and the header + footer chrome bands |
+| `surface_2` | One layer up, inside a surface: the selected or hovered list row, the selected board box, the selected row in a modal or picker, and detail-view AC rows |
+
+The two surface roles are deliberately quiet near-background tones, not
+saturated fills: `surface_2` sits on `surface_1`, and `foreground` is the
+readable text color on both. With `ui.color = false` every color role
+collapses to the terminal default and layering falls back to bold
+selection plus reversed cursor text.
+
 ## Key bindings
 
 Every navigation key is configurable via the user-level

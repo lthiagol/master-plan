@@ -252,3 +252,52 @@ fn tab_focused_tab_uses_focus_ring_bg() {
         "no surface may still be filled with the accent after the role split"
     );
 }
+
+// --- live palette swap -----------------------------------------------------
+
+/// Swapping `App::palette` must recolor the layering roles in the very
+/// next frame — the roles are read from the palette at render time, not
+/// baked into a style cache.
+#[test]
+fn live_swap_recolors_roles_in_next_frame() {
+    let mut app = milestones_app();
+    app.selected_index = 1;
+    app.palette = &raul::theme::MOCHA;
+    let mocha_buf = draw(&app, 120, 24);
+    let mocha_surface_2 = bg_cells(&mocha_buf, raul::theme::MOCHA.surface_2);
+    let mocha_ring = bg_cells(&mocha_buf, raul::theme::MOCHA.focus_ring);
+    assert!(
+        mocha_surface_2 > 0 && mocha_ring > 0,
+        "the mocha frame must carry both surface_2 and focus_ring cells"
+    );
+
+    // Live swap — no restart, no cache invalidation call.
+    app.palette = &raul::theme::LATTE;
+    let latte_buf = draw(&app, 120, 24);
+
+    assert_eq!(
+        bg_cells(&latte_buf, raul::theme::LATTE.surface_2),
+        mocha_surface_2,
+        "the same frame geometry must produce the same number of surface_2 cells"
+    );
+    assert_eq!(
+        bg_cells(&latte_buf, raul::theme::LATTE.focus_ring),
+        mocha_ring,
+        "the same frame geometry must produce the same number of focus_ring cells"
+    );
+    assert_eq!(
+        bg_cells(&latte_buf, raul::theme::MOCHA.surface_2),
+        0,
+        "no mocha surface_2 cell may survive a live swap to latte"
+    );
+    assert_eq!(
+        bg_cells(&latte_buf, raul::theme::MOCHA.focus_ring),
+        0,
+        "no mocha focus_ring cell may survive a live swap to latte"
+    );
+    // The chrome role swaps too.
+    assert!(
+        bg_cells(&latte_buf, raul::theme::LATTE.surface_1) > 0,
+        "the chrome surface_1 must follow the live swap"
+    );
+}
