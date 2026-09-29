@@ -334,21 +334,24 @@ fn parity_effective_spec_status_prefers_canonical_field() {
 }
 
 #[test]
-fn watch_drivable_eligibility_delegates_to_mp_model() {
+fn autopilot_drivable_eligibility_delegates_to_mp_model() {
     // M189 F-08: Raul must not keep a divergent allowlist that treats
-    // demoted review aliases as active drive targets.
+    // demoted review aliases as active drive targets. M230 moved
+    // the list into `tui::autopilot` (the picker module) so the
+    // `raul::tui::autopilot::picker_drivable_lifecycles` helper is
+    // the single source of truth.
     assert_eq!(
-        raul::tui::watch::DRIVABLE_LIFECYCLES,
+        raul::tui::autopilot::picker_drivable_lifecycles(),
         mp_model::WATCH_DRIVABLE_LIFECYCLES
     );
     for alias in ["self-reviewed", "reviewed"] {
         assert!(
-            !raul::tui::watch::is_drivable_lifecycle(alias),
-            "{alias} must not be watch-drivable"
+            !raul::tui::autopilot::is_picker_eligible(alias),
+            "{alias} must not be drivable"
         );
         assert!(!mp_model::is_watch_drivable_lifecycle(alias));
     }
     for active in ["approved", "in-progress", "remediation"] {
-        assert!(raul::tui::watch::is_drivable_lifecycle(active));
+        assert!(raul::tui::autopilot::is_picker_eligible(active));
     }
 }

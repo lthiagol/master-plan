@@ -178,7 +178,7 @@ fn pane_row_round_trips_through_serde() {
 /// AC-01: production-path regression. The renderer is
 /// reachable from the lane state through the public
 /// `autopilot.status_graph().render_to_string()` path.
-/// This is what `render_watch_lane` consumes in
+/// This is what `render_autopilot_lane` consumes in
 /// production (M216 S01 hot-path wire).
 #[test]
 fn status_graph_is_reachable_from_the_lane_state() {

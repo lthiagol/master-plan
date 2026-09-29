@@ -168,8 +168,8 @@ fn space_on_other_lanes_does_not_dispatch_autopilot_toggle_select() {
 
 /// F-01: the typed `AutopilotLaneState.picker` field is the
 /// production source of truth. Defensive pin: a future refactor
-/// that re-points the renderer at `app.watch.candidates` directly
-/// (bypassing the typed Picker) breaks this test.
+/// that re-points the renderer at the legacy `Watch` candidates
+/// directly (bypassing the typed Picker) breaks this test.
 #[test]
 fn autopilot_picker_field_is_the_production_source_of_truth() {
     let app = App::new();

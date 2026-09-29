@@ -313,7 +313,7 @@ fn filter_toggle_render() {
 }
 
 #[test]
-fn watch_lane_log_pane_uses_cached_entries_without_render_io() {
+fn autopilot_lane_log_pane_uses_cached_entries_without_render_io() {
     use raul::tui::app::Lane;
     let dir = tempfile::tempdir().expect("tempdir");
     let log_dir = dir.path().join(".mp");
@@ -329,7 +329,9 @@ fn watch_lane_log_pane_uses_cached_entries_without_render_io() {
     let mut app = App::new();
     app.active_lane = Lane::Autopilot;
     app.plan_dir = dir.path().to_path_buf();
-    app.watch.log_tail = raul::tui::watch::tail_watch_log(&app.plan_dir, 8);
+    // M230: the log pane reads `app.autopilot.log_tail` (the
+    // helper moved to `tui::autopilot` along with the field).
+    app.autopilot.log_tail = raul::tui::autopilot::tail_watch_log(&app.plan_dir, 8);
     std::fs::remove_dir_all(&log_dir).expect("poison render-time log path");
 
     let output = render_to_string(&app);
@@ -347,10 +349,10 @@ fn watch_lane_log_pane_uses_cached_entries_without_render_io() {
     );
 }
 
-// M179 F-02 negative case: when there is no watch.log, the pane
+// F-02 negative case: when there is no watch.log, the pane
 // falls back to the placeholder. Pins the empty-state contract.
 #[test]
-fn watch_lane_log_pane_placeholder_when_log_absent() {
+fn autopilot_lane_log_pane_placeholder_when_log_absent() {
     use raul::tui::app::Lane;
     let dir = tempfile::tempdir().expect("tempdir");
 
