@@ -205,14 +205,12 @@ fn actions_have_required_variants() {
             Action::SettingsSave => "SettingsSave",
             // M201: in-place settings editors — bucketed.
             Action::SettingsToggleBool | Action::SettingsCycleChoice { .. } => "SettingsEditors",
-            // M179: Watch-lane action family — bucketed.
-            Action::WatchToggleSelect
-            | Action::WatchPreflight
-            | Action::WatchStart
-            | Action::WatchStop
-            | Action::WatchRefresh
-            | Action::WatchClearQueue => "Watch",
-            Action::WatchMovePicker { .. } | Action::WatchMoveQueue { .. } => "WatchMove",
+            // M215 / F-01 (M230): the Autopilot lane's production hot
+            // path actions are bucketed into the M215 set below
+            // (`M215Autopilot`). The legacy `Action::Watch*`
+            // family was deleted by M230 — those variants never
+            // had a keybind and were dead aliases for the
+            // Autopilot actions.
             // M172 S5: sort-rebind action family — bucketed.
             Action::OpenSortRebind
             | Action::SortRebindNext
@@ -647,7 +645,7 @@ fn apply_action_settings_lane_quit_still_works() {
 #[test]
 fn normal_handler_tab_lane_jump_emits_jump_action() {
     let app = App::new();
-    // M198: digits index into the VISIBLE lane list (Watch omitted
+    // M198: digits index into the VISIBLE lane list (Autopilot omitted
     // when `ui.show_autopilot_tab` is off — the App::new() default), so
     // the upper bound follows `ordered_visible(app.show_autopilot_tab)`.
     let n = Lane::ordered_visible(app.show_autopilot_tab).len();

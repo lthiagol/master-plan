@@ -254,7 +254,7 @@ fn s3_left_right_and_h_l_route_to_previous_next() {
 #[test]
 fn s3_number_keys_jump_by_ordered_index() {
     // M184: Lane::ordered() has 7 entries (Overview, Milestones,
-    // Path, Backlog, Ideas, Watch, Settings).
+    // Path, Backlog, Ideas, Autopilot, Settings).
     // Jump(N) is 0-based; digits 1..=N map to lanes 0..N-1.
     let lanes = Lane::ordered();
     assert_eq!(
@@ -618,7 +618,7 @@ use raul::tui::runner::tab_hit_test;
 fn s5_tab_hit_test_first_tab_full_labels() {
     // Full labels at wide widths. After 1 leading space the first tab
     // (" Overview ") occupies cols 1..11 inclusive (length 10).
-    // F-02: pin the legacy 7-lane contract (Watch visible) — these
+    // F-02: pin the legacy 7-lane contract (Autopilot visible) — these
     // tests predate M198.
     let lanes = &Lane::ordered();
     assert_eq!(tab_hit_test(1, false, lanes), Some(0));
@@ -1161,14 +1161,6 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::SetCoApprovalAction(_)
             | Action::SubmitInput
             | Action::CancelInput
-            | Action::WatchToggleSelect
-            | Action::WatchPreflight
-            | Action::WatchStart
-            | Action::WatchStop
-            | Action::WatchRefresh
-            | Action::WatchClearQueue
-            | Action::WatchMovePicker { .. }
-            | Action::WatchMoveQueue { .. }
             | Action::PushInputChar(_)
             | Action::PopInputChar
             | Action::SettingsSave

@@ -236,34 +236,15 @@ pub enum Action {
     /// Save all staged Settings edits (`s` on the Settings lane).
     SettingsSave,
 
-    // ---- watch lane (M179) -----------------------------------------------
-    /// Toggle the picker cursor's selection into the ordered queue
-    /// (`Space` / `Enter` on the Watch lane).
-    WatchToggleSelect,
-    /// Run the dry-run preflight on the current queue (`p`).
-    WatchPreflight,
-    /// Start the validated queue through the M178 detach surface
-    /// (`s` on the Watch lane). Refused if preflight failed or a
-    /// live run is already attached.
-    WatchStart,
-    /// Stop the live watch run through the M178 control surface
-    /// (`x` on the Watch lane).
-    WatchStop,
-    /// Force-refresh the latest status / output snapshot
-    /// (`r` on the Watch lane).
-    WatchRefresh,
-    /// Move the picker cursor up/down on the Watch lane
-    /// (`j` / `k`).
-    WatchMovePicker {
-        delta: i64,
-    },
-    /// Move the queue cursor up/down on the Watch lane
-    /// (`J` / `K`).
-    WatchMoveQueue {
-        delta: i64,
-    },
-    /// Clear all queue selections on the Watch lane (`c`).
-    WatchClearQueue,
+    // ---- Autopilot lane (M215) -----------------------------------------
+    // M230: the legacy `Action::Watch*` family (8 variants:
+    // toggle-select, preflight, start, stop, refresh, picker-
+    // move, queue-move, clear-queue) was deleted — every
+    // variant was a never-keybound alias for the
+    // `Action::Autopilot*` family (M222 lane-keymap config) or
+    // for the M178 attach surface that M229 removed. Autopilot
+    // lane keys now flow through `Action::Autopilot*`
+    // exclusively.
 
     // ---- M215: Autopilot lane (F-01 wiring) -----------------------
     /// Toggle the highlighted picker's selection (Space on the
@@ -375,7 +356,6 @@ pub enum Action {
 /// practice the per-event error is rendered as a `flash_message` and the
 /// loop continues — see `run_loop`'s dispatch error handling.
 pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<()> {
-    let watch_before = app.watch.clone();
     let version_before = app.version();
     match action {
         // ---- global ---------------------------------------------------------
@@ -484,8 +464,9 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         Action::ClearFilters => {
             // AC-07: `c` clears all active filters on the active
             // lane. List lanes only — other lanes are a no-op
-            // (no filter to clear, and `c` is used for the
-            // Watch lane's clear-queue action).
+            // (no filter to clear; on the Autopilot lane the key
+            // is reserved for per-lane semantics, not the filter
+            // surface).
             let lane = app.active_lane;
             if app.content == ContentState::List
                 && matches!(lane, Lane::Milestones | Lane::Backlog | Lane::Ideas)
@@ -845,39 +826,6 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             apply_settings_cycle_choice(app, runner, forward)?;
         }
 
-        // ---- watch lane --------------------------------------------------
-        Action::WatchToggleSelect => {
-            let id_opt = app.watch.picker_candidate().map(|c| c.id.clone());
-            if let Some(id) = id_opt {
-                app.watch.toggle_select(&id);
-            }
-        }
-        Action::WatchPreflight => {
-            crate::tui::watch::run_preflight(runner, app)?;
-        }
-        Action::WatchStart => {
-            crate::tui::watch::start_watch(runner, app)?;
-        }
-        Action::WatchStop => {
-            crate::tui::watch::stop_watch(runner, app, 30)?;
-        }
-        Action::WatchRefresh => {
-            // M217 / AC-08: the legacy `poll_watch_state` scheduler is
-            // gone; the M179 `WatchRefresh` alias now routes through
-            // the one coalescing poller's manual path, so there is a
-            // single refresh implementation behind both keys.
-            crate::tui::poll::manual_refresh_lane(runner, app, crate::tui::poll::now_ms());
-        }
-        Action::WatchMovePicker { delta } => {
-            app.watch.move_picker(delta);
-        }
-        Action::WatchMoveQueue { delta } => {
-            app.watch.move_queue(delta);
-        }
-        Action::WatchClearQueue => {
-            app.watch.clear_selection();
-        }
-
         // ---- M215 / F-01: Autopilot lane production hot path ----
         Action::AutopilotToggleSelect => {
             let _ = app.autopilot.toggle_picker_select();
@@ -1116,7 +1064,7 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         }
     }
 
-    if app.watch != watch_before && app.version() == version_before {
+    if app.version() == version_before {
         app.touch();
     }
     Ok(())
@@ -1899,10 +1847,10 @@ fn apply_enter(app: &mut App, runner: &MpRunner) -> Result<()> {
             Lane::Autopilot => {
                 // M179 / M214: the Autopilot lane's Enter semantics
                 // are selector-driven (toggle a milestone's
-                // selection in the picker) — see `tui::watch`
-                // (S3). The dispatch here is a no-op fallback;
-                // S3 re-routes via a dedicated
-                // `Action::WatchToggleSelect`.
+                // selection in the picker) — handled by the
+                // `Action::AutopilotToggleSelect` dispatch in
+                // `modes::normal::handle_autopilot_lane_key`.
+                // This fallback is a no-op.
             }
             Lane::Settings => {}
         },

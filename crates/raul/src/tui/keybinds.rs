@@ -162,9 +162,10 @@ pub struct Keybinds {
     /// M186: cycle sort key (default `o`).
     pub cycle_sort: Vec<KeyCombo>,
     /// M204 / AC-07: clear all active filters on a list lane
-    /// (default `c`). Routes to `Action::ClearFilters`; on the
-    /// Watch lane the same key is shadowed by the per-lane
-    /// `WatchClearQueue` action (dispatcher in `modes/normal`).
+    /// (default `c`). Routes to `Action::ClearFilters`; other
+    /// lanes (Path / Autopilot / Settings) are no-ops because
+    /// there is no filter to clear and the key is reserved for
+    /// per-lane semantics.
     pub clear_filters: Vec<KeyCombo>,
     /// M222: per-lane Autopilot keymap. The handler in
     /// `modes::normal::handle_autopilot_lane_key` consults these
