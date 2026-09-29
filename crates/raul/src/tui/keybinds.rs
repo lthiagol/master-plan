@@ -1297,11 +1297,12 @@ impl Keybinds {
         // Defensive: every reachable (lane, content_state) arm
         // should have produced at least one token. Falling back to
         // ":move" guarantees a non-empty string for the test that
-        // walks every pair. Path and Watch explicitly return empty
-        // via `String::new()` above and never reach this point; any
-        // other pair that lands here is a navigation-shape mismatch
-        // (the per-tab line is still better than an empty string for
-        // a test that asserts a non-empty result).
+        // walks every pair. Path and the Autopilot lane
+        // explicitly return empty via `String::new()` above and
+        // never reach this point; any other pair that lands here
+        // is a navigation-shape mismatch (the per-tab line is
+        // still better than an empty string for a test that
+        // asserts a non-empty result).
         if out.is_empty() && !Self::primary(&kb.up).is_empty() {
             out.push_str(&format!(" {}:move ", Self::primary(&kb.up)));
         }
