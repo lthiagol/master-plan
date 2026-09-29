@@ -15,18 +15,15 @@
 //!
 //! The renderer is intentionally text-based — no tui
 //! widgets beyond `Paragraph` + `Block`. The TUI main loop
-//! calls `render_watch_lane` whenever the active lane is
+//! calls `render_autopilot_lane` whenever the active lane is
 //! `Lane::Autopilot`.
 //!
 //! M230: the picker / lifecycle / queue / log readers were
 //! migrated off the legacy `app.watch` mirror. The renderer
 //! now reads only `app.autopilot.picker` /
- //! `autopilot::render_lifecycle_graph` /
- //! `autopilot::render_compact_queue` /
- //! `app.autopilot.log_tail`. S4 renames this module to
- //! `render/autopilot_lane.rs` and the entry point to
- //! `render_autopilot_lane`; until then the legacy names
- //! survive so the rename can land as a single file move.
+//! `autopilot::render_lifecycle_graph` /
+//! `autopilot::render_compact_queue` /
+//! `app.autopilot.log_tail`.
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -39,7 +36,7 @@ use crate::tui::app::App;
 use crate::tui::autopilot;
 
 /// Render picker, lifecycle/queue, and cached log/output regions.
-pub fn render_watch_lane(frame: &mut Frame, app: &App, area: Rect) {
+pub fn render_autopilot_lane(frame: &mut Frame, app: &App, area: Rect) {
     // Two-column layout: picker on the left, everything else
     // on the right. The right column stacks the lifecycle
     // graph (top), the compact queue (middle), and the

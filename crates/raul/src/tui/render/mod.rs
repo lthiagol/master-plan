@@ -9,6 +9,7 @@ use super::mode::Mode;
 use super::path_view;
 use super::view_state::ViewState;
 
+pub mod autopilot_lane;
 pub mod board;
 mod chrome;
 mod dashboard_view;
@@ -20,7 +21,6 @@ pub mod modal;
 mod overlays;
 pub mod scrollbar;
 mod tab_bar;
-pub mod watch;
 
 use chrome::{
     list_lane_filter_chip, overlay_rect_or, render_footer, render_scrollbars, view_title,
