@@ -98,7 +98,7 @@
     {
       "id": "AC-05",
       "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
-      "verification": "make consumer-surface-lint",
+      "verification": "scripts/verify-m230-ac05.sh",
       "status": "passed",
       "evidence": "make consumer-surface-lint exit 0 (clean; 6 stale-watch allowlist entries pruned in S2.2 — those anchored to docs/raul/keybinds.md / docs/raul/README.md content that now says Autopilot)"
     },
