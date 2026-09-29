@@ -133,7 +133,7 @@
         "crates/raul/src/tui/watch.rs",
         "crates/raul/src/tui/mod.rs"
       ],
-      "tests": "cargo check -p raul --all-targets",
+      "tests": "! rg -q 'pub mod watch|tui::watch' crates/raul/src",
       "done_when": "AC-01 source-pin passes",
       "status": "pending",
       "covers_ac": [

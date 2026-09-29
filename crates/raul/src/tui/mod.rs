@@ -21,4 +21,3 @@ pub mod runner;
 pub mod runner_helpers;
 pub mod status;
 pub mod view_state;
-pub mod watch;

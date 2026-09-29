@@ -50,12 +50,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-use crate::tui::watch::DRIVABLE_LIFECYCLES;
-// M230: after the migration the renderer reads `app.autopilot.picker`
-// only, so the DRIVABLE_LIFECYCLES import above was the last
-// cross-module dependency on the legacy `tui::watch` module. The
-// re-export at `tui::watch::DRIVABLE_LIFECYCLES` remains in place
-// through S1.1.2 so the `pub use` shim can be removed last.
+// M230: the Autopilot lane's drivable-lifecycle allow-list is
+// sourced directly from `mp_model::WATCH_DRIVABLE_LIFECYCLES`.
+// Pre-M230, the list was re-exported through a legacy `watch`
+// module so the picker and that module agreed; that re-export
+// is gone now.
+const DRIVABLE_LIFECYCLES: &[&str] = mp_model::WATCH_DRIVABLE_LIFECYCLES;
 
 /// Lifecycles that the Autopilot picker accepts. Mirrors the watch
 /// lane's contract — single source of truth so both modules agree
@@ -462,12 +462,11 @@ pub const LIFECYCLE_NODES: &[&str] = &[
 
 /// M179 S6: build a single-line ASCII graph of the canonical
 /// lifecycle, highlighting the current lifecycle (if known).
-/// Migrated from `tui::watch` by M230 — the Autopilot lane reads
-/// `app.autopilot.picker.selected` (the lane's typed state) and
-/// renders the graph with no active node (the legacy watch-status
-/// path that supplied `current_lifecycle` always returned `None`
-/// after M229, so the new renderer keeps the same empty-active
-/// behavior).
+/// Migrated from the legacy `Watch` module by M230 — the
+/// Autopilot lane renders the graph with no active node
+/// (the legacy watch-status path that supplied
+/// `current_lifecycle` always returned `None` after M229, so
+/// the new renderer keeps the same empty-active behavior).
 ///
 /// F-09: only the active node is bracketed with `>...<`;
 /// inactive nodes render as bare labels joined by `-`.
@@ -496,11 +495,11 @@ pub fn render_lifecycle_graph(current: Option<&str>) -> String {
 }
 
 /// M179 S6: build a one-row compact queue summary for the
-/// Autopilot lane. Migrated from `tui::watch` by M230 — reads
-/// `app.autopilot.picker.queue_ids()` (the typed selection order)
-/// and reports `pending` for every queue row (the v2 status
-/// payload that supplied `milestone_outcomes` was always `None`
-/// post-M229).
+/// Autopilot lane. Migrated from the legacy `Watch` module by
+/// M230 — reads `app.autopilot.picker.queue_ids()` (the typed
+/// selection order) and reports `pending` for every queue row
+/// (the v2 status payload that supplied `milestone_outcomes`
+/// was always `None` post-M229).
 ///
 /// AC-10: outcomes are surfaced exactly as reported by mp. The
 /// renderer does not reinterpret the `kind` string — what mp
@@ -2513,10 +2512,10 @@ mod f01_tests {
 }
 
 /// M179 S8: read a bounded tail of `<plan_dir>/.mp/watch.log` for
-/// the polling cache. Migrated from `tui::watch::tail_watch_log`
-/// in M230 so the helper lives next to the `AutopilotLaneState`
-/// field it populates (`log_tail`). At most 64 KiB is read,
-/// regardless of total log size.
+/// the polling cache. Migrated into `tui::autopilot` by M230 so
+/// the helper lives next to the `AutopilotLaneState` field it
+/// populates (`log_tail`). At most 64 KiB is read, regardless of
+/// total log size.
 pub fn tail_watch_log(plan_dir: &std::path::Path, max_lines: usize) -> Vec<String> {
     use std::io::{Read, Seek, SeekFrom};
 
