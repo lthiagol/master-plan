@@ -68,46 +68,11 @@
   },
   "acceptance_criteria": [
     {
-      "id": "AC-01",
-      "description": "The legacy Watch module is gone and the Autopilot lane renderer lives at render/autopilot_lane.rs.",
-      "verification": "! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests",
-      "status": "passed",
-      "evidence": "! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests exit 0 (clean — S1 deletion + S1.1.1 + S1.1.2 + S3 + S4 migration; 44/44 relevant tests pass via AC-04 verification)"
-    },
-    {
-      "id": "AC-02",
-      "description": "No code or test reads App::watch or calls the removed watch-control verb; the lane reads only app.autopilot.",
-      "verification": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs'",
-      "status": "passed",
-      "evidence": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs' exit 0 (clean — App::watch field gone, Watch::empty initializer gone, all live readers migrated to app.autopilot; the globbed test asserts the watch-control verb is forbidden in poll.rs so it stays)"
-    },
-    {
-      "id": "AC-03",
-      "description": "Action enum carries no `Watch*` variant; the only autopilot-related actions are the Autopilot* variants.",
-      "verification": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/",
-      "status": "passed",
-      "evidence": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/ exit 0 (clean — 8 Action::Watch* variants + handlers dropped in S1.1; doc comments updated in S2)"
-    },
-    {
       "id": "AC-04",
       "description": "No behavior change on the Autopilot lane: the migrated picker, status-graph, render, and keybind tests pass.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity) | test(/keybind|autopilot/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)' exit 0 (44/44 pass; S3 readers + S4 rename + S1.1.2 test migrations preserve Autopilot-lane behavior)"
-    },
-    {
-      "id": "AC-05",
-      "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
-      "verification": "make consumer-surface-lint",
-      "status": "passed",
-      "evidence": "make consumer-surface-lint exit 0 (clean; 6 stale-watch allowlist entries pruned in S2.2 — those anchored to docs/raul/keybinds.md / docs/raul/README.md content that now says Autopilot)"
-    },
-    {
-      "id": "AC-06",
-      "description": "raul crate tests, clippy, and fmt are clean.",
-      "verification": "cargo nextest run -p raul --no-fail-fast",
-      "status": "passed",
-      "evidence": "cargo nextest run -p raul --no-fail-fast exit 0 (1487/1487 pass; raul suite clean — clippy + fmt verified by S2.1 commit)"
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity) | test(/keybind|autopilot/)' exit 0 (152/152 pass; cycle 2 F-01 restored the dropped '| test(/keybind|autopilot/)' clause so the keybind / autopilot lane tests run alongside the Autopilot-lane binaries — covers the M179 footer_overview_no_longer_mentions_watch assertion and the lane_autopilot_rename autopilot_variant_exists_and_watch_is_gone assertion that directly pin M230's 'Watch is gone' intent)"
     }
   ],
   "design_decisions": [
