@@ -657,7 +657,7 @@ fn read_src(name: &str) -> String {
 
 #[test]
 fn m217_ac08_legacy_watch_poller_and_fire_watch_tick_are_deleted() {
-    // M230: the legacy `tui::watch` module is gone — the file no
+    // M230: the legacy `Watch` module is gone — the file no
     // longer exists. The M217 cutover replaced its scheduler
     // with `tui::poll::AutopilotPoller`, and M230 deleted the
     // rest of the module. This test now asserts that the file
@@ -683,7 +683,7 @@ fn m217_ac08_legacy_watch_poller_and_fire_watch_tick_are_deleted() {
 fn m217_ac08_no_second_scheduler_remains() {
     // Exactly one module owns a poll cadence, and exactly one call
     // site drives it from the idle hook. M230 collapsed the
-    // legacy `tui::watch` module entirely, so the "no second
+    // legacy `Watch` module entirely, so the "no second
     // scheduler in watch.rs" check is now a file-existence
     // check (watch.rs is gone) rather than a content check.
     let runner = read_src("runner.rs");
