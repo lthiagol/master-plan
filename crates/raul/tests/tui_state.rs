@@ -98,7 +98,7 @@ fn filter_toggle() {
 // ─── M230 / AC-04: Autopilot lane lifecycle graph + compact queue ────
 //
 // M179's render_lifecycle_graph + render_compact_queue were
-// migrated from `tui::watch` to `tui::autopilot` by M230; the
+// migrated from the legacy `Watch` module to `tui::autopilot` by M230; the
 // public signature is preserved so the existing test contracts
 // stay pinned. The queue rows now always read `[pending]` (the
 // M229-removed watch verb was the only source of per-row
@@ -106,7 +106,7 @@ fn filter_toggle() {
 //
 // The legacy `Watch` mirror that the pre-M230 tests pinned
 // (the picker selection and the M178 status snapshot) is gone —
-// those tests were deleted along with `tui::watch` in M230.
+// those tests were deleted along with the legacy module in M230.
 // The equivalent contracts on the typed `Picker` already exist
 // in crates/raul/src/tui/autopilot.rs's #[cfg(test)] block.
 
@@ -197,7 +197,7 @@ fn render_compact_queue_omitted_when_empty() {
 // tests lived here. M217 deleted that scheduler; the equivalents
 // now exercise `tui::poll::AutopilotPoller`, whose clock is
 // injected so the cadence assertions no longer depend on real
-// wall-clock time. M230 deleted the surrounding `tui::watch`
+// wall-clock time. M230 deleted the surrounding legacy `Watch`
 // module entirely; the poller lives on as the lone scheduler.
 
 #[test]
