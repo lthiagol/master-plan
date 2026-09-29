@@ -649,10 +649,10 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
 
     // Top-level layout: row 0 = header, row 1 = main, last rows = footer.
     // M199: footer height is conditional on the active
-    // (lane, content_state) — Path and Watch have empty per-tab
-    // strings so the footer is 1 row (globals only); every other
-    // lane reserves 2 rows (globals on h-2, per-tab on h-1).
-    // `compute_view` is the single source of truth for
+    // (lane, content_state) — Path and the Autopilot lane have
+    // empty per-tab strings so the footer is 1 row (globals only);
+    // every other lane reserves 2 rows (globals on h-2, per-tab
+    // on h-1). `compute_view` is the single source of truth for
     // `footer_area.height`; `render_footer` reads it back without
     // re-deriving the count.
     // M217: size the footer from the *composed* per-tab text
@@ -730,9 +730,10 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
             }
             Lane::Autopilot => {
                 // M221: hit areas for the Autopilot picker. The
-                // renderer (`render::watch::render_picker`) takes
-                // the LEFT 40% of the content area; each candidate
-                // occupies one row inside the bordered block. We
+                // renderer (`render::autopilot_lane::render_picker`)
+                // takes the LEFT 40% of the content area; each
+                // candidate occupies one row inside the bordered
+                // block. We
                 // mirror that geometry here so a click on a row
                 // resolves to that candidate's id and the picker
                 // cursor moves (single-click) or toggles selection
@@ -1296,10 +1297,11 @@ fn compute_overview_list_rects(view: &mut ViewState, app: &App, area: Rect) {
 fn _junk_marker_removed() {}
 
 /// M221: hit areas for the Autopilot lane picker. The renderer
-/// (`render::watch::render_picker`) splits the content area 40/60
-/// and lays out each candidate as a single row inside a bordered
-/// block on the left; we mirror that geometry here so click
-/// resolution agrees with the rendered glyphs by construction.
+/// (`render::autopilot_lane::render_picker`) splits the content
+/// area 40/60 and lays out each candidate as a single row inside
+/// a bordered block on the left; we mirror that geometry here so
+/// click resolution agrees with the rendered glyphs by
+/// construction.
 ///
 /// Each candidate gets one `ListItemHitArea` keyed by the
 /// candidate's `id`. The picker surface does NOT use a scrollbar
@@ -1312,7 +1314,7 @@ fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
     }
 
     // The picker takes the left 40% of the content area — same
-    // split as `render_watch_lane`.
+    // split as `render_autopilot_lane`.
     let picker_area = Rect {
         x: area.x,
         y: area.y,
@@ -1320,19 +1322,17 @@ fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
         height: area.height,
     };
 
-    // Prefer the typed picker candidates; fall back to the legacy
-    // `app.watch.candidates` so the backcompat surface stays
-    // clickable (the same backcompat path `render_picker` walks).
-    let candidates: Vec<String> = if !app.autopilot.picker.candidates.is_empty() {
-        app.autopilot
-            .picker
-            .candidates
-            .iter()
-            .map(|c| c.id.clone())
-            .collect()
-    } else {
-        app.watch.candidates.iter().map(|c| c.id.clone()).collect()
-    };
+    // M230: the picker reads only `app.autopilot.picker.candidates`.
+    // The legacy `app.watch.candidates` fallback that kept the
+    // backcompat surface clickable is gone — the lane is single-
+    // sourced through the typed `Picker`.
+    let candidates: Vec<String> = app
+        .autopilot
+        .picker
+        .candidates
+        .iter()
+        .map(|c| c.id.clone())
+        .collect();
     if candidates.is_empty() {
         return;
     }

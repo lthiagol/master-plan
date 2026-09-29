@@ -7,8 +7,8 @@
 //! evolve without dragging the rest of the TUI along. The picker is
 //! sourced from `mp list milestones` and filtered to the autopilot-
 //! eligible lifecycles (`approved` / `in-progress` / `remediation` —
-//! shared with `tui::watch::DRIVABLE_LIFECYCLES` so both modules
-//! speak the same vocabulary). The override panel captures the
+//! sourced from `mp_model::WATCH_DRIVABLE_LIFECYCLES`, the canonical
+//! allow-list). The override panel captures the
 //! per-drive shape that gets written into the new `session.json` and
 //! honors the validation gate before anything lands on disk. The
 //! replay shell consumes `mp autopilot session list` + `session show`
@@ -51,6 +51,11 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::tui::watch::DRIVABLE_LIFECYCLES;
+// M230: after the migration the renderer reads `app.autopilot.picker`
+// only, so the DRIVABLE_LIFECYCLES import above was the last
+// cross-module dependency on the legacy `tui::watch` module. The
+// re-export at `tui::watch::DRIVABLE_LIFECYCLES` remains in place
+// through S1.1.2 so the `pub use` shim can be removed last.
 
 /// Lifecycles that the Autopilot picker accepts. Mirrors the watch
 /// lane's contract — single source of truth so both modules agree
@@ -437,6 +442,83 @@ pub const DEFAULT_REFRESH_SECS: u64 = 2;
 /// Default topology for the override panel. Matches the canonical
 /// 3-pane topology used elsewhere in the autopilot stack.
 pub const DEFAULT_TOPOLOGY: &str = "three-agent";
+
+/// M179 / AC-05: the canonical milestone lifecycle the
+/// ASCII graph renders. Order matters — `next_stage` walks
+/// these in the same sequence, and the graph's "current
+/// lifecycle" highlight reads this list to find the active
+/// node.
+pub const LIFECYCLE_NODES: &[&str] = &[
+    "draft",
+    "groomed",
+    "approved",
+    "in-progress",
+    "self-reviewed",
+    "reviewed",
+    "complete",
+    "cancelled",
+    "remediation",
+];
+
+/// M179 S6: build a single-line ASCII graph of the canonical
+/// lifecycle, highlighting the current lifecycle (if known).
+/// Migrated from `tui::watch` by M230 — the Autopilot lane reads
+/// `app.autopilot.picker.selected` (the lane's typed state) and
+/// renders the graph with no active node (the legacy watch-status
+/// path that supplied `current_lifecycle` always returned `None`
+/// after M229, so the new renderer keeps the same empty-active
+/// behavior).
+///
+/// F-09: only the active node is bracketed with `>...<`;
+/// inactive nodes render as bare labels joined by `-`.
+pub fn render_lifecycle_graph(current: Option<&str>) -> String {
+    let active = current.unwrap_or("");
+    let parts: Vec<String> = LIFECYCLE_NODES
+        .iter()
+        .map(|node| {
+            let label = match *node {
+                "self-reviewed" => "self-rev",
+                "in-progress" => "in-prog",
+                n => n,
+            };
+            if *node == active {
+                format!(">{label}<")
+            } else {
+                label.to_string()
+            }
+        })
+        .collect();
+    let mut out = parts.join("-");
+    if active == "remediation" {
+        out.push_str(" ↺");
+    }
+    out
+}
+
+/// M179 S6: build a one-row compact queue summary for the
+/// Autopilot lane. Migrated from `tui::watch` by M230 — reads
+/// `app.autopilot.picker.queue_ids()` (the typed selection order)
+/// instead of the legacy `app.watch.selected` and reports
+/// `pending` for every queue row (the v2 status payload that
+/// supplied `milestone_outcomes` was always `None` post-M229).
+///
+/// AC-10: outcomes are surfaced exactly as reported by mp. The
+/// renderer does not reinterpret the `kind` string — what mp
+/// says, the queue shows.
+pub fn render_compact_queue(app: &crate::tui::app::App) -> String {
+    let queue = app.autopilot.picker.queue_ids();
+    if queue.is_empty() {
+        return "(empty queue — select one or more drivable milestones)".to_string();
+    }
+    let mut out = String::new();
+    for (i, id) in queue.iter().enumerate() {
+        let prefix = if i == app.autopilot.picker.cursor { ">" } else { " " };
+        // No live run outcome is available; every row is pending
+        // until the autopilot session reports a terminal state.
+        out.push_str(&format!("{prefix}[pending] {id}\n"));
+    }
+    out
+}
 
 /// Per-role override envelope on the override panel. Mirrors the
 /// `roles.<role>` session.json block (M207 / M209). Empty
@@ -844,7 +926,7 @@ impl ReplayShell {
 ///
 /// `App::autopilot` is the single field that holds this struct;
 /// `apply_action` mutates it through the `Action::Autopilot*`
-/// variants, and `render_watch_lane` reads `picker` /
+/// variants, and `render_autopilot_lane` reads `picker` /
 /// `panel_open` / `replay_shell` to drive the visible surface.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AutopilotLaneState {
@@ -917,6 +999,14 @@ pub struct AutopilotLaneState {
     /// the first poll (or manual refresh) lands. raul renders this
     /// verbatim — it generates no pulses and owns no escalation.
     pub health: Option<crate::tui::poll::Health>,
+    /// M230: bounded Autopilot log tail refreshed by the idle
+    /// poller. Moved from `App::watch.log_tail` when the legacy
+    /// `Watch` struct was deleted. The renderer reads this
+    /// in-memory snapshot and never performs filesystem I/O; the
+    /// helper that populates it is `tail_watch_log` (re-exported
+    /// at the bottom of this module so the field's writer stays
+    /// next to its reader).
+    pub log_tail: Vec<String>,
 }
 
 impl AutopilotLaneState {
@@ -2420,4 +2510,38 @@ mod f01_tests {
         state.open_replay(ReplayShell::default());
         assert!(!state.can_start());
     }
+}
+
+/// M179 S8: read a bounded tail of `<plan_dir>/.mp/watch.log` for
+/// the polling cache. Migrated from `tui::watch::tail_watch_log`
+/// in M230 so the helper lives next to the `AutopilotLaneState`
+/// field it populates (`log_tail`). At most 64 KiB is read,
+/// regardless of total log size.
+pub fn tail_watch_log(plan_dir: &std::path::Path, max_lines: usize) -> Vec<String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    const MAX_TAIL_BYTES: u64 = 64 * 1024;
+    let path = plan_dir.join(".mp").join("watch.log");
+    let mut file = match std::fs::File::open(&path) {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+    let len = file.metadata().map(|metadata| metadata.len()).unwrap_or(0);
+    let start = len.saturating_sub(MAX_TAIL_BYTES);
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return Vec::new();
+    }
+    let mut bytes = Vec::with_capacity((len - start) as usize);
+    if file.read_to_end(&mut bytes).is_err() {
+        return Vec::new();
+    }
+    let body = String::from_utf8_lossy(&bytes);
+    body.lines()
+        .rev()
+        .take(max_lines)
+        .map(crate::text::sanitize_display_line)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect()
 }

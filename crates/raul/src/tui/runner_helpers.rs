@@ -166,31 +166,27 @@ pub fn load_milestones(runner: &MpRunner, app: &mut App) -> Result<()> {
 /// hide-done preference) and replaces the picker's candidate
 /// list. The picker's selection is preserved where it still
 /// resolves in the new candidate set; ids that no longer
-/// exist are dropped. M214: function name kept as `load_watch_picker`
-/// (internal helper, per scope "internal Watch-prefixed identifiers
-/// that are not user-visible stay as-is"); the user-facing lane label
-/// is `Autopilot`.
-pub fn load_watch_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
+/// exist are dropped.
+///
+/// M230: the legacy `app.watch.refresh_candidates` mirror and the
+/// `watch::restore_latest_status` post-step are gone — the lane
+/// reads only `app.autopilot.picker`, and the `mp watch-control
+/// status` verb the restore helper relied on was removed by M229.
+pub fn load_autopilot_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
     // M143: cache hit short-circuits the mp call. Cache key is
     // `Lane::Autopilot`; the picker source is `mp list milestones`
     // (no sort — the picker renders in canonical M122 order).
     if let Some(cached) = app.lane_cache.get(&Lane::Autopilot) {
         let data = &cached["data"];
         if data.is_object() {
-            app.watch.refresh_candidates(data);
-            // M215 / F-01: also refresh the typed Picker that the
-            // production render path reads from.
             app.autopilot.refresh_picker(data);
-            let _ = crate::tui::watch::restore_latest_status(runner, app)?;
             return Ok(());
         }
     }
     let data = reads::list_milestones(runner, None)?;
     let cache_value = serde_json::json!({ "data": data });
     app.lane_cache.put(Lane::Autopilot, cache_value);
-    app.watch.refresh_candidates(&data);
     app.autopilot.refresh_picker(&data);
-    let _ = crate::tui::watch::restore_latest_status(runner, app)?;
     Ok(())
 }
 
@@ -936,7 +932,7 @@ pub fn load_data_for_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         // selection-driven, not list-driven, so refresh uses
         // `mp list milestones` (the picker source). S7 adds
         // the periodic poller.
-        Lane::Autopilot => load_watch_picker(runner, app),
+        Lane::Autopilot => load_autopilot_picker(runner, app),
     }
 }
 

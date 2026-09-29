@@ -17,6 +17,16 @@
 //! widgets beyond `Paragraph` + `Block`. The TUI main loop
 //! calls `render_watch_lane` whenever the active lane is
 //! `Lane::Autopilot`.
+//!
+//! M230: the picker / lifecycle / queue / log readers were
+//! migrated off the legacy `app.watch` mirror. The renderer
+//! now reads only `app.autopilot.picker` /
+ //! `autopilot::render_lifecycle_graph` /
+ //! `autopilot::render_compact_queue` /
+ //! `app.autopilot.log_tail`. S4 renames this module to
+ //! `render/autopilot_lane.rs` and the entry point to
+ //! `render_autopilot_lane`; until then the legacy names
+ //! survive so the rename can land as a single file move.
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -26,7 +36,7 @@ use ratatui::Frame;
 
 use crate::tui::app::App;
 
-use super::super::watch;
+use crate::tui::autopilot;
 
 /// Render picker, lifecycle/queue, and cached log/output regions.
 pub fn render_watch_lane(frame: &mut Frame, app: &App, area: Rect) {
@@ -64,37 +74,19 @@ pub fn render_watch_lane(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
-    // M215 / F-01: prefer the new typed Picker state
-    // (`app.autopilot.picker`). The legacy `app.watch.candidates`
-    // is still rendered when the new picker is empty — this is the
-    // backcompat path for the M179 backcompat surface and keeps
-    // the M179 / M214 tests green.
-    let (candidates, selected, cursor) = if app.autopilot.picker.candidates.is_empty() {
-        let legacy: Vec<crate::tui::autopilot::PickerCandidate> = app
-            .watch
-            .candidates
-            .iter()
-            .map(|c| crate::tui::autopilot::PickerCandidate {
-                id: c.id.clone(),
-                title: c.title.clone(),
-                lifecycle: c.lifecycle.clone(),
-                priority: c.priority.clone(),
-            })
-            .collect();
-        let ids = app.watch.selected.clone();
-        let cursor = app.watch.picker_index;
-        (legacy, ids, cursor)
-    } else {
-        let ids = app.autopilot.picker.queue_ids().to_vec();
-        let cursor = app.autopilot.picker.cursor;
-        (app.autopilot.picker.candidates.clone(), ids, cursor)
-    };
+    // M230 S3: the picker reads only `app.autopilot.picker`. The
+    // legacy `app.watch.candidates` mirror and the
+    // `app.watch.selected` / `app.watch.picker_index` fallbacks
+    // are gone — the typed `Picker` is the single source of
+    // truth. S4 will rename this module to `autopilot_lane`.
+    let candidates = &app.autopilot.picker.candidates;
+    let selected = app.autopilot.picker.queue_ids();
+    let cursor = app.autopilot.picker.cursor;
     let title = format!(
         " Autopilot picker (drivable only) — {} candidates, {} selected ",
         candidates.len(),
         selected.len()
     );
-    let dep_blocked_color = app.palette.warn;
     let items: Vec<ListItem> = candidates
         .iter()
         .enumerate()
@@ -111,7 +103,6 @@ fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
             ));
             spans.push(Span::raw("  "));
             spans.push(Span::raw(c.title.clone()));
-            let _ = dep_blocked_color; // legacy dep_color fallback kept for backcompat
             ListItem::new(Line::from(spans))
         })
         .collect();
@@ -120,13 +111,11 @@ fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_lifecycle(frame: &mut Frame, app: &App, area: Rect) {
-    let current = app.watch.status.as_ref().and_then(|s| {
-        s.raw
-            .get("state")
-            .and_then(|st| st.get("current_lifecycle"))
-            .and_then(|c| c.as_str())
-    });
-    let mut graph = watch::render_lifecycle_graph(current);
+    // M230 S3: the lifecycle graph gets no active node (identical
+    // to the pre-M230 runtime, where the legacy watch-status
+    // restore always returned `None`). The migrated helper lives
+    // on `tui::autopilot` next to the typed lane state.
+    let mut graph = autopilot::render_lifecycle_graph(None);
     // M217 / AC-07: append the liveness + heartbeat badge reported
     // by `mp autopilot status`. Rendered verbatim — raul emits no
     // pulses of its own, and a `stale` marker is informational
@@ -144,7 +133,7 @@ fn render_lifecycle(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_queue(frame: &mut Frame, app: &App, area: Rect) {
-    let body = watch::render_compact_queue(app);
+    let body = autopilot::render_compact_queue(app);
     let title = " Queue (mp outcomes verbatim — AC-10) ";
     let p = Paragraph::new(body).block(Block::default().borders(Borders::ALL).title(title));
     frame.render_widget(p, area);
@@ -160,29 +149,25 @@ fn render_log_and_output(frame: &mut Frame, app: &App, area: Rect) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    // Log I/O belongs to the idle poller; rendering consumes memory only.
-    let log_body = if app.watch.log_tail.is_empty() {
+    // M230 S3: the log pane reads the in-memory snapshot cached on
+    // `app.autopilot.log_tail`. The pre-M230 mirror (`app.watch.log_tail`)
+    // is gone; the poller writes the typed field directly.
+    let log_body = if app.autopilot.log_tail.is_empty() {
         "(no log lines yet)".to_string()
     } else {
-        app.watch.log_tail.join("\n")
+        app.autopilot.log_tail.join("\n")
     };
     let log_p =
         Paragraph::new(log_body).block(Block::default().borders(Borders::ALL).title(" Log "));
     frame.render_widget(log_p, rows[0]);
 
     // Output: the latest active-role pane snapshot.
-    let out_body = app
-        .watch
-        .output
-        .as_ref()
-        .map(|o| {
-            if o.ok {
-                o.output.clone()
-            } else {
-                format!("(output error: {})", o.reason)
-            }
-        })
-        .unwrap_or_else(|| "(no output yet — Start a run)".to_string());
+    // M230: the legacy `app.watch.output` mirror that fed this
+    // pane was only ever populated by `mp watch-control output`
+    // (a verb removed by M229). The pane shows the placeholder
+    // until the autopilot control surface ships an equivalent
+    // snapshot.
+    let out_body = "(no output yet — Start a run)".to_string();
     let out_p = Paragraph::new(out_body).block(
         Block::default()
             .borders(Borders::ALL)
