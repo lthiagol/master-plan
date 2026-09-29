@@ -29,6 +29,14 @@
         "status": "done",
         "at": "2026-09-27T02:53:28.309883+00:00"
       },
+      "execute": {
+        "status": "done",
+        "at": "2026-09-29T15:28:49.210102+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-09-29T15:28:50.874660+00:00"
+      },
       "specify": {
         "status": "done",
         "at": "2026-09-27T02:53:28.309883+00:00"
@@ -63,43 +71,43 @@
       "id": "AC-01",
       "description": "The legacy Watch module is gone and the Autopilot lane renderer lives at render/autopilot_lane.rs.",
       "verification": "! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests exit 0 (clean — S1 deletion + S1.1.1 + S1.1.2 + S3 + S4 migration; 44/44 relevant tests pass via AC-04 verification)"
     },
     {
       "id": "AC-02",
       "description": "No code or test reads App::watch or calls the removed watch-control verb; the lane reads only app.autopilot.",
-      "verification": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests",
-      "status": "pending",
-      "evidence": ""
+      "verification": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs'",
+      "status": "passed",
+      "evidence": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs' exit 0 (clean — App::watch field gone, Watch::empty initializer gone, all live readers migrated to app.autopilot; the globbed test asserts the watch-control verb is forbidden in poll.rs so it stays)"
     },
     {
       "id": "AC-03",
       "description": "Action enum carries no `Watch*` variant; the only autopilot-related actions are the Autopilot* variants.",
       "verification": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/ exit 0 (clean — 8 Action::Watch* variants + handlers dropped in S1.1; doc comments updated in S2)"
     },
     {
       "id": "AC-04",
       "description": "No behavior change on the Autopilot lane: the migrated picker, status-graph, render, and keybind tests pass.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)' exit 0 (44/44 pass; S3 readers + S4 rename + S1.1.2 test migrations preserve Autopilot-lane behavior)"
     },
     {
       "id": "AC-05",
       "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
       "verification": "make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "make consumer-surface-lint exit 0 (clean; 6 stale-watch allowlist entries pruned in S2.2 — those anchored to docs/raul/keybinds.md / docs/raul/README.md content that now says Autopilot)"
     },
     {
       "id": "AC-06",
       "description": "raul crate tests, clippy, and fmt are clean.",
       "verification": "cargo nextest run -p raul --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast exit 0 (1487/1487 pass; raul suite clean — clippy + fmt verified by S2.1 commit)"
     }
   ],
   "design_decisions": [
@@ -127,7 +135,7 @@
     {
       "id": "S1",
       "work_package": "WP1",
-      "order": 1,
+      "order": 0,
       "action": "Delete crates/raul/src/tui/watch.rs and its pub mod entry in crates/raul/src/tui/mod.rs (last: nothing references it after S3/S4/S1.1/S1.1.1/S1.1.2).",
       "files": [
         "crates/raul/src/tui/watch.rs",
@@ -135,7 +143,7 @@
       ],
       "tests": "! rg -q 'pub mod watch|tui::watch' crates/raul/src",
       "done_when": "AC-01 source-pin passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -145,12 +153,12 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "7cf0c6e S1: delete crates/raul/src/tui/watch.rs and its pub mod entry"
     },
     {
       "id": "S1.1",
       "work_package": "WP1",
-      "order": 2,
+      "order": 0,
       "action": "Remove the Action::Watch* variants and handlers from crates/raul/src/tui/action.rs (variants ~241-266, handlers ~849-880) and the watch_before change-detection (~378, ~1119).",
       "files": [
         "crates/raul/src/tui/action.rs",
@@ -158,7 +166,7 @@
       ],
       "tests": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/",
       "done_when": "AC-03 source-pin passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -168,19 +176,19 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "9c322e1 S1.1: drop Action::Watch* variants + handlers; sweep Action::Watch* from tests"
     },
     {
       "id": "S1.1.1",
       "work_package": "WP1",
-      "order": 4,
+      "order": 0,
       "action": "Remove App::watch (app.rs:696) and its Watch::empty() initializer (app.rs:835).",
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
       "tests": "! rg -q 'pub watch:|Watch::empty|app\\.watch\\b' crates/raul/src --glob '!crates/raul/src/tui/watch.rs'",
       "done_when": "AC-02 source-pin passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -191,12 +199,12 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "b534d80 S1.1.1: drop App::watch field; sweep app.watch references"
     },
     {
       "id": "S1.1.2",
       "work_package": "WP1",
-      "order": 3,
+      "order": 0,
       "action": "Migrate raul tests off the Watch model: tui_state, tui_render, m215_f01_picker_production_path, autopilot_status_graph, tui_status_parity — keep Autopilot-lane assertions (rewritten against app.autopilot / render_autopilot_lane), delete legacy-fallback-only cases.",
       "files": [
         "crates/raul/tests/tui_state.rs",
@@ -207,7 +215,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
       "done_when": "AC-01 + AC-02 source-pins pass and cargo check -p raul is clean",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-04"
@@ -219,19 +227,19 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "6c700aa S1.1.2: migrate raul tests off the Watch model"
     },
     {
       "id": "S2",
       "work_package": "WP1",
-      "order": 5,
+      "order": 0,
       "action": "Sweep residual Watch-lane comments in raul sources (e.g. keybinds.rs:166-167 and :1299 'Path and Watch explicitly return empty') so no comment describes a lane that no longer exists.",
       "files": [
         "crates/raul/src/tui/keybinds.rs"
       ],
       "tests": "! rg -q -i 'watch lane|WatchClearQueue|Path and Watch' crates/raul/src/",
       "done_when": "No raul source comment names the Watch lane",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -241,19 +249,19 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "a1c7876 S2: sweep residual Watch-lane comments"
     },
     {
       "id": "S2.1",
       "work_package": "WP2",
-      "order": 7,
+      "order": 0,
       "action": "Run the raul suite, clippy, fmt, and the autopilot/keybind filter; add the CHANGELOG entry.",
       "files": [
         "CHANGELOG.md"
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast",
       "done_when": "AC-04 and AC-06 pass",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04",
         "AC-06"
@@ -266,19 +274,19 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "0600a5a S2.1: full raul suite, clippy, fmt; CHANGELOG entry"
     },
     {
       "id": "S2.2",
       "work_package": "WP2",
-      "order": 6,
+      "order": 0,
       "action": "Prune stale-watch allowlist entries in scripts/check-consumer-surface.sh that no longer match a real line (the docs/raul/keybinds.md entries point at text that now says Autopilot).",
       "files": [
         "scripts/check-consumer-surface.sh"
       ],
       "tests": "make consumer-surface-lint",
       "done_when": "AC-05 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -286,12 +294,12 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "5d1f085 S2.2: prune stale-watch allowlist entries"
     },
     {
       "id": "S3",
       "work_package": "WP1",
-      "order": 8,
+      "order": 0,
       "action": "Migrate live readers: move render_lifecycle_graph (+LIFECYCLE_NODES) and render_compact_queue into tui/autopilot.rs over app.autopilot.picker.selected; import mp_model::WATCH_DRIVABLE_LIFECYCLES directly; drop the app.watch.candidates fallbacks (render picker, view_state.rs:1330) and the runner_helpers.rs refresh_candidates / restore_latest_status calls.",
       "files": [
         "crates/raul/src/tui/autopilot.rs",
@@ -301,7 +309,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | test(/autopilot/)'",
       "done_when": "Autopilot lane renders from app.autopilot only",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02",
         "AC-04"
@@ -310,12 +318,12 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "fc27a19 S3: migrate Autopilot lane live readers to app.autopilot"
     },
     {
       "id": "S4",
       "work_package": "WP1",
-      "order": 9,
+      "order": 0,
       "action": "Rename crates/raul/src/tui/render/watch.rs → render/autopilot_lane.rs and render_watch_lane → render_autopilot_lane (update render/mod.rs and lane_lists.rs:43).",
       "files": [
         "crates/raul/src/tui/render/watch.rs",
@@ -325,7 +333,7 @@
       ],
       "tests": "! rg -q 'render_watch_lane|render::watch' crates/raul/src",
       "done_when": "Renderer renamed; lane dispatch updated",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -335,7 +343,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "3825640 S4: rename render/watch.rs to render/autopilot_lane.rs"
     }
   ],
   "verification": {
