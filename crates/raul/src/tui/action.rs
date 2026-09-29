@@ -1069,10 +1069,11 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
     // function does not bump the version when Esc is pressed
     // on a top-level List with no drilled-in context. Pre-M230,
     // the watch_before comparison at the bottom caught
-    // app.watch mutations and bumped the version; the typed
-    // AutopilotLaneState mutators call app.touch() directly, so
-    // a post-pass would double-bump. The version_before local
-    // is retained (unused) for the test's "no bump" contract.
+    // mutations on the legacy `Watch` mirror and bumped the
+    // version; the typed AutopilotLaneState mutators call
+    // app.touch() directly, so a post-pass would double-bump.
+    // The version_before local is retained (unused) for the
+    // test's "no bump" contract.
     let _ = version_before;
     Ok(())
 }

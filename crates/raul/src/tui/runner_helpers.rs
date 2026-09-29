@@ -170,8 +170,8 @@ pub fn load_milestones(runner: &MpRunner, app: &mut App) -> Result<()> {
 ///
 /// M230: the legacy `Watch` mirror and the
 /// `watch::restore_latest_status` post-step are gone — the lane
-/// reads only `app.autopilot.picker`, and the `mp watch-control
-/// status` verb the restore helper relied on was removed by M229.
+/// reads only `app.autopilot.picker`, and the status verb the
+/// restore helper relied on was removed by M229.
 pub fn load_autopilot_picker(runner: &MpRunner, app: &mut App) -> Result<()> {
     // M143: cache hit short-circuits the mp call. Cache key is
     // `Lane::Autopilot`; the picker source is `mp list milestones`

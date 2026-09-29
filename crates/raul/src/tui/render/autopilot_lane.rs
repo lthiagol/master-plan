@@ -160,7 +160,7 @@ fn render_log_and_output(frame: &mut Frame, app: &App, area: Rect) {
 
     // Output: the latest active-role pane snapshot.
     // M230: the legacy `Watch::output` field that fed this pane
-    // was only ever populated by `mp watch-control output` (a
+    // was only ever populated by the legacy watch output verb (a
     // verb removed by M229). The pane shows the placeholder
     // until the autopilot control surface ships an equivalent
     // snapshot.

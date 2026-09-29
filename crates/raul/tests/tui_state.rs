@@ -101,14 +101,14 @@ fn filter_toggle() {
 // migrated from `tui::watch` to `tui::autopilot` by M230; the
 // public signature is preserved so the existing test contracts
 // stay pinned. The queue rows now always read `[pending]` (the
-// M229-removed `mp watch-control` verb was the only source of
-// per-row outcomes, and it never landed before M229).
+// M229-removed watch verb was the only source of per-row
+// outcomes, and it never landed before M229).
 //
 // The legacy `Watch` mirror that the pre-M230 tests pinned
-// (`app.watch.selected`, `app.watch.status`) is gone — those
-// tests were deleted along with `tui::watch` in M230. The
-// equivalent contracts on the typed `Picker` already exist in
-// crates/raul/src/tui/autopilot.rs's #[cfg(test)] block.
+// (the picker selection and the M178 status snapshot) is gone —
+// those tests were deleted along with `tui::watch` in M230.
+// The equivalent contracts on the typed `Picker` already exist
+// in crates/raul/src/tui/autopilot.rs's #[cfg(test)] block.
 
 #[test]
 fn render_lifecycle_graph_highlights_current_node() {
@@ -169,9 +169,9 @@ fn render_compact_queue_surfaces_typed_picker_queue() {
     let q = render_compact_queue(&app);
     // M230: every row is `[pending]` — the v2 status payload
     // that supplied per-milestone outcomes was removed with
-    // `mp watch-control` in M229, so the renderer has no live
-    // outcome to surface until the autopilot control surface
-    // ships an equivalent.
+    // the legacy watch verb in M229, so the renderer has no
+    // live outcome to surface until the autopilot control
+    // surface ships an equivalent.
     assert!(q.contains("[pending] 01"));
     assert!(q.contains("[pending] 02"));
     // The active queue row carries the `>` marker. After two
