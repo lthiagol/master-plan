@@ -100,14 +100,14 @@
       "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
       "verification": "scripts/verify-m230-ac05.sh",
       "status": "passed",
-      "evidence": "make consumer-surface-lint exit 0 (clean; 6 stale-watch allowlist entries pruned in S2.2 — those anchored to docs/raul/keybinds.md / docs/raul/README.md content that now says Autopilot)"
+      "evidence": "scripts/verify-m230-ac05.sh exit 0 (cycle 2 F-04 wrapped the original rg-precondition + make consumer-surface-lint — rg precondition absorbed by the pruned allowlist; the lint reports clean across all five patterns)"
     },
     {
       "id": "AC-06",
       "description": "raul crate tests, clippy, and fmt are clean.",
       "verification": "scripts/verify-m230-ac06.sh",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --no-fail-fast exit 0 (1487/1487 pass; raul suite clean — clippy + fmt verified by S2.1 commit)"
+      "evidence": "scripts/verify-m230-ac06.sh exit 0 (cycle 2 F-05 wrapped the original 3-check chain — cargo nextest run -p raul --no-fail-fast 1487/1487 pass; cargo clippy -p raul --all-targets --no-deps -- -D warnings clean; cargo fmt --all -- --check clean)"
     }
   ],
   "design_decisions": [
