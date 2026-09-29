@@ -70,16 +70,7 @@ ALLOWLIST=(
     "dead-code-review-lessons:docs/skills/README.md:154:read \`docs/code-review-lessons.md\`:the 'Authoring rules' section uses the dead-link path inside a backticked negative example to teach the rule"
     "dead-code-review-lessons:docs/skills/README.md:191:paths \`docs/code-review-lessons.md\`:the 'Preventing recurrence' section names the dead-link patterns this guard detects"
     "dead-dogfood:docs/skills/README.md:191:docs/dogfood:the 'Preventing recurrence' section names the dead-link patterns this guard detects"
-    # M220: literal raul lane label "Watch lane" is still rendered in the UI
-    # (see `crates/raul/src/lanes.rs::LANE_WATCH = "Watch"`); allowlist the
-    # consumer-surface references so the lane label is consistent end-to-end.
-    'stale-watch:docs/raul/keybinds.md:42:**Watch lane**:literal raul lane label; the surrounding text contrasts it with `w`/`W` auto-refresh toggle on the Overview lane'
-    'stale-watch:docs/raul/keybinds.md:44:[Watch lane](#watch-lane):anchor link target — same literal lane label as line 42'
-    'stale-watch:docs/raul/keybinds.md:62:## Watch lane:section header for the literal raul lane — first occurrence in this file'
-    'stale-watch:docs/raul/keybinds.md:64:**Watch** lane (lane 6):the first bold **Watch** is the lane label; the (lane 6) qualifier pins the lane ordinal'
-    'stale-watch:docs/raul/README.md:44:| **Watch** |:lane label cell in the lane-overview table; the column header is the literal raul lane name'
-    'stale-watch:docs/raul/README.md:67:- **Watch lane.**:bulleted lane description; preserves the literal lane label end-to-end with keybinds.md'
-    # M220: imperative-verb English uses ("watch it go red") in
+    # M220 + M230: imperative-verb English uses ("watch it go red") in
     # diagnosing-bugs are method instructions, not system terminology.
     'stale-watch:templates/skills/diagnosing-bugs/SKILL.md:69:Watch it go red:imperative-verb English describing what to observe during the bug-loop; not the autopilot/watch system'
     'stale-watch:templates/skills/diagnosing-bugs/SKILL.md:124:Watch it fail:imperative-verb English in step 2 of the loop; not the autopilot/watch system'
