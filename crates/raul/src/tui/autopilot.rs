@@ -498,9 +498,9 @@ pub fn render_lifecycle_graph(current: Option<&str>) -> String {
 /// M179 S6: build a one-row compact queue summary for the
 /// Autopilot lane. Migrated from `tui::watch` by M230 — reads
 /// `app.autopilot.picker.queue_ids()` (the typed selection order)
-/// instead of the legacy `app.watch.selected` and reports
-/// `pending` for every queue row (the v2 status payload that
-/// supplied `milestone_outcomes` was always `None` post-M229).
+/// and reports `pending` for every queue row (the v2 status
+/// payload that supplied `milestone_outcomes` was always `None`
+/// post-M229).
 ///
 /// AC-10: outcomes are surfaced exactly as reported by mp. The
 /// renderer does not reinterpret the `kind` string — what mp

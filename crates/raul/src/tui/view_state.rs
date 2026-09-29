@@ -1323,7 +1323,7 @@ fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
     };
 
     // M230: the picker reads only `app.autopilot.picker.candidates`.
-    // The legacy `app.watch.candidates` fallback that kept the
+    // The legacy `Watch::candidates` fallback that kept the
     // backcompat surface clickable is gone — the lane is single-
     // sourced through the typed `Picker`.
     let candidates: Vec<String> = app

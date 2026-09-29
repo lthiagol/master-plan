@@ -597,13 +597,12 @@ where
                 app.touch();
             }
         }
-        // F-08: poll_watch_state mutates `app.watch.status` /
-        // `app.watch.output` via direct field writes. Those
-        // writes now call `app.touch()` (see poll_watch_state),
-        // so a version bump here means state changed and the
-        // next render phase must fire — without this, the
-        // screen would not refresh until the next keypress,
-        // breaking AC-06's "update without a keypress" promise.
+        // F-08: the autopilot poller mutates the typed `app.autopilot`
+        // surface and calls `app.touch()` on every change, so a
+        // version bump here means state changed and the next
+        // render phase must fire — without this, the screen would
+        // not refresh until the next keypress, breaking AC-06's
+        // "update without a keypress" promise.
         if app.version() != version_before {
             needs_render = true;
         }

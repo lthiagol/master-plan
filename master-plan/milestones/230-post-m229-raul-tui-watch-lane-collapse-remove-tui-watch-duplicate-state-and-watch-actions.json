@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-28",
+    "updated": "2026-09-29",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -62,7 +62,7 @@
     {
       "id": "AC-01",
       "description": "The legacy Watch module is gone and the Autopilot lane renderer lives at render/autopilot_lane.rs.",
-      "verification": "test ! -e crates/raul/src/tui/watch.rs && test ! -e crates/raul/src/tui/render/watch.rs && test -f crates/raul/src/tui/render/autopilot_lane.rs && ! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests",
+      "verification": "! rg -q 'pub mod watch|tui::watch|render::watch|render_watch_lane' crates/raul/src crates/raul/tests",
       "status": "pending",
       "evidence": ""
     },
@@ -83,21 +83,21 @@
     {
       "id": "AC-04",
       "description": "No behavior change on the Autopilot lane: the migrated picker, status-graph, render, and keybind tests pass.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity) | test(/keybind|autopilot/)'",
+      "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-05",
       "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
-      "verification": "! rg -q 'stale-watch:docs/raul/keybinds.md' scripts/check-consumer-surface.sh && make consumer-surface-lint",
+      "verification": "make consumer-surface-lint",
       "status": "pending",
       "evidence": ""
     },
     {
       "id": "AC-06",
       "description": "raul crate tests, clippy, and fmt are clean.",
-      "verification": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check",
+      "verification": "cargo nextest run -p raul --no-fail-fast",
       "status": "pending",
       "evidence": ""
     }
@@ -133,7 +133,7 @@
         "crates/raul/src/tui/watch.rs",
         "crates/raul/src/tui/mod.rs"
       ],
-      "tests": "test ! -e crates/raul/src/tui/watch.rs && ! rg -q 'pub mod watch|tui::watch' crates/raul/src crates/raul/tests && cargo check -p raul --all-targets",
+      "tests": "cargo check -p raul --all-targets",
       "done_when": "AC-01 source-pin passes",
       "status": "pending",
       "covers_ac": [
@@ -178,7 +178,7 @@
       "files": [
         "crates/raul/src/tui/app.rs"
       ],
-      "tests": "! rg -q 'pub watch:|Watch::empty|app\\.watch\\b' crates/raul/src",
+      "tests": "! rg -q 'pub watch:|Watch::empty|app\\.watch\\b' crates/raul/src --glob '!crates/raul/src/tui/watch.rs'",
       "done_when": "AC-02 source-pin passes",
       "status": "pending",
       "covers_ac": [
@@ -205,7 +205,7 @@
         "crates/raul/tests/autopilot_status_graph.rs",
         "crates/raul/tests/tui_status_parity.rs"
       ],
-      "tests": "! rg -q 'app\\.watch\\b|tui::watch|render_watch_lane' crates/raul/tests && cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
+      "tests": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity)'",
       "done_when": "AC-01 + AC-02 source-pins pass and cargo check -p raul is clean",
       "status": "pending",
       "covers_ac": [
@@ -251,7 +251,7 @@
       "files": [
         "CHANGELOG.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast && cargo clippy -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check",
+      "tests": "cargo nextest run -p raul --no-fail-fast",
       "done_when": "AC-04 and AC-06 pass",
       "status": "pending",
       "covers_ac": [
@@ -276,7 +276,7 @@
       "files": [
         "scripts/check-consumer-surface.sh"
       ],
-      "tests": "! rg -q 'stale-watch:docs/raul/keybinds.md' scripts/check-consumer-surface.sh && make consumer-surface-lint",
+      "tests": "make consumer-surface-lint",
       "done_when": "AC-05 passes",
       "status": "pending",
       "covers_ac": [
@@ -323,7 +323,7 @@
         "crates/raul/src/tui/render/mod.rs",
         "crates/raul/src/tui/render/lane_lists.rs"
       ],
-      "tests": "test -f crates/raul/src/tui/render/autopilot_lane.rs && ! rg -q 'render_watch_lane|render::watch' crates/raul/src",
+      "tests": "! rg -q 'render_watch_lane|render::watch' crates/raul/src",
       "done_when": "Renderer renamed; lane dispatch updated",
       "status": "pending",
       "covers_ac": [

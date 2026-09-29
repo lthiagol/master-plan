@@ -686,21 +686,18 @@ pub struct App {
     pub keybinds: Keybinds,
     /// M169: populated while `active_lane == Lane::Settings`; cleared on leave.
     pub settings: Option<SettingsState>,
-    /// M179: Autopilot client model — picker + selection + preflight +
-    /// M178 status/output snapshots. Single source of truth for
-    /// the Autopilot lane; other modules read but do not write.
-    /// M214: field name kept as `watch` (internal identifier, per
-    /// scope "internal Watch-prefixed identifiers that are not
-    /// user-visible stay as-is"); the user-facing lane label is
-    /// `Autopilot`.
-    pub watch: crate::tui::watch::Watch,
-    /// M215 / F-01: the typed Autopilot lane state — picker +
-    /// override panel + replay shell. The renderer reads
-    /// `autopilot.picker` / `autopilot.panel_open` /
-    /// `autopilot.replay_shell` to draw the lane; the dispatcher
-    /// mutates it through the `Action::Autopilot*` variants. The
-    /// legacy `watch` field above stays intact for the M179
-    /// backcompat surface.
+    /// M215 / F-01 (M230): the typed Autopilot lane state —
+    /// picker + override panel + replay shell + log tail. The
+    /// renderer reads `autopilot.picker` /
+    /// `autopilot.panel_open` / `autopilot.replay_shell` /
+    /// `autopilot.log_tail` to draw the lane; the dispatcher
+    /// mutates the picker through the `Action::Autopilot*`
+    /// variants. The legacy `App::watch: crate::tui::watch::Watch`
+    /// mirror that M179 / M214 carried for backcompat was
+    /// deleted by M230 — every reader was migrated to the typed
+    /// `autopilot` field in S3, and the dead control surface
+    /// (`watch::start_watch` / `stop_watch` / `run_preflight`)
+    /// was M229's responsibility.
     pub autopilot: crate::tui::autopilot::AutopilotLaneState,
     /// M217: the Autopilot lane's display poller. The `run_loop`'s
     /// `on_idle` closure calls `poll::poll_autopilot_lane` whenever
@@ -708,9 +705,9 @@ pub struct App {
     /// (session override > config > 2s default), the single-flight
     /// lock, the focus gate, and the operator's on/off toggle.
     ///
-    /// M217 AC-08 cutover: this replaces the M179 fixed-interval
-    /// `watch::Poller`. There is exactly one scheduler for the
-    /// lane.
+    /// M217 AC-08 cutover: this is the only scheduler for the lane;
+    /// M179's fixed-interval `watch::Poller` was deleted along with
+    /// the rest of the legacy `tui::watch` module by M230.
     pub autopilot_poller: crate::tui::poll::AutopilotPoller,
     /// Plan directory used by the Autopilot poller to refresh its bounded log cache.
     /// Defaults to `.` for tests and callers that do not override it.
@@ -832,7 +829,6 @@ impl App {
             version: 0,
             keybinds: Keybinds::default(),
             settings: None,
-            watch: crate::tui::watch::Watch::empty(),
             autopilot: crate::tui::autopilot::AutopilotLaneState::empty(),
             autopilot_poller: crate::tui::poll::AutopilotPoller::new(),
             plan_dir: std::path::PathBuf::from("."),

@@ -168,7 +168,7 @@ pub fn load_milestones(runner: &MpRunner, app: &mut App) -> Result<()> {
 /// resolves in the new candidate set; ids that no longer
 /// exist are dropped.
 ///
-/// M230: the legacy `app.watch.refresh_candidates` mirror and the
+/// M230: the legacy `Watch` mirror and the
 /// `watch::restore_latest_status` post-step are gone — the lane
 /// reads only `app.autopilot.picker`, and the `mp watch-control
 /// status` verb the restore helper relied on was removed by M229.

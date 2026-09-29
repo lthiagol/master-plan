@@ -19,7 +19,7 @@
 //! `Lane::Autopilot`.
 //!
 //! M230: the picker / lifecycle / queue / log readers were
-//! migrated off the legacy `app.watch` mirror. The renderer
+//! migrated off the legacy `Watch` mirror state. The renderer
 //! now reads only `app.autopilot.picker` /
 //! `autopilot::render_lifecycle_graph` /
 //! `autopilot::render_compact_queue` /
@@ -71,11 +71,10 @@ pub fn render_autopilot_lane(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_picker(frame: &mut Frame, app: &App, area: Rect) {
-    // M230 S3: the picker reads only `app.autopilot.picker`. The
-    // legacy `app.watch.candidates` mirror and the
-    // `app.watch.selected` / `app.watch.picker_index` fallbacks
-    // are gone — the typed `Picker` is the single source of
-    // truth. S4 will rename this module to `autopilot_lane`.
+    // M230: the picker reads only `app.autopilot.picker`. The
+    // legacy `Watch` mirror state that used to back the
+    // backcompat surface is gone — the typed `Picker` is the
+    // single source of truth.
     let candidates = &app.autopilot.picker.candidates;
     let selected = app.autopilot.picker.queue_ids();
     let cursor = app.autopilot.picker.cursor;
@@ -146,9 +145,10 @@ fn render_log_and_output(frame: &mut Frame, app: &App, area: Rect) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    // M230 S3: the log pane reads the in-memory snapshot cached on
-    // `app.autopilot.log_tail`. The pre-M230 mirror (`app.watch.log_tail`)
-    // is gone; the poller writes the typed field directly.
+    // M230: the log pane reads the in-memory snapshot cached on
+    // `app.autopilot.log_tail`. The poller writes the typed
+    // field directly; the legacy mirror that lived on the
+    // deleted `Watch` struct is gone.
     let log_body = if app.autopilot.log_tail.is_empty() {
         "(no log lines yet)".to_string()
     } else {
@@ -159,9 +159,9 @@ fn render_log_and_output(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(log_p, rows[0]);
 
     // Output: the latest active-role pane snapshot.
-    // M230: the legacy `app.watch.output` mirror that fed this
-    // pane was only ever populated by `mp watch-control output`
-    // (a verb removed by M229). The pane shows the placeholder
+    // M230: the legacy `Watch::output` field that fed this pane
+    // was only ever populated by `mp watch-control output` (a
+    // verb removed by M229). The pane shows the placeholder
     // until the autopilot control surface ships an equivalent
     // snapshot.
     let out_body = "(no output yet — Start a run)".to_string();

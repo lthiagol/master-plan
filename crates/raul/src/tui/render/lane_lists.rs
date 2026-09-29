@@ -39,7 +39,7 @@ pub(super) fn render_lane_list(frame: &mut Frame, app: &App, area: Rect, view: &
         // its own renderer (picker + lifecycle graph + compact
         // queue + log + active-pane output). The renderer reads
         // only `app.autopilot`; the legacy `selected_index` +
-        // scrollbar path and the `app.watch` mirror state are
+        // scrollbar path and the legacy `Watch` mirror state are
         // gone.
         Lane::Autopilot => super::autopilot_lane::render_autopilot_lane(frame, app, area),
         _ => {
