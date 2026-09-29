@@ -1,5 +1,13 @@
 ## Unreleased — WIP CI hardening
 
+- **raul collapsed the legacy Watch model into the Autopilot lane.**
+  `tui::watch` is gone: `App::watch` and every `Action::Watch*` variant are
+  removed, `crates/raul/src/tui/render/watch.rs` is renamed to
+  `render/autopilot_lane.rs`, and the live readers (picker, lifecycle graph,
+  compact queue, log tail) move next to `AutopilotLaneState` on
+  `app.autopilot`. No user-visible change — pressing the same keymap as
+  before still drives the Autopilot lane.
+
 - **Autopilot stopped losing the first prompt, and stopped calling a slow
   runner hung.** A prompt is now delivered only after the harness has reported
   `idle` **continuously** for a settle window (`mp autopilot start

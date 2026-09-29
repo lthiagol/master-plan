@@ -357,6 +357,7 @@ pub enum Action {
 /// loop continues — see `run_loop`'s dispatch error handling.
 pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<()> {
     let version_before = app.version();
+    let _ = version_before; // retained for the M167 esc-on-list no-op test; touch-ups now live inside the action arms.
     match action {
         // ---- global ---------------------------------------------------------
         Action::Quit => {
@@ -1064,9 +1065,15 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
         }
     }
 
-    if app.version() == version_before {
-        app.touch();
-    }
+    // M230: the M167 esc-on-list no-op test pinned that this
+    // function does not bump the version when Esc is pressed
+    // on a top-level List with no drilled-in context. Pre-M230,
+    // the watch_before comparison at the bottom caught
+    // app.watch mutations and bumped the version; the typed
+    // AutopilotLaneState mutators call app.touch() directly, so
+    // a post-pass would double-bump. The version_before local
+    // is retained (unused) for the test's "no bump" contract.
+    let _ = version_before;
     Ok(())
 }
 

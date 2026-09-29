@@ -657,18 +657,17 @@ fn read_src(name: &str) -> String {
 
 #[test]
 fn m217_ac08_legacy_watch_poller_and_fire_watch_tick_are_deleted() {
-    let watch = read_src("watch.rs");
-    for gone in [
-        "pub struct Poller",
-        "POLL_INTERVAL_MS",
-        "pub fn poll_watch_state",
-        "fn mark_fired",
-    ] {
-        assert!(
-            !watch.contains(gone),
-            "watch.rs must no longer define {gone:?} — M217 replaced it with tui::poll"
-        );
-    }
+    // M230: the legacy `tui::watch` module is gone — the file no
+    // longer exists. The M217 cutover replaced its scheduler
+    // with `tui::poll::AutopilotPoller`, and M230 deleted the
+    // rest of the module. This test now asserts that the file
+    // itself is absent and that the dead scheduler names that
+    // lived on `runner.rs` (M217-era scrub targets) are gone.
+    let watch_path = raul_src_dir().join("watch.rs");
+    assert!(
+        !watch_path.exists(),
+        "watch.rs must no longer exist (M230 deleted the legacy Watch module)"
+    );
     let runner = read_src("runner.rs");
     assert!(
         !runner.contains("fire_watch_tick"),
@@ -683,7 +682,10 @@ fn m217_ac08_legacy_watch_poller_and_fire_watch_tick_are_deleted() {
 #[test]
 fn m217_ac08_no_second_scheduler_remains() {
     // Exactly one module owns a poll cadence, and exactly one call
-    // site drives it from the idle hook.
+    // site drives it from the idle hook. M230 collapsed the
+    // legacy `tui::watch` module entirely, so the "no second
+    // scheduler in watch.rs" check is now a file-existence
+    // check (watch.rs is gone) rather than a content check.
     let runner = read_src("runner.rs");
     assert_eq!(
         runner.matches("poll_autopilot_lane").count(),
@@ -694,10 +696,10 @@ fn m217_ac08_no_second_scheduler_remains() {
         runner.contains("time_until_due_ms"),
         "the loop's idle wait must derive from the one poller's interval"
     );
-    let watch = read_src("watch.rs");
+    let watch_path = raul_src_dir().join("watch.rs");
     assert!(
-        !watch.contains("tail_watch_log(&app.plan_dir"),
-        "no scheduled log-tail read may remain — the renderer pulls the tail instead"
+        !watch_path.exists(),
+        "watch.rs must not exist — the renderer pulls the tail via tui::autopilot::tail_watch_log"
     );
 }
 

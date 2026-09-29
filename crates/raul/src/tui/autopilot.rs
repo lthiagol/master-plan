@@ -511,7 +511,11 @@ pub fn render_compact_queue(app: &crate::tui::app::App) -> String {
     }
     let mut out = String::new();
     for (i, id) in queue.iter().enumerate() {
-        let prefix = if i == app.autopilot.picker.cursor { ">" } else { " " };
+        let prefix = if i == app.autopilot.picker.cursor {
+            ">"
+        } else {
+            " "
+        };
         // No live run outcome is available; every row is pending
         // until the autopilot session reports a terminal state.
         out.push_str(&format!("{prefix}[pending] {id}\n"));
