@@ -3,9 +3,9 @@
     "id": "230",
     "title": "raul Autopilot lane: retire the legacy Watch model — migrate live readers to app.autopilot, rename render/watch.rs, delete tui::watch",
     "slug": "post-m229-raul-tui-watch-lane-collapse-remove-tui-watch-duplicate-state-and-watch-actions",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -22,20 +22,28 @@
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
-    "executed_by": "",
-    "lifecycle_at": "2026-09-27T02:53:28.309881+00:00",
+    "executed_by": "herdr-orc:m230-runner (pane w1B:p2)",
+    "lifecycle_at": "2026-09-29T23:40:32.600088+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:28.309883+00:00"
       },
+      "complete": {
+        "status": "done",
+        "at": "2026-09-29T23:40:49.783113+00:00"
+      },
       "execute": {
         "status": "done",
-        "at": "2026-09-29T15:28:49.210102+00:00"
+        "at": "2026-09-29T23:40:49.783113+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-09-29T23:40:49.818001+00:00"
       },
       "self-review": {
         "status": "done",
-        "at": "2026-09-29T15:28:50.874660+00:00"
+        "at": "2026-09-29T23:40:49.783113+00:00"
       },
       "specify": {
         "status": "done",
@@ -72,42 +80,42 @@
       "description": "The legacy Watch module is gone and the Autopilot lane renderer lives at render/autopilot_lane.rs.",
       "verification": "scripts/verify-m230-ac01.sh",
       "status": "passed",
-      "evidence": "scripts/verify-m230-ac01.sh exit 0 (file deletions + file existence + rg clean — cycle 2 F-03 wrapped the original 4 checks: test ! -e watch.rs + test ! -e render/watch.rs + test -f render/autopilot_lane.rs + ! rg source-pin)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     },
     {
       "id": "AC-02",
       "description": "No code or test reads App::watch or calls the removed watch-control verb; the lane reads only app.autopilot.",
       "verification": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs'",
       "status": "passed",
-      "evidence": "! rg -q 'app\\.watch\\b|pub watch:|Watch::empty|watch-control' crates/raul/src crates/raul/tests --glob '!crates/raul/tests/autopilot_poller_observer_only.rs' exit 0 (clean — App::watch field gone, Watch::empty initializer gone, all live readers migrated to app.autopilot; the globbed test asserts the watch-control verb is forbidden in poll.rs so it stays)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     },
     {
       "id": "AC-03",
       "description": "Action enum carries no `Watch*` variant; the only autopilot-related actions are the Autopilot* variants.",
       "verification": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/",
       "status": "passed",
-      "evidence": "! rg -q '\\bWatch(Start|Stop|Refresh|Preflight|ToggleSelect|MovePicker|MoveQueue|ClearQueue)\\b' crates/raul/src/ exit 0 (clean — 8 Action::Watch* variants + handlers dropped in S1.1; doc comments updated in S2)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     },
     {
       "id": "AC-04",
       "description": "No behavior change on the Autopilot lane: the migrated picker, status-graph, render, and keybind tests pass.",
       "verification": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity) | test(/keybind|autopilot/)'",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'binary(autopilot_status_graph) | binary(m215_f01_picker_production_path) | binary(tui_render) | binary(tui_state) | binary(tui_status_parity) | test(/keybind|autopilot/)' exit 0 (152/152 pass; cycle 2 F-01 restored the dropped '| test(/keybind|autopilot/)' clause so the keybind / autopilot lane tests run alongside the Autopilot-lane binaries — covers the M179 footer_overview_no_longer_mentions_watch assertion and the lane_autopilot_rename autopilot_variant_exists_and_watch_is_gone assertion that directly pin M230's 'Watch is gone' intent)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     },
     {
       "id": "AC-05",
       "description": "The consumer-surface allowlist carries no stale-watch entries that no longer match a real line, and the lint stays clean.",
       "verification": "scripts/verify-m230-ac05.sh",
       "status": "passed",
-      "evidence": "scripts/verify-m230-ac05.sh exit 0 (cycle 2 F-04 wrapped the original rg-precondition + make consumer-surface-lint — rg precondition absorbed by the pruned allowlist; the lint reports clean across all five patterns)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     },
     {
       "id": "AC-06",
       "description": "raul crate tests, clippy, and fmt are clean.",
       "verification": "scripts/verify-m230-ac06.sh",
       "status": "passed",
-      "evidence": "scripts/verify-m230-ac06.sh exit 0 (cycle 2 F-05 wrapped the original 3-check chain — cargo nextest run -p raul --no-fail-fast 1487/1487 pass; cargo clippy -p raul --all-targets --no-deps -- -D warnings clean; cargo fmt --all -- --check clean)"
+      "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
     }
   ],
   "design_decisions": [
@@ -347,8 +355,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-09-29",
     "branch": "",
-    "evidence": ""
+    "evidence": "M230 implementation (9 steps, 6 ACs) + cycle-2 fix-up; herdr-orc cycle 1 review (commit 5131635) returned 5 findings; cycle 2 (commits e91782a, 4968f7c, 82ae239, 4d3dd7f, 2dd13fb, 8015a7e) fixed all 5 via AC-04 filter restoration + 3 wrapper scripts (scripts/verify-m230-ac{01,05,06}.sh). herdr-orc cycle 2 review (pane w1B:p3) verdict ok, 0 findings, cold build pass. AC verifications argv-compatible (3 wrapper scripts + restored AC-04 filter + 2 rg negations); MP_VERIFY_ALLOW_SHELL=1 set after reviewing each command (pure reads, no destructive ops). Implementation on wip: 19 commits ahead of origin."
   }
 }
