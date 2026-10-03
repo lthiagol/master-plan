@@ -23,7 +23,7 @@ use crate::config::{ConfigSchemaReport, SchemaEntry, CONFIG_SCHEMA_VERSION};
 /// Pinned row count for [`KEY_DESCRIPTIONS`]. Every added or removed
 /// setting bumps this, which is the point: the schema surface is a
 /// contract with the golden fixtures and with raul's Settings lane.
-pub const EXPECTED_KEY_DESCRIPTIONS_LEN: usize = 46;
+pub const EXPECTED_KEY_DESCRIPTIONS_LEN: usize = 49;
 
 /// M201: per-key rows. The list is the single source of truth that
 /// `mp config schema` projects into the `keys` array (sorted by key at
@@ -288,6 +288,27 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
         "Which lane `mp next` should prefer when both have work available.",
     ),
     (
+        "ui.autopilot.split_pct",
+        "integer",
+        "40",
+        None,
+        "Left column width of the Autopilot tab's setup + sidebar split, as a percentage. Must be between 25 and 75; the sidebar border drags within the same window.",
+    ),
+    (
+        "ui.autopilot.sidebar_tab",
+        "choice",
+        "progress",
+        Some(UI_AUTOPILOT_SIDEBAR_TABS),
+        "Active tab in the Autopilot sidebar. v / Shift+V cycle the tabs; state is hidden while a run is live.",
+    ),
+    (
+        "ui.autopilot.sidebar_visible",
+        "bool",
+        "true",
+        None,
+        "Whether the Autopilot tab shows its sidebar. z toggles this and the choice persists here.",
+    ),
+    (
         "ui.color",
         "bool",
         "true",
@@ -364,6 +385,11 @@ pub const KEY_DESCRIPTIONS: &[(&str, &str, &str, Option<&[&str]>, &str)] = &[
 /// source of truth shared with raul's palette catalog.
 pub use mp_model::UI_THEMES;
 pub const UI_ICONS: &[&str] = &["none", "ascii", "unicode"];
+/// M241: the Autopilot sidebar tabs, re-exported from
+/// [`crate::config::UI_AUTOPILOT_SIDEBAR_TABS`] so the schema's
+/// `allowed` list and the `config set` validator quote the same
+/// slice.
+pub use crate::config::UI_AUTOPILOT_SIDEBAR_TABS;
 pub const BRANCH_STRATEGIES: &[&str] = &["per-milestone", "current", "none"];
 pub const AUTO_REMEDIATE: &[&str] = &["none", "low", "medium", "high", "all"];
 pub const NEXT_PREFER: &[&str] = &["milestone", "track"];
@@ -403,6 +429,9 @@ pub fn build_schema_report() -> ConfigSchemaReport {
                 "ui.color" => cfg.ui.color.unwrap_or(true).to_string(),
                 "ui.hide_done" => cfg.ui.hide_done.unwrap_or(false).to_string(),
                 "ui.show_autopilot_tab" => cfg.ui.show_autopilot_tab.unwrap_or(false).to_string(),
+                // M241: the accessor (not a raw `unwrap_or`) owns the
+                // default so the schema and `config get` cannot drift.
+                "ui.autopilot.sidebar_visible" => cfg.ui_autopilot_sidebar_visible().to_string(),
                 "agent.automation.stall_timeout_minutes" => {
                     cfg.automation_stall_timeout_minutes().to_string()
                 }

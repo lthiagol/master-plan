@@ -1463,15 +1463,14 @@ pub fn uninstall(harness_ids: &[String], _global: bool, purge: bool) -> Result<U
                 removed.push(format!("convention:{}:{}", h.id, convention_path.display()));
             }
         }
-        for (label, path) in [("toolkit", install_dir())] {
-            if path.exists() {
-                if path.is_dir() {
-                    fs::remove_dir_all(&path)?;
-                } else {
-                    fs::remove_file(&path)?;
-                }
-                removed.push(format!("{label}:{}", path.display()));
+        let toolkit_dir = install_dir();
+        if toolkit_dir.exists() {
+            if toolkit_dir.is_dir() {
+                fs::remove_dir_all(&toolkit_dir)?;
+            } else {
+                fs::remove_file(&toolkit_dir)?;
             }
+            removed.push(format!("toolkit:{}", toolkit_dir.display()));
         }
     } else {
         for id in harness_ids {

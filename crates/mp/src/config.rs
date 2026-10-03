@@ -407,6 +407,22 @@ pub use mp_model::UI_THEMES;
 /// list now matches `SETTINGS_KEYS` and `KEYBIND_DEFAULTS` line-for-line;
 /// the docstring on `KEYBIND_DEFAULTS` restates the contract that every
 /// action name appears in both lists.
+/// M241: the `ui.autopilot.split_pct` clamp window. The spec fixes the
+/// drag bounds at 25%..=75% so neither column can be dragged out of
+/// readability; `ui_autopilot_split_pct` clamps to this window and
+/// `config set` rejects out-of-range values before they land.
+pub const UI_AUTOPILOT_SPLIT_PCT_MIN: u32 = 25;
+pub const UI_AUTOPILOT_SPLIT_PCT_MAX: u32 = 75;
+/// M241: default left-column width — the 40/60 geometry named in the
+/// milestone's `intent.outcome`.
+pub const UI_AUTOPILOT_SPLIT_PCT_DEFAULT: u32 = 40;
+/// M241: the three sidebar tabs, in render order. `v` / `Shift+V`
+/// cycle through this slice, skipping `state` while a run is live.
+pub const UI_AUTOPILOT_SIDEBAR_TABS: &[&str] = &["progress", "activity", "state"];
+/// M241: the tab selected when `ui.autopilot.sidebar_tab` is unset or
+/// unparseable.
+pub const UI_AUTOPILOT_SIDEBAR_TAB_DEFAULT: &str = "progress";
+
 pub const KEYBIND_ACTIONS: &[&str] = &[
     "quit",
     "up",
@@ -588,6 +604,33 @@ pub struct UiConfig {
     /// longer honored; configs carrying the old key lose that
     /// setting after upgrade.
     pub show_autopilot_tab: Option<bool>,
+    /// M241: Autopilot lane layout preferences. `None` keeps the
+    /// whole `autopilot` object out of `config.json` so the on-disk
+    /// shape stays additive — a project that never opens the
+    /// Autopilot tab sees no new keys.
+    pub autopilot: Option<UiAutopilotConfig>,
+}
+
+/// M241: UI preferences for the Autopilot tab's control-first split
+/// view. Every field is optional; raul applies the documented
+/// default when a field is unset, and `mp config set
+/// ui.autopilot.<field>` is the only writer.
+///
+/// The three fields map 1:1 onto the spec's persistence contract:
+/// `split_pct` is the left/right split of the setup + sidebar view,
+/// `sidebar_tab` is the active sidebar tab, and `sidebar_visible`
+/// collapses the sidebar. `split_pct` is validated to `25..=75` at
+/// the `config set` boundary (not here) so a hand-edited
+/// `config.json` can still be read.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UiAutopilotConfig {
+    /// Left column width as a percentage of the lane width. Valid
+    /// range 25..=75; raul clamps defensively on load.
+    pub split_pct: Option<u32>,
+    /// Active sidebar tab: `progress` | `activity` | `state`.
+    pub sidebar_tab: Option<String>,
+    /// Whether the tabbed sidebar is visible at all.
+    pub sidebar_visible: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -627,6 +670,47 @@ impl ProjectConfig {
 
     pub fn next_prefer(&self) -> &str {
         self.next.prefer.as_deref().unwrap_or("milestone")
+    }
+
+    /// M241: left-column width of the Autopilot split, as a
+    /// percentage. The default is `40` (the 40/60 geometry from the
+    /// milestone's intent). Values outside `25..=75` are rejected at
+    /// the `config set` boundary; this accessor clamps anyway so a
+    /// hand-edited `config.json` can never make raul render a
+    /// degenerate column.
+    pub fn ui_autopilot_split_pct(&self) -> u32 {
+        self.ui
+            .autopilot
+            .as_ref()
+            .and_then(|a| a.split_pct)
+            .unwrap_or(UI_AUTOPILOT_SPLIT_PCT_DEFAULT)
+            .clamp(UI_AUTOPILOT_SPLIT_PCT_MIN, UI_AUTOPILOT_SPLIT_PCT_MAX)
+    }
+
+    /// M241: the active sidebar tab. Any value outside the three
+    /// known tabs falls back to `progress` so a stale/hand-edited
+    /// config cannot leave the lane in an unrenderable state.
+    pub fn ui_autopilot_sidebar_tab(&self) -> &str {
+        let raw = self
+            .ui
+            .autopilot
+            .as_ref()
+            .and_then(|a| a.sidebar_tab.as_deref());
+        match raw {
+            Some(t) if UI_AUTOPILOT_SIDEBAR_TABS.contains(&t) => t,
+            _ => UI_AUTOPILOT_SIDEBAR_TAB_DEFAULT,
+        }
+    }
+
+    /// M241: whether the tabbed sidebar is visible. Defaults to
+    /// `true` — the split is the milestone's headline layout, so the
+    /// sidebar is shown until the operator collapses it with `z`.
+    pub fn ui_autopilot_sidebar_visible(&self) -> bool {
+        self.ui
+            .autopilot
+            .as_ref()
+            .and_then(|a| a.sidebar_visible)
+            .unwrap_or(true)
     }
 
     pub fn strictness(&self) -> &str {

@@ -108,8 +108,12 @@ fn keep_and_shorten_inventory_comments_are_tag_free() {
             &["`implemented` is the legacy spec equivalent"][..],
         ),
         (
-            "crates/raul/src/tui/render/watch.rs",
-            &["Log I/O belongs to the idle poller"][..],
+            // The Autopilot renderer was renamed from `watch.rs` when the
+            // legacy `Watch` struct was deleted; the pin follows the file so
+            // the "log I/O belongs to the poller, not the renderer" invariant
+            // keeps its tag-free-comment coverage.
+            "crates/raul/src/tui/render/autopilot_lane.rs",
+            &["log pane reads the in-memory snapshot"][..],
         ),
     ];
 

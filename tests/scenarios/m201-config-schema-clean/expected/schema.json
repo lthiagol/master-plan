@@ -234,6 +234,29 @@
       "description": "Which lane `mp next` should prefer when both have work available."
     },
     {
+      "key": "ui.autopilot.sidebar_tab",
+      "type": "choice",
+      "default": "progress",
+      "allowed": [
+        "progress",
+        "activity",
+        "state"
+      ],
+      "description": "Active tab in the Autopilot sidebar. v / Shift+V cycle the tabs; state is hidden while a run is live."
+    },
+    {
+      "key": "ui.autopilot.sidebar_visible",
+      "type": "bool",
+      "default": "true",
+      "description": "Whether the Autopilot tab shows its sidebar. z toggles this and the choice persists here."
+    },
+    {
+      "key": "ui.autopilot.split_pct",
+      "type": "integer",
+      "default": "40",
+      "description": "Left column width of the Autopilot tab's setup + sidebar split, as a percentage. Must be between 25 and 75; the sidebar border drags within the same window."
+    },
+    {
       "key": "ui.color",
       "type": "bool",
       "default": "true",

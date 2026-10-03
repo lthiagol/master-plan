@@ -145,10 +145,9 @@ fn render_log_and_output(frame: &mut Frame, app: &App, area: Rect) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
-    // M230: the log pane reads the in-memory snapshot cached on
+    // The log pane reads the in-memory snapshot cached on
     // `app.autopilot.log_tail`. The poller writes the typed
-    // field directly; the legacy mirror that lived on the
-    // deleted `Watch` struct is gone.
+    // field directly; the renderer performs no filesystem I/O.
     let log_body = if app.autopilot.log_tail.is_empty() {
         "(no log lines yet)".to_string()
     } else {

@@ -177,6 +177,12 @@ pub fn config_get(ctx: &PlanContext, key: &str) -> Result<Value> {
         // `ui.show_watch_tab` key was removed by M229's
         // breaking-release cleanup.
         "ui.show_autopilot_tab" => Ok(json!(cfg.ui.show_autopilot_tab.unwrap_or(false))),
+        // M241: the Autopilot split geometry + sidebar preferences.
+        // Each accessor owns its own default / clamp so `config get`
+        // and the docs schema cannot drift apart.
+        "ui.autopilot.split_pct" => Ok(json!(cfg.ui_autopilot_split_pct())),
+        "ui.autopilot.sidebar_tab" => Ok(json!(cfg.ui_autopilot_sidebar_tab())),
+        "ui.autopilot.sidebar_visible" => Ok(json!(cfg.ui_autopilot_sidebar_visible())),
         _ => bail!("unknown config key: {key}"),
     }
 }
@@ -349,6 +355,30 @@ fn apply_config_set(cfg: &mut ProjectConfig, key: &str, value: &str) -> Result<(
         // value the operator can stage and the doctor + TUI
         // surfaces can render as the "default" state.
         "ui.show_autopilot_tab" => cfg.ui.show_autopilot_tab = Some(parse_bool(value)?),
+        // M241: the three Autopilot UI preference keys. Each is
+        // validated at this boundary (not at deserialize time) so a
+        // bad value is a clean `config set` error instead of a
+        // read-time failure on a hand-edited config.json.
+        "ui.autopilot.split_pct" => {
+            let pct = parse_split_pct(value)?;
+            cfg.ui
+                .autopilot
+                .get_or_insert_with(Default::default)
+                .split_pct = Some(pct);
+        }
+        "ui.autopilot.sidebar_tab" => {
+            let tab = parse_sidebar_tab(value)?;
+            cfg.ui
+                .autopilot
+                .get_or_insert_with(Default::default)
+                .sidebar_tab = Some(tab);
+        }
+        "ui.autopilot.sidebar_visible" => {
+            cfg.ui
+                .autopilot
+                .get_or_insert_with(Default::default)
+                .sidebar_visible = Some(parse_bool(value)?);
+        }
         _ => bail!("unknown config key: {key}"),
     }
     Ok(())
@@ -704,6 +734,38 @@ fn parse_icons(value: &str) -> Result<String> {
     match value {
         "none" | "ascii" | "unicode" => Ok(value.to_string()),
         _ => bail!("expected one of none|ascii|unicode, got {value}"),
+    }
+}
+
+/// M241: parse and range-check `ui.autopilot.split_pct`. The bounds
+/// mirror the spec's drag clamp (25%..=75%) so a value that a drag
+/// could never produce is rejected at the config boundary too.
+fn parse_split_pct(value: &str) -> Result<u32> {
+    let pct: u32 = value
+        .parse()
+        .map_err(|_| anyhow::anyhow!("expected an integer percentage, got {value}"))?;
+    if !(crate::config::UI_AUTOPILOT_SPLIT_PCT_MIN..=crate::config::UI_AUTOPILOT_SPLIT_PCT_MAX)
+        .contains(&pct)
+    {
+        bail!(
+            "ui.autopilot.split_pct must be between {} and {} (got {pct})",
+            crate::config::UI_AUTOPILOT_SPLIT_PCT_MIN,
+            crate::config::UI_AUTOPILOT_SPLIT_PCT_MAX
+        );
+    }
+    Ok(pct)
+}
+
+/// M241: parse and validate `ui.autopilot.sidebar_tab` against the
+/// three known tabs.
+fn parse_sidebar_tab(value: &str) -> Result<String> {
+    if crate::config::UI_AUTOPILOT_SIDEBAR_TABS.contains(&value) {
+        Ok(value.to_string())
+    } else {
+        bail!(
+            "expected one of {}, got {value}",
+            crate::config::UI_AUTOPILOT_SIDEBAR_TABS.join("|")
+        )
     }
 }
 
