@@ -2167,6 +2167,14 @@
       "reviewed_at": "2026-09-29",
       "notes": "Cycle 1 verdict changes-needed (5 findings: F-01 medium AC-04 filter dropped, F-02 medium hand-off drift, F-03 low AC-01 file-existence dropped, F-04 low AC-05 rg-precondition dropped, F-05 low AC-06 clippy+fmt dropped). Cycle 2 fixes: AC-04 filter restored (152/152 pass), 3 wrapper scripts added (scripts/verify-m230-ac{01,05,06}.sh). Cycle 2 review verdict ok, 0 findings, cold build pass. AC-04 filter verified to add the keybind/autopilot clause (106 unique test names; the test-name regex clause contributes ~62 tests beyond the binary clause). Wrapper script contents reviewed — real checks with set -e, exit 0. Findings recorded in commit 5131635 (cycle 1) and resolved in commits e91782a/4968f7c/82ae239/4d3dd7f/2dd13fb/8015a7e (cycle 2).",
       "milestone_completed_at": "2026-09-29"
+    },
+    {
+      "milestone_id": "241",
+      "verdict": "ok",
+      "reviewer": "herdr-orc:m241-reviewer (pane w1G:p4)",
+      "reviewed_at": "2026-10-03",
+      "notes": "3 cycles. Cycle 1: 1 medium (F-01 takeover row cycle hard-coded to 1). Cycle 2: F-01 resolved (QueueRow.cycle added, populated from session.queue_cycle_history with additive serde default, test strengthened to assert exact per-row cycles including at-least-one > 1), F-02 filed (1-milestone gate at autopilot.rs:1792, the > 1 gate dropped to is_empty). Cycle 3: F-02 resolved (gate change + regression test a_single_milestone_run_reports_its_real_cycle_count, verified the test bites against the old gate by re-introducing it). Cold build pass on all cycles. Three judgment calls accepted: (1) data-source simplification queue[].cycle vs queue_cycle_history deferred as future cleanup, (2) stale sample_session_show fixture in autopilot_manual_refresh.rs accepted as separate concern, (3) bonus side effects active_session_id + open_detail on single-milestone runs unblocked. Findings commit: 9f46021 (cycle 2), 294dee4 (cycle 3).",
+      "milestone_completed_at": "2026-10-03"
     }
   ],
   "comments": [
