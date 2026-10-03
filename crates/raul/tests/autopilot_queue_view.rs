@@ -189,8 +189,25 @@ fn queue_row_round_trips_through_serde() {
         title: "Coordination".to_string(),
         lifecycle: "in-progress".to_string(),
         active: true,
+        cycle: 2,
     };
     let v = serde_json::to_value(&row).unwrap();
     let back: QueueRow = serde_json::from_value(v).unwrap();
     assert_eq!(back, row);
+}
+
+/// The `cycle` field is additive: a row serialized before the field
+/// existed must still deserialize, reporting cycle 1. A session
+/// payload written by an older build is exactly this shape.
+#[test]
+fn queue_row_without_a_cycle_field_deserializes_as_cycle_one() {
+    use raul::tui::autopilot::QueueRow;
+    let legacy = serde_json::json!({
+        "milestone_id": "209",
+        "title": "Coordination",
+        "lifecycle": "in-progress",
+        "active": true,
+    });
+    let row: QueueRow = serde_json::from_value(legacy).expect("legacy row deserializes");
+    assert_eq!(row.cycle, 1, "an absent cycle means the first cycle");
 }

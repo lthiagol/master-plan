@@ -1517,6 +1517,54 @@ pub struct QueueRow {
     pub title: String,
     pub lifecycle: String,
     pub active: bool,
+    /// Which cycle the drive is on for this milestone, read from
+    /// `session.queue_cycle_history[]`. `1` when the milestone has no
+    /// history yet — which is the normal state for a milestone that is
+    /// queued but has not been attempted, and is the truthful answer
+    /// rather than a guess: it has been through no cycles.
+    ///
+    /// `#[serde(default)]` keeps the row additive: a session payload
+    /// written before this field existed deserializes with `1`.
+    #[serde(default = "queue_row_default_cycle")]
+    pub cycle: u64,
+}
+
+/// The cycle a queue row reports when the payload carries no history
+/// for it. Named so the `serde` default and the builder agree.
+pub fn queue_row_default_cycle() -> u64 {
+    1
+}
+
+/// The cycle a milestone is on, from `session.queue_cycle_history[]`.
+///
+/// The history is an append-only list of attempts; the cycle a
+/// milestone is *currently on* is the highest `cycle` any of its
+/// entries names, not the entry count (an entry count would read 2 for
+/// a milestone whose first attempt was recorded twice, and would not
+/// distinguish cycle 3 from three attempts at cycle 1).
+///
+/// Returns `None` when the payload has no history for this milestone,
+/// so the caller can apply the "queued, not yet attempted" fallback
+/// explicitly rather than conflating it with cycle 0.
+fn cycle_from_history(session_show: &Value, milestone_id: &str) -> Option<u64> {
+    let entries = session_show
+        .get("session")?
+        .get("queue_cycle_history")?
+        .as_array()?;
+    // Queue rows carry the id with the `M` prefix stripped; history
+    // entries carry it in full. Normalize both sides rather than
+    // assuming a prefix.
+    let wanted = milestone_id.trim_start_matches('M');
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let id = entry.get("milestone_id")?.as_str()?;
+            (id.trim_start_matches('M') == wanted)
+                .then(|| entry.get("cycle")?.as_u64())
+                .flatten()
+        })
+        .max()
+        .filter(|cycle| *cycle > 0)
 }
 
 /// Multi-milestone queue view. Built from `mp autopilot
@@ -1591,11 +1639,16 @@ impl QueueView {
                             .unwrap_or("")
                             .to_string();
                         let active = active_id.as_deref() == Some(id.as_str());
+                        // A milestone with no cycle history has not
+                        // been attempted yet, so it is on cycle 1.
+                        let cycle = cycle_from_history(payload, &id)
+                            .unwrap_or_else(queue_row_default_cycle);
                         QueueRow {
                             milestone_id: id,
                             title,
                             lifecycle,
                             active,
+                            cycle,
                         }
                     })
                     .collect()

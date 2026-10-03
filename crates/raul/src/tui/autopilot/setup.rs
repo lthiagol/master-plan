@@ -623,6 +623,22 @@ pub struct TakeoverRow {
 /// poller from `mp autopilot session show`); falls back to the setup
 /// form's per-run selection so a run that started before the first
 /// refresh still shows what is queued.
+///
+/// ## Known gap: single-milestone runs show cycle 1
+///
+/// The cycle count is the drive's own number, read from
+/// `session.queue_cycle_history[]` — but only when `queue_view` exists,
+/// and the refresh adapter only populates `queue_view` when the session
+/// has **more than one** queued milestone (a pre-existing condition on
+/// that path, outside the takeover's row builder). A single-milestone
+/// run therefore takes the fallback below and renders "cycle 1" even
+/// when `queue_cycle_history` says it is on cycle 3.
+///
+/// The value is still better than a constant — it is correct for every
+/// multi-milestone run, which is the case the takeover exists for — but
+/// it is not yet correct for every run. Lifting the `rows.len() > 1`
+/// gate would fix it, and is left alone here as a change to typed-row
+/// code outside this path.
 pub fn queued_milestones(app: &crate::tui::app::App) -> Vec<TakeoverRow> {
     if let Some(view) = &app.autopilot.queue_view {
         if !view.rows.is_empty() {
@@ -632,10 +648,11 @@ pub fn queued_milestones(app: &crate::tui::app::App) -> Vec<TakeoverRow> {
                 .map(|row| TakeoverRow {
                     id: row.milestone_id.clone(),
                     lifecycle: row.lifecycle.clone(),
-                    // The typed queue carries no cycle count; the drive
-                    // has not reported one until the first refresh
-                    // lands, so render 1 rather than a misleading 0.
-                    cycle: 1,
+                    // The drive's own count, from
+                    // `session.queue_cycle_history[]`. A milestone with
+                    // no history has not been attempted, so it is on
+                    // cycle 1 — which `QueueRow::cycle` already encodes.
+                    cycle: row.cycle,
                     active: row.active,
                 })
                 .collect();
@@ -648,7 +665,14 @@ pub fn queued_milestones(app: &crate::tui::app::App) -> Vec<TakeoverRow> {
         .map(|id| TakeoverRow {
             id: id.clone(),
             lifecycle: "in-progress".to_string(),
-            cycle: 1,
+            // No queue view: either the run has not been refreshed yet,
+            // or it is a single-milestone session (see the gap note
+            // above). Cycle 1 is the honest reading in the first case —
+            // the milestone has not been attempted, so it is on its
+            // first cycle. In the second case it is a known
+            // under-report, not a claim: the operator sees 1 where the
+            // drive may be on a later cycle.
+            cycle: super::queue_row_default_cycle(),
             active: false,
         })
         .collect()

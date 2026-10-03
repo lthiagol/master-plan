@@ -112,6 +112,11 @@ fn the_takeover_renders_all_five_bands() {
 
 /// AC-05: each row carries the id, the lifecycle, a cycle count, and
 /// the lifecycle-position bar.
+///
+/// The cycle assertion is an exact `== 1`, not `>= 1`: this fixture has
+/// no `session.queue_cycle_history[]`, so every row is on its first
+/// cycle. `>= 1` would be satisfied by any value including a hard-coded
+/// placeholder, which is the bug this test used to hide.
 #[test]
 fn each_row_carries_id_lifecycle_cycle_and_position_bar() {
     let app = live_app(&["240"]);
@@ -119,10 +124,165 @@ fn each_row_carries_id_lifecycle_cycle_and_position_bar() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, "240");
     assert!(!rows[0].lifecycle.is_empty());
-    assert!(rows[0].cycle >= 1);
+    assert_eq!(
+        rows[0].cycle, 1,
+        "with no cycle history the milestone is on its first cycle"
+    );
     let bar = lifecycle_position_bar(&rows[0].lifecycle);
     assert!(bar.starts_with('[') && bar.ends_with(']'));
     assert!(bar.contains('#'), "a live milestone should be past stage 0");
+}
+
+/// A `mp autopilot session show <id>` payload with a multi-cycle
+/// history. Three queued milestones:
+///   - M240 has been through cycles 1, 2, and 3
+///   - M241 has two entries, both at cycle 1
+///   - M242 has a single entry at cycle 2
+///
+/// M241 is the case that separates "the highest cycle" from "the number
+/// of attempts": an entry count would report 2 for it, which is wrong.
+fn multi_cycle_session_show() -> serde_json::Value {
+    serde_json::json!({
+        "session_id": "alpha",
+        "session": {
+            "id": "alpha",
+            "status": "active",
+            "working_on": {"milestone_id": "M240", "cycle": 3, "role": "runner"},
+            "queue": [
+                {"milestone_id": "M240", "title": "Deep", "lifecycle": "in-progress"},
+                {"milestone_id": "M241", "title": "Retried once", "lifecycle": "approved"},
+                {"milestone_id": "M242", "title": "Second cycle", "lifecycle": "in-progress"},
+            ],
+            "queue_cycle_history": [
+                {"milestone_id": "M240", "cycle": 1, "outcome": "remediation"},
+                {"milestone_id": "M240", "cycle": 2, "outcome": "remediation"},
+                {"milestone_id": "M240", "cycle": 3, "started_at": "2026-09-04T00:03:00Z"},
+                {"milestone_id": "M241", "cycle": 1, "outcome": "remediation"},
+                {"milestone_id": "M241", "cycle": 1, "outcome": "remediation"},
+                {"milestone_id": "M242", "cycle": 2, "started_at": "2026-09-04T00:02:00Z"},
+            ],
+        }
+    })
+}
+
+/// F-01 / AC-05: the takeover row's cycle count is the drive's own
+/// number from `session.queue_cycle_history[]`, not a constant.
+///
+/// This is the test the old `cycle >= 1` assertion could not catch: a
+/// hard-coded 1 satisfies `>= 1` while being wrong for two of the three
+/// rows here. Each row is asserted exactly, and the M241 case pins
+/// "highest cycle, not attempt count".
+#[test]
+fn the_takeover_row_cycle_count_comes_from_the_cycle_history() {
+    let payload = multi_cycle_session_show();
+    let queue = raul::tui::autopilot::QueueView::from_session_show(&payload);
+    assert_eq!(queue.rows.len(), 3);
+
+    let mut app = app_with_queue(&[]);
+    app.autopilot.queue_view = Some(queue);
+    app.autopilot.note_run_live(true);
+
+    let rows = queued_milestones(&app);
+    let by_id = |id: &str| {
+        rows.iter()
+            .find(|r| r.id == id)
+            .unwrap_or_else(|| panic!("no takeover row for {id}"))
+            .cycle
+    };
+
+    assert_eq!(by_id("240"), 3, "M240 is on its third cycle");
+    assert_eq!(
+        by_id("241"),
+        1,
+        "M241's two entries are both cycle 1 — the highest cycle wins, \
+         not the attempt count"
+    );
+    assert_eq!(by_id("242"), 2, "M242 is on its second cycle");
+    assert!(
+        rows.iter().any(|r| r.cycle > 1),
+        "at least one row must show a cycle above 1, or this test is not \
+         actually exercising the history"
+    );
+}
+
+/// F-01: the cycle survives the real refresh path, not just the
+/// `QueueView` constructor. This is the wiring that the takeover
+/// actually reads.
+#[test]
+fn the_refresh_adapter_carries_the_cycle_count_through_to_the_lane() {
+    let payload = multi_cycle_session_show();
+    let status = serde_json::json!({"run_state": {"kind": "live"}});
+    let mut state = raul::tui::autopilot::AutopilotLaneState::empty();
+    raul::tui::autopilot::refresh::refresh_from_json(&mut state, &payload, &status);
+
+    let view = state
+        .queue_view()
+        .expect("a 3-row queue populates the view");
+    let cycles: Vec<(&str, u64)> = view
+        .rows
+        .iter()
+        .map(|r| (r.milestone_id.as_str(), r.cycle))
+        .collect();
+    assert_eq!(
+        cycles,
+        vec![("240", 3), ("241", 1), ("242", 2)],
+        "each queued row's cycle must reach the lane state"
+    );
+}
+
+/// F-01: a history entry with no milestone id, or with a non-numeric
+/// cycle, is skipped rather than read as cycle 0 or panicking.
+#[test]
+fn malformed_history_entries_are_ignored() {
+    let payload = serde_json::json!({
+        "session": {
+            "id": "alpha",
+            "status": "active",
+            "queue": [
+                {"milestone_id": "M240", "title": "A", "lifecycle": "in-progress"},
+                {"milestone_id": "M241", "title": "B", "lifecycle": "in-progress"},
+            ],
+            "queue_cycle_history": [
+                {"milestone_id": "M240", "cycle": 4},
+                {"cycle": 9},
+                {"milestone_id": "M241", "cycle": "not-a-number"},
+            ],
+        }
+    });
+    let queue = raul::tui::autopilot::QueueView::from_session_show(&payload);
+    let by_id = |id: &str| {
+        queue
+            .rows
+            .iter()
+            .find(|r| r.milestone_id == id)
+            .map(|r| r.cycle)
+    };
+    assert_eq!(by_id("240"), Some(4));
+    assert_eq!(
+        by_id("241"),
+        Some(1),
+        "an unparseable cycle falls back to 1, not 0"
+    );
+}
+
+/// F-01: the `M` prefix is normalized on both sides. History entries
+/// carry the full id; queue rows carry it stripped.
+#[test]
+fn the_cycle_lookup_normalizes_the_milestone_id_prefix() {
+    let stripped = serde_json::json!({
+        "session": {
+            "id": "a", "status": "active",
+            "queue": [{"milestone_id": "240", "title": "A", "lifecycle": "in-progress"},
+                      {"milestone_id": "241", "title": "B", "lifecycle": "in-progress"}],
+            "queue_cycle_history": [{"milestone_id": "240", "cycle": 2}],
+        }
+    });
+    let queue = raul::tui::autopilot::QueueView::from_session_show(&stripped);
+    assert_eq!(
+        queue.rows[0].cycle, 2,
+        "a bare id matches a bare history id"
+    );
+    assert_eq!(queue.rows[1].cycle, 1);
 }
 
 /// The bar tracks the canonical lifecycle order, so two milestones at
@@ -158,12 +318,14 @@ fn the_live_queue_overrides_the_forms_selection() {
                 title: "A".to_string(),
                 lifecycle: "in-progress".to_string(),
                 active: true,
+                cycle: 3,
             },
             raul::tui::autopilot::QueueRow {
                 milestone_id: "live-2".to_string(),
                 title: "B".to_string(),
                 lifecycle: "approved".to_string(),
                 active: false,
+                cycle: 1,
             },
         ],
         status: "active".to_string(),
