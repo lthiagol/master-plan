@@ -113,7 +113,7 @@
       "description": "When mp autopilot status reports a live run, the split is replaced by the takeover: topology strip, one row per queued milestone (id, lifecycle, cycle, lifecycle-position bar), activity tail, health/heartbeat strip, control row.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing",
       "status": "passed",
-      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing exit 0 (20 tests run, 20 passed)"
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing exit 0 (24/24 pass; cycle count now reads from session.queue_cycle_history — F-01 fixed in 9d3cbb1, was hard-coded to 1)"
     },
     {
       "id": "AC-06",
@@ -343,7 +343,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/takeover|layout|rows|queued|live_run|position_bar/)' exit 0 (12 tests run, 12 passed); commits 50ff5a8,31f575d"
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/takeover|layout|rows|queued|live_run|position_bar|cycle_count|cycle_lookup|refresh_adapter|malformed_history/)' exit 0 (16 tests run, 16 passed); commits 50ff5a8,31f575d,9d3cbb1 (F-01: cycle count from session.queue_cycle_history)"
     },
     {
       "id": "S1.4",
