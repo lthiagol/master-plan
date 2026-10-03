@@ -1,0 +1,36 @@
+ Review, Approve, Understand Layers - R.A.U.L. - Autopilot
+ Overview │ Milestones │ Path │ Backlog │ Ideas │ Settings
+┌ Topology ─────────────────────────────────────────┐ Progress   Activity   State
+│[one-agent] [two-agent] [three-agent]              │┌ Progress ───────────────────────────────────────────────────────────────────┐
+└───────────────────────────────────────────────────┘│draft-groomed-approved-in-prog-self-rev-reviewed-complete-cancelled-remediati│
+┌ Harness ──────────────────────────────────────────┐│(empty queue — select one or more drivable milestones)                       │
+│orchestrator: [inherit][opencode][cursor][pi]      ││(no heartbeat yet — press r to refresh)                                      │
+│runner: [inherit][opencode][cursor][pi] (inheriting││                                                                             │
+└───────────────────────────────────────────────────┘│                                                                             │
+┌ Milestones ───────────────────────────────────────┐│                                                                             │
+│[M240] [M241]                                      ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+│                                                   ││                                                                             │
+└───────────────────────────────────────────────────┘│                                                                             │
+┌ Commit ───────────────────────────────────────────┐│                                                                             │
+│[commit] [push]                                    ││                                                                             │
+└───────────────────────────────────────────────────┘│                                                                             │
+┌ Run mode ─────────────────────────────────────────┐│                                                                             │
+│[normal] [detached]                                ││                                                                             │
+└───────────────────────────────────────────────────┘│                                                                             │
+┌ Start ────────────────────────────────────────────┐│                                                                             │
+│Start  normal                                      ││                                                                             │
+│2 milestones · two-agent · normal                  ││                                                                             │
+└───────────────────────────────────────────────────┘│                                                                             │
+┌ Controls ─────────────────────────────────────────┐│                                                                             │
+│[Pause]  [Stop]  [Resume]  [Back]                  ││                                                                             │
+└───────────────────────────────────────────────────┘└─────────────────────────────────────────────────────────────────────────────┘
+                         q:quit ·  ?:help ·  Shift+Tab/Tab:lanes ·  ↑↓/↑:move ·  Enter:go ·  Ctrl+r:refresh
+                                                         poll: 2s (default)

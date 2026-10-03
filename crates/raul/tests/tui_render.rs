@@ -332,6 +332,10 @@ fn autopilot_lane_log_pane_uses_cached_entries_without_render_io() {
     // M230: the log pane reads `app.autopilot.log_tail` (the
     // helper moved to `tui::autopilot` along with the field).
     app.autopilot.log_tail = raul::tui::autopilot::tail_watch_log(&app.plan_dir, 8);
+    // The log moved behind the Activity tab when the sidebar became
+    // tabbed; the default tab is Progress, so select Activity to reach
+    // the same surface this test is about.
+    app.autopilot.layout.sidebar_tab = raul::tui::autopilot::setup::SidebarTab::Activity;
     std::fs::remove_dir_all(&log_dir).expect("poison render-time log path");
 
     let output = render_to_string(&app);
@@ -359,6 +363,8 @@ fn autopilot_lane_log_pane_placeholder_when_log_absent() {
     let mut app = App::new();
     app.active_lane = Lane::Autopilot;
     app.plan_dir = dir.path().to_path_buf();
+    // Activity tab — see the sibling test for why the tab is selected.
+    app.autopilot.layout.sidebar_tab = raul::tui::autopilot::setup::SidebarTab::Activity;
 
     let output = render_to_string(&app);
     assert!(
