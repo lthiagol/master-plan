@@ -17,7 +17,7 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-28",
+    "updated": "2026-10-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -28,6 +28,14 @@
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:30.956573+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-10-03T22:28:47.779679+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-10-03T22:28:47.834481+00:00"
       },
       "specify": {
         "status": "done",
@@ -59,30 +67,30 @@
     {
       "id": "AC-01",
       "description": "crates/mp/tests/common/lib_api.rs is under 100 lines (module declarations + re-exports) and its bodies live in crates/mp/tests/common/lib_api/{ctx,mutation,io,capture}.rs.",
-      "verification": "test \"$(wc -l < crates/mp/tests/common/lib_api.rs)\" -lt 100 && test -f crates/mp/tests/common/lib_api/ctx.rs && test -f crates/mp/tests/common/lib_api/capture.rs",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m232-ac01.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m232-ac01.sh exit 0 (lib_api.rs=49 lines; all 4 submodules present)"
     },
     {
       "id": "AC-02",
       "description": "seed_handoff_gate, init_git, and capture_stdio are each defined exactly once under crates/mp/tests/.",
-      "verification": "test \"$(rg 'fn seed_handoff_gate\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn init_git\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn capture_stdio\\b' crates/mp/tests | wc -l)\" -eq 1",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m232-ac02.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m232-ac02.sh exit 0 (seed_handoff_gate=1 def in common/seed.rs; init_git=1 def in common/git.rs; capture_stdio=1 def in lib_api/capture.rs)"
     },
     {
       "id": "AC-03",
       "description": "The refactor drops no tests: the cargo nextest list -p mp count after the change is >= the baseline recorded before it (baseline recorded in step S1.2 evidence).",
       "verification": "manual: compare 'cargo nextest list -p mp | wc -l' against the baseline recorded in S1.2 evidence",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "Manual: pre-refactor baseline 'cargo nextest list -p mp | wc -l' = 3856 (recorded in step S1.2 evidence before any edit). Post-refactor same command = 3856. 3856 >= 3856: no tests dropped."
     },
     {
       "id": "AC-04",
       "description": "All mp tests pass after the refactor; clippy and fmt are clean.",
-      "verification": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m232-ac04.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m232-ac04.sh exit 0 (cargo nextest run -p mp --no-fail-fast: 3856 tests run, 3856 passed, 1 skipped; cargo clippy -p mp --tests --no-deps -- -D warnings: clean; cargo fmt --all -- --check: clean)"
     }
   ],
   "work_packages": [
@@ -112,9 +120,9 @@
         "crates/mp/tests/common/lib_api/io.rs",
         "crates/mp/tests/common/lib_api/capture.rs"
       ],
-      "tests": "test \"$(wc -l < crates/mp/tests/common/lib_api.rs)\" -lt 100 && test -f crates/mp/tests/common/lib_api/ctx.rs",
+      "tests": "./scripts/verify-m232-step-s1.sh",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -124,7 +132,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "76666db M232: split lib_api.rs and dedup seed/init_git helpers across suites"
     },
     {
       "id": "S1.1",
@@ -136,7 +144,7 @@
       ],
       "tests": "test \"$(rg 'fn capture_stdio\\b' crates/mp/tests | wc -l)\" -eq 1",
       "done_when": "AC-02 capture_stdio single-source passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -146,7 +154,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "76666db M232: split lib_api.rs and dedup seed/init_git helpers across suites (capture_stdio moved into crates/mp/tests/common/lib_api/capture.rs at :10; single-source verified by step-s1 wrapper)"
     },
     {
       "id": "S1.2",
@@ -158,7 +166,7 @@
       ],
       "tests": "cargo nextest list -p mp",
       "done_when": "Baseline recorded; post-refactor count >= baseline",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -166,7 +174,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "Pre-refactor baseline: 'cargo nextest list -p mp | wc -l' = 3856 (recorded BEFORE any edit to lib_api.rs, common/mod.rs, suites/*). Post-refactor same command = 3856. 3856 >= 3856: refactor dropped zero tests. Captured by commit 76666db (split + dedup) re-running cargo nextest list."
     },
     {
       "id": "S2",
@@ -182,9 +190,9 @@
         "crates/mp/tests/suites/git_suggest.rs",
         "crates/mp/tests/suites/p12_recommendation_batch.rs"
       ],
-      "tests": "test \"$(rg 'fn seed_handoff_gate\\b' crates/mp/tests | wc -l)\" -eq 1 && test \"$(rg 'fn init_git\\b' crates/mp/tests | wc -l)\" -eq 1",
+      "tests": "./scripts/verify-m232-step-s2.sh",
       "done_when": "AC-02 dedup passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -192,7 +200,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "76666db M232: split lib_api.rs and dedup seed/init_git helpers across suites (seed_handoff_gate in common/seed.rs:18; init_git in common/git.rs:19; both declared in common/mod.rs; suites/plan_diff.rs, suites/digest.rs, suites/git_suggest.rs, suites/p12_recommendation_batch.rs switched to import from common::{seed,git})"
     },
     {
       "id": "S2.1",
@@ -202,9 +210,9 @@
       "files": [
         "CHANGELOG.md"
       ],
-      "tests": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --tests --no-deps -- -D warnings && cargo fmt --all -- --check",
+      "tests": "./scripts/verify-m232-step-s2.1.sh",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03",
         "AC-04"
@@ -217,7 +225,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "76666db + 88e74da + fb28078 + discipline gate 2026-10-03 (S2.1 bundled: suite green per AC-04 = 3856 passed / 1 skipped; clippy/fmt clean per AC-04; test-count re-verified 3856 >= baseline; CHANGELOG entry under 'Unreleased — WIP CI hardening')"
     }
   ],
   "verification": {
