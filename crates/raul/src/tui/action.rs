@@ -330,6 +330,18 @@ pub enum Action {
     /// M216 AC-05: leave the detail panel.
     AutopilotCloseDetail,
 
+    // ---- Autopilot split-view preferences -------------------------------
+    /// Select the next sidebar tab. `AutopilotLaneState::cycle_sidebar_tab`
+    /// owns the ordering and skips the State tab while a run is live.
+    AutopilotNextSidebarTab,
+    /// Select the previous sidebar tab (the mirror of
+    /// [`Action::AutopilotNextSidebarTab`], same skip rule).
+    AutopilotPrevSidebarTab,
+    /// Collapse / expand the sidebar. The new value is written back to
+    /// `ui.autopilot.sidebar_visible` through `mp config set`, so the
+    /// choice is mp-owned rather than raul-owned session state.
+    AutopilotToggleSidebar,
+
     // ---- M222: keybinds reload (cross-platform) ---------------------------
     /// Reload `~/.config/raul/keybinds.toml`. On Unix the same
     /// effect happens when the process receives SIGHUP — the
@@ -338,6 +350,24 @@ pub enum Action {
     /// action is reachable on every platform so Windows / macOS
     /// non-Unix shells can still trigger the reload.
     ReloadKeybinds,
+}
+
+/// Persist one Autopilot lane preference, reporting failure as a
+/// flash message rather than an error.
+///
+/// A rejected or failed `mp config set` must not take down the event
+/// loop — the operator keeps working — but it must also not be silent,
+/// or a preference that silently failed to save looks identical to one
+/// that saved. The flash names the field so the operator knows to
+/// retry.
+fn persist_autopilot_layout(runner: &MpRunner, app: &mut App, field: &str) -> Result<()> {
+    match crate::tui::runner_helpers::autopilot_setup::persist_layout_field(runner, app, field) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            app.set_flash_message(format!("Could not save ui.autopilot.{field}: {e}"));
+            Ok(())
+        }
+    }
 }
 
 /// Apply an `Action` to `app`. This is the single place that mutates `App`
@@ -947,6 +977,21 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             // mistaken for a stalled drive. Turning the poll back
             // on arms one immediate request (not a burst).
             app.autopilot_poller.toggle_enabled();
+            app.touch();
+        }
+        Action::AutopilotNextSidebarTab => {
+            app.autopilot.layout.cycle_tab(1);
+            persist_autopilot_layout(runner, app, "sidebar_tab")?;
+            app.touch();
+        }
+        Action::AutopilotPrevSidebarTab => {
+            app.autopilot.layout.cycle_tab(-1);
+            persist_autopilot_layout(runner, app, "sidebar_tab")?;
+            app.touch();
+        }
+        Action::AutopilotToggleSidebar => {
+            app.autopilot.layout.toggle_sidebar();
+            persist_autopilot_layout(runner, app, "sidebar_visible")?;
             app.touch();
         }
         Action::AutopilotPause => {

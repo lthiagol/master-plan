@@ -50,6 +50,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+/// Control-first setup form, split geometry, sidebar state, and the
+/// detached-mode popover. See the module docs for the persistence
+/// split (what round-trips through mp config vs. what is per-run).
+pub mod setup;
+
 // M230: the Autopilot lane's drivable-lifecycle allow-list is
 // sourced directly from `mp_model::WATCH_DRIVABLE_LIFECYCLES`.
 // Pre-M230, the list was re-exported through a legacy `watch`
@@ -1010,6 +1015,39 @@ pub struct AutopilotLaneState {
     /// at the bottom of this module so the field's writer stays
     /// next to its reader).
     pub log_tail: Vec<String>,
+    /// Split geometry + sidebar preferences. The three persisted
+    /// fields round-trip through mp config under `ui.autopilot.*`;
+    /// `state_tab_hidden` is derived session state. Read on lane
+    /// load, written on change.
+    pub layout: crate::tui::autopilot::setup::AutopilotLayout,
+    /// The six-section setup form. Topology, per-role harness, and
+    /// the commit toggles persist through mp; milestone selection
+    /// and run mode are per-run by design.
+    pub setup: crate::tui::autopilot::setup::SetupForm,
+    /// `Some` while the detached-mode confirmation popover is open.
+    /// A detached Start is only reachable through this struct, so
+    /// there is no way to detach without passing the prompt.
+    pub detached_confirm: Option<crate::tui::autopilot::setup::DetachedConfirm>,
+    /// `Some` while the read-only per-milestone peek is open. Set by
+    /// Enter or a click on a takeover row; cleared by Esc / Back.
+    pub peek: Option<crate::tui::autopilot::setup::MilestonePeek>,
+    /// `true` when `mp autopilot status` reports a live run, which is
+    /// what promotes the split to the full-screen takeover.
+    pub run_live: bool,
+    /// `true` while the operator has pressed Back from the takeover;
+    /// the run keeps going and the split comes back.
+    pub takeover_dismissed: bool,
+    /// Number of entries in `mp autopilot session list`. Feeds the
+    /// derived topology id — nothing is persisted.
+    pub session_count: usize,
+    /// Bounded read-only `mp activity` rows, newest first, for the
+    /// Activity sidebar tab. Refreshed on the poll tick.
+    pub activity_rows: Vec<String>,
+    /// Latest read-only state snapshots for the State tab, in the
+    /// order the spec lists them: autopilot config, `ui.autopilot.*`,
+    /// `mp autopilot status`, the current session (when present), and
+    /// the pending override-panel values.
+    pub state_sections: Vec<(String, String)>,
 }
 
 impl AutopilotLaneState {
@@ -1164,6 +1202,84 @@ impl AutopilotLaneState {
 
     pub fn last_refresh_at(&self) -> &str {
         &self.last_refresh_at
+    }
+
+    // ---- control-first split view ------------------------------------
+    //
+    // The lane is one state block viewed two ways: a split (setup
+    // form left, tabbed sidebar right) and a full-screen takeover
+    // while a run is live. These helpers own the transition between
+    // them so no renderer has to re-derive the rule.
+
+    /// `true` when the full-screen takeover owns the lane. The
+    /// takeover shows whenever a run is live *until* the operator
+    /// presses Back, and Back is sticky — the run keeps going behind
+    /// the split, so the takeover does not spring back on the next
+    /// poll tick.
+    pub fn takeover_active(&self) -> bool {
+        self.run_live && !self.takeover_dismissed
+    }
+
+    /// Called when `mp autopilot status` reports a live run. A newly
+    /// live run re-arms the takeover; the State tab is also
+    /// withdrawn, because the split it would describe is a snapshot of
+    /// a run in motion.
+    pub fn note_run_live(&mut self, live: bool) {
+        if live && !self.run_live {
+            self.takeover_dismissed = false;
+            self.layout.state_tab_hidden = true;
+        }
+        if !live {
+            // The run ended: the split is authoritative again, so the
+            // State tab comes back and the takeover resets for the
+            // next run.
+            self.takeover_dismissed = false;
+            self.layout.state_tab_hidden = false;
+        }
+        self.run_live = live;
+    }
+
+    /// Back from the takeover: return to the split while the run
+    /// continues, with the State tab hidden. No-op when no run is
+    /// live (Esc then falls through to its normal targets).
+    pub fn dismiss_takeover(&mut self) -> bool {
+        if !self.run_live {
+            return false;
+        }
+        self.takeover_dismissed = true;
+        self.layout.state_tab_hidden = true;
+        true
+    }
+
+    /// Open the detached confirmation popover. Called on *every*
+    /// selection of the detached chip — mouse or keyboard — so there
+    /// is no path to a detached run that skipped the prompt.
+    pub fn open_detached_confirm(&mut self) {
+        self.detached_confirm = Some(crate::tui::autopilot::setup::DetachedConfirm::new());
+    }
+
+    /// Resolve the popover. Returns the choice the operator made so
+    /// the caller can apply it (and write through mp).
+    pub fn take_detached_choice(&mut self) -> Option<crate::tui::autopilot::setup::DetachedChoice> {
+        self.detached_confirm
+            .as_ref()
+            .map(|p| p.current())
+            .inspect(|_| self.detached_confirm = None)
+    }
+
+    /// Open the read-only peek for `id`. Re-opening replaces any
+    /// current peek rather than stacking them.
+    pub fn open_peek(&mut self, peek: crate::tui::autopilot::setup::MilestonePeek) {
+        self.peek = Some(peek);
+    }
+
+    pub fn close_peek(&mut self) {
+        self.peek = None;
+    }
+
+    /// The derived, read-only topology id for the override panel.
+    pub fn topology_id(&self) -> String {
+        crate::tui::autopilot::setup::topology_id(&self.setup.topology, self.session_count)
     }
 
     /// M216 AC-03: the session id the lane is currently

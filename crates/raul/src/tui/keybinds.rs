@@ -243,6 +243,23 @@ pub struct AutopilotLaneKeybinds {
     /// and `pause` is matched first, so the toggle would never
     /// fire. Move `pause` elsewhere in the same edit.
     pub toggle_poll: Vec<KeyCombo>,
+    /// Next sidebar tab (default `v`).
+    ///
+    /// The Autopilot sidebar has three tabs — Progress, Activity,
+    /// State — and this cycles forward through the ones currently
+    /// *selectable*. While a run is live, `state` is not offered
+    /// (the takeover owns the full screen), so the cycle skips it
+    /// rather than landing on a tab that cannot render.
+    pub next_sidebar_tab: Vec<KeyCombo>,
+    /// Previous sidebar tab (default `V`, capital). The mirror of
+    /// `next_sidebar_tab` and subject to the same live-run skip.
+    pub prev_sidebar_tab: Vec<KeyCombo>,
+    /// Collapse / expand the sidebar (default `z`).
+    ///
+    /// Persisted to `ui.autopilot.sidebar_visible` through `mp
+    /// config set`, so the choice survives a restart. With the
+    /// sidebar hidden the setup region takes the full lane width.
+    pub toggle_sidebar: Vec<KeyCombo>,
 }
 
 impl Default for AutopilotLaneKeybinds {
@@ -270,6 +287,9 @@ impl Default for AutopilotLaneKeybinds {
             open_detail: vec![plain(KeyCode::Char('d'))],
             close_detail: vec![shift_char('D')],
             toggle_poll: vec![ctrl(KeyCode::Char('p'))],
+            next_sidebar_tab: vec![plain(KeyCode::Char('v'))],
+            prev_sidebar_tab: vec![shift_char('V')],
+            toggle_sidebar: vec![plain(KeyCode::Char('z'))],
         }
     }
 }
@@ -359,6 +379,9 @@ impl Default for Keybinds {
                 open_detail: vec![plain(KeyCode::Char('d'))],
                 close_detail: vec![shift_char('D')],
                 toggle_poll: vec![ctrl(KeyCode::Char('p'))],
+                next_sidebar_tab: vec![plain(KeyCode::Char('v'))],
+                prev_sidebar_tab: vec![shift_char('V')],
+                toggle_sidebar: vec![plain(KeyCode::Char('z'))],
             },
         }
     }
@@ -1507,6 +1530,18 @@ impl Keybinds {
                     self.lane_autopilot.close.clone(),
                     defaults.lane_autopilot.close.clone(),
                 ),
+                "next_sidebar_tab" => (
+                    self.lane_autopilot.next_sidebar_tab.clone(),
+                    defaults.lane_autopilot.next_sidebar_tab.clone(),
+                ),
+                "prev_sidebar_tab" => (
+                    self.lane_autopilot.prev_sidebar_tab.clone(),
+                    defaults.lane_autopilot.prev_sidebar_tab.clone(),
+                ),
+                "toggle_sidebar" => (
+                    self.lane_autopilot.toggle_sidebar.clone(),
+                    defaults.lane_autopilot.toggle_sidebar.clone(),
+                ),
                 _ => (Vec::new(), Vec::new()),
             };
             rows.push(KeybindsViewRow {
@@ -1607,6 +1642,9 @@ impl Keybinds {
             "start" => self.lane_autopilot.start = value,
             "replay" => self.lane_autopilot.replay = value,
             "close" => self.lane_autopilot.close = value,
+            "next_sidebar_tab" => self.lane_autopilot.next_sidebar_tab = value,
+            "prev_sidebar_tab" => self.lane_autopilot.prev_sidebar_tab = value,
+            "toggle_sidebar" => self.lane_autopilot.toggle_sidebar = value,
             _ => {}
         }
     }
@@ -1661,6 +1699,9 @@ impl Keybinds {
             "start",
             "replay",
             "close",
+            "next_sidebar_tab",
+            "prev_sidebar_tab",
+            "toggle_sidebar",
         ];
         NAMES
     }
@@ -1701,6 +1742,18 @@ impl Keybinds {
             ("start", defaults.lane_autopilot.start.as_slice()),
             ("replay", defaults.lane_autopilot.replay.as_slice()),
             ("close", defaults.lane_autopilot.close.as_slice()),
+            (
+                "next_sidebar_tab",
+                defaults.lane_autopilot.next_sidebar_tab.as_slice(),
+            ),
+            (
+                "prev_sidebar_tab",
+                defaults.lane_autopilot.prev_sidebar_tab.as_slice(),
+            ),
+            (
+                "toggle_sidebar",
+                defaults.lane_autopilot.toggle_sidebar.as_slice(),
+            ),
         ];
         for (name, combos) in ap {
             out.push((

@@ -329,6 +329,20 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
         return Some(vec![Action::AutopilotTogglePoll]);
     }
 
+    // Sidebar navigation. These three sit at the end of the lane's
+    // dispatch so a user who rebinds one of them onto an existing
+    // lane key keeps the earlier binding — the same shadowing rule
+    // `toggle_poll` follows.
+    if any_matches(&ap.next_sidebar_tab, &key) {
+        return Some(vec![Action::AutopilotNextSidebarTab]);
+    }
+    if any_matches(&ap.prev_sidebar_tab, &key) {
+        return Some(vec![Action::AutopilotPrevSidebarTab]);
+    }
+    if any_matches(&ap.toggle_sidebar, &key) {
+        return Some(vec![Action::AutopilotToggleSidebar]);
+    }
+
     None
 }
 

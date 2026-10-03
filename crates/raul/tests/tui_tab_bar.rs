@@ -1216,6 +1216,12 @@ fn s7_action_enum_carries_page_up_down() {
             | Action::AutopilotTogglePoll => {
                 set.insert("OtherM136Action");
             }
+            // Sidebar navigation — non-input variants.
+            Action::AutopilotNextSidebarTab
+            | Action::AutopilotPrevSidebarTab
+            | Action::AutopilotToggleSidebar => {
+                set.insert("OtherM136Action");
+            }
             // M222: keybinds-reload action — non-input variant.
             Action::ReloadKeybinds => {
                 set.insert("OtherM136Action");

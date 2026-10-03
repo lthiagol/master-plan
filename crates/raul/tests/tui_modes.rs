@@ -265,6 +265,9 @@ fn actions_have_required_variants() {
             | Action::AutopilotCloseDetail
             // M217 / AC-03: auto-refresh on/off toggle.
             | Action::AutopilotTogglePoll => "M215Autopilot",
+            | Action::AutopilotNextSidebarTab
+            | Action::AutopilotPrevSidebarTab
+            | Action::AutopilotToggleSidebar => "M241Sidebar",
             // Force exhaustiveness — must compile, must use every variant.
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",

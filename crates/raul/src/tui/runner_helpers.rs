@@ -1,5 +1,140 @@
 //! Data-loading and subprocess side-effect helpers shared by the action reducer,
 //! mode handlers, and integration tests.
+pub mod autopilot_setup {
+    //! Persistence for the Autopilot lane's setup form and UI
+    //! preferences.
+    //!
+    //! raul owns no state file: every persisted choice is an `mp config
+    //! set` (or `mp autopilot config set`) call, and every preference is
+    //! read back with `mp config get` on lane load. The argv builders
+    //! live in [`crate::tui::autopilot::setup`] as data so the
+    //! persistence contract is assertable without a subprocess; the
+    //! functions here are the thin shell-out layer on top of them.
+
+    use super::*;
+    use crate::tui::autopilot::setup::{self, SidebarTab, UiPrefs};
+
+    /// The three `ui.autopilot.*` keys, in the order they are read.
+    /// One slice so the loader and the fake-runner assertions cannot
+    /// drift apart.
+    pub const UI_PREF_KEYS: [&str; 3] = [
+        "ui.autopilot.split_pct",
+        "ui.autopilot.sidebar_tab",
+        "ui.autopilot.sidebar_visible",
+    ];
+
+    /// Write one preference through `mp config set`.
+    ///
+    /// Failures are reported, not swallowed: a preference the operator
+    /// just toggled that never reached disk would silently reappear on
+    /// the next launch. `apply_action` turns the error into a flash
+    /// message so the operator sees it instead of assuming it stuck.
+    pub fn persist_pref(runner: &MpRunner, argv: &[String]) -> Result<()> {
+        let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let out = runner.run_raw_allow_failure("config", &args)?;
+        parse_mp_ok_response(&out, b"", "config set")
+    }
+
+    /// Convenience wrapper: build the argv and write it.
+    pub fn persist_ui_pref(runner: &MpRunner, field: &str, value: &str) -> Result<()> {
+        persist_pref(runner, &setup::ui_pref_argv(field, value))
+    }
+
+    /// Read one `ui.autopilot.*` value, returning the raw string form
+    /// of `mp config get <key>`'s `value` field. An unreadable key
+    /// yields `None` so one bad value cannot fail the whole load.
+    fn read_pref(runner: &MpRunner, key: &str) -> Option<String> {
+        let out = runner
+            .run_raw_allow_failure("config", &["get", key, "--format", "json"])
+            .ok()?;
+        let value: serde_json::Value = serde_json::from_slice(&out).ok()?;
+        Some(match value.get("value")? {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Bool(b) => b.to_string(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => return None,
+        })
+    }
+
+    /// Load the three `ui.autopilot.*` preferences and apply them to
+    /// the lane's layout. Never fails: a preferences read that errors
+    /// leaves the lane on its documented defaults, which is a
+    /// recoverable state (unlike a load that propagates and blanks
+    /// the lane).
+    pub fn load_layout_prefs(runner: &MpRunner, app: &mut App) {
+        let mut pairs: Vec<(&str, String)> = Vec::with_capacity(UI_PREF_KEYS.len());
+        for key in UI_PREF_KEYS {
+            if let Some(value) = read_pref(runner, key) {
+                pairs.push((key, value));
+            }
+        }
+        let owned: Vec<(&str, &str)> = pairs.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        UiPrefs::from_pairs(owned).apply_to(&mut app.autopilot.layout);
+    }
+
+    /// Persist the current layout after a change. `changed` names the
+    /// field so only the affected key is written — writing all three
+    /// on every drag would put three lines in `config.json` where one
+    /// changed.
+    pub fn persist_layout_field(runner: &MpRunner, app: &App, field: &str) -> Result<()> {
+        let layout = &app.autopilot.layout;
+        let value = match field {
+            "split_pct" => layout.split_pct.to_string(),
+            "sidebar_tab" => layout.sidebar_tab.as_str().to_string(),
+            "sidebar_visible" => layout.sidebar_visible.to_string(),
+            other => anyhow::bail!("unknown autopilot layout field: {other}"),
+        };
+        persist_ui_pref(runner, field, &value)
+    }
+
+    /// Persist the setup form's persisted fields. Topology, per-role
+    /// harness, and the two commit toggles round-trip through mp;
+    /// milestone selection and run mode are per-run and are never
+    /// written.
+    pub fn persist_setup_field(runner: &MpRunner, app: &App, field: &str) -> Result<()> {
+        let setup = &app.autopilot.setup;
+        match field {
+            "topology" => {
+                let argv = setup::autopilot_config_set_argv("autopilot.topology", &setup.topology);
+                let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+                let out = runner.run_raw_allow_failure("autopilot", &args)?;
+                parse_mp_ok_response(&out, b"", "autopilot config set")
+            }
+            role_field => {
+                if let Some(role) = role_field.strip_prefix("harness:") {
+                    let harness = setup.harness_for(role);
+                    let argv = setup::autopilot_config_set_argv(
+                        &format!("autopilot.roles.{role}.harness"),
+                        harness,
+                    );
+                    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+                    let out = runner.run_raw_allow_failure("autopilot", &args)?;
+                    parse_mp_ok_response(&out, b"", "autopilot config set")
+                } else {
+                    anyhow::bail!("unknown autopilot setup field: {role_field}")
+                }
+            }
+        }
+    }
+
+    /// Persist a commit-behavior toggle through `mp config set
+    /// agent.automation.<field>`.
+    pub fn persist_commit_toggle(runner: &MpRunner, app: &App, field: &str) -> Result<()> {
+        let enabled = match field {
+            "commit_after_execute" => app.autopilot.setup.commit_after_execute,
+            "push_after_review" => app.autopilot.setup.push_after_review,
+            other => anyhow::bail!("unknown commit toggle: {other}"),
+        };
+        persist_pref(runner, &setup::commit_toggle_argv(field, enabled))
+    }
+
+    /// Read the stored tab back as the enum. Split out so the State
+    /// tab's "current session" read and the layout read can share the
+    /// one parse rule.
+    pub fn tab_from_raw(raw: &str) -> SidebarTab {
+        SidebarTab::parse(raw)
+    }
+}
 
 use anyhow::Result;
 
