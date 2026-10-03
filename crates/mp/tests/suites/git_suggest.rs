@@ -1,26 +1,8 @@
 use std::fs;
 use std::process::Command;
 
+use crate::common::git::init_git;
 use crate::common::TestEnv;
-
-fn init_git(env: &TestEnv) {
-    let root = env.tmp.path();
-    Command::new("git")
-        .args(["init"])
-        .current_dir(root)
-        .output()
-        .expect("git init");
-    Command::new("git")
-        .args(["config", "user.email", "test@example.com"])
-        .current_dir(root)
-        .output()
-        .expect("git config email");
-    Command::new("git")
-        .args(["config", "user.name", "Test"])
-        .current_dir(root)
-        .output()
-        .expect("git config name");
-}
 
 #[test]
 fn git_status_suggest_and_commit_plan_only() {

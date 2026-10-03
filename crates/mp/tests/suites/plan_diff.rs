@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crate::common::lib_api;
+use crate::common::seed::seed_handoff_gate;
 use crate::common::TestEnv;
 
 fn git_init_and_commit(cwd: &std::path::Path, message: &str) {
@@ -28,49 +29,6 @@ fn git_init_and_commit(cwd: &std::path::Path, message: &str) {
             );
         }
     }
-}
-
-fn seed_handoff_gate(env: &TestEnv) {
-    let create_json = r#"{
-        "title": "Handoff gate",
-        "intent": { "outcome": "Enable handoff." },
-        "problem": { "description": "Need handoff gate." },
-        "scope": { "in_scope": ["x"], "out_of_scope": ["a", "b"] },
-        "acceptance_criteria": [
-            { "description": "works", "verification": "manual: ok" }
-        ]
-    }"#;
-    assert!(
-        lib_api::run(env, &["milestone", "create", "--json", create_json])
-            .status
-            .success(),
-        "create handoff gate"
-    );
-    assert!(lib_api::run(env, &["milestone", "approve", "01"])
-        .status
-        .success());
-    assert!(lib_api::run(env, &["milestone", "decompose", "01"])
-        .status
-        .success());
-    assert!(env
-        .run(&[
-            "milestone",
-            "step",
-            "add",
-            "01",
-            "--wp",
-            "WP1",
-            "--action",
-            "step",
-            "--done-when",
-            "done",
-            "--tests",
-            "manual: ok",
-            "--covers-ac",
-            "AC-01",
-        ])
-        .status
-        .success());
 }
 
 fn create_milestone(env: &TestEnv, title: &str) -> String {

@@ -1,46 +1,8 @@
 use std::process::Command;
 
+use crate::common::seed::seed_handoff_gate;
 use crate::common::{isolated_harness_env, mp_bin, repo_root, TestEnv};
 use tempfile::TempDir;
-
-fn seed_handoff_gate(env: &TestEnv) {
-    let create_json = r#"{
-        "title": "Handoff gate",
-        "intent": { "outcome": "Enable handoff." },
-        "problem": { "description": "Need handoff gate." },
-        "scope": { "in_scope": ["x"], "out_of_scope": ["a", "b"] },
-        "acceptance_criteria": [
-            { "description": "works", "verification": "manual: ok" }
-        ]
-    }"#;
-    assert!(
-        env.run(&["milestone", "create", "--json", create_json])
-            .status
-            .success(),
-        "create handoff gate"
-    );
-    assert!(env.run(&["milestone", "approve", "01"]).status.success());
-    assert!(env.run(&["milestone", "decompose", "01"]).status.success());
-    assert!(env
-        .run(&[
-            "milestone",
-            "step",
-            "add",
-            "01",
-            "--wp",
-            "WP1",
-            "--action",
-            "step",
-            "--done-when",
-            "done",
-            "--tests",
-            "manual: ok",
-            "--covers-ac",
-            "AC-01",
-        ])
-        .status
-        .success());
-}
 
 fn do_handoff(env: &TestEnv) {
     // M197 F-07: `execution handoff` now also requires watch

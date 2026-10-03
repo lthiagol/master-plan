@@ -591,5 +591,7 @@ pub fn json_from_stdout(stdout: &[u8]) -> serde_json::Value {
 }
 
 pub mod fake_herdr;
+pub mod git;
 pub mod lib_api;
 pub mod review_queue_fixture;
+pub mod seed;
