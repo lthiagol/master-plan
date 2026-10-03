@@ -3,9 +3,9 @@
     "id": "241",
     "title": "Autopilot tab: 40/60 split geometry + While-Executing full-screen takeover",
     "slug": "autopilot-tab-40-60-split-geometry-while-executing-full-screen-takeover",
-    "lifecycle": "approved",
+    "lifecycle": "in-progress",
     "spec_status": "ready",
-    "execution_status": "planned",
+    "execution_status": "in-progress",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -19,17 +19,25 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-28",
+    "updated": "2026-10-03",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
     "executed_by": "",
-    "lifecycle_at": "2026-09-27T16:01:11.850346+00:00",
+    "lifecycle_at": "2026-10-03T19:23:23.586902+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T16:01:11.850348+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-10-03T19:23:30.571373+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-10-03T19:23:30.625136+00:00"
       },
       "specify": {
         "status": "done",
@@ -76,78 +84,78 @@
       "id": "AC-01",
       "description": "At 132x36 the setup region renders six stacked sections (topology, harness per role, milestones, commit behavior, run mode, Start + summary) and the control row, matching a committed golden buffer; each chip toggles on click and via keyboard focus.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout exit 0 (8 tests run, 8 passed)"
     },
     {
       "id": "AC-02",
       "description": "The sidebar split drags between 25% and 75% (clamped), persists to ui.autopilot.split_pct on mouse-up via mp config set, and is inert while a run is live.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar exit 0 (20 tests run, 20 passed)"
     },
     {
       "id": "AC-03",
       "description": "Sidebar tabs Progress / Activity / State switch by click and by v / Shift+V; z toggles sidebar visibility; tab and visibility persist to ui.autopilot.sidebar_tab / sidebar_visible; all three bindings are rebindable AutopilotLaneKeybinds fields that collide with no existing lane or global default.",
-      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar && cargo nextest run -p raul --no-fail-fast -E 'test(/keybind/)'",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m241-ac03.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m241-ac03.sh exit 0 (57 tests run, 57 passed)"
     },
     {
       "id": "AC-04",
       "description": "The State tab shows read-only JSON for autopilot config, ui.autopilot.* values, mp autopilot status, the current session (when present), and pending override-panel values; it refreshes on the poll tick and on Refresh.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab exit 0 (8 tests run, 8 passed)"
     },
     {
       "id": "AC-05",
       "description": "When mp autopilot status reports a live run, the split is replaced by the takeover: topology strip, one row per queued milestone (id, lifecycle, cycle, lifecycle-position bar), activity tail, health/heartbeat strip, control row.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing exit 0 (20 tests run, 20 passed)"
     },
     {
       "id": "AC-06",
       "description": "Esc / Back from the takeover returns to the split while the run continues, with the State tab hidden (click and v/V skip it); clicking or Enter on a takeover row opens a read-only peek with intent.outcome and the AC list.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek/)' exit 0 (5 tests run, 5 passed)"
     },
     {
       "id": "AC-07",
       "description": "The override panel shows a read-only topology id '<topology>-<NNN>' with NNN = 1 + mp autopilot session list count, zero-padded; nothing is persisted.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id exit 0 (9 tests run, 9 passed)"
     },
     {
       "id": "AC-08",
       "description": "Every selection of the detached chip opens Confirm / Configure extras / Back; Confirm keeps detached, Configure extras opens the override panel, Back reverts to normal.",
       "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm exit 0 (14 tests run, 14 passed)"
     },
     {
       "id": "AC-09",
       "description": "Setup chips write through mp (autopilot.topology, autopilot.roles.<role>.harness, agent.automation.commit_after_execute / push_after_review); mp accepts and validates the new ui.autopilot.* keys; no .mp/autopilot-state.json is written.",
-      "verification": "cargo nextest run -p raul --no-fail-fast --test autopilot_persistence && cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_autopilot/)' && ! rg -q 'autopilot-state\\.json' crates/raul/src",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m241-ac09.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m241-ac09.sh exit 0 (23 tests run, 23 passed)"
     },
     {
       "id": "AC-10",
       "description": "The existing ? help overlay has an Autopilot section generated from AutopilotLaneKeybinds (a rebind shows up), and docs/raul/keybinds.md lists v / Shift+V / z.",
-      "verification": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_overlay_autopilot/)' && rg -q 'next_sidebar_tab' docs/raul/keybinds.md",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m241-ac10.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m241-ac10.sh exit 0 (4 tests run, 4 passed)"
     },
     {
       "id": "AC-11",
       "description": "mp and raul tests, clippy, fmt, and consumer-surface lint are clean; existing autopilot reads are unaffected (new config keys are additive).",
-      "verification": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m241-ac11.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m241-ac11.sh exit 0 (5454 tests run, 5454 passed)"
     }
   ],
   "design_decisions": [
@@ -203,7 +211,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout",
       "done_when": "Setup region matches the committed golden; chips toggle by click and keyboard",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -211,7 +219,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout exit 0 (8 tests run, 8 passed); commits 233acec,31f575d"
     },
     {
       "id": "S1.1",
@@ -225,7 +233,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar -E 'test(/drag/)'",
       "done_when": "Drag clamps, persists on release, inert during a run",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -235,7 +243,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar -E 'test(/drag|split/)' exit 0 (6 tests run, 6 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S1.2",
@@ -249,7 +257,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab",
       "done_when": "State tab renders all five sources read-only",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -259,7 +267,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_state_tab exit 0 (8 tests run, 8 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S1.3",
@@ -273,7 +281,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek/)'",
       "done_when": "Back + hidden State tab + peek modal work during a live run",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -284,7 +292,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/state_tab_hidden|peek|after_back|sticky|back_is/)' exit 0 (8 tests run, 8 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S0",
@@ -298,7 +306,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar",
       "done_when": "Tabs switch by click and keys; prefs persist",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -310,7 +318,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_sidebar exit 0 (20 tests run, 20 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S2",
@@ -324,7 +332,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/takeover|layout|rows/)'",
       "done_when": "Takeover replaces the split during a live run",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -335,7 +343,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing -E 'test(/takeover|layout|rows|queued|live_run|position_bar/)' exit 0 (12 tests run, 12 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S1.4",
@@ -348,7 +356,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id",
       "done_when": "Topology id derives from topology + session count",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -358,7 +366,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_topo_id exit 0 (9 tests run, 9 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S1.5",
@@ -372,7 +380,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm",
       "done_when": "Popover appears every time with all three outcomes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-08"
       ],
@@ -382,7 +390,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_detached_confirm exit 0 (14 tests run, 14 passed); commits 50ff5a8,31f575d"
     },
     {
       "id": "S1.6",
@@ -397,7 +405,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_autopilot/)'",
       "done_when": "mp config set/get round-trips the three ui.autopilot keys and rejects invalid values",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-09"
       ],
@@ -405,7 +413,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p mp --test suite_config --no-fail-fast -E 'test(/ui_autopilot/)' exit 0 (9 tests run, 9 passed); commits 55ebafe"
     },
     {
       "id": "S1.7",
@@ -415,9 +423,9 @@
       "files": [
         "CHANGELOG.md"
       ],
-      "tests": "cargo nextest run -p mp -p raul --no-fail-fast && cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint",
+      "tests": "./scripts/verify-m241-step-s1.7.sh",
       "done_when": "All gates green",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-11"
       ],
@@ -436,7 +444,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "./scripts/verify-m241-step-s1.7.sh exit 0 (5454 tests run, 5454 passed); commits 2ba118b"
     },
     {
       "id": "S1.8",
@@ -448,9 +456,9 @@
         "crates/raul/src/tui/runner_helpers.rs",
         "crates/raul/tests/autopilot_persistence.rs"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_persistence && ! rg -q 'autopilot-state\\.json' crates/raul/src",
+      "tests": "./scripts/verify-m241-step-s1.8.sh",
       "done_when": "Every persisted choice round-trips through mp",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-09"
       ],
@@ -461,7 +469,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "./scripts/verify-m241-step-s1.8.sh exit 0 (14 tests run, 14 passed); commits 2ba118b"
     },
     {
       "id": "S2.1",
@@ -474,7 +482,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout -E 'test(/control_row/)'",
       "done_when": "Control row reuses existing lane actions and is inert when idle",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01",
         "AC-05"
@@ -485,7 +493,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast --test autopilot_setup_layout -E 'test(/control_row/)' exit 0 (3 tests run, 3 passed); commits 233acec,31f575d"
     },
     {
       "id": "S2.2",
@@ -497,7 +505,7 @@
       ],
       "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybind/)'",
       "done_when": "Three new rebindable lane bindings with no default collisions",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -505,7 +513,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "cargo nextest run -p raul --no-fail-fast -E 'test(/keybind/)' exit 0 (37 tests run, 37 passed); commits 3ae7656,31f575d"
     },
     {
       "id": "S3",
@@ -516,9 +524,9 @@
         "crates/raul/src/tui/render/overlays.rs",
         "docs/raul/keybinds.md"
       ],
-      "tests": "cargo nextest run -p raul --no-fail-fast -E 'test(/help_overlay_autopilot/)' && rg -q 'next_sidebar_tab' docs/raul/keybinds.md",
+      "tests": "./scripts/verify-m241-step-s3.sh",
       "done_when": "Help overlay reflects rebinds; docs list the new keys",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-10"
       ],
@@ -528,7 +536,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "./scripts/verify-m241-step-s3.sh exit 0 (4 tests run, 4 passed); commits 2ba118b"
     }
   ],
   "verification": {
