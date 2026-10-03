@@ -110,10 +110,10 @@ fn keep_and_shorten_inventory_comments_are_tag_free() {
         (
             // The Autopilot renderer was renamed from `watch.rs` when the
             // legacy `Watch` struct was deleted; the pin follows the file so
-            // the "log I/O belongs to the poller, not the renderer" invariant
-            // keeps its tag-free-comment coverage.
+            // the "the renderer does no I/O — the poller owns every read"
+            // invariant keeps its tag-free-comment coverage.
             "crates/raul/src/tui/render/autopilot_lane.rs",
-            &["log pane reads the in-memory snapshot"][..],
+            &["It performs no I/O; the poller and the"][..],
         ),
     ];
 

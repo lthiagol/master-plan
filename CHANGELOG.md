@@ -1,5 +1,45 @@
 ## Unreleased — WIP CI hardening
 
+- **The Autopilot tab is now a control-first split view, and takes over the
+  screen while a run is live.** The status-first picker/graph/queue layout is
+  replaced by a setup form on the left (40% of the lane) and a tabbed sidebar
+  on the right (60%). The form has six stacked sections — Topology, Harness per
+  role, Milestones, Commit behavior, Run mode, and Start with a one-line
+  `<n> milestones · <topology> · <run mode>` summary — plus a Pause / Stop /
+  Resume / Back control row that is dim and inert when no run is live. Every
+  chip, tab, button, and takeover row is clickable, and the `│` between the
+  columns drags (clamped to 25–75%, inert during a run).
+  The sidebar has three tabs: **Progress** (lifecycle graph, queue, health
+  badge), **Activity** (`mp activity`, newest first), and **State** (a
+  read-only window onto the autopilot config, the `ui.autopilot.*` values, the
+  autopilot status, the current session, and pending override values).
+  `v` / `Shift+V` move between tabs and `z` collapses the sidebar; all three
+  are rebindable and appear in the `?` help overlay.
+  When `mp autopilot status` reports a live run, the split is replaced by a
+  full-screen takeover — topology strip, one row per queued milestone with its
+  lifecycle position, activity tail, health strip, control row. `Esc` returns
+  to the split while the run continues (the State tab is withheld until the run
+  ends), and clicking or pressing `Enter` on a row opens a read-only peek with
+  the milestone's `intent.outcome` and AC list.
+  Two safety rails worth calling out: selecting **detached** run mode always
+  opens a Confirm / Configure extras / Back popover, so there is no path to a
+  detached run that skips the prompt; and the override panel shows a *derived*,
+  read-only run id (`<topology>-<NNN>`) that is recomputed from the live session
+  count rather than stored.
+
+- **Three new `ui.autopilot.*` config keys, so the lane's layout persists
+  through mp instead of a raul-owned state file.** `ui.autopilot.split_pct`
+  (integer 25–75, default 40), `ui.autopilot.sidebar_tab`
+  (`progress|activity|state`, default `progress`), and
+  `ui.autopilot.sidebar_visible` (bool, default `true`) are validated by
+  `mp config set` and documented in `mp config schema`. The whole
+  `ui.autopilot` object is omitted from `config.json` until a value is set, so
+  the config shape stays additive for projects that never open the tab. raul
+  writes every persisted choice through `mp config set` /
+  `mp autopilot config set`; milestone selection and run mode are deliberately
+  per-run and are never written, because a stale selection from last week is
+  worse than no selection at all.
+
 - **raul collapsed the legacy Watch model into the Autopilot lane.**
   `tui::watch` is gone: `App::watch` and every `Action::Watch*` variant are
   removed, `crates/raul/src/tui/render/watch.rs` is renamed to

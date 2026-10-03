@@ -60,10 +60,8 @@ sort key, `Enter` binds and closes, `Esc` cancels without binding.
 
 The **Autopilot** lane (lane 6, only visible when
 `ui.show_autopilot_tab = true`) is the visual surface for the `mp autopilot`
-workflow: it renders the drivable-milestone picker, the lifecycle graph, the
-ordered queue, and the live agent output of an autopilot run. The lane is a
-*view* — the actual control surface is the `mp autopilot` CLI
-([`../mp/commands.md`](../mp/commands.md)):
+workflow. The lane is a *view* — the actual control surface is the
+`mp autopilot` CLI ([`../mp/commands.md`](../mp/commands.md)):
 
 ```bash
 mp autopilot start <id> [<id>…] [--dry-run]   # drive milestones through their lifecycle
@@ -77,9 +75,55 @@ hidden and **Settings is lane 6** instead of lane 7. Lane-number bindings
 (`1`–`7`) skip the hidden lane; everything else in this file is lane-ordinal
 agnostic. Use `mp config set ui.show_autopilot_tab true` to enable.
 
-The lane's interactive keys (picker selection, dry-run preflight, start/stop)
-are wired through the action set but not yet bound to the keyboard dispatcher;
-use the CLI commands above to drive a run today.
+### The split view
+
+The lane is a setup form on the left and a tabbed sidebar on the right:
+
+- **Setup form (left)** — six stacked sections: Topology, Harness per role,
+  Milestones, Commit behavior, Run mode, and Start with a one-line summary
+  (`<n> milestones · <topology> · <run mode>`). Under Start sits the control
+  row: Pause / Stop / Resume / Back, dim and inert when no run is live.
+- **Sidebar (right)** — Progress, Activity, and State.
+- **Takeover** — while a run is live the split is replaced by a full-screen
+  dashboard (topology strip, one row per queued milestone, activity tail,
+  health strip, control row). `Esc` returns to the split while the run
+  continues; the State tab is hidden until the run ends.
+
+Every chip, tab, button, and takeover row is also clickable. Drag the `│`
+between the two columns to resize; the width is clamped to 25–75% and
+cannot be dragged while a run is live.
+
+### Sidebar keys
+
+| Action | Default key |
+|--------|-------------|
+| Next sidebar tab | `v` |
+| Previous sidebar tab | `Shift+V` |
+| Toggle sidebar | `z` |
+
+All three are rebindable under `[autopilot]` in `keybinds.toml` as
+`next_sidebar_tab`, `prev_sidebar_tab`, and `toggle_sidebar`. They appear
+in the `?` help overlay's Autopilot section, which is generated from the
+live keymap — a rebind shows up there with no second edit.
+
+The active tab and the sidebar's visibility persist through mp:
+
+```bash
+mp config get  ui.autopilot.split_pct         # 25..=75, default 40
+mp config get  ui.autopilot.sidebar_tab       # progress | activity | state
+mp config get  ui.autopilot.sidebar_visible   # bool, default true
+```
+
+The **State** tab is a read-only window onto `mp autopilot config get
+autopilot`, the `ui.autopilot.*` values, `mp autopilot status`, the current
+session, and any override-panel values you have typed but not yet applied.
+
+Selecting the **detached** run mode always opens a confirmation popover
+(Confirm / Configure extras / Back) — there is no path to a detached run
+that skips the prompt. `Configure extras` opens the override panel, which
+also shows a derived, read-only run id of the form
+`<topology>-<NNN>` (`NNN` is one more than the number of existing
+sessions).
 
 ## Annotations, approval, review
 
@@ -161,6 +205,9 @@ page_down = ["PageDown", "pagedown"]
 [autopilot]
 select = "f1"          # was Space
 move_picker_up = "k"
+next_sidebar_tab = "v"      # sidebar: next tab
+prev_sidebar_tab = "V"      # sidebar: previous tab
+toggle_sidebar = "z"        # sidebar: collapse / expand
 ```
 
 Reload the file without restarting: on Unix, `kill -HUP <raul-pid>` requests

@@ -586,7 +586,9 @@ pub fn update_split_drag(app: &mut App, regions: &setup::AutopilotRegions, x: u1
     if !app.autopilot.dragging_split {
         return;
     }
-    let pct = split_pct_for_column(regions.setup.width, x, regions.setup.x);
+    // Relative to the lane's full width, not the current setup column —
+    // see `AutopilotRegions::lane_width`.
+    let pct = split_pct_for_column(regions.lane_width, x, regions.setup.x);
     app.autopilot.layout.set_split_pct(pct as i64);
 }
 

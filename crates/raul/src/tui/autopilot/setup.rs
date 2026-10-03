@@ -771,6 +771,11 @@ pub struct ControlRowAreas {
 /// disagree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AutopilotRegions {
+    /// The lane's full width. The split percentage is relative to
+    /// this, not to the setup column: dividing by the *current* setup
+    /// width would make the drag accelerate as the column narrows, so
+    /// a pointer held still would keep pushing the border left.
+    pub lane_width: u16,
     /// The setup form's column (left). Equals `area` when the sidebar
     /// is collapsed.
     pub setup: Rect,
@@ -1144,6 +1149,7 @@ pub fn regions(
     }
 
     AutopilotRegions {
+        lane_width: area.width,
         setup: setup_rect,
         sidebar,
         split_x,
@@ -1178,31 +1184,33 @@ pub fn takeover_bands(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
     const TOPOLOGY_H: u16 = 3;
     const TELEMETRY_H: u16 = 1;
     const CONTROL_H: u16 = 3;
-    let telemetry_y = area.y + TOPOLOGY_H;
-    let rows_y = telemetry_y + TELEMETRY_H;
-    let rows_h = area
-        .height
-        .saturating_sub(TOPOLOGY_H + TELEMETRY_H + CONTROL_H);
-    let control_y = rows_y.saturating_add(rows_h);
-    (
-        Rect::new(area.x, area.y, area.width, TOPOLOGY_H),
-        Rect::new(area.x, telemetry_y, area.width, TELEMETRY_H),
-        Rect::new(area.x, rows_y, area.width, rows_h),
-        // The activity tail takes the last row of the rows band so it
-        // fills whatever the queue did not.
-        Rect::new(
-            area.x,
-            rows_y.saturating_add(rows_h).saturating_sub(1),
-            area.width,
-            if rows_h == 0 { 0 } else { 1 },
-        ),
-        Rect::new(
-            area.x,
-            control_y,
-            area.width,
-            CONTROL_H.min(area.height.saturating_sub(rows_y)),
-        ),
-    )
+
+    // Every band is clamped to the space left below it, so a terminal
+    // too short to hold the takeover gets truncated bands rather than
+    // rects that run past the bottom of the lane.
+    let bottom = area.y.saturating_add(area.height);
+    let clamp = |y: u16, want: u16| -> Rect {
+        let y = y.min(bottom);
+        Rect::new(area.x, y, area.width, want.min(bottom.saturating_sub(y)))
+    };
+
+    let topology = clamp(area.y, TOPOLOGY_H);
+    let telemetry = clamp(topology.y.saturating_add(topology.height), TELEMETRY_H);
+    // The control row is pinned to the bottom so pause / stop stay
+    // reachable however short the terminal is.
+    let control = clamp(bottom.saturating_sub(CONTROL_H.min(area.height)), CONTROL_H);
+    // The rows band takes whatever is between telemetry and control.
+    let rows_y = telemetry.y.saturating_add(telemetry.height);
+    let rows = Rect::new(area.x, rows_y, area.width, control.y.saturating_sub(rows_y));
+    // The activity tail takes the last row of the rows band, so it
+    // fills whatever the queue did not.
+    let activity = Rect::new(
+        area.x,
+        rows.y.saturating_add(rows.height).saturating_sub(1),
+        area.width,
+        if rows.height == 0 { 0 } else { 1 },
+    );
+    (topology, telemetry, rows, activity, control)
 }
 
 #[cfg(test)]

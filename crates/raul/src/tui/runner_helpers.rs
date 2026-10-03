@@ -1067,7 +1067,16 @@ pub fn load_data_for_lane(runner: &MpRunner, app: &mut App) -> Result<()> {
         // selection-driven, not list-driven, so refresh uses
         // `mp list milestones` (the picker source). S7 adds
         // the periodic poller.
-        Lane::Autopilot => load_autopilot_picker(runner, app),
+        Lane::Autopilot => {
+            // Read the persisted UI preferences on every lane load, not
+            // once at startup: the operator can change `split_pct` /
+            // `sidebar_tab` / `sidebar_visible` from another window (or
+            // by hand) and a lane reload should pick that up. The read
+            // never fails the load — a bad value leaves the documented
+            // default in place.
+            autopilot_setup::load_layout_prefs(runner, app);
+            load_autopilot_picker(runner, app)
+        }
     }
 }
 
