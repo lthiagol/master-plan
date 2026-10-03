@@ -387,6 +387,75 @@ impl Default for Keybinds {
     }
 }
 
+/// The Autopilot section of the `?` help overlay, as
+/// `(label, keys)` pairs generated from the live keymap.
+///
+/// Generated rather than hand-written so a rebind in `keybinds.toml`
+/// shows up in the overlay with no second edit. Order matches the
+/// struct's declaration order, which is also the order an operator
+/// learns the actions in.
+pub fn autopilot_help_entries(kb: &Keybinds) -> Vec<(String, String)> {
+    let ap = &kb.lane_autopilot;
+    let rows: [(&str, &Vec<KeyCombo>); 16] = [
+        ("select", &ap.select),
+        ("move picker up", &ap.move_picker_up),
+        ("move picker down", &ap.move_picker_down),
+        ("toggle override panel", &ap.toggle_panel),
+        ("start run", &ap.start),
+        ("open past-session replay", &ap.replay),
+        ("close panel / back", &ap.close),
+        ("manual refresh", &ap.refresh),
+        ("pause run", &ap.pause),
+        ("cancel run", &ap.cancel),
+        ("resume run", &ap.resume),
+        ("restart run", &ap.restart),
+        ("steer", &ap.steer),
+        ("open milestone detail", &ap.open_detail),
+        ("close milestone detail", &ap.close_detail),
+        ("toggle auto-refresh", &ap.toggle_poll),
+    ];
+    let mut out: Vec<(String, String)> = rows
+        .into_iter()
+        .map(|(label, combos)| {
+            (
+                label.to_string(),
+                combos
+                    .iter()
+                    .map(|c| combo_to_toml_string(*c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )
+        })
+        .collect();
+    // The three split-view bindings, appended after the legacy lane
+    // actions so the existing section keeps its familiar order.
+    out.push((
+        "next sidebar tab".to_string(),
+        ap.next_sidebar_tab
+            .iter()
+            .map(|c| combo_to_toml_string(*c))
+            .collect::<Vec<_>>()
+            .join(", "),
+    ));
+    out.push((
+        "previous sidebar tab".to_string(),
+        ap.prev_sidebar_tab
+            .iter()
+            .map(|c| combo_to_toml_string(*c))
+            .collect::<Vec<_>>()
+            .join(", "),
+    ));
+    out.push((
+        "toggle sidebar".to_string(),
+        ap.toggle_sidebar
+            .iter()
+            .map(|c| combo_to_toml_string(*c))
+            .collect::<Vec<_>>()
+            .join(", "),
+    ));
+    out
+}
+
 /// Does any combo in `combos` match `key`?
 pub fn any_matches(combos: &[KeyCombo], key: &KeyEvent) -> bool {
     combos.iter().any(|c| key_event_matches_combo(key, *c))

@@ -785,6 +785,7 @@ pub fn poll_autopilot_lane(runner: &MpRunner, app: &mut App, now_ms: u64) -> Pol
             app.autopilot.health = Some(Health::from_status(&status));
             app.touch();
         }
+        refresh_sidebar_sources(runner, app, &session_show, &status);
         poller.finish(now_ms);
     }
     app.autopilot_poller = poller;
@@ -811,10 +812,158 @@ pub fn manual_refresh_lane(runner: &MpRunner, app: &mut App, now_ms: u64) -> boo
         );
         app.autopilot.health = Some(Health::from_status(&status));
         app.touch();
+        refresh_sidebar_sources(runner, app, &session_show, &status);
         poller.finish(now_ms);
     }
     app.autopilot_poller = poller;
     admitted
+}
+
+/// Refresh everything the sidebar's non-Progress tabs read, plus the
+/// live-run flag that drives the takeover transition.
+///
+/// Called on every poll tick and on a manual refresh, so the Activity
+/// and State tabs never show a snapshot older than the Progress tab's.
+/// Every read is `run_raw_allow_failure`: a failing source contributes
+/// an empty section rather than failing the poll, because one
+/// unavailable command must not stop the drive's status from updating.
+///
+/// `status` drives `note_run_live`, which is the only thing that
+/// promotes the split to the takeover or withdraws the State tab.
+fn refresh_sidebar_sources(runner: &MpRunner, app: &mut App, session_show: &Value, status: &Value) {
+    // Liveness first: the layout transition depends on it.
+    let health = Health::from_status(status);
+    app.autopilot.note_run_live(health.run_state == "live");
+
+    // --- session count (feeds the derived topology id) ---------------
+    if let Ok(out) =
+        runner.run_raw_allow_failure("autopilot", &["session", "list", "--format", "json"])
+    {
+        if let Ok(payload) = serde_json::from_slice::<Value>(&out) {
+            app.autopilot.session_count = session_list_len(&payload);
+        }
+    }
+
+    // --- Activity tab: `mp activity`, newest first --------------------
+    if let Ok(out) = runner.run_raw_allow_failure("activity", &["--format", "json"]) {
+        if let Ok(payload) = serde_json::from_slice::<Value>(&out) {
+            app.autopilot.activity_rows = activity_rows(&payload, 50);
+        }
+    }
+
+    // --- State tab: the five read-only sources ------------------------
+    let mut sections: Vec<(String, String)> = Vec::new();
+    sections.push((
+        "autopilot config".to_string(),
+        pretty(
+            runner
+                .run_raw_allow_failure(
+                    "autopilot",
+                    &["config", "get", "autopilot", "--format", "json"],
+                )
+                .ok()
+                .as_deref(),
+        ),
+    ));
+    sections.push((
+        "ui.autopilot.*".to_string(),
+        pretty(
+            runner
+                .run_raw_allow_failure("config", &["show", "--format", "json"])
+                .ok()
+                .as_deref(),
+        ),
+    ));
+    sections.push(("autopilot status".to_string(), pretty_value(status)));
+    if let Some(session_id) = app.autopilot.active_session_id() {
+        sections.push((format!("session {session_id}"), pretty_value(session_show)));
+    }
+    sections.push((
+        "pending overrides".to_string(),
+        pretty_override_panel(&app.autopilot),
+    ));
+    app.autopilot.state_sections = sections;
+}
+
+/// How many sessions `mp autopilot session list` reports. Accepts both
+/// a bare array and the `{ "sessions": [...] }` envelope, and returns
+/// 0 for anything else so the topology id falls back to `-001` rather
+/// than miscounting.
+fn session_list_len(payload: &Value) -> usize {
+    if let Some(rows) = payload.as_array() {
+        return rows.len();
+    }
+    payload
+        .get("sessions")
+        .and_then(|s| s.as_array())
+        .map(|s| s.len())
+        .unwrap_or(0)
+}
+
+/// The Activity tab's rows, newest first. Accepts `{"entries": [...]}`
+/// or a bare array; each row is rendered as `<timestamp> <summary>`.
+fn activity_rows(payload: &Value, limit: usize) -> Vec<String> {
+    let entries = payload
+        .get("entries")
+        .and_then(|e| e.as_array())
+        .or_else(|| payload.as_array());
+    let Some(entries) = entries else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .take(limit)
+        .map(|row| {
+            let ts = row
+                .get("timestamp")
+                .or_else(|| row.get("ts"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let summary = row
+                .get("summary")
+                .or_else(|| row.get("message"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if ts.is_empty() {
+                summary.to_string()
+            } else {
+                format!("{ts}  {summary}")
+            }
+        })
+        .collect()
+}
+
+/// Pretty-print a JSON payload, or a stable placeholder when the read
+/// failed. The State tab is read-only, so it shows what it has rather
+/// than hiding a section.
+fn pretty(bytes: Option<&[u8]>) -> String {
+    let Some(bytes) = bytes else {
+        return "(unavailable)".to_string();
+    };
+    match serde_json::from_slice::<Value>(bytes) {
+        Ok(value) => {
+            serde_json::to_string_pretty(&value).unwrap_or_else(|_| "(unavailable)".into())
+        }
+        Err(_) => "(unavailable)".to_string(),
+    }
+}
+
+/// [`pretty`] for a payload that is already parsed.
+fn pretty_value(value: &Value) -> String {
+    serde_json::to_string_pretty(value).unwrap_or_else(|_| "(unavailable)".to_string())
+}
+
+/// The pending override-panel values, rendered from the in-memory
+/// panel. These are *pending* — typed but not written — so the State
+/// tab shows them without persisting anything.
+fn pretty_override_panel(state: &crate::tui::autopilot::AutopilotLaneState) -> String {
+    match state.panel() {
+        Some(panel) => match serde_json::to_string_pretty(panel) {
+            Ok(text) => text,
+            Err(_) => "(unavailable)".to_string(),
+        },
+        None => "(no overrides typed)".to_string(),
+    }
 }
 
 #[cfg(test)]

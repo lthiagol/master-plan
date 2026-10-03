@@ -40,11 +40,24 @@ const GOLDEN_PATH: &str = "tests/fixtures/autopilot_setup_render.txt";
 fn app_with_setup() -> App {
     let mut app = App::new();
     app.select_lane(Lane::Autopilot);
+    // The Milestones section renders the picker's drivable candidates,
+    // so the fixture needs a populated picker — not just a selection.
+    app.autopilot.picker.refresh_candidates(&serde_json::json!({
+        "milestones": [
+            {"id": "M239", "title": "Telemetry", "lifecycle": "approved"},
+            {"id": "M240", "title": "Poll", "lifecycle": "in-progress"},
+            {"id": "M241", "title": "Split", "lifecycle": "approved"},
+            {"id": "M242", "title": "Picker", "lifecycle": "groomed"},
+        ]
+    }));
     let form = &mut app.autopilot.setup;
     form.set_topology("two-agent");
     form.harness_uniform = false;
     form.set_harness("runner", "cursor");
-    form.selected = vec!["M240".into(), "M241".into()];
+    // The picker strips the `M` prefix from ids (pre-existing), so the
+    // selection uses the picker's own ids — a selection that does not
+    // match a candidate would render as nothing selected.
+    form.selected = vec!["240".into(), "241".into()];
     form.commit_after_execute = true;
     form.push_after_review = false;
     form.run_mode = RunMode::Normal;

@@ -1219,7 +1219,12 @@ fn s7_action_enum_carries_page_up_down() {
             // Sidebar navigation — non-input variants.
             Action::AutopilotNextSidebarTab
             | Action::AutopilotPrevSidebarTab
-            | Action::AutopilotToggleSidebar => {
+            | Action::AutopilotToggleSidebar
+            | Action::AutopilotDismissTakeover
+            | Action::AutopilotOpenPeek
+            | Action::AutopilotClosePeek
+            | Action::AutopilotDetachedMove { .. }
+            | Action::AutopilotDetachedAccept => {
                 set.insert("OtherM136Action");
             }
             // M222: keybinds-reload action — non-input variant.

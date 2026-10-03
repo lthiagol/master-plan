@@ -33,7 +33,9 @@ use std::time::Instant;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use super::app::{App, ContentState, Lane};
+use super::autopilot::setup;
 use super::view_state::{self, ListItemHitArea, ViewState};
+use ratatui::layout::Rect;
 
 /// Double-click window in milliseconds. A second click within this
 /// window at (nearly) the same coordinates classifies as a
@@ -185,8 +187,39 @@ pub fn resolve_index_for_lane(app: &App, row_id: &str) -> Option<usize> {
 /// click — `true` opens detail (where applicable), `false` sets
 /// selection.
 pub fn handle_dispatch(app: &mut App, view: &ViewState, x: u16, y: u16, was_double: bool) -> bool {
+    handle_dispatch_with_runner(app, None, view, x, y, was_double)
+}
+
+/// [`handle_dispatch`] with an [`MpRunner`], for the lanes whose
+/// controls shell out to `mp` (the Autopilot control row).
+///
+/// Passing `None` is honest rather than a silent no-op: a click on a
+/// control that needs the runner mutates the in-memory state and the
+/// write-back is skipped, which is what the pure-state tests want. The
+/// production call site always passes the runner.
+pub fn handle_dispatch_with_runner(
+    app: &mut App,
+    runner: Option<&crate::mp_runner::MpRunner>,
+    view: &ViewState,
+    x: u16,
+    y: u16,
+    was_double: bool,
+) -> bool {
     if !lane_supports_click_selection(app.active_lane) {
         return false;
+    }
+
+    // The Autopilot lane's control-first view hit-tests its own chips,
+    // tabs, buttons, and takeover rows before the generic list-row
+    // path: those elements are drawn by the lane's own renderer and
+    // published in `view.autopilot`, so the generic `list_item_rects`
+    // does not describe them.
+    if app.active_lane == Lane::Autopilot {
+        if let Some(regions) = &view.autopilot {
+            if dispatch_autopilot_click(app, runner, regions, x, y) {
+                return true;
+            }
+        }
     }
 
     if was_double && double_click_opens_detail(app.active_lane) {
@@ -205,6 +238,367 @@ pub fn handle_dispatch(app: &mut App, view: &ViewState, x: u16, y: u16, was_doub
         return dispatch_single_click(app, &row_id);
     }
     false
+}
+
+/// Hit-test the Autopilot lane's control-first view and apply the
+/// click. Returns `true` when a state mutation happened.
+///
+/// Every rect comes from `view.autopilot` — the value the renderer
+/// itself drew from — so a chip is clickable exactly where it is
+/// drawn. Chip clicks mutate the in-memory form and stage the mp
+/// write-back; the `Action` dispatcher is what actually shells out to
+/// `mp config set`, so the persistence path has one owner.
+fn dispatch_autopilot_click(
+    app: &mut App,
+    runner: Option<&crate::mp_runner::MpRunner>,
+    regions: &crate::tui::autopilot::setup::AutopilotRegions,
+    x: u16,
+    y: u16,
+) -> bool {
+    // The detached popover is modal: it swallows every click until the
+    // operator picks one of its three outcomes, so a click cannot land
+    // on a setup chip "through" the prompt.
+    if let Some(rect) = regions.detached_popover {
+        return dispatch_detached_choice(app, rect, x, y);
+    }
+
+    // The read-only peek is modal for the same reason: a click cannot
+    // reach the setup form behind it. Dismiss-on-click is the one
+    // gesture that makes sense, so accept it anywhere.
+    if app.autopilot.peek.is_some() {
+        app.autopilot.close_peek();
+        app.touch();
+        return true;
+    }
+
+    // Takeover rows: a click opens the read-only peek for that
+    // milestone. Checked before the control row so a row in the same
+    // band wins over the row behind it.
+    for row in &regions.takeover_rows {
+        if point_in_rect(x, y, row.rect) {
+            app.autopilot.peek_target = Some(row.milestone_id.clone());
+            app.touch();
+            return true;
+        }
+    }
+
+    // Control row.
+    for (action, rect) in &regions.control_row.buttons {
+        if point_in_rect(x, y, *rect) {
+            dispatch_control_click(app, runner, *action);
+            return true;
+        }
+    }
+
+    // Sidebar tabs.
+    for tab_area in &regions.tabs {
+        if point_in_rect(x, y, tab_area.rect) {
+            app.autopilot.layout.sidebar_tab = tab_area.tab;
+            app.touch();
+            return true;
+        }
+    }
+
+    // Setup chips.
+    for chip in &regions.chips {
+        if point_in_rect(x, y, chip.rect) {
+            return dispatch_chip_click(app, runner, chip.id.as_str());
+        }
+    }
+
+    false
+}
+
+/// Apply a setup-chip click to the in-memory form. The id grammar
+/// mirrors what `setup::regions` emits.
+///
+/// Persisted fields (topology, harness, the commit toggles) are written
+/// straight back through `mp` here, because a chip click has no
+/// keyboard twin to route the write-back through. Per-run fields
+/// (milestone selection, run mode) are memory-only by design.
+fn dispatch_chip_click(
+    app: &mut App,
+    runner: Option<&crate::mp_runner::MpRunner>,
+    id: &str,
+) -> bool {
+    use crate::tui::autopilot::setup;
+    if let Some(topology) = id.strip_prefix("topology:") {
+        app.autopilot.setup.set_topology(topology);
+        persist_setup_click(app, runner, "topology");
+        app.touch();
+        return true;
+    }
+    if id == "harness:uniform" {
+        app.autopilot.setup.harness_uniform = !app.autopilot.setup.harness_uniform;
+        app.touch();
+        return true;
+    }
+    if let Some(rest) = id.strip_prefix("harness:") {
+        if let Some((role, harness)) = rest.rsplit_once(':') {
+            app.autopilot.setup.set_harness(role, harness);
+            let field = format!("harness:{role}");
+            persist_setup_click(app, runner, &field);
+            app.touch();
+            return true;
+        }
+    }
+    if let Some(milestone) = id.strip_prefix("milestone:") {
+        // One gesture: land the cursor and flip the selection, matching
+        // what Space does from the keyboard.
+        return setup::click_candidate(app, milestone);
+    }
+    if let Some(field) = id.strip_prefix("commit:") {
+        let changed = match field {
+            "commit_after_execute" => {
+                app.autopilot.setup.commit_after_execute =
+                    !app.autopilot.setup.commit_after_execute;
+                true
+            }
+            "push_after_review" => {
+                app.autopilot.setup.push_after_review = !app.autopilot.setup.push_after_review;
+                true
+            }
+            _ => false,
+        };
+        if !changed {
+            return false;
+        }
+        if let Some(r) = runner {
+            if let Err(e) =
+                crate::tui::runner_helpers::autopilot_setup::persist_commit_toggle(r, app, field)
+            {
+                app.set_flash_message(format!("Could not save agent.automation.{field}: {e}"));
+            }
+        }
+        app.touch();
+        return true;
+    }
+    if let Some(mode) = id.strip_prefix("run_mode:") {
+        // Selecting detached always opens the confirmation popover —
+        // mouse or keyboard, every time. There is deliberately no path
+        // from the chip to a detached run that does not prompt.
+        if mode == "detached" {
+            app.autopilot.setup.run_mode = setup::RunMode::Detached;
+            app.autopilot.open_detached_confirm();
+        } else {
+            app.autopilot.setup.run_mode = setup::RunMode::Normal;
+        }
+        app.touch();
+        return true;
+    }
+    if id == "start" {
+        // Start goes through the same action as the `s` key so
+        // validation, the detached gate, and the mp call have one
+        // implementation. `apply_action` owns all of it.
+        return apply_start(app, runner);
+    }
+    false
+}
+
+/// Write a setup-form field back through `mp`, flashing on failure.
+/// A missing runner means a pure-state caller; nothing is written and
+/// nothing is reported.
+fn persist_setup_click(app: &mut App, runner: Option<&crate::mp_runner::MpRunner>, field: &str) {
+    let Some(r) = runner else { return };
+    if let Err(e) = crate::tui::runner_helpers::autopilot_setup::persist_setup_field(r, app, field)
+    {
+        app.set_flash_message(format!("Could not save autopilot setup: {e}"));
+    }
+}
+
+/// Start a run. Mirrors `Action::AutopilotStart` for the click path.
+fn apply_start(app: &mut App, runner: Option<&crate::mp_runner::MpRunner>) -> bool {
+    // An empty selection cannot start a run — same gate as the `s` key.
+    if app.autopilot.setup.selected.is_empty() {
+        app.set_flash_message("Select at least one milestone before starting.");
+        return true;
+    }
+    let Some(r) = runner else {
+        // No runner: record the intent so the keyboard/event-loop path
+        // can pick it up rather than silently doing nothing.
+        app.autopilot.start_requested = true;
+        app.touch();
+        return true;
+    };
+    let ids: Vec<String> = app.autopilot.setup.selected.clone();
+    let detach = app.autopilot.setup.run_mode == setup_run_mode_detached();
+    let argv: Vec<String> = if detach {
+        let mut v = vec!["start".to_string(), "--detach".to_string()];
+        v.extend(ids);
+        v
+    } else {
+        let mut v = vec!["start".to_string()];
+        v.extend(ids);
+        v
+    };
+    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+    let _ = r.run_raw_allow_failure("autopilot", &args);
+    app.touch();
+    true
+}
+
+fn setup_run_mode_detached() -> crate::tui::autopilot::setup::RunMode {
+    crate::tui::autopilot::setup::RunMode::Detached
+}
+
+/// Resolve a click inside the detached popover.
+fn dispatch_detached_choice(app: &mut App, rect: Rect, x: u16, y: u16) -> bool {
+    if !point_in_rect(x, y, rect) {
+        // A click outside the popover is swallowed: the popover is
+        // modal, so the click must not reach the setup form behind it.
+        return true;
+    }
+    // One row per choice, in `DETACHED_CHOICES` order, starting inside
+    // the block's top border.
+    let index = usize::from(y.saturating_sub(rect.y + 1));
+    let choice = match setup::DETACHED_CHOICES.get(index) {
+        Some(c) => *c,
+        None => return true,
+    };
+    if let Some(pop) = app.autopilot.detached_confirm.as_mut() {
+        pop.cursor = index;
+    }
+    apply_detached_choice(app, choice);
+    true
+}
+
+/// Apply the operator's popover pick.
+pub fn apply_detached_choice(app: &mut App, choice: setup::DetachedChoice) {
+    use crate::tui::autopilot::setup;
+    app.autopilot.detached_confirm = None;
+    match choice {
+        setup::DetachedChoice::Confirm => {
+            // Keep the run detached; the control row now governs it.
+        }
+        setup::DetachedChoice::ConfigureExtras => {
+            app.autopilot.open_panel();
+        }
+        setup::DetachedChoice::Back => {
+            // Revert to normal and leave the popover.
+            app.autopilot.setup.run_mode = setup::RunMode::Normal;
+        }
+    }
+    app.touch();
+}
+
+/// Route a control-row click to the same action the corresponding key
+/// dispatches. Inert when no run is live — the buttons render dim and
+/// do nothing, which is the contract the golden pins.
+fn dispatch_control_click(
+    app: &mut App,
+    runner: Option<&crate::mp_runner::MpRunner>,
+    action: setup::ControlAction,
+) {
+    if !app.autopilot.run_live {
+        return;
+    }
+    // Back is pure state: return to the split while the run continues.
+    if action == setup::ControlAction::Back {
+        app.autopilot.dismiss_takeover();
+        app.touch();
+        return;
+    }
+    let Some(r) = runner else {
+        return;
+    };
+    let Some(session_id) = app.autopilot.active_session_id() else {
+        return;
+    };
+    let argv = match action {
+        setup::ControlAction::Pause => {
+            crate::tui::autopilot::RecoveryControl::pause_argv(&session_id)
+        }
+        setup::ControlAction::Resume => {
+            crate::tui::autopilot::RecoveryControl::resume_argv(&session_id)
+        }
+        setup::ControlAction::Stop => {
+            crate::tui::autopilot::RecoveryControl::cancel_argv(&session_id)
+        }
+        setup::ControlAction::Back => Vec::new(),
+    };
+    if argv.is_empty() {
+        return;
+    }
+    let _ = r.run_raw_allow_failure(
+        "autopilot",
+        &argv.iter().map(String::as_str).collect::<Vec<_>>(),
+    );
+    app.touch();
+}
+
+/// Open the read-only peek for `milestone_id` from a
+/// `mp show milestone <id>` payload. Returns `false` when the payload
+/// has no `intent.outcome`, so a truncated response opens no modal.
+pub fn open_peek_from_payload(
+    app: &mut App,
+    milestone_id: &str,
+    payload: &serde_json::Value,
+) -> bool {
+    match setup::MilestonePeek::from_show_json(milestone_id, payload) {
+        Some(peek) => {
+            app.autopilot.open_peek(peek);
+            app.touch();
+            true
+        }
+        None => false,
+    }
+}
+
+/// The split percentage a drag to column `x` implies, given a lane of
+/// `width` columns. Clamped to the same window the config validator
+/// enforces, so a drag can never produce a value `mp config set` would
+/// reject.
+pub fn split_pct_for_column(width: u16, x: u16, area_x: u16) -> u32 {
+    if width == 0 {
+        return setup::SPLIT_PCT_DEFAULT;
+    }
+    let offset = x.saturating_sub(area_x);
+    let pct = (offset as u32 * 100) / width as u32;
+    setup::AutopilotLayout::clamp_split_pct(pct as i64)
+}
+
+/// Begin a split drag. Returns `false` when the click missed the
+/// border or a run is live — the border is inert during a run.
+pub fn begin_split_drag(app: &mut App, regions: &setup::AutopilotRegions, x: u16, y: u16) -> bool {
+    let Some(border_x) = regions.split_x else {
+        return false;
+    };
+    // A small horizontal tolerance: the border is one column wide, and
+    // demanding a pixel-exact hit would make the drag feel broken.
+    if x.abs_diff(border_x) > 1 {
+        return false;
+    }
+    if y < regions.setup.y || y >= regions.setup.y + regions.setup.height {
+        return false;
+    }
+    if app.autopilot.run_live {
+        // Inert while a run is live. Report false so the caller does
+        // not start a drag that would be silently dropped on mouse-up.
+        return false;
+    }
+    app.autopilot.dragging_split = true;
+    true
+}
+
+/// Continue a split drag. Clamps on every motion, so the preview can
+/// never show an out-of-range column even before mouse-up.
+pub fn update_split_drag(app: &mut App, regions: &setup::AutopilotRegions, x: u16) {
+    if !app.autopilot.dragging_split {
+        return;
+    }
+    let pct = split_pct_for_column(regions.setup.width, x, regions.setup.x);
+    app.autopilot.layout.set_split_pct(pct as i64);
+}
+
+/// End a split drag. The width is already clamped in memory; the
+/// caller persists it through `mp config set ui.autopilot.split_pct`
+/// so the choice survives a restart.
+pub fn end_split_drag(app: &mut App) -> bool {
+    if !app.autopilot.dragging_split {
+        return false;
+    }
+    app.autopilot.dragging_split = false;
+    true
 }
 
 /// Open detail for the given row id, mirroring the keyboard Enter

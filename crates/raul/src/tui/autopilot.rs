@@ -1048,6 +1048,18 @@ pub struct AutopilotLaneState {
     /// `mp autopilot status`, the current session (when present), and
     /// the pending override-panel values.
     pub state_sections: Vec<(String, String)>,
+    /// The milestone whose peek a click on a takeover row requested.
+    /// The dispatcher turns this into the `mp show milestone` read and
+    /// then into a [`MilestonePeek`]. `None` when no row is pending.
+    pub peek_target: Option<String>,
+    /// True between a split-border mousedown and mouse-up. The width
+    /// is clamped on every motion, so the live preview can never show
+    /// an out-of-range column.
+    pub dragging_split: bool,
+    /// Set by a Start click when no [`crate::mp_runner::MpRunner`] was
+    /// available to shell out with (the pure-state test path). The
+    /// event loop picks it up and dispatches the real start.
+    pub start_requested: bool,
 }
 
 impl AutopilotLaneState {

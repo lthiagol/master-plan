@@ -341,6 +341,22 @@ pub enum Action {
     /// `ui.autopilot.sidebar_visible` through `mp config set`, so the
     /// choice is mp-owned rather than raul-owned session state.
     AutopilotToggleSidebar,
+    /// Back from the takeover: return to the split while the run
+    /// continues, with the State tab hidden. A no-op when no run is
+    /// live, so Esc falls through to its other targets.
+    AutopilotDismissTakeover,
+    /// Open the read-only peek for the takeover row under the cursor /
+    /// at the top of the queue. Reads `mp show milestone <id>` and
+    /// renders `intent.outcome` plus the AC list.
+    AutopilotOpenPeek,
+    /// Close the read-only peek.
+    AutopilotClosePeek,
+    /// Move the detached popover's highlight.
+    AutopilotDetachedMove {
+        delta: i64,
+    },
+    /// Accept the highlighted detached-popover option.
+    AutopilotDetachedAccept,
 
     // ---- M222: keybinds reload (cross-platform) ---------------------------
     /// Reload `~/.config/raul/keybinds.toml`. On Unix the same
@@ -993,6 +1009,58 @@ pub fn apply_action(app: &mut App, runner: &MpRunner, action: Action) -> Result<
             app.autopilot.layout.toggle_sidebar();
             persist_autopilot_layout(runner, app, "sidebar_visible")?;
             app.touch();
+        }
+        Action::AutopilotDismissTakeover => {
+            // Esc / Back from the takeover. The run keeps going; the
+            // split comes back with the State tab withheld.
+            if app.autopilot.dismiss_takeover() {
+                app.touch();
+            }
+        }
+        Action::AutopilotOpenPeek => {
+            // Enter on the takeover: peek the first queued milestone, or
+            // the one a click already targeted.
+            let target = app.autopilot.peek_target.clone().or_else(|| {
+                crate::tui::autopilot::setup::queued_milestones(app)
+                    .first()
+                    .map(|r| r.id.clone())
+            });
+            let Some(milestone_id) = target else {
+                return Ok(());
+            };
+            let args = [
+                "show",
+                "milestone",
+                milestone_id.as_str(),
+                "--format",
+                "json",
+            ];
+            let out = runner.run_raw_allow_failure("milestone", &args)?;
+            let payload: serde_json::Value = match serde_json::from_slice(&out) {
+                Ok(v) => v,
+                // A truncated or unparseable response opens no modal
+                // rather than an empty one.
+                Err(_) => return Ok(()),
+            };
+            if crate::tui::mouse::open_peek_from_payload(app, &milestone_id, &payload) {
+                app.autopilot.peek_target = None;
+            }
+        }
+        Action::AutopilotClosePeek => {
+            app.autopilot.close_peek();
+            app.touch();
+        }
+        Action::AutopilotDetachedMove { delta } => {
+            if let Some(pop) = app.autopilot.detached_confirm.as_mut() {
+                pop.move_cursor(delta);
+                app.touch();
+            }
+        }
+        Action::AutopilotDetachedAccept => {
+            let choice = app.autopilot.detached_confirm.as_ref().map(|p| p.current());
+            if let Some(choice) = choice {
+                crate::tui::mouse::apply_detached_choice(app, choice);
+            }
         }
         Action::AutopilotPause => {
             // M216 AC-06: pause via `mp autopilot control pause

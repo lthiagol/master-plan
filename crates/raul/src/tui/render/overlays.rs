@@ -304,12 +304,208 @@ pub(super) fn render_help_overlay(frame: &mut Frame, app: &App, overlay_area: Re
         )));
     }
 
+    // The Autopilot section is generated from `AutopilotLaneKeybinds`
+    // rather than hand-listed, so a rebind in keybinds.toml shows up
+    // here automatically. Only rendered while the Autopilot lane is
+    // active — the overlay is contextual-first, and an inactive lane's
+    // full keymap would bury the global list.
+    if app.active_lane == crate::tui::app::Lane::Autopilot {
+        help_lines.push(Line::from(""));
+        help_lines.push(Line::from(vec![Span::styled(" Autopilot", accent)]));
+        for (label, keys) in crate::tui::keybinds::autopilot_help_entries(&app.keybinds) {
+            help_lines.push(Line::from(format!("  {keys} {label}")));
+        }
+    }
+
     let paragraph = Paragraph::new(help_lines)
         .block(Block::default().borders(Borders::ALL).title(" Help "))
         .style(Style::default().fg(app.effective_palette().foreground))
         .wrap(ratatui::widgets::Wrap { trim: false });
 
     frame.render_widget(paragraph, overlay_area);
+}
+
+/// The per-drive override panel (`o`).
+///
+/// Renders the pending model / skill / extras values plus the derived,
+/// read-only topology id. The id is computed on render from the current
+/// topology and the live session count — nothing about it is stored, so
+/// the panel never writes a run id that has already gone stale.
+pub(super) fn render_override_panel(frame: &mut Frame, app: &App, rect: Rect) {
+    let Some(panel) = app.autopilot.panel() else {
+        return;
+    };
+    let accent = Style::default()
+        .fg(app.effective_palette().accent)
+        .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(app.effective_palette().dim);
+    let fg = Style::default().fg(app.effective_palette().foreground);
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(vec![
+            Span::styled("topology  ", dim),
+            Span::styled(panel.topology.clone(), accent),
+        ]),
+        // The derived id is read-only: no key, no edit affordance, and
+        // nothing is persisted for it.
+        Line::from(vec![
+            Span::styled("run id     ", dim),
+            Span::styled(app.autopilot.topology_id(), fg),
+            Span::styled("  (derived, read-only)", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("refresh    ", dim),
+            Span::raw(format!("{}s", panel.refresh_secs)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("per-role overrides", accent)),
+    ];
+    if panel.roles.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  (none — every role inherits)",
+            dim,
+        )));
+    }
+    for (role, ovr) in &panel.roles {
+        let mut spans = vec![Span::styled(format!("  {role}:"), fg), Span::raw("  ")];
+        let described = [
+            ("harness", ovr.harness.as_deref()),
+            ("model", ovr.model.as_deref()),
+            ("skill", ovr.skill.as_deref()),
+            ("extras", ovr.extras.as_deref()),
+        ];
+        let mut first = true;
+        for (label, value) in described {
+            let Some(value) = value.filter(|v| !v.is_empty()) else {
+                continue;
+            };
+            if !first {
+                spans.push(Span::raw("  "));
+            }
+            spans.push(Span::styled(format!("{label}="), dim));
+            spans.push(Span::raw(value.to_string()));
+            first = false;
+        }
+        if first {
+            spans.push(Span::styled("(inherits everything)", dim));
+        }
+        lines.push(Line::from(spans));
+    }
+    // Show the validator's verdict rather than letting an invalid value
+    // sit silently until Start refuses it.
+    if let Err(err) = panel.validate() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("invalid: {err}"),
+            Style::default().fg(app.effective_palette().warn),
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("Esc closes · o toggles", dim)));
+
+    let paragraph = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Overrides ")
+                .border_type(BorderType::Double)
+                .style(Style::default().bg(crate::tui::palette::overlay_backdrop(
+                    app.effective_palette(),
+                ))),
+        )
+        .style(fg)
+        .wrap(ratatui::widgets::Wrap { trim: false });
+    frame.render_widget(paragraph, rect);
+}
+
+/// The detached-mode confirmation popover: Confirm / Configure extras /
+/// Back. Drawn over the setup region; the box is the one
+/// `mouse::dispatch_detached_choice` hit-tests, so the operator cannot
+/// click a choice that is not drawn.
+pub(super) fn render_detached_popover(frame: &mut Frame, app: &App, rect: Rect) {
+    let Some(pop) = &app.autopilot.detached_confirm else {
+        return;
+    };
+    let accent = Style::default()
+        .fg(app.effective_palette().accent)
+        .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(app.effective_palette().dim);
+
+    let mut lines: Vec<Line> = vec![Line::from(Span::styled(" Detached run? ", accent))];
+    for (i, choice) in crate::tui::autopilot::setup::DETACHED_CHOICES
+        .iter()
+        .enumerate()
+    {
+        let style = if i == pop.cursor { accent } else { dim };
+        lines.push(Line::from(format!(
+            " {} {}",
+            if i == pop.cursor { ">" } else { " " },
+            choice.label()
+        )));
+        let _ = style;
+    }
+    lines.push(Line::from(Span::styled(" Esc / Back cancels", dim)));
+
+    let paragraph = Paragraph::new(lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Run mode: {} ", pop.mode.label()))
+            .border_type(BorderType::Double)
+            .style(Style::default().bg(crate::tui::palette::overlay_backdrop(
+                app.effective_palette(),
+            ))),
+    );
+    frame.render_widget(paragraph, rect);
+}
+
+/// The read-only per-milestone peek: `intent.outcome` plus the AC
+/// list, with the command hint for going deeper. Never an editor —
+/// raul renders what `mp show milestone` returned and writes nothing.
+pub(super) fn render_peek_modal(frame: &mut Frame, app: &App, rect: Rect) {
+    let Some(peek) = &app.autopilot.peek else {
+        return;
+    };
+    let accent = Style::default()
+        .fg(app.effective_palette().accent)
+        .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(app.effective_palette().dim);
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(format!(" {} ", peek.milestone_id), accent)),
+        Line::from(peek.title.clone()),
+        Line::from(""),
+        Line::from(Span::styled("intent.outcome", accent)),
+    ];
+    for line in peek.outcome.lines() {
+        lines.push(Line::from(line.to_string()));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled("Acceptance criteria", accent)));
+    if peek.acs.is_empty() {
+        lines.push(Line::from(Span::styled("  (none)", dim)));
+    }
+    for ac in &peek.acs {
+        lines.push(Line::from(format!("  {}  {}", ac.id, ac.status)));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        format!("mp reviews show {}", peek.milestone_id),
+        dim,
+    )));
+
+    let paragraph = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Milestone (read-only) ")
+                .border_type(BorderType::Double)
+                .style(Style::default().bg(crate::tui::palette::overlay_backdrop(
+                    app.effective_palette(),
+                ))),
+        )
+        .style(Style::default().fg(app.effective_palette().foreground))
+        .wrap(ratatui::widgets::Wrap { trim: false });
+    frame.render_widget(paragraph, rect);
 }
 
 pub(super) fn render_input_overlay(frame: &mut Frame, app: &App, overlay_area: Rect) {

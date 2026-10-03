@@ -535,6 +535,16 @@ pub struct ViewState {
     /// Co-approval screen chunks: `[header_block, body_block,
     /// actions_block, status_block]`. `None` when not in co-approval.
     pub co_approval_chunks: Option<[Rect; 4]>,
+
+    /// Autopilot lane hit areas — the setup chips, sidebar tabs,
+    /// control-row buttons, takeover rows, and the draggable split
+    /// border. `None` when the active lane is not Autopilot.
+    ///
+    /// Carries the whole `setup::AutopilotRegions` value rather than
+    /// a projection, because the mouse handler needs the split border
+    /// and the takeover row rects too, and re-deriving any of them
+    /// here would reintroduce the drift this field exists to remove.
+    pub autopilot: Option<crate::tui::autopilot::setup::AutopilotRegions>,
 }
 
 // =============================================================================
@@ -739,7 +749,7 @@ pub fn compute_view(app: &App, area: Rect) -> ViewState {
                 // cursor moves (single-click) or toggles selection
                 // (double-click via `Action::AutopilotToggleSelect`
                 // dispatched by the mouse handler).
-                compute_autopilot_picker_rects(&mut view, app, content_area);
+                compute_autopilot_rects(&mut view, app, content_area);
             }
         }
     } else if app.content == ContentState::CoApproval {
@@ -1296,72 +1306,59 @@ fn compute_overview_list_rects(view: &mut ViewState, app: &App, area: Rect) {
 #[allow(dead_code)]
 fn _junk_marker_removed() {}
 
-/// M221: hit areas for the Autopilot lane picker. The renderer
-/// (`render::autopilot_lane::render_picker`) splits the content
-/// area 40/60 and lays out each candidate as a single row inside
-/// a bordered block on the left; we mirror that geometry here so
-/// click resolution agrees with the rendered glyphs by
-/// construction.
+/// Hit areas for the Autopilot lane's control-first split view.
 ///
-/// Each candidate gets one `ListItemHitArea` keyed by the
-/// candidate's `id`. The picker surface does NOT use a scrollbar
-/// (the picker is intentionally short — the queue panel above
-/// is the multi-row surface), so no scrollbar hit area is added
-/// here.
-fn compute_autopilot_picker_rects(view: &mut ViewState, app: &App, area: Rect) {
+/// Delegates to `autopilot::setup::regions` — the same function the
+/// renderer draws from — so a chip, tab, control button, or takeover
+/// row is clickable exactly where it is drawn. No copy of the layout
+/// arithmetic lives here, which is the whole point: the previous
+/// version re-derived the 40% picker column here and drifted from the
+/// renderer the moment the geometry changed.
+fn compute_autopilot_rects(view: &mut ViewState, app: &App, area: Rect) {
     if area.width < 4 || area.height < 4 {
         return;
     }
-
-    // The picker takes the left 40% of the content area — same
-    // split as `render_autopilot_lane`.
-    let picker_area = Rect {
-        x: area.x,
-        y: area.y,
-        width: (area.width as u32 * 40 / 100) as u16,
-        height: area.height,
-    };
-
-    // M230: the picker reads only `app.autopilot.picker.candidates`.
-    // The legacy `Watch::candidates` fallback that kept the
-    // backcompat surface clickable is gone — the lane is single-
-    // sourced through the typed `Picker`.
-    let candidates: Vec<String> = app
-        .autopilot
-        .picker
-        .candidates
+    let regions = crate::tui::autopilot::setup::regions(
+        area,
+        &app.autopilot.layout,
+        &app.autopilot.setup,
+        &crate::tui::autopilot::setup::picker_candidates(app),
+        app.autopilot.takeover_active(),
+        &crate::tui::autopilot::setup::queued_milestones(app),
+        app.autopilot.detached_confirm.is_some(),
+    );
+    // The picker's candidate rows are also published as generic
+    // `list_item_rects` so the lane keeps describing its milestone
+    // list to anything that reads the generic list surface (wheel
+    // scroll, the fallback dispatch path). The Autopilot click path
+    // consumes the chip rects first, so these never double-handle a
+    // click — they are the compatibility view of the same rows.
+    let milestones_section = regions
+        .sections
         .iter()
-        .map(|c| c.id.clone())
-        .collect();
-    if candidates.is_empty() {
-        return;
-    }
-
-    // Picker block: bordered box at `picker_area`. Border eats
-    // the top + bottom rows; data starts at `picker_area.y + 1`
-    // and is `area.height - 2` rows tall.
-    let inner_y_start = picker_area.y.saturating_add(1);
-    let inner_height = picker_area.height.saturating_sub(2);
-    if inner_height == 0 {
-        return;
-    }
-    let inner_x = picker_area.x.saturating_add(1);
-    let inner_width = picker_area.width.saturating_sub(2);
-
-    for (i, id) in candidates.iter().enumerate() {
-        if i as u16 >= inner_height {
-            break;
+        .find(|(s, _)| *s == crate::tui::autopilot::setup::SetupSection::Milestones)
+        .map(|(_, r)| *r);
+    if let Some(section) = milestones_section {
+        for (i, candidate) in crate::tui::autopilot::setup::picker_candidates(app)
+            .iter()
+            .enumerate()
+        {
+            let y = section.y + 1 + i as u16;
+            if y + 1 > section.y + section.height {
+                break;
+            }
+            view.list_item_rects.push(ListItemHitArea {
+                id: candidate.clone(),
+                rect: Rect {
+                    x: section.x + 1,
+                    y,
+                    width: section.width.saturating_sub(2),
+                    height: 1,
+                },
+            });
         }
-        view.list_item_rects.push(ListItemHitArea {
-            id: id.clone(),
-            rect: Rect {
-                x: inner_x,
-                y: inner_y_start.saturating_add(i as u16),
-                width: inner_width,
-                height: 1,
-            },
-        });
     }
+    view.autopilot = Some(regions);
 }
 
 /// M243: hit areas for the Settings `ui.theme` picker rows.

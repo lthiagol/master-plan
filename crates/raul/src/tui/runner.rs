@@ -917,6 +917,18 @@ pub fn handle_mouse(
                 return Ok(());
             }
 
+            // Autopilot: arm a split drag when the mousedown lands on
+            // the border. Checked before the click dispatch because a
+            // press on the border must not also toggle whatever chip
+            // happens to sit under it.
+            if app.active_lane == Lane::Autopilot {
+                if let Some(regions) = &view.autopilot {
+                    if mouse::begin_split_drag(app, regions, x, y) {
+                        return Ok(());
+                    }
+                }
+            }
+
             // Scrollbar-track click wins over list-row selection
             // (external-review F-01 / AC-04). A click on the gutter
             // never selects the row underneath.
@@ -1014,7 +1026,7 @@ pub fn handle_mouse(
             // select for Overview + Settings. `handle_dispatch`
             // returns true when it consumed the click.
             if app.content == ContentState::List
-                && mouse::handle_dispatch(app, &view, x, y, was_double)
+                && mouse::handle_dispatch_with_runner(app, Some(runner), &view, x, y, was_double)
             {
                 return Ok(());
             }
@@ -1041,7 +1053,32 @@ pub fn handle_mouse(
                 }
             }
         }
-        MouseEventKind::Drag(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left) => {
+        MouseEventKind::Drag(MouseButton::Left) => {
+            // Autopilot: dragging the split border. Clamped on every
+            // motion, so the live preview never shows an out-of-range
+            // column, and only armed from a mousedown that actually
+            // hit the border (and only while no run is live).
+            if app.autopilot.dragging_split {
+                if let Some(regions) = &view.autopilot {
+                    mouse::update_split_drag(app, regions, x);
+                }
+            }
+        }
+        MouseEventKind::Up(MouseButton::Left) => {
+            // A completed split drag persists the width through `mp`
+            // config so the choice survives a restart. Nothing is
+            // written while dragging — a drag emits dozens of motion
+            // events and each one landing in config.json would be
+            // both slow and unreadable.
+            if mouse::end_split_drag(app) {
+                if let Err(e) = crate::tui::runner_helpers::autopilot_setup::persist_layout_field(
+                    runner,
+                    app,
+                    "split_pct",
+                ) {
+                    app.set_flash_message(format!("Could not save ui.autopilot.split_pct: {e}"));
+                }
+            }
             // release doesn't accidentally classify as a double.
             // (A genuine double-click is Down + Down; the Up arm
             // never fires between them because the user is still

@@ -573,10 +573,90 @@ impl UiPrefs {
     }
 }
 
+/// The picker's drivable-milestone ids, in picker order. The
+/// Milestones section's chips and the takeover's fallback rows both read
+/// this, so "what is queued" has one answer.
+pub fn picker_candidates(app: &crate::tui::app::App) -> Vec<String> {
+    app.autopilot
+        .picker
+        .candidates
+        .iter()
+        .map(|c| c.id.clone())
+        .collect()
+}
+
+/// Move the picker cursor to `id` and toggle its selection. One gesture,
+/// because a chip is both the row you point at and the row you want:
+/// landing the cursor and flipping the flag in one click matches what
+/// the keyboard's Space does, and makes "click the milestone I mean"
+/// a single action.
+pub fn click_candidate(app: &mut crate::tui::app::App, id: &str) -> bool {
+    let Some(index) = app
+        .autopilot
+        .picker
+        .candidates
+        .iter()
+        .position(|c| c.id == id)
+    else {
+        return false;
+    };
+    app.autopilot.picker.cursor = index;
+    app.autopilot.setup.toggle_milestone(id);
+    app.touch();
+    true
+}
+
+/// One queued-milestone row's worth of data, as the takeover shows it.
+/// A projection of [`super::QueueRow`] with the fields the takeover
+/// renders.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TakeoverRow {
+    pub id: String,
+    pub lifecycle: String,
+    pub cycle: u64,
+    /// True for the row the drive is currently working on, so a glance
+    /// identifies the active step.
+    pub active: bool,
+}
+
+/// The takeover's rows. Prefers the live queue view (populated by the
+/// poller from `mp autopilot session show`); falls back to the setup
+/// form's per-run selection so a run that started before the first
+/// refresh still shows what is queued.
+pub fn queued_milestones(app: &crate::tui::app::App) -> Vec<TakeoverRow> {
+    if let Some(view) = &app.autopilot.queue_view {
+        if !view.rows.is_empty() {
+            return view
+                .rows
+                .iter()
+                .map(|row| TakeoverRow {
+                    id: row.milestone_id.clone(),
+                    lifecycle: row.lifecycle.clone(),
+                    // The typed queue carries no cycle count; the drive
+                    // has not reported one until the first refresh
+                    // lands, so render 1 rather than a misleading 0.
+                    cycle: 1,
+                    active: row.active,
+                })
+                .collect();
+        }
+    }
+    app.autopilot
+        .setup
+        .selected
+        .iter()
+        .map(|id| TakeoverRow {
+            id: id.clone(),
+            lifecycle: "in-progress".to_string(),
+            cycle: 1,
+            active: false,
+        })
+        .collect()
+}
+
 // ======================================================================
 // Geometry — one derivation shared by the renderer and the hit test
-// ======================================================================
-//
+// ======================================================================//
 // The renderer draws from these rects and the mouse handler hit-tests
 // against the same values, so a chip can never be drawn in one place
 // and clickable in another. Kept free of any ratatui widget types so
@@ -711,6 +791,22 @@ pub struct AutopilotRegions {
     pub sidebar_body: Rect,
     /// The control row under Start.
     pub control_row: ControlRowAreas,
+    /// One rect per takeover milestone row. Empty unless the takeover
+    /// is on screen — the rows and the setup chips never coexist.
+    pub takeover_rows: Vec<TakeoverRowArea>,
+    /// The detached-mode popover's rect. `None` unless the popover is
+    /// open. Lives here (rather than being recomputed by the mouse
+    /// handler) so the box the operator clicks is the box the renderer
+    /// drew.
+    pub detached_popover: Option<Rect>,
+}
+
+/// One queued-milestone row on the takeover. Clicking it (or pressing
+/// Enter on it) opens the read-only peek.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TakeoverRowArea {
+    pub milestone_id: String,
+    pub rect: Rect,
 }
 
 impl AutopilotRegions {
@@ -757,16 +853,27 @@ fn fixed_section_heights(setup: &SetupForm) -> [(SetupSection, u16); 7] {
 /// Derive every rect the lane needs from its state and the full lane
 /// area.
 ///
-/// `run_live` gates the split border: while a run is live the sidebar
-/// is not draggable, because the operator is watching the takeover
-/// rather than arranging a form. The border is still *drawn* (so the
-/// layout does not jump when the run ends) but is not offered as a
-/// hit target.
+/// `takeover_active` and `takeover_rows` are separate because they are
+/// separate facts: the takeover is on screen whenever a run is live and
+/// has not been dismissed, and its rows band is empty when nothing is
+/// queued. Collapsing them would make a live-but-empty takeover render
+/// as the split.
+///
+/// A live takeover also gates the split border — there is no split to
+/// drag while the takeover owns the screen.
+///
+/// `candidates` is the picker's drivable-milestone list. The
+/// Milestones section renders every candidate as a chip (selected ones
+/// marked) rather than only the selection, because the operator has to
+/// be able to see and click what they have not picked yet.
 pub fn regions(
     area: Rect,
     layout: &AutopilotLayout,
     setup: &SetupForm,
-    run_live: bool,
+    candidates: &[String],
+    takeover_active: bool,
+    takeover_rows: &[TakeoverRow],
+    popover_open: bool,
 ) -> AutopilotRegions {
     let sidebar_visible = layout.sidebar_visible && area.width >= 8;
     let left_w = if sidebar_visible {
@@ -788,8 +895,9 @@ pub fn regions(
         width: area.width.saturating_sub(left_w),
         height: area.height,
     });
-    // One column is the border itself.
-    let split_x = sidebar.map(|s| s.x);
+    // One column is the border itself. No hit target while the
+    // takeover owns the screen — there is no split to drag.
+    let split_x = sidebar.filter(|_| !takeover_active).map(|s| s.x);
 
     // --- setup bands -------------------------------------------------
     // Fixed bands first, then whatever is left goes to Milestones so
@@ -898,10 +1006,15 @@ pub fn regions(
     }
     push_row(
         SetupSection::Milestones,
-        setup
-            .selected
+        candidates
             .iter()
-            .map(|id| (format!("milestone:{id}"), id.clone(), true))
+            .map(|id| {
+                (
+                    format!("milestone:{id}"),
+                    id.clone(),
+                    setup.selected.iter().any(|s| s == id),
+                )
+            })
             .collect(),
     );
     push_row(
@@ -994,16 +1107,102 @@ pub fn regions(
         sidebar_body = Rect::new(sb.x, sb.y + 1, sb.width, sb.height.saturating_sub(1));
     }
 
+    // --- detached popover ----------------------------------------------
+    // Centred over the setup region, and only present when the popover
+    // is open. The renderer draws it and the mouse handler hit-tests
+    // the same rect.
+    let detached_popover = popover_open.then(|| detached_popover_rect(setup_rect));
+
+    // --- takeover rows ------------------------------------------------
+    // Five stacked bands: topology strip, queued rows, activity tail,
+    // telemetry strip, control row. The rows band is elastic and the
+    // rest are fixed.
+    let mut takeover_areas: Vec<TakeoverRowArea> = Vec::new();
+    if takeover_active {
+        const TOPOLOGY_H: u16 = 3;
+        const TELEMETRY_H: u16 = 1;
+        const CONTROL_H: u16 = 3;
+        let fixed = TOPOLOGY_H + TELEMETRY_H + CONTROL_H;
+        let rows_height = area.height.saturating_sub(fixed);
+        let rows_top = area.y + TOPOLOGY_H + TELEMETRY_H;
+        // One row inside the band's borders.
+        for (i, row) in takeover_rows.iter().enumerate() {
+            if i as u16 + 2 > rows_height {
+                break; // band full — the rest stay unclickable rather
+                       // than being mapped onto rows that are not drawn
+            }
+            takeover_areas.push(TakeoverRowArea {
+                milestone_id: row.id.clone(),
+                rect: Rect::new(
+                    area.x + 1,
+                    rows_top + 1 + i as u16,
+                    area.width.saturating_sub(2),
+                    1,
+                ),
+            });
+        }
+    }
+
     AutopilotRegions {
         setup: setup_rect,
         sidebar,
-        split_x: if run_live { None } else { split_x },
+        split_x,
         sections,
         chips,
         tabs,
         sidebar_body,
         control_row,
+        takeover_rows: takeover_areas,
+        detached_popover: detached_popover
+            .is_some()
+            .then(|| detached_popover.unwrap()),
     }
+}
+
+/// The detached popover's rect, centred over the setup region. One row
+/// per choice plus the two borders.
+pub fn detached_popover_rect(area: Rect) -> Rect {
+    let width = 40.min(area.width);
+    let height = (DETACHED_CHOICES.len() as u16 + 2).min(area.height);
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    }
+}
+
+/// The takeover's five band rects, in render order. Shared by the
+/// renderer and the hit test for the same reason `regions` is.
+pub fn takeover_bands(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
+    const TOPOLOGY_H: u16 = 3;
+    const TELEMETRY_H: u16 = 1;
+    const CONTROL_H: u16 = 3;
+    let telemetry_y = area.y + TOPOLOGY_H;
+    let rows_y = telemetry_y + TELEMETRY_H;
+    let rows_h = area
+        .height
+        .saturating_sub(TOPOLOGY_H + TELEMETRY_H + CONTROL_H);
+    let control_y = rows_y.saturating_add(rows_h);
+    (
+        Rect::new(area.x, area.y, area.width, TOPOLOGY_H),
+        Rect::new(area.x, telemetry_y, area.width, TELEMETRY_H),
+        Rect::new(area.x, rows_y, area.width, rows_h),
+        // The activity tail takes the last row of the rows band so it
+        // fills whatever the queue did not.
+        Rect::new(
+            area.x,
+            rows_y.saturating_add(rows_h).saturating_sub(1),
+            area.width,
+            if rows_h == 0 { 0 } else { 1 },
+        ),
+        Rect::new(
+            area.x,
+            control_y,
+            area.width,
+            CONTROL_H.min(area.height.saturating_sub(rows_y)),
+        ),
+    )
 }
 
 #[cfg(test)]

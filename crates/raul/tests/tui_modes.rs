@@ -267,7 +267,12 @@ fn actions_have_required_variants() {
             | Action::AutopilotTogglePoll => "M215Autopilot",
             | Action::AutopilotNextSidebarTab
             | Action::AutopilotPrevSidebarTab
-            | Action::AutopilotToggleSidebar => "M241Sidebar",
+            | Action::AutopilotToggleSidebar
+            | Action::AutopilotDismissTakeover
+            | Action::AutopilotOpenPeek
+            | Action::AutopilotClosePeek
+            | Action::AutopilotDetachedMove { .. }
+            | Action::AutopilotDetachedAccept => "M241Sidebar",
             // Force exhaustiveness — must compile, must use every variant.
             Action::SetCoApprovalAction(CoApprovalAction::Reject) => "SetCoApprovalAction",
             Action::JumpLane(_) => "JumpLane",

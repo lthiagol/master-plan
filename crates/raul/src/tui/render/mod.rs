@@ -29,8 +29,9 @@ use dashboard_view::render_dashboard;
 use lane_lists::{render_backlog_detail, render_lane_list};
 use milestone_detail::render_milestone_detail;
 use overlays::{
-    render_annotation_thread, render_co_approval, render_help_overlay, render_input_overlay,
-    render_lifecycle_filter_overlay, render_review_menu_overlay, render_search_input_overlay,
+    render_annotation_thread, render_co_approval, render_detached_popover, render_help_overlay,
+    render_input_overlay, render_lifecycle_filter_overlay, render_override_panel,
+    render_peek_modal, render_review_menu_overlay, render_search_input_overlay,
     render_settings_lane, render_sort_rebind_overlay,
 };
 pub use scrollbar::{scrollbar_rect, track_click_to_scroll, SCROLLBAR_GUTTER};
@@ -168,7 +169,50 @@ pub fn render(frame: &mut Frame, app: &App, view: &ViewState) {
     if app.sort_rebind_open() {
         render_sort_rebind_overlay(frame, app, overlay_rect_or(view, area));
     }
+    // The Autopilot lane's two modal surfaces. Drawn from the same
+    // rects the mouse handler hit-tests, so a click always lands on the
+    // row the operator can see.
+    if let Some(rect) = view.autopilot.as_ref().and_then(|r| r.detached_popover) {
+        render_detached_popover(frame, app, rect);
+    }
+    // The override panel sits under the detached popover: the popover's
+    // "Configure extras" outcome is what opens it, and both can be on
+    // screen during the hand-off.
+    if app.autopilot.panel_open
+        && view
+            .autopilot
+            .as_ref()
+            .and_then(|r| r.detached_popover)
+            .is_none()
+    {
+        let content = view.content_area;
+        let panel_rect = Rect {
+            width: content.width.saturating_sub(16).max(30).min(content.width),
+            height: content.height.saturating_sub(8).max(8).min(content.height),
+            ..content
+        };
+        render_override_panel(frame, app, center_within(content, panel_rect));
+    }
+    if app.autopilot.peek.is_some() {
+        let content = view.content_area;
+        let peek_rect = Rect {
+            width: content.width.saturating_sub(8).max(20).min(content.width),
+            height: content.height.saturating_sub(6).max(8).min(content.height),
+            ..content
+        };
+        render_peek_modal(frame, app, center_within(content, peek_rect));
+    }
 
     // M183: two-line footer (globals + per-tab); flash/quit span both rows.
     render_footer(frame, app, view);
+}
+
+/// Center `rect` inside `outer`. Used for the Autopilot peek so the
+/// modal sits in the same place at every terminal size.
+fn center_within(outer: Rect, rect: Rect) -> Rect {
+    Rect {
+        x: outer.x + outer.width.saturating_sub(rect.width) / 2,
+        y: outer.y + outer.height.saturating_sub(rect.height) / 2,
+        ..rect
+    }
 }

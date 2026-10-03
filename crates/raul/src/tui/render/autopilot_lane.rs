@@ -54,7 +54,15 @@ pub fn render_autopilot_lane(frame: &mut Frame, app: &App, area: Rect) {
 
 /// The split view: setup region left, tabbed sidebar right.
 fn render_split(frame: &mut Frame, app: &App, area: Rect) {
-    let regions = setup::regions(area, &app.autopilot.layout, &app.autopilot.setup, false);
+    let regions = setup::regions(
+        area,
+        &app.autopilot.layout,
+        &app.autopilot.setup,
+        &setup::picker_candidates(app),
+        false,
+        &[],
+        app.autopilot.detached_confirm.is_some(),
+    );
     render_setup(frame, app, &regions);
     if let Some(sidebar) = regions.sidebar {
         // The sidebar block draws its own left edge at `split_x`, so
@@ -119,11 +127,20 @@ fn section_body(
             lines
         }
         SetupSection::Milestones => {
-            if form.selected.is_empty() {
+            if regions.chips_in(section).is_empty() {
                 vec![Line::from(Span::styled(
-                    "(none selected — pick with Space or a click)",
+                    "(no drivable milestones — press r to refresh)",
                     dim,
                 ))]
+            } else if form.selected.is_empty() {
+                // Candidates are listed but none are picked — say so,
+                // because "Start" is inert until at least one is.
+                let mut lines = chip_line(regions, section, &dim);
+                lines.push(Line::from(Span::styled(
+                    "(none selected — Start is inert)",
+                    dim,
+                )));
+                lines
             } else {
                 chip_line(regions, section, &dim)
             }
@@ -356,47 +373,23 @@ fn render_takeover(frame: &mut Frame, app: &App, area: Rect) {
     // The setup form is not drawn during a run — the takeover owns the
     // whole screen — but the control row still is, so pause / stop stay
     // reachable without a Back.
-    let topology_strip = Rect { height: 3, ..area };
-    let control_strip = Rect {
-        y: area.y + area.height.saturating_sub(3),
-        height: 3,
-        ..area
-    };
-    let telemetry_strip = Rect {
-        y: topology_strip.y + topology_strip.height,
-        height: 1.min(area.height.saturating_sub(4)),
-        ..area
-    };
-    let rows_area = Rect {
-        y: telemetry_strip.y + telemetry_strip.height,
-        height: area
-            .height
-            .saturating_sub(topology_strip.height + telemetry_strip.height + 3),
-        ..area
-    };
-    let activity_area = Rect {
-        y: rows_area.y + rows_area.height,
-        height: 0,
-        ..area
-    };
+    let (topology, telemetry, rows, activity, _control) = setup::takeover_bands(area);
+    render_topology_strip(frame, app, topology);
+    render_telemetry_strip(frame, app, telemetry);
+    render_takeover_rows(frame, app, rows);
+    render_activity_tail(frame, app, activity);
 
-    render_topology_strip(frame, app, topology_strip);
-    render_telemetry_strip(frame, app, telemetry_strip);
-    render_takeover_rows(frame, app, rows_area);
-    let _ = activity_area; // the activity tail shares the remaining band below
-    render_activity_tail(
-        frame,
-        app,
-        Rect {
-            y: control_strip.y.saturating_sub(1).max(rows_area.y),
-            height: 1,
-            ..area
-        },
+    // Reuse the split's control row builder so the buttons and their
+    // hit rects are defined once.
+    let regions = setup::regions(
+        area,
+        &app.autopilot.layout,
+        &app.autopilot.setup,
+        &setup::picker_candidates(app),
+        true,
+        &setup::queued_milestones(app),
+        app.autopilot.detached_confirm.is_some(),
     );
-
-    // Reuse the split's control row so the buttons and their hit rects
-    // are defined once.
-    let regions = setup::regions(area, &app.autopilot.layout, &app.autopilot.setup, true);
     render_control_row(frame, app, &regions);
 }
 
@@ -457,7 +450,7 @@ fn render_takeover_rows(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let dim = Style::default().fg(crate::tui::palette::dim_color(app.palette));
-    let queue = queued_milestones(app);
+    let queue = setup::queued_milestones(app);
     let mut lines: Vec<Line<'static>> = Vec::new();
     if queue.is_empty() {
         lines.push(Line::from(Span::styled("(no queued milestones)", dim)));
@@ -506,55 +499,6 @@ fn render_activity_tail(frame: &mut Frame, app: &App, area: Rect) {
             .collect()
     };
     frame.render_widget(Paragraph::new(tail), area);
-}
-
-/// One queued-milestone row's worth of data, as the takeover needs it.
-/// A projection of [`crate::tui::autopilot::QueueRow`] with the
-/// fields the takeover renders, plus the cycle count (which the typed
-/// queue does not carry — it lives on the detail panel).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TakeoverRow {
-    pub id: String,
-    pub lifecycle: String,
-    pub cycle: u64,
-    /// True for the row the drive is currently working on. The
-    /// takeover marks it so a glance identifies the active step.
-    pub active: bool,
-}
-
-/// The takeover's rows. Prefers the live queue view (populated by the
-/// poller from `mp autopilot session show`); falls back to the setup
-/// form's per-run selection so a run that started before the first
-/// refresh still shows what is queued.
-pub fn queued_milestones(app: &App) -> Vec<TakeoverRow> {
-    if let Some(view) = &app.autopilot.queue_view {
-        if !view.rows.is_empty() {
-            return view
-                .rows
-                .iter()
-                .map(|row| TakeoverRow {
-                    id: row.milestone_id.clone(),
-                    lifecycle: row.lifecycle.clone(),
-                    // The typed queue carries no cycle count; the drive
-                    // has not reported one until the first refresh
-                    // lands, so render 1 rather than a misleading 0.
-                    cycle: 1,
-                    active: row.active,
-                })
-                .collect();
-        }
-    }
-    app.autopilot
-        .setup
-        .selected
-        .iter()
-        .map(|id| TakeoverRow {
-            id: id.clone(),
-            lifecycle: "in-progress".to_string(),
-            cycle: 1,
-            active: false,
-        })
-        .collect()
 }
 
 /// A fixed-width lifecycle-position bar: filled up to the milestone's

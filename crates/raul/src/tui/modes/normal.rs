@@ -213,15 +213,48 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
     use crate::tui::keybinds::any_matches;
     let ap = &app.keybinds.lane_autopilot;
 
-    // Esc (or any binding in `ap.close`) closes the panel or replay
-    // shell first; otherwise falls through to the global Esc handler.
+    // The two modal surfaces own Esc first: the detached popover and
+    // the read-only peek. Both are dismissible with Esc, and letting
+    // Esc fall through to the takeover / panel targets while a modal
+    // was open would act on something the operator cannot see.
     if any_matches(&ap.close, &key) {
+        if app.autopilot.detached_confirm.is_some() {
+            // Esc in the popover is the same as "Back": revert to
+            // normal mode and leave the prompt.
+            return Some(vec![Action::AutopilotDetachedAccept]);
+        }
+        if app.autopilot.peek.is_some() {
+            return Some(vec![Action::AutopilotClosePeek]);
+        }
+        // Esc from the takeover returns to the split while the run
+        // continues. Checked before the panel so a Back from a live
+        // run is not swallowed by an open override panel.
+        if app.autopilot.takeover_active() {
+            return Some(vec![Action::AutopilotDismissTakeover]);
+        }
         if app.autopilot.panel_open {
             return Some(vec![Action::AutopilotTogglePanel]);
         }
         if app.autopilot.replay_open {
             return Some(vec![Action::AutopilotCloseReplay]);
         }
+    }
+
+    // While the detached popover is open, Up/Down move its highlight
+    // and Enter accepts it. Every other lane key is inert until the
+    // operator has answered the prompt — that is the point of the
+    // prompt.
+    if app.autopilot.detached_confirm.is_some() {
+        if matches!(key.code, KeyCode::Up) {
+            return Some(vec![Action::AutopilotDetachedMove { delta: -1 }]);
+        }
+        if matches!(key.code, KeyCode::Down) {
+            return Some(vec![Action::AutopilotDetachedMove { delta: 1 }]);
+        }
+        if matches!(key.code, KeyCode::Enter) {
+            return Some(vec![Action::AutopilotDetachedAccept]);
+        }
+        return None;
     }
 
     // Toggle picker selection. The picker is only reachable when
@@ -327,6 +360,13 @@ fn handle_autopilot_lane_key(key: KeyEvent, app: &App) -> Option<Vec<Action>> {
     // onto an M216 key does not silently shadow it.
     if any_matches(&ap.toggle_poll, &key) {
         return Some(vec![Action::AutopilotTogglePoll]);
+    }
+
+    // Enter on the takeover opens the read-only peek for the row the
+    // drive is working on. Only bound while the takeover owns the
+    // screen — in the split, Enter keeps its existing meaning.
+    if app.autopilot.takeover_active() && matches!(key.code, KeyCode::Enter) {
+        return Some(vec![Action::AutopilotOpenPeek]);
     }
 
     // Sidebar navigation. These three sit at the end of the lane's
