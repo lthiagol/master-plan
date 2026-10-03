@@ -1588,8 +1588,9 @@ impl QueueView {
     }
 
     /// Parse the queue view from the `mp autopilot session
-    /// show <id>` payload. The block is rendered only when
-    /// `rows.len() > 1`; the caller checks before rendering.
+    /// show <id>` payload. A non-empty queue produces rows whether
+    /// there is one milestone or many; the caller decides whether to
+    /// show them.
     pub fn from_session_show(payload: &Value) -> Self {
         let session_id = payload
             .get("session_id")
@@ -1789,10 +1790,25 @@ pub mod refresh {
         let ac = AcDetail::from_payload(session_show);
         let telemetry = Telemetry::from_payload(session_show);
         app.status_graph = Some(graph);
-        app.queue_view = if queue.rows.len() > 1 {
-            Some(queue)
-        } else {
+        // Any non-empty queue populates the view, including a
+        // single-milestone session.
+        //
+        // This used to require `rows.len() > 1`, on the reasoning that
+        // a one-milestone "queue" is not worth a block. But the view is
+        // not only a block any more: the takeover reads each row's
+        // `cycle` from it, and a 1-row session gated out of the view
+        // reported "cycle 1" for a milestone the drive was actually on
+        // cycle 3 of. A single-milestone drive is a real case, so the
+        // gate made the takeover's cycle count wrong precisely when
+        // there was only one thing to watch.
+        //
+        // An *empty* queue still yields `None`: there is nothing to
+        // show, and a `QueueView` with no rows would report every
+        // lookup as "first cycle".
+        app.queue_view = if queue.rows.is_empty() {
             None
+        } else {
+            Some(queue)
         };
         app.violations = Some(violations);
         app.detail_panel = Some(detail);

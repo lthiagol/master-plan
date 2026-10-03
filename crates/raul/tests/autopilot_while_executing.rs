@@ -230,7 +230,86 @@ fn the_refresh_adapter_carries_the_cycle_count_through_to_the_lane() {
     );
 }
 
-/// F-01: a history entry with no milestone id, or with a non-numeric
+/// F-02: a **single**-milestone run reports its real cycle count.
+///
+/// This is the case the pre-existing `rows.len() > 1` gate broke: the
+/// refresh adapter left `queue_view` as `None` for a one-row queue, so
+/// the takeover fell back to the form's selection and rendered
+/// "cycle 1" for a milestone the drive was on cycle 3 of. The spec asks
+/// for a cycle count per queued row without qualifying on session size,
+/// and a single-milestone drive is a real case.
+///
+/// Pinned through `refresh_from_json` rather than by assigning
+/// `queue_view` directly — the gate lived in the adapter, so a test that
+/// sets the field itself would pass with the gate still present.
+#[test]
+fn a_single_milestone_run_reports_its_real_cycle_count() {
+    let payload = serde_json::json!({
+        "session_id": "solo",
+        "session": {
+            "id": "solo",
+            "status": "active",
+            "working_on": {"milestone_id": "M240", "cycle": 3, "role": "runner"},
+            "queue": [
+                {"milestone_id": "M240", "title": "Only one", "lifecycle": "in-progress"},
+            ],
+            "queue_cycle_history": [
+                {"milestone_id": "M240", "cycle": 1, "outcome": "remediation"},
+                {"milestone_id": "M240", "cycle": 2, "outcome": "remediation"},
+                {"milestone_id": "M240", "cycle": 3, "started_at": "2026-09-04T00:03:00Z"},
+            ],
+        }
+    });
+    let status = serde_json::json!({"run_state": {"kind": "live"}});
+
+    let mut state = raul::tui::autopilot::AutopilotLaneState::empty();
+    raul::tui::autopilot::refresh::refresh_from_json(&mut state, &payload, &status);
+
+    // The gate itself: a one-row queue must reach the lane state.
+    let view = state
+        .queue_view()
+        .expect("a one-milestone queue is still a queue");
+    assert_eq!(view.rows.len(), 1);
+
+    // …and the takeover must show the drive's cycle, not a constant.
+    let mut app = app_with_queue(&[]);
+    app.autopilot.queue_view = Some(view.clone());
+    app.autopilot.note_run_live(true);
+    let rows = raul::tui::autopilot::setup::queued_milestones(&app);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, "240");
+    assert_eq!(
+        rows[0].cycle, 3,
+        "a single-milestone drive on cycle 3 must not report cycle 1"
+    );
+
+    // And it reaches the screen.
+    let screen = screen(&app);
+    assert!(
+        screen.contains("cycle 3"),
+        "the takeover row should show the real cycle; got:\n{screen}"
+    );
+    assert!(
+        !screen.contains("cycle 1"),
+        "the takeover row must not show the fallback cycle; got:\n{screen}"
+    );
+}
+
+/// F-02: an *empty* queue is still not a queue view. A `QueueView` with
+/// no rows would answer every cycle lookup with "first cycle", so the
+/// gate's real job — suppressing an empty queue — is kept, only its
+/// size condition is not.
+#[test]
+fn an_empty_queue_still_produces_no_queue_view() {
+    let payload = serde_json::json!({
+        "session_id": "hollow",
+        "session": {"id": "hollow", "status": "active", "queue": []},
+    });
+    let status = serde_json::json!({"run_state": {"kind": "live"}});
+    let mut state = raul::tui::autopilot::AutopilotLaneState::empty();
+    raul::tui::autopilot::refresh::refresh_from_json(&mut state, &payload, &status);
+    assert!(state.queue_view().is_none());
+}
 /// cycle, is skipped rather than read as cycle 0 or panicking.
 #[test]
 fn malformed_history_entries_are_ignored() {

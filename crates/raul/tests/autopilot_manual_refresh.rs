@@ -65,16 +65,62 @@ fn manual_refresh_populates_all_typed_surfaces() {
     assert!(!state.last_refresh_at().is_empty());
 }
 
-/// AC-03: a single-milestone session has no queue view
-/// (the block only renders when there are multiple
-/// milestones). The adapter follows the same gate.
+/// AC-03: a single-milestone session *does* get a queue view.
+///
+/// This used to assert the opposite: the adapter gated on
+/// `rows.len() > 1` so a one-milestone session left `queue_view` as
+/// `None`. That gate made the takeover's cycle count wrong for
+/// single-milestone drives — the view is where each row's `cycle`
+/// comes from, so a gated-out session reported "cycle 1" regardless of
+/// what `queue_cycle_history` said.
+///
+/// Uses a `queue[]` entry shaped like mp's real `QueueItem`
+/// (`milestone_id` / `stage` / `cycle`). The shared
+/// [`sample_session_show`] fixture predates that shape and carries
+/// pane-style keys instead, so it cannot answer this question.
 #[test]
-fn manual_refresh_skips_queue_view_for_single_milestone() {
+fn manual_refresh_populates_queue_view_for_single_milestone() {
+    let show = serde_json::json!({
+        "session_id": "alpha",
+        "session": {
+            "id": "alpha",
+            "status": "active",
+            "queue": [
+                {"milestone_id": "M209", "stage": "in-progress", "cycle": 3},
+            ],
+            "working_on": {"milestone_id": "M209", "cycle": 3, "role": "runner"},
+            "queue_cycle_history": [
+                {"milestone_id": "M209", "cycle": 1},
+                {"milestone_id": "M209", "cycle": 2},
+                {"milestone_id": "M209", "cycle": 3},
+            ],
+        },
+    });
     let mut state = AutopilotLaneState::empty();
-    refresh_from_json(&mut state, &sample_session_show(), &sample_status());
+    refresh_from_json(&mut state, &show, &sample_status());
+    let qv = state.queue_view().expect("a one-row queue still populates");
+    assert_eq!(qv.rows.len(), 1);
+    assert_eq!(qv.rows[0].milestone_id, "209");
+    assert_eq!(
+        qv.rows[0].cycle, 3,
+        "the one row carries the drive's real cycle"
+    );
+}
+
+/// An *empty* queue is still not a queue view — there is nothing to
+/// show, and an empty `QueueView` would report every cycle lookup as
+/// "first cycle".
+#[test]
+fn manual_refresh_skips_queue_view_when_the_queue_is_empty() {
+    let show = serde_json::json!({
+        "session_id": "alpha",
+        "session": {"id": "alpha", "status": "active", "queue": []},
+    });
+    let mut state = AutopilotLaneState::empty();
+    refresh_from_json(&mut state, &show, &sample_status());
     assert!(
         state.queue_view().is_none(),
-        "single-milestone sessions must skip the queue block"
+        "an empty queue must not produce a queue view"
     );
 }
 

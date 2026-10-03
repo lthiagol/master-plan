@@ -155,7 +155,10 @@ fn queue_view_is_reachable_from_the_lane_state() {
     let rendered = state.queue_view().unwrap().render_to_string();
     assert!(rendered.starts_with("Multi-milestone queue (alpha)"));
 
-    // Single-milestone: refresher would set the field to None.
+    // Single-milestone: a one-row queue is still a queue. The
+    // refresher used to gate this on `rows.len() > 1`, which left
+    // `queue_view` as `None` and made the takeover's cycle count
+    // report "cycle 1" for any single-milestone drive.
     let single = serde_json::json!({
         "session_id": "delta",
         "session": {
@@ -165,14 +168,31 @@ fn queue_view_is_reachable_from_the_lane_state() {
         },
     });
     let qv_single = QueueView::from_session_show(&single);
-    state.queue_view = if qv_single.rows.len() > 1 {
-        Some(qv_single)
-    } else {
+    state.queue_view = if qv_single.rows.is_empty() {
         None
+    } else {
+        Some(qv_single)
+    };
+    assert!(
+        state.queue_view().is_some(),
+        "a one-milestone session still has a queue"
+    );
+    assert_eq!(state.queue_view().unwrap().rows.len(), 1);
+
+    // An empty queue is the case that still yields None.
+    let empty = serde_json::json!({
+        "session_id": "delta",
+        "session": {"id": "delta", "status": "active", "queue": []},
+    });
+    let qv_empty = QueueView::from_session_show(&empty);
+    state.queue_view = if qv_empty.rows.is_empty() {
+        None
+    } else {
+        Some(qv_empty)
     };
     assert!(
         state.queue_view().is_none(),
-        "single-milestone sessions must skip the queue block"
+        "an empty queue must not produce a queue view"
     );
 }
 
