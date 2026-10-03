@@ -1,5 +1,13 @@
 ## Unreleased — WIP CI hardening
 
+- **mp test helper reorganization (M232): no behavior change.** The 1,134-line
+  `crates/mp/tests/common/lib_api.rs` is split into four domain submodules
+  (`lib_api/{ctx,mutation,io,capture}.rs`), and `seed_handoff_gate` /
+  `init_git` are deduplicated into `common/seed.rs` and `common/git.rs` so
+  each is defined exactly once under `crates/mp/tests/`. Existing callers
+  continue to compile via re-exports; `cargo nextest run -p mp` is unchanged
+  (3856 tests, 1 skipped).
+
 - **The Autopilot tab is now a control-first split view, and takes over the
   screen while a run is live.** The status-first picker/graph/queue layout is
   replaced by a setup form on the left (40% of the lane) and a tabbed sidebar
