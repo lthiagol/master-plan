@@ -73,7 +73,7 @@
       "description": "autopilot_detach.rs has at least three behavioral tests that exercise the setsid detach, state-file write, and shutdown paths.",
       "verification": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast.",
       "status": "passed",
-      "evidence": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast exit 0 (3 new tests: preflight_refuses_with_exit_code_2_when_no_harness, state_file_written_to_autopilot_run_state_json_path, detached_pid_in_state_matches_response_pid — total 16/16 in binary)"
+      "evidence": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast exit 0 (4 new tests: preflight_refuses_with_exit_code_2_when_no_harness + state_file_written_to_autopilot_run_state_json_path + detached_pid_in_state_matches_response_pid + shutdown_signals_recorded_pid_and_persists_terminal_outcome — total 17/17 in binary; F-01 fixed in c6e213e + b0bb1bd — shutdown path test added)"
     },
     {
       "id": "AC-02",
@@ -108,7 +108,7 @@
       "description": "At least three negative integration tests exist that drive existing `?`-propagated error paths in config.rs / git.rs / archive.rs / digest.rs to non-zero exits, and CI runs them.",
       "verification": "./scripts/verify-m233-ac06.sh",
       "status": "passed",
-      "evidence": "./scripts/verify-m233-ac06.sh exit 0 (3 binaries / 9 new negative tests pass: config_cmd_negative 3/3, archive_negative 3/3, digest_negative 3/3)"
+      "evidence": "./scripts/verify-m233-ac06.sh exit 0 (4 binaries / 12 new negative tests pass: config_cmd_negative 3/3, archive_negative 3/3, digest_negative 3/3, git_negative 3/3; F-02 fixed in 18846bb — git.rs negative test added)"
     },
     {
       "id": "AC-07",
