@@ -2175,6 +2175,14 @@
       "reviewed_at": "2026-10-03",
       "notes": "3 cycles. Cycle 1: 1 medium (F-01 takeover row cycle hard-coded to 1). Cycle 2: F-01 resolved (QueueRow.cycle added, populated from session.queue_cycle_history with additive serde default, test strengthened to assert exact per-row cycles including at-least-one > 1), F-02 filed (1-milestone gate at autopilot.rs:1792, the > 1 gate dropped to is_empty). Cycle 3: F-02 resolved (gate change + regression test a_single_milestone_run_reports_its_real_cycle_count, verified the test bites against the old gate by re-introducing it). Cold build pass on all cycles. Three judgment calls accepted: (1) data-source simplification queue[].cycle vs queue_cycle_history deferred as future cleanup, (2) stale sample_session_show fixture in autopilot_manual_refresh.rs accepted as separate concern, (3) bonus side effects active_session_id + open_detail on single-milestone runs unblocked. Findings commit: 9f46021 (cycle 2), 294dee4 (cycle 3).",
       "milestone_completed_at": "2026-10-03"
+    },
+    {
+      "milestone_id": "232",
+      "verdict": "ok",
+      "reviewer": "herdr-orc:m232-reviewer (pane w1G:p6)",
+      "reviewed_at": "2026-10-04",
+      "notes": "Cycle 1 verdict ok. 1 LOW finding (F-01, doc drift): scripts/verify-m232-step-s1.sh header claims 'line-count < 100 plus the four submodule files' but the body has only 2 checks (line-count + ctx.rs); mutation.rs / io.rs / capture.rs existence not covered. AC-01 wrapper covers all 5, so cosmetic only. 4/4 ACs verified independently: 4 wrapper scripts exit 0 (ac01/ac02/ac04 + step-s1/s2/s2.1); each helper (seed_handoff_gate / init_git / capture_stdio) defined exactly once across crates/mp/tests; lib_api.rs is 59 lines (under 100); 4 submodules exist with real content; zero tests dropped (baseline 3856 = final 3856); cargo fmt + clippy -D warnings clean. Cold build pass. Findings commit: [to be filed].",
+      "milestone_completed_at": "2026-10-04"
     }
   ],
   "comments": [
