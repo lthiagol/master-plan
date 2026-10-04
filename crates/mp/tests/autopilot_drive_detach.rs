@@ -47,14 +47,7 @@ fn preflight_refuses_with_exit_code_2_when_no_harness() {
     let env = TestEnv::new();
     // Fresh TestEnv has no harness config; preconditions must fail
     // before detach tries to spawn anything.
-    let out = env.run(&[
-        "autopilot",
-        "start",
-        "1",
-        "--detach",
-        "--format",
-        "json",
-    ]);
+    let out = env.run(&["autopilot", "start", "1", "--detach", "--format", "json"]);
     assert!(
         !out.status.success(),
         "detach with no harness must exit non-zero; stderr={}",
@@ -64,7 +57,8 @@ fn preflight_refuses_with_exit_code_2_when_no_harness() {
     // surfaced by `cmd_watch_drive` when `preconditions.ok == false`.
     let code = out.status.code().unwrap_or(0);
     assert_eq!(
-        code, 2,
+        code,
+        2,
         "expected precondition refusal exit code 2; got {code}; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
@@ -113,14 +107,7 @@ fn state_file_written_to_autopilot_run_state_json_path() {
     // Live detach — preconditions + herdr gate green.
     let out = env.run_with_env(
         &[("PATH", &path_with_fake)],
-        &[
-            "autopilot",
-            "start",
-            "1",
-            "--detach",
-            "--format",
-            "json",
-        ],
+        &["autopilot", "start", "1", "--detach", "--format", "json"],
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -180,20 +167,12 @@ fn detached_pid_in_state_matches_response_pid() {
 
     let out = env.run_with_env(
         &[("PATH", &path_with_fake)],
-        &[
-            "autopilot",
-            "start",
-            "1",
-            "--detach",
-            "--format",
-            "json",
-        ],
+        &["autopilot", "start", "1", "--detach", "--format", "json"],
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "detach must succeed: {stderr}");
 
-    let response: Value =
-        serde_json::from_slice(&out.stdout).expect("detach response JSON");
+    let response: Value = serde_json::from_slice(&out.stdout).expect("detach response JSON");
     let detached_pid = response["detached_pid"]
         .as_u64()
         .expect("response.detached_pid must be a u64");

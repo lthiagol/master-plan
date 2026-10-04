@@ -46,8 +46,7 @@ fn metrics_set_show_round_trip() {
         set.status.success(),
         "metrics set must succeed on a fresh plan: {stderr}"
     );
-    let set_payload: serde_json::Value =
-        serde_json::from_slice(&set.stdout).expect("set JSON");
+    let set_payload: serde_json::Value = serde_json::from_slice(&set.stdout).expect("set JSON");
     assert_eq!(set_payload["ok"].as_bool(), Some(true));
     let metrics = &set_payload["metrics"];
     assert_eq!(metrics["lines_of_code"].as_u64(), Some(1234));
@@ -73,8 +72,7 @@ fn metrics_set_show_round_trip() {
         show.status.success(),
         "metrics show must succeed after set: {show_stderr}"
     );
-    let show_payload: serde_json::Value =
-        serde_json::from_slice(&show.stdout).expect("show JSON");
+    let show_payload: serde_json::Value = serde_json::from_slice(&show.stdout).expect("show JSON");
     assert_eq!(show_payload["ok"].as_bool(), Some(true));
     let shown = &show_payload["metrics"];
     assert_eq!(shown["lines_of_code"].as_u64(), Some(1234));

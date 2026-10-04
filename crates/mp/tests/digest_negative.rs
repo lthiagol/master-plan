@@ -71,13 +71,7 @@ fn digest_since_handoff_without_prior_handoff_exits_with_no_handoff_message() {
 #[test]
 fn digest_rejects_invalid_since_duration_string() {
     let env = TestEnv::new();
-    let out = env.run(&[
-        "digest",
-        "--since",
-        "not-a-duration",
-        "--format",
-        "json",
-    ]);
+    let out = env.run(&["digest", "--since", "not-a-duration", "--format", "json"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
     assert!(

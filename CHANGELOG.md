@@ -1,5 +1,18 @@
 ## Unreleased — WIP CI hardening
 
+- **Test coverage gap closure (M233): no behavior change.** Adds direct
+  integration tests for `autopilot_detach.rs` (setsid + state-file write
+  + preflight refusal), `breaking_release::apply` (write-marker +
+  blocked-preflight bail), `mp plan metrics` (set→show round-trip +
+  non-numeric rejection), the TrackItem arm of `archive.rs`, and a
+  negative case for the G6 gate (the prior `|| !success` escape is
+  removed; `g6_clears_when_all_acs_passed` is the new positive case).
+  Three new top-level test binaries — `config_cmd_negative.rs`,
+  `archive_negative.rs`, `digest_negative.rs` — drive existing `?`-
+  propagated error paths in `config.rs` / `archive.rs` / `digest.rs`
+  to non-zero exits with the expected wording. Test count grows from
+  3856 → 3939 (83 new tests, 1 skipped unchanged); full mp suite green.
+
 - **mp test helper reorganization (M232): no behavior change.** The 1,134-line
   `crates/mp/tests/common/lib_api.rs` is split into four domain submodules
   (`lib_api/{ctx,mutation,io,capture}.rs`), and `seed_handoff_gate` /

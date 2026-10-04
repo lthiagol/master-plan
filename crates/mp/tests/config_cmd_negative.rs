@@ -67,8 +67,7 @@ fn config_set_unknown_key_exits_nonzero_with_unknown_config_key_message() {
     // `mp config set` returns a structured envelope with `ok=false`
     // and `errors[].message` carrying the wording; the production
     // bail at config_cmd.rs:382 surfaces there rather than in stderr.
-    let payload: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("config set JSON");
+    let payload: serde_json::Value = serde_json::from_slice(&out.stdout).expect("config set JSON");
     assert_eq!(payload["ok"].as_bool(), Some(false));
     let errors = payload["errors"].as_array().expect("errors array");
     let joined = errors
@@ -106,8 +105,7 @@ fn config_set_rejects_non_boolean_for_boolean_field() {
         !out.status.success(),
         "config set non-boolean must exit non-zero"
     );
-    let payload: serde_json::Value =
-        serde_json::from_slice(&out.stdout).expect("config set JSON");
+    let payload: serde_json::Value = serde_json::from_slice(&out.stdout).expect("config set JSON");
     assert_eq!(payload["ok"].as_bool(), Some(false));
     let errors = payload["errors"].as_array().expect("errors array");
     let joined = errors

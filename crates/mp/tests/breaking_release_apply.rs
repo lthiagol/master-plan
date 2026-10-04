@@ -107,12 +107,7 @@ fn apply_after_blocked_preflight_returns_nonzero_with_bail_message() {
         ]),
     );
 
-    let out = env.run(&[
-        "breaking-release",
-        "apply",
-        "--format",
-        "json",
-    ]);
+    let out = env.run(&["breaking-release", "apply", "--format", "json"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
     assert!(
@@ -153,12 +148,7 @@ fn apply_after_clean_preflight_writes_marker_file() {
         ]),
     );
 
-    let out = env.run(&[
-        "breaking-release",
-        "apply",
-        "--format",
-        "json",
-    ]);
+    let out = env.run(&["breaking-release", "apply", "--format", "json"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
     assert!(
@@ -190,11 +180,11 @@ fn apply_after_clean_preflight_writes_marker_file() {
         Some("3.0.0"),
         "marker must carry the recorded target_version"
     );
-    let evidence = payload["evidence_releases"].as_array().expect("evidence_releases");
+    let evidence = payload["evidence_releases"]
+        .as_array()
+        .expect("evidence_releases");
     assert!(
-        evidence
-            .iter()
-            .any(|v| v.as_str() == Some("2.0.0")),
+        evidence.iter().any(|v| v.as_str() == Some("2.0.0")),
         "marker must list 2.0.0 in evidence_releases; got {evidence:?}"
     );
 }

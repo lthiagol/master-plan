@@ -24,10 +24,7 @@ fn track_archive_marks_item_archived_and_hides_from_active_list() {
         "json",
     ]);
     let add_stderr = String::from_utf8_lossy(&add.stderr);
-    assert!(
-        add.status.success(),
-        "track add must succeed: {add_stderr}"
-    );
+    assert!(add.status.success(), "track add must succeed: {add_stderr}");
     let item_id = crate::common::json_from_stdout(&add.stdout)["item"]["id"]
         .as_str()
         .unwrap()
@@ -67,13 +64,9 @@ fn track_archive_marks_item_archived_and_hides_from_active_list() {
     );
 
     // The on-disk track JSON must now show status=archived.
-    let track_path = env
-        .tmp
-        .path()
-        .join("master-plan/tracks/tweak.json");
+    let track_path = env.tmp.path().join("master-plan/tracks/tweak.json");
     let track_text = std::fs::read_to_string(&track_path).expect("track json");
-    let track: serde_json::Value =
-        serde_json::from_str(&track_text).expect("track parse");
+    let track: serde_json::Value = serde_json::from_str(&track_text).expect("track parse");
     let items = track["items"].as_array().expect("items array");
     let archived = items
         .iter()
@@ -94,20 +87,13 @@ fn track_archive_marks_item_archived_and_hides_from_active_list() {
     // exactly the set the production code considers "in flight";
     // archived items are filtered out before reaching the
     // operator's view.
-    let list = env.run(&[
-        "track",
-        "list",
-        "--items",
-        "--format",
-        "json",
-    ]);
+    let list = env.run(&["track", "list", "--items", "--format", "json"]);
     assert!(
         list.status.success(),
         "track list must succeed: {}",
         String::from_utf8_lossy(&list.stderr)
     );
-    let list_payload: serde_json::Value =
-        serde_json::from_slice(&list.stdout).expect("list JSON");
+    let list_payload: serde_json::Value = serde_json::from_slice(&list.stdout).expect("list JSON");
     // `tracks` is an array; find the "tweak" entry and inspect its
     // items list. The active set is exactly the set the production
     // code considers "in flight"; archived items are filtered out
