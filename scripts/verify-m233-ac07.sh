@@ -11,13 +11,13 @@
 #   - 3 back-to-back runs of the new/changed test binaries + suites
 #     (autopilot_drive_detach, breaking_release_apply,
 #      config_cmd_negative, archive_negative, digest_negative,
-#      suite_misc metrics::*, suite_validate gate_matrix::g6_*,
-#      suite_track track_archive)
+#      git_negative, suite_misc metrics::*, suite_track track_archive,
+#      suite_validate gate_matrix::g6_*)
 #   - one full `cargo nextest run -p mp --no-fail-fast`
 set -euo pipefail
 for i in 1 2 3; do
   cargo nextest run -p mp --no-fail-fast \
-    -E 'binary(autopilot_drive_detach) | binary(breaking_release_apply) | binary(config_cmd_negative) | binary(archive_negative) | binary(digest_negative) | test(/^metrics::|track_archive|^gate_matrix::g6_/)'
+    -E 'binary(autopilot_drive_detach) | binary(breaking_release_apply) | binary(config_cmd_negative) | binary(archive_negative) | binary(digest_negative) | binary(git_negative) | test(/^metrics::|track_archive|^gate_matrix::g6_/)'
   echo "flakiness run $i: pass"
 done
 cargo nextest run -p mp --no-fail-fast
