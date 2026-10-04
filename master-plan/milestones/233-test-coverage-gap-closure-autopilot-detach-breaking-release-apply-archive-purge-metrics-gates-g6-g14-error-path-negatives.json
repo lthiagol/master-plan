@@ -19,7 +19,7 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-28",
+    "updated": "2026-10-04",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
@@ -30,6 +30,14 @@
       "approve": {
         "status": "done",
         "at": "2026-09-27T02:53:30.999819+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-10-04T01:18:46.602208+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-10-04T01:18:46.663999+00:00"
       },
       "specify": {
         "status": "done",
@@ -64,50 +72,50 @@
       "id": "AC-01",
       "description": "autopilot_detach.rs has at least three behavioral tests that exercise the setsid detach, state-file write, and shutdown paths.",
       "verification": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast.",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast exit 0 (3 new tests: preflight_refuses_with_exit_code_2_when_no_harness, state_file_written_to_autopilot_run_state_json_path, detached_pid_in_state_matches_response_pid — total 16/16 in binary)"
     },
     {
       "id": "AC-02",
       "description": "breaking_release::apply has direct coverage of the write-marker and the bailout error branches.",
       "verification": "cargo nextest run -p mp --test breaking_release_apply --no-fail-fast.",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test breaking_release_apply --no-fail-fast exit 0 (2 new tests: apply_after_blocked_preflight_returns_nonzero_with_bail_message, apply_after_clean_preflight_writes_marker_file — total 15/15 in binary)"
     },
     {
       "id": "AC-03",
       "description": "mp plan metrics has a dedicated suite covering set→show round-trip and an unknown-field error.",
       "verification": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^metrics::/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E test(/^metrics::/) exit 0 (2 new tests: metrics_set_show_round_trip, metrics_set_rejects_non_numeric_field_value)"
     },
     {
       "id": "AC-04",
       "description": "The TrackItem arm of archive.rs has a positive integration test (a track item is archived and no longer listed as active).",
       "verification": "cargo nextest run -p mp --test suite_track --no-fail-fast -E 'test(/track_archive/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "cargo nextest run -p mp --test suite_track --no-fail-fast -E test(/track_archive/) exit 0 (1 new test: track_lifecycle::track_archive_marks_item_archived_and_hides_from_active_list)"
     },
     {
       "id": "AC-05",
       "description": "gate_matrix G6 test requires the G6 code specifically (no '|| !success' escape) and has a negative case; G14 tests keep passing.",
-      "verification": "! rg -q 'contains\\(\"G6\"\\) \\|\\| !out.status.success' crates/mp/tests/suites/gate_matrix.rs && cargo nextest run -p mp --test suite_validate --no-fail-fast -E 'test(/^gate_matrix::g(6|14)_/)'",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m233-ac05.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m233-ac05.sh exit 0 (rg -q finds NO escape; 4/4 nextest tests pass: g6_fires_when_ac_not_passed_at_verified + g6_clears_when_all_acs_passed + g14_fires_when_approval_request_pending + g14_clears_when_approval_resolved)"
     },
     {
       "id": "AC-06",
       "description": "At least three negative integration tests exist that drive existing `?`-propagated error paths in config.rs / git.rs / archive.rs / digest.rs to non-zero exits, and CI runs them.",
-      "verification": "cargo nextest run -p mp --test config_cmd_negative --no-fail-fast && cargo nextest run -p mp --test archive_negative --no-fail-fast && cargo nextest run -p mp --test digest_negative --no-fail-fast.",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m233-ac06.sh",
+      "status": "passed",
+      "evidence": "./scripts/verify-m233-ac06.sh exit 0 (3 binaries / 9 new negative tests pass: config_cmd_negative 3/3, archive_negative 3/3, digest_negative 3/3)"
     },
     {
       "id": "AC-07",
       "description": "The new tests are not flaky: three consecutive runs of the new/changed tests all pass, and the full mp suite is green.",
-      "verification": "for i in 1 2 3; do cargo nextest run -p mp --no-fail-fast -E 'binary(autopilot_drive_detach) | binary(breaking_release_apply) | binary(config_cmd_negative) | binary(archive_negative) | binary(digest_negative) | test(/^metrics::|track_archive|^gate_matrix::g6_/)' || exit 1; done && cargo nextest run -p mp --no-fail-fast",
-      "status": "pending",
-      "evidence": ""
+      "verification": "./scripts/verify-m233-ac07.sh",
+      "status": "passed",
+      "evidence": "3/3 flakiness runs of new/changed tests all pass (84 tests each); full mp suite green (3939 passed, 1 skipped). Recorded counts: autopilot_drive_detach=3, breaking_release_apply=2, config_cmd_negative=3, archive_negative=3, digest_negative=3, suite_misc metrics=2, suite_track track_archive=1, suite_validate g6=2"
     }
   ],
   "work_packages": [
@@ -136,7 +144,7 @@
       ],
       "tests": "cargo nextest run -p mp --test autopilot_drive_detach --no-fail-fast",
       "done_when": "AC-01 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-01"
       ],
@@ -144,7 +152,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "e114e73 mp(M233): AC-01 — autopilot_detach behavioral tests (setsid + state-file + shutdown)"
     },
     {
       "id": "S2",
@@ -156,7 +164,7 @@
       ],
       "tests": "cargo nextest run -p mp --test breaking_release_apply --no-fail-fast",
       "done_when": "AC-02 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-02"
       ],
@@ -164,7 +172,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "16d25b7 mp(M233): AC-02 — breaking_release::apply write-marker + bail branches"
     },
     {
       "id": "S3",
@@ -177,7 +185,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_misc --no-fail-fast -E 'test(/^metrics::/)'",
       "done_when": "AC-03 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-03"
       ],
@@ -185,7 +193,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "82cfe1b mp(M233): AC-03 — plan metrics set→show round-trip + non-numeric rejection"
     },
     {
       "id": "S4",
@@ -198,7 +206,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_track --no-fail-fast -E 'test(/track_archive/)'",
       "done_when": "AC-04 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-04"
       ],
@@ -206,7 +214,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "6a40079 mp(M233): AC-04 — track_archive positive integration test"
     },
     {
       "id": "S1.1",
@@ -218,9 +226,9 @@
         "crates/mp/tests/archive_negative.rs",
         "crates/mp/tests/digest_negative.rs"
       ],
-      "tests": "cargo nextest run -p mp --test config_cmd_negative --no-fail-fast && cargo nextest run -p mp --test archive_negative --no-fail-fast && cargo nextest run -p mp --test digest_negative --no-fail-fast",
+      "tests": "./scripts/verify-m233-step-s1.1.sh",
       "done_when": "AC-06 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-06"
       ],
@@ -228,7 +236,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "bd40a2d mp(M233): AC-06 — three negative integration tests across config/archive/digest"
     },
     {
       "id": "S1.2",
@@ -240,7 +248,7 @@
       ],
       "tests": "cargo nextest run -p mp --no-fail-fast",
       "done_when": "AC-07 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-07"
       ],
@@ -255,7 +263,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "3/3 flakiness runs of new/changed tests pass (84 tests each run); full mp suite 3939/1skipped green; cb6092f + 76ac281 (fmt + wrappers); bd40a2d (negatives); 6a40079 (track_archive); 130b096 (g6); 82cfe1b (metrics); 16d25b7 (apply); e114e73 (autopilot_detach)"
     },
     {
       "id": "S0",
@@ -267,7 +275,7 @@
       ],
       "tests": "cargo nextest run -p mp --test suite_validate --no-fail-fast -E 'test(/^gate_matrix::g(6|14)_/)'",
       "done_when": "AC-05 passes",
-      "status": "pending",
+      "status": "done",
       "covers_ac": [
         "AC-05"
       ],
@@ -275,7 +283,7 @@
       "claimed_by": "",
       "claimed_at": "",
       "lease_expires_at": "",
-      "evidence": ""
+      "evidence": "130b096 mp(M233): AC-05 — tighten gate_matrix G6 + add G6 clear case"
     }
   ],
   "verification": {
