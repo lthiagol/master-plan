@@ -299,14 +299,7 @@ fn shutdown_signals_recorded_pid_and_persists_terminal_outcome() {
     // but the state file persists with whatever pid it captured.
     let detach = env.run_with_env(
         &[("PATH", &path_with_fake)],
-        &[
-            "autopilot",
-            "start",
-            "1",
-            "--detach",
-            "--format",
-            "json",
-        ],
+        &["autopilot", "start", "1", "--detach", "--format", "json"],
     );
     assert!(
         detach.status.success(),
@@ -374,8 +367,7 @@ fn shutdown_signals_recorded_pid_and_persists_terminal_outcome() {
         .path()
         .join("master-plan/.mp/autopilot-run.state.json");
     let state_text = std::fs::read_to_string(&state_file).expect("state file");
-    let mut state: Value =
-        serde_json::from_str(&state_text).expect("state JSON parse");
+    let mut state: Value = serde_json::from_str(&state_text).expect("state JSON parse");
     state["pid"] = serde_json::json!(sleeper_pid);
     state["run_outcome"] = serde_json::Value::Null;
     std::fs::write(
@@ -434,10 +426,8 @@ fn shutdown_signals_recorded_pid_and_persists_terminal_outcome() {
     // The state file must now record the terminal outcome the stop
     // path flushed (`RunOutcome::GracefullyStopped` serializes as
     // `{"kind": "gracefully-stopped"}` per run_state_v2.rs:84).
-    let patched_text =
-        std::fs::read_to_string(&state_file).expect("state file after stop");
-    let patched: Value =
-        serde_json::from_str(&patched_text).expect("state JSON after stop");
+    let patched_text = std::fs::read_to_string(&state_file).expect("state file after stop");
+    let patched: Value = serde_json::from_str(&patched_text).expect("state JSON after stop");
     let outcome = &patched["run_outcome"];
     assert_eq!(
         outcome["kind"].as_str(),
@@ -451,7 +441,7 @@ fn shutdown_signals_recorded_pid_and_persists_terminal_outcome() {
     // report >= timeout.
     let elapsed = report["elapsed_secs"].as_f64().unwrap_or(-1.0);
     assert!(
-        elapsed >= 0.0 && elapsed < 10.0,
+        (0.0..10.0).contains(&elapsed),
         "stop.elapsed_secs must be in [0, timeout=10); got {elapsed}"
     );
 
