@@ -74,6 +74,9 @@ mod lifecycle_migration;
 #[path = "suites/m144_lifecycle_at.rs"]
 mod m144_lifecycle_at;
 
+#[path = "suites/metrics.rs"]
+mod metrics;
+
 #[path = "suites/read_ergonomics.rs"]
 mod read_ergonomics;
 
