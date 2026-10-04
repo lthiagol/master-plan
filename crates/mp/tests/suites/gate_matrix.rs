@@ -431,11 +431,67 @@ fn g6_fires_when_ac_not_passed_at_verified() {
         .run(&["milestone", "approve", &id, "--format", "json"])
         .status
         .success());
-    let out = lib_api::run(&env, &["milestone", "verify", &id, "--format", "json"]);
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    // Set spec_status=verified so the G6 branch fires when AC is not
+    // passed. We patch the JSON directly (the spec_status gate path
+    // blocks a real transition through `mp milestone set-spec-status`).
+    patch_milestone_json(&env, &id, |v| {
+        v["milestone"]["spec_status"] = serde_json::json!("verified");
+    });
+    // G6 is reported via `mp validate --format json` in the report's
+    // `errors[].code` array (line 218 of crates/mp/src/validate/plan.rs).
+    // The prior `mp milestone verify` invocation did not surface the
+    // G6 code at all (verify runs AC verifications, not the gate
+    // matrix), so the original assertion's `|| !success` escape was
+    // passing on any failure, not on the gate firing specifically.
     assert!(
-        stderr.contains("G6") || !out.status.success(),
-        "G6 should fire at verify: {stderr}"
+        validate_has_gate(&env, "G6", &id),
+        "G6 should fire in validate when AC not passed at spec_status=verified"
+    );
+}
+
+/// M233 AC-05: positive case — once every AC is marked pass, the G6
+/// gate MUST clear. This is the negative half of the G6 contract:
+/// `g6_fires_when_ac_not_passed_at_verified` proves the gate fires
+/// for an un-passed AC; `g6_clears_when_all_acs_passed` proves the
+/// gate is also cleared by the canonical fix (pass each AC), not by
+/// some unrelated side-effect.
+#[test]
+fn g6_clears_when_all_acs_passed() {
+    let env = TestEnv::new();
+    let id = create_milestone(&env, "g6-clear");
+    assert!(env
+        .run(&["milestone", "approve", &id, "--format", "json"])
+        .status
+        .success());
+    // Mark the AC as passed with synthetic evidence.
+    let pass = env.run(&[
+        "milestone",
+        "ac",
+        "pass",
+        &id,
+        "AC-01",
+        "--evidence",
+        "manual: round-trip ok",
+        "--format",
+        "json",
+    ]);
+    let stderr = String::from_utf8_lossy(&pass.stderr);
+    assert!(
+        pass.status.success(),
+        "ac pass must succeed on an approved milestone: {stderr}"
+    );
+    // Set spec_status=verified after the AC is passed; the gate
+    // should NOT fire because every AC is passed.
+    patch_milestone_json(&env, &id, |v| {
+        v["milestone"]["spec_status"] = serde_json::json!("verified");
+    });
+
+    // After all ACs are passed, G6 must NOT appear in the validate
+    // report for this milestone. `validate_has_no_gate` reads the
+    // full report and asserts the code is absent.
+    assert!(
+        validate_has_no_gate(&env, "G6"),
+        "G6 should clear once every AC is passed at spec_status=verified"
     );
 }
 
