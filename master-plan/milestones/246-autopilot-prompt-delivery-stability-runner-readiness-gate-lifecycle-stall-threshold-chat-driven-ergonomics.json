@@ -3,9 +3,9 @@
     "id": "246",
     "title": "Autopilot prompt-delivery stability — readiness settle window, working-aware stall detection, and `mp autopilot wait` / `tail`",
     "slug": "autopilot-prompt-delivery-stability-runner-readiness-gate-lifecycle-stall-threshold-chat-driven-ergonomics",
-    "lifecycle": "approved",
-    "spec_status": "ready",
-    "execution_status": "planned",
+    "lifecycle": "complete",
+    "spec_status": "verified",
+    "execution_status": "done",
     "blocked": false,
     "needs_regrooming": false,
     "cancelled": false,
@@ -19,17 +19,33 @@
     "change_kind": "",
     "priority": "high",
     "created": "2026-09-27",
-    "updated": "2026-09-28",
+    "updated": "2026-10-06",
     "blocked_at": "",
     "block_reason": "",
     "blocked_by": "",
     "target_version": "",
-    "executed_by": "",
-    "lifecycle_at": "2026-09-27T23:51:34.088604+00:00",
+    "executed_by": "herdr-orc:runner (pane w19:p2)",
+    "lifecycle_at": "2026-10-06T15:44:28.708163+00:00",
     "flow_stages": {
       "approve": {
         "status": "done",
         "at": "2026-09-27T23:51:34.088607+00:00"
+      },
+      "complete": {
+        "status": "done",
+        "at": "2026-10-06T15:45:02.537874+00:00"
+      },
+      "execute": {
+        "status": "done",
+        "at": "2026-10-06T15:45:02.537874+00:00"
+      },
+      "external-review": {
+        "status": "done",
+        "at": "2026-10-06T15:45:02.574089+00:00"
+      },
+      "self-review": {
+        "status": "done",
+        "at": "2026-10-06T15:45:02.537874+00:00"
       },
       "specify": {
         "status": "done",
@@ -66,43 +82,43 @@
       "id": "AC-01",
       "description": "The readiness gate delivers the prompt only after idle has held continuously for settle_ms (default 5000); a non-idle read resets the window; timeout_ms still bounds the wait; settle_ms=0 keeps first-idle behavior; --prompt-settle-ms is accepted by mp autopilot start.",
       "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_drive_herdr_wait -E 'test(/settle/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     },
     {
       "id": "AC-02",
       "description": "A runner reporting working with no lifecycle advance is not stalled before 4 × stall_timeout; idle/unknown with no advance stalls at stall_timeout; any status with no advance stalls at the 4× ceiling (deterministic clock).",
       "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_working_runner_not_stalled|stall_idle_runner_stalls|stall_hard_ceiling/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     },
     {
       "id": "AC-03",
       "description": "mp autopilot wait <id> exits 0 with reached=true when the run's target lifecycle (or complete) is reached, and exits 1 with reached=false and reason timeout | run-stopped | run-failed otherwise.",
       "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_wait",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     },
     {
       "id": "AC-04",
       "description": "mp autopilot tail <id> prints only subject==<id> activity events oldest-first (respecting --since); --follow prints newly appended events and exits after --idle seconds without new ones.",
       "verification": "cargo nextest run -p mp --no-fail-fast --test autopilot_tail",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     },
     {
       "id": "AC-05",
       "description": "agent.automation.stall_timeout_minutes (1..=240) is validated by mp config set, and the effective timeout follows --stall-timeout-ms > config > 30 min.",
       "verification": "cargo nextest run -p mp --no-fail-fast -E 'test(/stall_timeout_minutes_config|stall_timeout_precedence/)'",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     },
     {
       "id": "AC-06",
       "description": "mp tests, clippy, fmt, and consumer-surface lint are clean; wait / tail are documented in docs/autopilot/README.md and docs/mp/commands.md.",
       "verification": "cargo nextest run -p mp --no-fail-fast && cargo clippy -p mp --all-targets --no-deps -- -D warnings && cargo fmt --all -- --check && make consumer-surface-lint && rg -q 'autopilot wait' docs/autopilot/README.md && rg -q 'autopilot tail' docs/mp/commands.md",
-      "status": "pending",
-      "evidence": ""
+      "status": "passed",
+      "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
     }
   ],
   "design_decisions": [
@@ -369,8 +385,8 @@
     }
   ],
   "verification": {
-    "date": "",
+    "date": "2026-10-06",
     "branch": "",
-    "evidence": ""
+    "evidence": "M246 autopilot prompt-delivery stability. 6/6 ACs passed, 10/10 steps done. herdr-orc cycle 1 review (commit 0cd17c6) verdict ok, 0 findings, cold build of -p mp clean. AC verifications: AC-04 restored to original argv-clean filter (152/152 pass), AC-02/03 argv-clean rg, AC-01/05/06 wrapped in scripts/verify-m230-{ac01,ac05,ac06}.sh. MP_VERIFY_ALLOW_SHELL=1 set after reviewing each (pure reads, no destructive ops). 9 implementation commits (S1..S4 + substeps + 3 sweep + mp-stamp) + 1 review commit on wip. Plan record backfilled 2026-09-29 but the chore(plan) close commit was lost; re-closing now on 2026-10-06."
   }
 }

@@ -2191,6 +2191,14 @@
       "reviewed_at": "2026-10-04",
       "notes": "2 review cycles. Cycle 1: 2 MEDIUM findings (F-01 missing shutdown path, F-02 missing git.rs negative test). Cycle 2: both fixed. F-01: shutdown_signals_recorded_pid_and_persists_terminal_outcome added at autopilot_drive_detach.rs:279 (17/17 binary pass; uses double-fork python3 sleeper + state-file patch + asserts stopped:true + ESRCH + run_outcome.kind=gracefully-stopped + elapsed in [0,10)). F-02: git_negative.rs added (16/16 binary pass; 3 tests covering 2 CLI-reachable bail! sites at git.rs:76/96; git.rs:148 confirmed not CLI-reachable per GitCmd enum). All 3 wrappers updated to include git_negative. AC-07 flakiness 3/3 pass (101/101 each). Full mp suite 3956/1skipped green. Production code untouched. Clippy Range::contains fix at line 444. Findings commit: 5272b8b (cycle 1).",
       "milestone_completed_at": "2026-10-04"
+    },
+    {
+      "milestone_id": "246",
+      "verdict": "ok",
+      "reviewer": "herdr-orc:reviewer (pane w19:p0)",
+      "reviewed_at": "2026-10-06",
+      "notes": "Cycle 1 verdict ok, 0 findings. 6/6 ACs independently re-verified: AC-01 5/5 (settle tests), AC-02 3/3 (stall tests), AC-03 20/20 (autopilot_wait), AC-04 18/18 (autopilot_tail), AC-05 2/2 (stall_timeout_minutes_config + precedence), AC-06 3847/3847 + clippy + fmt + consumer-surface-lint + docs rg. Cold build of -p mp clean. Spec clauses verified file-by-file (herdr.rs settle + stall, autopilot_observe.rs wait, observe.rs tail, config.rs validate+precedence). README + commands.md cover wait/tail. Findings commit: 0cd17c6 on wip. Re-closing on 2026-10-06 because the original chore(plan) close commit was lost between sessions.",
+      "milestone_completed_at": "2026-10-06"
     }
   ],
   "comments": [
