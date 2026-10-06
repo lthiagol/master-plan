@@ -29,6 +29,7 @@ subfolder with a primary `README.md` and, where useful, deeper reference files.
 | [`workflows/`](./workflows/) | **For humans.** Concrete recipes and prompt patterns for day-to-day use of master-plan via your agent |
 | [`autopilot/`](./autopilot/) | The `mp autopilot` orchestration surface — session JSON schema, topology, and migration |
 | [`agent-guide/`](./agent-guide/) | **For agents.** A load-once orientation doc plus on-demand detail files for each workflow |
+| [`diagrams/`](./diagrams/) | Visual maps of the system — the agent tree, roles, flow stages, and CLI internals, as Mermaid |
 
 ## Where to start
 
