@@ -135,12 +135,16 @@ fn each_row_carries_id_lifecycle_cycle_and_position_bar() {
 
 /// A `mp autopilot session show <id>` payload with a multi-cycle
 /// history. Three queued milestones:
-///   - M240 has been through cycles 1, 2, and 3
-///   - M241 has two entries, both at cycle 1
-///   - M242 has a single entry at cycle 2
+///   - M240 is on its third cycle
+///   - M241 is on cycle 1 (the row's own `cycle` field, not a count
+///     of history entries)
+///   - M242 is on its second cycle
 ///
-/// M241 is the case that separates "the highest cycle" from "the number
-/// of attempts": an entry count would report 2 for it, which is wrong.
+/// The cycle lives on each `QueueItem` (mp's typed source — see
+/// `crates/mp/src/autopilot/session.rs`) and the row reads it
+/// directly. M241 is the case that separates "the row's cycle field"
+/// from "the number of attempts": an entry count would report 2 for
+/// it, which is wrong.
 fn multi_cycle_session_show() -> serde_json::Value {
     serde_json::json!({
         "session_id": "alpha",
@@ -149,31 +153,24 @@ fn multi_cycle_session_show() -> serde_json::Value {
             "status": "active",
             "working_on": {"milestone_id": "M240", "cycle": 3, "role": "runner"},
             "queue": [
-                {"milestone_id": "M240", "title": "Deep", "lifecycle": "in-progress"},
-                {"milestone_id": "M241", "title": "Retried once", "lifecycle": "approved"},
-                {"milestone_id": "M242", "title": "Second cycle", "lifecycle": "in-progress"},
-            ],
-            "queue_cycle_history": [
-                {"milestone_id": "M240", "cycle": 1, "outcome": "remediation"},
-                {"milestone_id": "M240", "cycle": 2, "outcome": "remediation"},
-                {"milestone_id": "M240", "cycle": 3, "started_at": "2026-09-04T00:03:00Z"},
-                {"milestone_id": "M241", "cycle": 1, "outcome": "remediation"},
-                {"milestone_id": "M241", "cycle": 1, "outcome": "remediation"},
-                {"milestone_id": "M242", "cycle": 2, "started_at": "2026-09-04T00:02:00Z"},
+                {"milestone_id": "M240", "title": "Deep", "lifecycle": "in-progress", "cycle": 3},
+                {"milestone_id": "M241", "title": "Retried once", "lifecycle": "approved", "cycle": 1},
+                {"milestone_id": "M242", "title": "Second cycle", "lifecycle": "in-progress", "cycle": 2},
             ],
         }
     })
 }
 
 /// F-01 / AC-05: the takeover row's cycle count is the drive's own
-/// number from `session.queue_cycle_history[]`, not a constant.
+/// number from `session.queue[i].cycle`, not a constant.
 ///
 /// This is the test the old `cycle >= 1` assertion could not catch: a
 /// hard-coded 1 satisfies `>= 1` while being wrong for two of the three
 /// rows here. Each row is asserted exactly, and the M241 case pins
-/// "highest cycle, not attempt count".
+/// "the row's own cycle, not an attempt count derived from
+/// `queue_cycle_history`".
 #[test]
-fn the_takeover_row_cycle_count_comes_from_the_cycle_history() {
+fn the_takeover_row_cycle_count_comes_from_the_queue_item() {
     let payload = multi_cycle_session_show();
     let queue = raul::tui::autopilot::QueueView::from_session_show(&payload);
     assert_eq!(queue.rows.len(), 3);
@@ -194,14 +191,14 @@ fn the_takeover_row_cycle_count_comes_from_the_cycle_history() {
     assert_eq!(
         by_id("241"),
         1,
-        "M241's two entries are both cycle 1 — the highest cycle wins, \
-         not the attempt count"
+        "M241's queue item carries cycle 1 — the typed source wins, \
+         not a count of history entries"
     );
     assert_eq!(by_id("242"), 2, "M242 is on its second cycle");
     assert!(
         rows.iter().any(|r| r.cycle > 1),
         "at least one row must show a cycle above 1, or this test is not \
-         actually exercising the history"
+         actually exercising the queue item's cycle field"
     );
 }
 
@@ -251,12 +248,7 @@ fn a_single_milestone_run_reports_its_real_cycle_count() {
             "status": "active",
             "working_on": {"milestone_id": "M240", "cycle": 3, "role": "runner"},
             "queue": [
-                {"milestone_id": "M240", "title": "Only one", "lifecycle": "in-progress"},
-            ],
-            "queue_cycle_history": [
-                {"milestone_id": "M240", "cycle": 1, "outcome": "remediation"},
-                {"milestone_id": "M240", "cycle": 2, "outcome": "remediation"},
-                {"milestone_id": "M240", "cycle": 3, "started_at": "2026-09-04T00:03:00Z"},
+                {"milestone_id": "M240", "title": "Only one", "lifecycle": "in-progress", "cycle": 3},
             ],
         }
     });
@@ -310,21 +302,20 @@ fn an_empty_queue_still_produces_no_queue_view() {
     raul::tui::autopilot::refresh::refresh_from_json(&mut state, &payload, &status);
     assert!(state.queue_view().is_none());
 }
-/// cycle, is skipped rather than read as cycle 0 or panicking.
+/// The cycle field on a queue item is the typed source. A row whose
+/// `cycle` is unparseable, missing, or zero falls back to 1 rather
+/// than panicking or reporting cycle 0.
 #[test]
-fn malformed_history_entries_are_ignored() {
+fn malformed_or_missing_cycle_field_falls_back_to_one() {
     let payload = serde_json::json!({
         "session": {
             "id": "alpha",
             "status": "active",
             "queue": [
-                {"milestone_id": "M240", "title": "A", "lifecycle": "in-progress"},
-                {"milestone_id": "M241", "title": "B", "lifecycle": "in-progress"},
-            ],
-            "queue_cycle_history": [
-                {"milestone_id": "M240", "cycle": 4},
-                {"cycle": 9},
-                {"milestone_id": "M241", "cycle": "not-a-number"},
+                {"milestone_id": "M240", "title": "A", "lifecycle": "in-progress", "cycle": 4},
+                {"milestone_id": "M241", "title": "B", "lifecycle": "in-progress", "cycle": "not-a-number"},
+                {"milestone_id": "M242", "title": "C", "lifecycle": "in-progress", "cycle": 0},
+                {"milestone_id": "M243", "title": "D", "lifecycle": "in-progress"},
             ],
         }
     });
@@ -342,26 +333,37 @@ fn malformed_history_entries_are_ignored() {
         Some(1),
         "an unparseable cycle falls back to 1, not 0"
     );
+    assert_eq!(
+        by_id("242"),
+        Some(1),
+        "a zero cycle falls back to 1 — it has not been attempted"
+    );
+    assert_eq!(
+        by_id("243"),
+        Some(1),
+        "a missing cycle field falls back to 1"
+    );
 }
 
-/// F-01: the `M` prefix is normalized on both sides. History entries
-/// carry the full id; queue rows carry it stripped.
+/// F-01: the `M` prefix on a milestone id is normalized to a bare
+/// number when building the row. The row carries the stripped id
+/// regardless of whether the queue item used the `M` prefix.
 #[test]
-fn the_cycle_lookup_normalizes_the_milestone_id_prefix() {
-    let stripped = serde_json::json!({
+fn the_milestone_id_prefix_is_normalized_in_the_row() {
+    let payload = serde_json::json!({
         "session": {
             "id": "a", "status": "active",
-            "queue": [{"milestone_id": "240", "title": "A", "lifecycle": "in-progress"},
-                      {"milestone_id": "241", "title": "B", "lifecycle": "in-progress"}],
-            "queue_cycle_history": [{"milestone_id": "240", "cycle": 2}],
+            "queue": [
+                {"milestone_id": "M240", "title": "A", "lifecycle": "in-progress", "cycle": 2},
+                {"milestone_id": "241", "title": "B", "lifecycle": "in-progress", "cycle": 3},
+            ],
         }
     });
-    let queue = raul::tui::autopilot::QueueView::from_session_show(&stripped);
-    assert_eq!(
-        queue.rows[0].cycle, 2,
-        "a bare id matches a bare history id"
-    );
-    assert_eq!(queue.rows[1].cycle, 1);
+    let queue = raul::tui::autopilot::QueueView::from_session_show(&payload);
+    assert_eq!(queue.rows[0].milestone_id, "240");
+    assert_eq!(queue.rows[0].cycle, 2);
+    assert_eq!(queue.rows[1].milestone_id, "241");
+    assert_eq!(queue.rows[1].cycle, 3);
 }
 
 /// The bar tracks the canonical lifecycle order, so two milestones at
