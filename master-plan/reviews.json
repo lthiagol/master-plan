@@ -2207,6 +2207,14 @@
       "reviewed_at": "2026-10-07",
       "notes": "Queue clearance. M203 was completed 2026-09-02 (8/8 steps, 9/9 ACs, all passed) and has been sitting in mp reviews pending since. Verified today: per-AC evidence intact; spot-checks (backlog_list list_backlog_projects_preview_field + tui_milestones_title_chip backlog_row_renders_two_visual_lines) pass. Full mp + raul suite was green at completion (3247/3247). Verdict ok, no findings; cleared to complete.",
       "milestone_completed_at": "2026-09-02"
+    },
+    {
+      "milestone_id": "249",
+      "verdict": "ok",
+      "reviewer": "herdr-orc:m249-reviewer (pane w1G:p8)",
+      "reviewed_at": "2026-10-07",
+      "notes": "1 cycle, verdict ok, 0 findings. AC-01: cycle_from_history deleted (rg 0; old HEAD~4 had 2); 26/26 nextest on autopilot_while_executing including all 6 M241 cycle tests. AC-02: sample_session_show uses real QueueItem shape (milestone_id/stage/cycle); 11/11 nextest on autopilot_manual_refresh including new sample_session_show_fixture_yields_a_non_empty_queue_row_id. AC-03: 5563/5563 + 1 pre-existing skip mp+raul; clippy -D warnings + fmt --check clean. TakeoverRow.cycle in setup.rs:640 reads from QueueRow.cycle via QueueView::from_session_show at autopilot.rs:1619. 4 remaining queue_cycle_history refs are on DetailPanel and Telemetry (legitimate, separate concerns). #[serde(default = 'queue_row_default_cycle')] preserved. Cold build pass (cargo clean -p raul -p mp + cargo build = 10.39s). Findings commit: dcb9c42.",
+      "milestone_completed_at": "2026-10-07"
     }
   ],
   "comments": [
