@@ -13,6 +13,15 @@
 use raul::tui::autopilot::refresh::refresh_from_json;
 use raul::tui::autopilot::{AutopilotLaneState, StatusGraph};
 
+/// A `mp autopilot session show <id>` payload shaped like mp's real
+/// `QueueItem` (`milestone_id` / `stage` / `cycle` — see
+/// `crates/mp/src/autopilot/session.rs`). The previous fixture used
+/// pane-graph keys (`label` / `role` / `role_skill`) that predate the
+/// M240 queue rename, which left `QueueView::from_session_show` with
+/// an empty row id because it reads `milestone_id`, not `label`. The
+/// StatusGraph still tolerates the legacy shape (its row builder
+/// defaults to empty strings for missing keys), so the fixture is
+/// safe to share.
 fn sample_session_show() -> serde_json::Value {
     serde_json::json!({
         "session_id": "alpha",
@@ -21,9 +30,9 @@ fn sample_session_show() -> serde_json::Value {
             "status": "active",
             "queue": [
                 {
-                    "label": "role-runner-1",
-                    "role": "runner",
-                    "role_skill": "mp-runner",
+                    "milestone_id": "M209",
+                    "stage": "in-progress",
+                    "cycle": 1,
                     "last_notify": "2026-09-04T00:01:00Z",
                     "verifier_verdict": "pass",
                 },
@@ -65,6 +74,42 @@ fn manual_refresh_populates_all_typed_surfaces() {
     assert!(!state.last_refresh_at().is_empty());
 }
 
+/// The shared [`sample_session_show`] fixture uses the real
+/// `QueueItem` shape (`milestone_id` / `stage` / `cycle`). Feeding
+/// it to `QueueView::from_session_show` (via `refresh_from_json`)
+/// produces a row with a non-empty id — the legacy pane-graph
+/// fixture left this empty because the view reads `milestone_id`,
+/// not `label`. The test guards the shape so a future revert to
+/// pane-graph keys surfaces here rather than as a silent empty
+/// row id downstream.
+#[test]
+fn sample_session_show_fixture_yields_a_non_empty_queue_row_id() {
+    use raul::tui::autopilot::QueueView;
+
+    let show = sample_session_show();
+    let view = QueueView::from_session_show(&show);
+    assert_eq!(view.rows.len(), 1, "the fixture has one queue entry");
+    let row = &view.rows[0];
+    assert!(
+        !row.milestone_id.is_empty(),
+        "milestone_id must come from the queue item's milestone_id field, \
+         not the legacy label; got empty string for row: {row:?}"
+    );
+    assert_eq!(
+        row.milestone_id, "209",
+        "the M prefix is stripped when the row is built"
+    );
+
+    // And the same goes through the production refresh adapter.
+    let mut state = AutopilotLaneState::empty();
+    refresh_from_json(&mut state, &show, &sample_status());
+    let view = state
+        .queue_view()
+        .expect("a non-empty queue populates the view");
+    assert_eq!(view.rows.len(), 1);
+    assert_eq!(view.rows[0].milestone_id, "209");
+}
+
 /// AC-03: a single-milestone session *does* get a queue view.
 ///
 /// This used to assert the opposite: the adapter gated on
@@ -72,12 +117,10 @@ fn manual_refresh_populates_all_typed_surfaces() {
 /// `None`. That gate made the takeover's cycle count wrong for
 /// single-milestone drives — the view is where each row's `cycle`
 /// comes from, so a gated-out session reported "cycle 1" regardless of
-/// what `queue_cycle_history` said.
+/// what the cycle source said.
 ///
 /// Uses a `queue[]` entry shaped like mp's real `QueueItem`
-/// (`milestone_id` / `stage` / `cycle`). The shared
-/// [`sample_session_show`] fixture predates that shape and carries
-/// pane-style keys instead, so it cannot answer this question.
+/// (`milestone_id` / `stage` / `cycle`).
 #[test]
 fn manual_refresh_populates_queue_view_for_single_milestone() {
     let show = serde_json::json!({
@@ -89,11 +132,6 @@ fn manual_refresh_populates_queue_view_for_single_milestone() {
                 {"milestone_id": "M209", "stage": "in-progress", "cycle": 3},
             ],
             "working_on": {"milestone_id": "M209", "cycle": 3, "role": "runner"},
-            "queue_cycle_history": [
-                {"milestone_id": "M209", "cycle": 1},
-                {"milestone_id": "M209", "cycle": 2},
-                {"milestone_id": "M209", "cycle": 3},
-            ],
         },
     });
     let mut state = AutopilotLaneState::empty();
