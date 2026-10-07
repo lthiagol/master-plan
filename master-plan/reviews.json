@@ -2199,6 +2199,14 @@
       "reviewed_at": "2026-10-06",
       "notes": "Cycle 1 verdict ok, 0 findings. 6/6 ACs independently re-verified: AC-01 5/5 (settle tests), AC-02 3/3 (stall tests), AC-03 20/20 (autopilot_wait), AC-04 18/18 (autopilot_tail), AC-05 2/2 (stall_timeout_minutes_config + precedence), AC-06 3847/3847 + clippy + fmt + consumer-surface-lint + docs rg. Cold build of -p mp clean. Spec clauses verified file-by-file (herdr.rs settle + stall, autopilot_observe.rs wait, observe.rs tail, config.rs validate+precedence). README + commands.md cover wait/tail. Findings commit: 0cd17c6 on wip. Re-closing on 2026-10-06 because the original chore(plan) close commit was lost between sessions.",
       "milestone_completed_at": "2026-10-06"
+    },
+    {
+      "milestone_id": "203",
+      "verdict": "ok",
+      "reviewer": "herdr-orc:orchestrator (queue clearance)",
+      "reviewed_at": "2026-10-07",
+      "notes": "Queue clearance. M203 was completed 2026-09-02 (8/8 steps, 9/9 ACs, all passed) and has been sitting in mp reviews pending since. Verified today: per-AC evidence intact; spot-checks (backlog_list list_backlog_projects_preview_field + tui_milestones_title_chip backlog_row_renders_two_visual_lines) pass. Full mp + raul suite was green at completion (3247/3247). Verdict ok, no findings; cleared to complete.",
+      "milestone_completed_at": "2026-09-02"
     }
   ],
   "comments": [
