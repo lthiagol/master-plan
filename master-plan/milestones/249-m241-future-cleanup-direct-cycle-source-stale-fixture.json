@@ -1,0 +1,185 @@
+{
+  "milestone": {
+    "id": "249",
+    "title": "M241 future cleanup — direct cycle source + stale fixture",
+    "slug": "m241-future-cleanup-direct-cycle-source-stale-fixture",
+    "lifecycle": "approved",
+    "spec_status": "ready",
+    "execution_status": "planned",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-10-07",
+    "updated": "2026-10-07",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-10-07T20:04:02.766045+00:00",
+    "flow_stages": {
+      "approve": {
+        "status": "done",
+        "at": "2026-10-07T20:04:02.825209+00:00"
+      },
+      "specify": {
+        "status": "done",
+        "at": "2026-10-07T20:04:02.825209+00:00"
+      }
+    }
+  },
+  "intent": {
+    "outcome": "Close out two follow-ups from the M241 autopilot-tab milestone: (1) TakeoverRow.cycle should read directly from session.queue[].cycle (the real mp source) rather than the max-of-queue_cycle_history derivation it inherited from F-01; (2) the shared sample_session_show fixture in crates/mp/tests/autopilot_manual_refresh.rs should use the real QueueItem shape (milestone_id / stage / cycle) instead of pane-graph keys (label / role / role_skill) so that QueueView::from_session_show produces a non-empty row id when fed the fixture. Both are polish items flagged by the herdr-orc M241 cycle 3 review."
+  },
+  "problem": {
+    "description": "Two latent spec/code drift items from M241 surfaced after M230 dropped the render/watch module (forcing render/autopilot_lane.rs to read app.autopilot.picker directly). (1) TakeoverRow.cycle was implemented in M241 round 1 via cycle_from_history(history) — taking the max cycle named in session.queue_cycle_history[]. But mp's real QueueItem (crates/mp/src/autopilot/session.rs:203) already carries cycle: u32 on session.queue[] directly. The F-01 reviewer flagged it as a 'more direct source' judgment call and deferred it as future cleanup. (2) sample_session_show uses pane-graph input (label / role / role_skill) that predates the M240-queue-rename; QueueView::from_session_show reads milestone_id instead, so the fixture's row id comes out empty. It was invisible while the > 1 gate suppressed single-row queues; the M241 F-02 fix made it reachable. Both are correct-and-working today; this milestone cleans them up for the next refactor that touches the area."
+  },
+  "scope": {
+    "in_scope": [
+      "crates/raul/src/tui/autopilot.rs: change TakeoverRow.cycle population from cycle_from_history(session.queue_cycle_history) to session.queue[].cycle (the matching entry's cycle, or 1 as the same fallback)",
+      "crates/mp/tests/autopilot_manual_refresh.rs: update shared sample_session_show to use real QueueItem shape (milestone_id, stage, cycle) so QueueView::from_session_show produces a non-empty row id",
+      "Add or update the cycle-source-change test to cover the direct session.queue[].cycle path",
+      "Add or update the fixture-shape test to cover the new QueueItem shape"
+    ],
+    "out_of_scope": [
+      "Any change to crates/mp/src/autopilot/session.rs (QueueItem shape itself)",
+      "Any change to render/autopilot_lane.rs layout (M241 spec interpretation 4a stays as-is)",
+      "The 1-milestone refresh gate change (M241 F-02 already shipped)",
+      "The --force debt on S1.7/S1.1 wrappers (tracked separately as backlog B-88)",
+      "M232 cosmetic doc drift (already fixed at f49ebbee1... wait, let me just say 'already fixed in a separate commit')"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "TakeoverRow.cycle reads directly from session.queue[].cycle (the real mp source) instead of taking the max over session.queue_cycle_history[]. The fallback (when queue is empty or the entry has no cycle field) keeps cycle 1 with the reason in a comment. #[serde(default)] on QueueRow.cycle stays so legacy payloads deserialize as 1.",
+      "verification": "./scripts/verify-m249-ac01.sh",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "The shared sample_session_show fixture in crates/mp/tests/autopilot_manual_refresh.rs uses the real QueueItem shape (milestone_id / stage / cycle) — not the legacy pane-graph keys (label / role / role_skill). QueueView::from_session_show fed the fixture produces a non-empty row id.",
+      "verification": "./scripts/verify-m249-ac02.sh",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "Full mp + raul test suite stays green; no regressions; clippy -D warnings + fmt --check clean; the M241 AC-05 takeover tests (cycle count, state_tab_hidden, peek, etc.) still pass.",
+      "verification": "./scripts/verify-m249-ac03.sh",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "F-01 source-of-truth for cycle count",
+      "choice": "Use session.queue[].cycle directly (the typed source) instead of session.queue_cycle_history[] (a derived history). session.queue[] carries the same per-row cycle as the M241 takeover row needs; the history is a separate recording channel.",
+      "rationale": "Direct > derived. Same data, fewer steps, easier to reason about. The cycle_from_history function and its 2-space 'M' prefix normalization can be deleted."
+    },
+    {
+      "area": "sample_session_show fixture scope",
+      "choice": "Update only the queue-related fields in the fixture (milestone_id / stage / cycle). Leave pane-graph keys (label / role / role_skill) alone in pane_graph input.",
+      "rationale": "scope discipline. The fixture's purpose is test surface for QueueView; pane_graph is a separate concern and out of scope."
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP1",
+      "name": "Direct cycle source",
+      "goal": "TakeoverRow.cycle reads directly from session.queue[i].cycle (mp's typed source) instead of deriving it from session.queue_cycle_history[] via cycle_from_history",
+      "rollback": ""
+    },
+    {
+      "id": "WP2",
+      "name": "Real QueueItem shape in fixture",
+      "goal": "The shared sample_session_show fixture in crates/raul/tests/autopilot_manual_refresh.rs uses the real QueueItem shape (milestone_id / stage / cycle) so QueueView::from_session_show produces a non-empty row id",
+      "rollback": ""
+    },
+    {
+      "id": "WP3",
+      "name": "Wrapper scripts + execution records",
+      "goal": "Three argv-clean wrapper scripts (scripts/verify-m249-ac{01,02,03}.sh) so mp milestone complete can run the &&-chained verifications. AC-03 + execution records stamp 3/3 ACs passed",
+      "rollback": ""
+    }
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "work_package": "WP1",
+      "order": 1,
+      "action": "crates/raul/src/tui/autopilot.rs: delete cycle_from_history; QueueView::from_session_show reads item.cycle directly with a fallback to 1 on missing/zero/unparseable. crates/raul/tests/autopilot_while_executing.rs: update multi_cycle_session_show and a_single_milestone payload to put the cycle on the queue item; rename the_takeover_row_cycle_count_comes_from_the_cycle_history to ..._from_the_queue_item; rewrite the history-malformed and M-prefix tests against the new direct read. crates/raul/src/tui/autopilot/setup.rs: drop the stale 'Known gap: single-milestone runs show cycle 1' doc comment (the M241 F-02 gate is gone) and update the cycle-source doc.",
+      "files": [
+        "crates/raul/src/tui/autopilot.rs",
+        "crates/raul/src/tui/autopilot/setup.rs",
+        "crates/raul/tests/autopilot_while_executing.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_while_executing",
+      "done_when": "AC-01 evidence: cycle_from_history absent from autopilot.rs; the M241 cycle tests still pass against the new source.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-01"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S2",
+      "work_package": "WP2",
+      "order": 2,
+      "action": "crates/raul/tests/autopilot_manual_refresh.rs: reshape the sample_session_show queue item to real QueueItem shape (milestone_id / stage / cycle), keep last_notify and verifier_verdict for the StatusGraph row builder. Add sample_session_show_fixture_yields_a_non_empty_queue_row_id test. Update the doc comment on manual_refresh_populates_queue_view_for_single_milestone that no longer needs to claim the shared fixture is legacy-shaped.",
+      "files": [
+        "crates/raul/tests/autopilot_manual_refresh.rs"
+      ],
+      "tests": "cargo nextest run -p raul --no-fail-fast --test autopilot_manual_refresh",
+      "done_when": "AC-02 evidence: sample_session_show queue items use QueueItem shape; QueueView::from_session_show fed the fixture yields a non-empty milestone_id.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-02"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    },
+    {
+      "id": "S3",
+      "work_package": "WP3",
+      "order": 3,
+      "action": "scripts/verify-m249-ac{01,02,03}.sh: three argv-clean wrapper scripts. AC-01 wrapper: rg-guard cycle_from_history is gone + cargo nextest on autopilot_while_executing. AC-02 wrapper: Python brace-matched scope of sample_session_show's queue array for pane-graph keys + cargo nextest on autopilot_manual_refresh. AC-03 wrapper: full mp + raul nextest + clippy -D warnings + fmt --check. Update M249's three AC verifications to point at the wrappers via mp milestone ac update.",
+      "files": [
+        "scripts/verify-m249-ac01.sh",
+        "scripts/verify-m249-ac02.sh",
+        "scripts/verify-m249-ac03.sh"
+      ],
+      "tests": "cargo nextest run -p mp -p raul --no-fail-fast; cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings; cargo fmt --all -- --check",
+      "done_when": "AC-03 evidence: full mp + raul suite green; clippy -D warnings + fmt --check clean. Each wrapper exits 0 on a fresh run.",
+      "status": "pending",
+      "covers_ac": [
+        "AC-03"
+      ],
+      "depends_on_steps": [],
+      "claimed_by": "",
+      "claimed_at": "",
+      "lease_expires_at": "",
+      "evidence": ""
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
