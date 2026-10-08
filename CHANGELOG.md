@@ -1,3 +1,49 @@
+## v1.0.0-rc6 — 2026-10-08 — Release-tap integrity: per-archive checksums, live tap CI, honest docs
+
+Fixes the `brew upgrade` failure introduced by the rc5 tap bump, where
+`Formula master-plan-dev` aborted with `Error: Formula reports different
+checksum` after fetching 34.7MB.
+
+**The bug.** The release workflow computed a *single* sha256 — the one for the
+**tag** archive — and wrote it into both formulae. But the dev formula's `url`
+is rewritten to the **commit** archive. GitHub names an archive's root
+directory after the ref versus the sha (`master-plan-1.0.0-rc5/` versus
+`master-plan-f4964f7b…/`), so those two archives are never byte-identical and
+their checksums can never be equal. Every tag bump therefore wrote a
+guaranteed-wrong `sha256` into the dev formula. rc5 shipped `ae7b6882` (the
+tag's) against the commit archive, whose real checksum is `d9193c0a`. The
+`wip`-push path was always correct — `dev-tap-update.yml` derives its hash from
+the commit archive it names — which is why only tag bumps broke.
+
+**The fix.**
+
+- The workflow now resolves two hashes: `TAG_SHA` from the tag archive for
+  `master-plan.rb`, and `DEV_SHA` from the commit archive for
+  `master-plan-dev.rb`. Each formula's declared checksum now belongs to the
+  archive its own `url` points at.
+- The dev formula's version carries the short commit sha, matching the
+  `<version>-dev.<date>-<short8>` shape `dev-tap-update.yml` already wrote, so
+  the same tarball no longer appears under two different version strings
+  depending on which workflow last touched the file.
+- The tag bump now enables auto-merge, matching the dev-tap-update contract.
+
+**Why it shipped.** The tap's own CI declares `on: push/pull_request: branches:
+[stable]`, but the tap's default branch is `main` (renamed 2026-08-25) and
+every automation PR targets `main`. `ruby -c` and `brew style` had not gated a
+single tap commit since that rename. The tap's workflow now triggers on `main`,
+and gains a step that re-fetches each formula's `url` and compares it against
+the declared `sha256` — the exact class of defect that passed review here.
+
+**Docs.** The tap advertised binaries that no formula installs: both
+`projects/master-plan-dev/README.md` and the root formula table promised
+`mp-dev` + `raul-dev` running side-by-side. Both formulae run a plain
+`cargo install`, so they install `mp` and `raul` — which is exactly why
+`conflicts_with` exists. The docs now name the real binaries and state that
+installing one at a time is the intended behaviour.
+
+No changes to `crates/mp` or `crates/raul`; the rc5 binaries are unaffected.
+Workspace version `1.0.0-rc5` → `1.0.0-rc6`.
+
 ## v1.0.0-rc5 — 2026-10-08 — Re-cut over rc4 with stable-ci workflow fix
 
 Re-cuts `v1.0.0-rc4` with the stable `master-plan` formula's `version`

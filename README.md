@@ -107,6 +107,12 @@ latest commits on `wip` — newest features, but may contain bugs.
 The [`lthiagol/homebrew-tap`](https://github.com/lthiagol/homebrew-tap) repo
 carries both formulas. Tap it once, then pick one.
 
+> **Install one at a time.** Both formulas install binaries named `mp` and
+> `raul`, so Homebrew refuses to have them installed simultaneously. To switch
+> channels, `brew uninstall` the current formula before installing the other.
+> If you need both available at once, install one from source into a separate
+> `CARGO_TARGET_DIR` per branch instead.
+
 #### Stable tap (recommended)
 
 ```bash
