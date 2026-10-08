@@ -1,0 +1,113 @@
+{
+  "milestone": {
+    "id": "250",
+    "title": "Release-tap integrity — fix the dev formula checksum the tag workflow writes, and the tap CI that never runs",
+    "slug": "release-tap-integrity-fix-the-dev-formula-checksum-the-tag-workflow-writes-and-the-tap-ci-that-never-runs",
+    "lifecycle": "draft",
+    "blocked": false,
+    "needs_regrooming": false,
+    "cancelled": false,
+    "deferred": false,
+    "deferred_reason": "",
+    "depends_on": [],
+    "effort": "S",
+    "risk": "low",
+    "change_kind": "",
+    "priority": "normal",
+    "created": "2026-10-08",
+    "updated": "2026-10-08",
+    "blocked_at": "",
+    "block_reason": "",
+    "blocked_by": "",
+    "target_version": "",
+    "executed_by": "",
+    "lifecycle_at": "2026-10-08T17:15:10.745315+00:00"
+  },
+  "intent": {
+    "outcome": "Cutting a release tag produces a homebrew-tap bump whose master-plan-dev sha256 matches the tarball its url actually points at, so `brew upgrade lthiagol/tap/master-plan-dev` installs instead of failing with 'Formula reports different checksum'. The tap's brew style / ruby -c gate runs on every PR, and the tap docs describe the real binary names and the deliberate mutual exclusion between the two formulas."
+  },
+  "problem": {
+    "description": "Three defects in the release path surfaced when v1.0.0-rc5's tap bump (#61) failed to install.\n\n(1) The bug that broke the install: .github/workflows/stable-ci.yml computes one SHA at the 'Resolve tag + commit SHA + SHA256' step — the sha256 of the TAG tarball (archive/refs/tags/v<semver>.tar.gz). It then writes that same SHA into BOTH formulas, but the master-plan-dev sed rewrites the dev formula's url to archive/<commit>.tar.gz. The tag tarball and the commit tarball are different files (different root directory name inside the archive), so their sha256 values can never be equal. Every stable tag bump therefore writes a guaranteed-wrong sha256 into the dev formula. rc5's bump landed sha ae7b6882 (tag) against the wip commit tarball, whose real sha is d9193c0a.\n\n(2) The tap's own CI never runs. lthiagol/homebrew-tap/.github/workflows/stable-ci.yml triggers on push and pull_request against branch 'stable', but the tap's default branch is 'main' (renamed under F-tap-2, 2026-08-25) and every PR targets main. `brew style Formula/*.rb` and `ruby -c` have not gated a single tap commit since the rename, which is why (1) merged unnoticed.\n\n(3) The tap docs describe binaries that do not exist. projects/master-plan-dev/README.md and the root README.md both advertise 'mp-dev' + 'raul-dev' running 'side-by-side'. Both formulae run a plain `cargo install --path crates/<name>`, so they install 'mp' and 'raul' — which is exactly why master-plan-dev carries conflicts_with \"master-plan\". The docs describe an implementation that was never built."
+  },
+  "scope": {
+    "in_scope": [
+      "stable-ci.yml: resolve a separate sha256 for the commit tarball and write that (not the tag's) into master-plan-dev.rb",
+      "stable-ci.yml: align the dev formula version with dev-tap-update.yml's <version>-dev.<date>-<short8> convention so a tag bump and a wip push produce the same version shape",
+      "lthiagol/homebrew-tap/.github/workflows/stable-ci.yml: trigger on main (the tap's default branch) so brew style + ruby -c actually gate PRs",
+      "Repair the master-plan-dev.rb sha256/version left broken by #61",
+      "Correct the tap docs: binaries are mp + raul, and the two formulae are deliberately mutually exclusive via conflicts_with — one at a time",
+      "Re-cut the release tag so the automation produces a correct bump"
+    ],
+    "out_of_scope": [
+      "Installing the binaries as mp-dev + raul-dev so both formulae can coexist. The conflicts_with mutual exclusion is the intended design: one version at a time.",
+      "Reworking the stable/wip branch model or back-merging wip into stable",
+      "Any change to crates/mp or crates/raul"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-01",
+      "description": "The sha256 written into master-plan-dev.rb by the tag workflow is computed from the same archive/<commit>.tar.gz URL the workflow writes into that formula's url field, so the two cannot diverge. The tag tarball's sha256 is still used for master-plan.rb.",
+      "verification": "scripts/check-tap-checksums.sh",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-02",
+      "description": "The dev formula version produced by a tag bump carries the short commit sha, matching what dev-tap-update.yml emits for a wip push. Both workflows produce <workspace-version>-dev.<date>-<short8>.",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-03",
+      "description": "The tap's formula CI triggers on the branch its PRs actually target. Both push-to-main and PR-to-main fire the job.",
+      "verification": "make mp-flow-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-04",
+      "description": "Both formulae in the tap declare a sha256 equal to the sha256 of the tarball their own url points at, verified against the live archives.",
+      "verification": "make tap-checksums",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-05",
+      "description": "Tap docs name the binaries mp and raul (not mp-dev/raul-dev), state that the two formulae are mutually exclusive by design, and do not promise a side-by-side install. Consumer-surface lint is clean over docs/.",
+      "verification": "make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    },
+    {
+      "id": "AC-06",
+      "description": "A release tag exists whose tap bump installs cleanly: `brew upgrade --dry-run lthiagol/tap/master-plan-dev` reports no checksum error.",
+      "verification": "make consumer-surface-lint",
+      "status": "pending",
+      "evidence": ""
+    }
+  ],
+  "design_decisions": [
+    {
+      "area": "binary naming",
+      "choice": "Keep both formulae installing mp and raul, with the conflicts_with mutual exclusion, instead of renaming the dev cut's binaries to mp-dev + raul-dev.",
+      "rationale": "One version installed at a time is safer than two formulae claiming the same names on PATH. The conflicts_with declaration already makes Homebrew refuse the second install, so a rename would add an install-time mechanism to solve a problem the conflict already prevents."
+    },
+    {
+      "area": "fix locus",
+      "choice": "Fix the tag workflow and re-cut the release tag, rather than hand-repairing the tap formula alone.",
+      "rationale": "The automation is the defect. A hand-fix to master-plan-dev.rb would leave the next tag bump to reintroduce the same wrong checksum on the same line."
+    },
+    {
+      "area": "dev version shape",
+      "choice": "Align the tag workflow's dev version to dev-tap-update.yml's <version>-dev.<date>-<short8> shape.",
+      "rationale": "Both workflows write the same formula. Divergent version shapes mean the same tarball can appear under two version strings depending on which workflow last touched it."
+    }
+  ],
+  "verification": {
+    "date": "",
+    "branch": "",
+    "evidence": ""
+  }
+}
