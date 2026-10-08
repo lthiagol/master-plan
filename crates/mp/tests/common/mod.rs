@@ -537,8 +537,22 @@ mod mp_bin_snapshot_tests {
     #[test]
     fn ensure_mp_snapshot_reuses_existing_path() {
         let src = Path::new(env!("CARGO_BIN_EXE_mp"));
-        let first = ensure_mp_snapshot(src).expect("first snapshot");
-        let second = ensure_mp_snapshot(src).expect("second snapshot");
+        // Pin src to a stable temp file. CI's parallel nextest workers
+        // + cargo's incremental rebuild can flip target/debug/mp's
+        // (mtime, size) between two back-to-back ensure_mp_snapshot(src)
+        // calls, producing two distinct content-keyed dest paths and
+        // failing the assert_eq! below. A single local copy pins both
+        // inputs so the snapshot path is stable across both calls.
+        // process::id() scopes the temp file per-binary so concurrent
+        // nextest workers don't race on a shared path (a second
+        // worker's copy would otherwise overwrite this worker's file
+        // between the two ensure_mp_snapshot calls and re-introduce
+        // the same drift).
+        let stable_src =
+            std::env::temp_dir().join(format!("mp-snapshot-stable-source-{}", std::process::id()));
+        std::fs::copy(src, &stable_src).expect("copy src to stable temp file");
+        let first = ensure_mp_snapshot(&stable_src).expect("first snapshot");
+        let second = ensure_mp_snapshot(&stable_src).expect("second snapshot");
         assert_eq!(first, second);
         // Prefer hardlink when TMPDIR is same FS: nlink >= 2 (src + dest),
         // or at least dest exists after a copy fallback.
