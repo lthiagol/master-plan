@@ -1,4 +1,316 @@
-## Unreleased — WIP CI hardening
+## v1.0.0-rc4 — 2026-10-08 — Autopilot chain + WIP CI hardening
+
+Second release candidate of the 1.0 line. Lands the full autopilot
+chain — M246 (prompt-delivery stability), M230 (legacy Watch model
+retirement), M241 (40/60 tab split + While-Executing takeover),
+M232 (test-helper reorganization), M233 (test-coverage gap closure),
+M249 (M241 future cleanup) — plus the WIP CI-hardening batch and the
+pre-2.0 raul TUI refactor (M183–M186) that was sitting unreleased.
+Workspace version `1.0.0-rc3` → `1.0.0-rc4`. No breaking changes from rc1.
+
+The v1.0.0-rc.2 / v1.0.0-rc2 tag history is preserved as a record of the
+cut cycle; the rc3→rc4 jump reflects the four-month autopilot sweep
+since rc1. The **Unreleased — raul TUI refactor (M183–M186)** section
+from the previous CHANGELOG has been folded into this release; its
+content is older work that landed ahead of the v2.x line.
+
+### Headline changes — autopilot chain
+
+- **Autopilot prompt-delivery stability (M246): no user-visible change.**
+  The readiness gate delivers the prompt only after idle has held continuously
+  for `settle_ms` (default 5000); any non-idle read resets the window;
+  `timeout_ms` still bounds the wait; `--prompt-settle-ms 0` restores the old
+  first-idle behaviour; `--prompt-settle-ms` is accepted by `mp autopilot start`.
+  The stall timer now accrues only while `agent_status != working` and the
+  lifecycle has not advanced — a long build or test run (steady `working`)
+  is no longer declared hung after 30 minutes. A 4×stall_timeout hard ceiling
+  still applies at any status, so pausing the timer cannot make a genuinely
+  hung runner immortal. The threshold is tunable per project via
+  `agent.automation.stall_timeout_minutes` (1..=240, default 30), with
+  `--stall-timeout-ms` overriding it per run. `mp autopilot wait <id>` blocks
+  until the run's target lifecycle (or `complete`) is reached, exiting 0/1
+  with structured output; `mp autopilot tail <id> [--follow]` streams
+  subject-filtered activity events as JSON lines.
+
+- **raul collapsed the legacy Watch model into the Autopilot lane (M230): no
+  user-visible change.** `tui::watch` is gone: `App::watch` and every
+  `Action::Watch*` variant are removed, `crates/raul/src/tui/render/watch.rs`
+  is renamed to `render/autopilot_lane.rs`, and the live readers (picker,
+  lifecycle graph, compact queue, log tail) move next to `AutopilotLaneState`
+  on `app.autopilot`. `crates/raul/src/tui/autopilot.rs::AutopilotLaneState`
+  is now the single home for lane data (~2.4k LOC); `crates/raul/src/tui/watch.rs`
+  is deleted; `seed_handoff_gate`, `init_git`, and `capture_stdio` are each
+  defined exactly once under `crates/raul/tests/`. Pressing the same keymap as
+  before still drives the Autopilot lane.
+
+- **Autopilot tab is now a control-first split view, and takes over the screen
+  while a run is live (M241).** The status-first picker/graph/queue layout is
+  replaced by a setup form on the left (40% of the lane) and a tabbed sidebar
+  on the right (60%). The form has six stacked sections — Topology, Harness per
+  role, Milestones, Commit behavior, Run mode, and Start with a one-line
+  `<n> milestones · <topology> · <run mode>` summary — plus a Pause / Stop /
+  Resume / Back control row that is dim and inert when no run is live. Every
+  chip, tab, button, and takeover row is clickable, and the `│` between the
+  columns drags (clamped to 25–75%, inert during a run).
+  The sidebar has three tabs: **Progress** (lifecycle graph, queue, health
+  badge), **Activity** (`mp activity`, newest first), and **State** (a
+  read-only window onto the autopilot config, the `ui.autopilot.*` values, the
+  autopilot status, the current session, and pending override values).
+  `v` / `Shift+V` move between tabs and `z` collapses the sidebar; all three
+  are rebindable and appear in the `?` help overlay.
+  When `mp autopilot status` reports a live run, the split is replaced by a
+  full-screen takeover — topology strip, one row per queued milestone with its
+  lifecycle position, activity tail, health strip, control row. `Esc` returns
+  to the split while the run continues (the State tab is withheld until the run
+  ends), and clicking or pressing `Enter` on a row opens a read-only peek with
+  the milestone's `intent.outcome` and AC list.
+  Two safety rails worth calling out: selecting **detached** run mode always
+  opens a Confirm / Configure extras / Back popover, so there is no path to a
+  detached run that skips the prompt; and the override panel shows a *derived*,
+  read-only run id (`<topology>-<NNN>`) that is recomputed from the live session
+  count rather than stored.
+
+- **Three new `ui.autopilot.*` config keys, so the lane's layout persists
+  through mp instead of a raul-owned state file.** `ui.autopilot.split_pct`
+  (integer 25..=75, default 40), `ui.autopilot.sidebar_tab`
+  (`progress|activity|state`, default `progress`), and
+  `ui.autopilot.sidebar_visible` (bool, default `true`) are validated by
+  `mp config set` and documented in `mp config schema`. The whole
+  `ui.autopilot` object is omitted from `config.json` until a value is set, so
+  the config shape stays additive for projects that never open the tab. raul
+  writes every persisted choice through `mp config set` /
+  `mp autopilot config set`; milestone selection and run mode are deliberately
+  per-run and are never written, because a stale selection from last week is
+  worse than no selection at all.
+
+- **mp test helper reorganization (M232): no behavior change.** The
+  1,134-line `crates/mp/tests/common/lib_api.rs` is split into four domain
+  submodules (`lib_api/{ctx,mutation,io,capture}.rs`), and `seed_handoff_gate`
+  / `init_git` are deduplicated into `common/seed.rs` and `common/git.rs` so
+  each is defined exactly once under `crates/mp/tests/`. Existing callers
+  continue to compile via re-exports; `cargo nextest run -p mp` is unchanged
+  at 3856 tests (1 skipped).
+
+- **Test coverage gap closure (M233): no behavior change.** Adds direct
+  integration tests for `autopilot_detach.rs` (setsid + state-file write
+  + preflight refusal), `breaking_release::apply` (write-marker +
+  blocked-preflight bail), `mp plan metrics` (set→show round-trip +
+  non-numeric rejection), the TrackItem arm of `archive.rs`, and a
+  negative case for the G6 gate (the prior `|| !success` escape is
+  removed; `g6_clears_when_all_acs_passed` is the new positive case).
+  Three new top-level test binaries — `config_cmd_negative.rs`,
+  `archive_negative.rs`, `digest_negative.rs` — drive existing `?`-
+  propagated error paths in `config.rs` / `archive.rs` / `digest.rs`
+  to non-zero exits with the expected wording. Test count grows from
+  3856 → 3939 (83 new tests, 1 skipped unchanged); full mp suite green.
+  A new top-level binary `crates/mp/tests/git_negative.rs` covers
+  CLI-reachable `bail!('not a git repository')` paths in `git.rs`.
+
+- **M241 future cleanup (M249): no behavior change.** `TakeoverRow.cycle` reads
+  directly from `session.queue[i].cycle` (the typed `QueueItem` source —
+  `crates/mp/src/autopilot/session.rs:203`) instead of taking the max over
+  `session.queue_cycle_history[]`; the `cycle_from_history` function and its
+  `M`-prefix normalization are deleted. `#[serde(default =
+  "queue_row_default_cycle")]` on `QueueRow.cycle` is preserved so legacy
+  payloads deserialize as 1, and the existing M241 cycle-count tests
+  (cycle 3 / cycle 1 / cycle 2 scenarios) still pass. The shared
+  `sample_session_show` fixture in `crates/raul/tests/autopilot_manual_refresh.rs`
+  now uses the real `QueueItem` shape (`milestone_id` / `stage` / `cycle`)
+  so `QueueView::from_session_show` produces a non-empty row id when fed
+  the fixture; the new test
+  `sample_session_show_fixture_yields_a_non_empty_queue_row_id` pins it.
+
+### Headline changes — WIP CI hardening
+
+- **raul's Settings lane gained a live-preview theme picker, and the
+  theme catalog gained Alucard (M243).** The `ui.theme` row now expands
+  into a picker: one row per shipped palette with a six-block swatch
+  drawn in that palette and a one-line description, a `Default (mocha)`
+  reset row, and a status-preview row showing what the lifecycle
+  colors look like under the highlighted theme. **Moving the highlight
+  repaints the whole TUI in that palette on the next frame** — arrows,
+  `j` / `k`, and the mouse all work — so you pick a theme by looking
+  at it rather than by reading its name. Nothing reaches disk until `s`,
+  which commits the highlighted palette through the existing
+  `mp config set` path (and picks up any other staged Settings edits in
+  the same save); `Esc` drops the preview and restores the saved
+  palette. The Settings title carries a chip — `saved: <name>`, or
+  `preview: <name> (saved: <name>)` — so an unsaved preview is never
+  silent. Two palettes changed: **Alucard Classic** (Dracula's light
+  counterpart) ships as a first-class selectable theme, and **Frappé's
+  `dim` moved to Catppuccin Subtext0** so it matches the secondary-text
+  role in the other three Catppuccin flavors instead of reading a step
+  brighter. The theme-name list also stopped being copy-pasted: it now
+  lives once in `mp-model` and feeds both `mp config set ui.theme`
+  validation and raul's palette catalog, with a test asserting the two
+  sets are equal in both directions — so a name mp would accept but
+  raul cannot render (or a palette raul ships that mp rejects) now
+  fails the build instead of silently falling back at runtime. The
+  no-color `monochrome` palette is deliberately outside both lists; it
+  is what `ui.color = false` selects. `docs/raul/settings.md`
+  documents the picker, the key map, and every palette.
+- **raul theme system gained three quiet layering roles (M244).**
+  `Palette` now carries `focus_ring` (where the cursor is: focused tab
+  fill, selected-row border + marker, selected board box, focused Path
+  node), `surface_1` (the panel a surface floats on: overlay / modal
+  backdrops and the header + footer chrome bands), and `surface_2` (one
+  layer up, inside a surface: selected or hovered list row, selected row
+  in a modal, detail-view AC rows), populated for every shipped palette
+  from the official upstream values (Catppuccin Lavender / Mantle /
+  Surface0, Dracula Cyan / Background Light / Selection). Previously the
+  six pre-existing roles meant selection highlights, focused chips,
+  modal surfaces, and nested panels all drew with the same accent /
+  foreground / dim and never set a background, so layers were
+  indistinguishable and the UI was loud. The renderers now adopt the
+  roles: selected list and board rows are `surface_2` with a
+  `focus_ring` marker, overlays and chrome are `surface_1`, and the
+  focused tab is `focus_ring`. Swapping `ui.theme` recolors every role
+  in the next frame. The six existing role values are unchanged, and
+  `monochrome` collapses the new roles to the terminal default so
+  layering falls back to modifiers. `docs/raul/settings.md` documents
+  each role and where it is used. The Settings theme picker (a separate
+  milestone) will adopt the roles when it lands.
+- **mp-flow role-binding table is now lint-locked to the stage manifest
+  (M231).** `make mp-flow-lint` only checked that `SKILL.md` had a
+  `## <name>` section per `[[stages]]` entry in `stages.toml`; the
+  role-binding table itself was never read. 7 of its 12 Name cells had
+  drifted from the manifest (the table said `Define outcome` /
+  `Interview & shape` / `Write acceptance` / `Approve spec` /
+  `Mark complete` / `Remediate findings` / `Hand-off` where the manifest
+  says `Draft` / `Groom` / `Specify` / `Approve` / `Complete` /
+  `Remediate` / `Hand off`) while the lint stayed green — even though
+  `stages.toml`'s own header claims the table mirrors the manifest and
+  "the lint fails" on divergence. The lint now parses the
+  `| Stage | Name | Owner |` table and diffs every row against
+  `[[stages]]` number / name / role, plus the manifest's own
+  `[role_binding.*].stages` lists, emitting one diagnostic per mismatch
+  that names the stage, the field, and the expected vs actual value. It
+  also gained `--skill` / `--manifest` path overrides and a `--json`
+  view that prints the 12 parsed rows. The table in `SKILL.md` was
+  corrected to the canonical manifest names; no stages were added,
+  removed, or renumbered, and role ownership is unchanged.
+- **Repo-only skill moved out of the template tree (M235).** The
+  `mp-code-review` skill — lesson-pattern pre-screen plus runnable
+  fixtures — moved from `templates/skills/mp-code-review/` to
+  `internal/skills/mp-code-review/`. It was never deployable (manifest
+  `category: internal`, so `mp install` and `mp install --list-skills`
+  skip it) but it did sit inside the adopter template tree, so copying
+  `templates/` into a project would have carried a repo-only skill along.
+  Its behavior is unchanged: `mp install --skills=mp-code-review` still
+  fails, rejected as an unknown skill, and the `internal` manifest
+  category stays reserved for future repo-only skills. As a side effect,
+  `scripts/check-consumer-surface.sh` no longer needs the
+  `EXCLUDE_PATHS` carve-out it carried for the skill's internal lesson
+  codes and milestone ids, and `make consumer-surface-lint` is clean
+  without it.
+- **mp-model doc-comment lint cleanup (M236).** Closed the
+  recurring `clippy::doc_overindented_list_items` lint at
+  `crates/mp-model/src/milestone.rs:155-158` (4 backlog
+  occurrences in M209/M212/M220/M222 review cycles). One-line
+  continuation consolidation; pinned by `cargo clippy -p mp-model
+  --all-targets -- -D warnings` exiting 0 from a clean tree.
+- **Breaking release cleanup (M229).** The legacy `mp watch` and
+  `mp watch-control` aliases plus the `mp autopilot migrate` shim
+  were removed. The canonical surface is `mp autopilot start`,
+  `mp autopilot status|stop|output|result`, and the per-verb
+  subtrees. The `ui.show_watch_tab` config key was dropped; `mp
+  doctor` no longer reports a `ui_show_watch_tab` row. The
+  `.mp/watch.state.json` migration path is gone — autopilot
+  sessions live exclusively under
+  `<plan_dir>/autopilot/<id>/session.json`. New gate: `mp
+  breaking-release preflight` records the explicit next-major
+  target version and migration-window evidence before any further
+  compatibility removals ship. See `docs/autopilot/migration.md`
+  for the full migration timeline and the closed deprecation
+  window.
+- **raul keybind deconflict.** `keybinds.refresh` now defaults to
+  `Ctrl-R` (was `r`); `keybinds.previous_lane` dropped the `h` alias
+  (use `Left` or `BackTab`); `keybinds.focus_content` is no longer a
+  user-rebindable setting (it was a TUI-internal reserved action).
+  Existing user overrides win — no migration is required for projects
+  with a `[keybinds]` section in their config. `mp config validate`
+  surfaces a non-blocking deprecation warning for any stale
+  `focus_content` line; the line is silently dropped the next time you
+  set a different keybind.
+- **CI provides `mp` on PATH** (`target/release` via `$GITHUB_PATH` in
+  `wip-ci.yml` / `stable-ci.yml`) so raul integration tests that shell out
+  to `mp` run on clean runners.
+- **`make ci` preflight** requires `mp` on PATH or `$MP_HOME/bin/mp`; runs
+  `lint` + `test` + `mp-flow-lint` + `test-scenarios`. `NEXTTEST=1` selects
+  nextest `--profile ci` (`fail-fast=false`).
+- **Install-helper tests** prepend the per-test install bin to PATH
+  (`path_with_install_bin`) so doctor `runtime:mp_on_path` matches real
+  `source env.sh` behavior without relaxing the doctor contract.
+- **`make regen-goldens`** rewrites json-shape + track goldens (replaces
+  ignored `regenerate_goldens` tests).
+- **raul `find_mp`**: resolves `target/{debug,release}/mp` from cargo-test
+  `deps/` layout; dashboard parity fixtures use lifecycle bucket
+  `executed` (M196 rename from `done`).
+
+### Headline changes — pre-2.0 raul TUI refactor (M183–M186, folded in)
+
+This subsection was sitting unreleased in the previous CHANGELOG. The work
+shipped ahead of the v2.x line; capturing it here for completeness rather
+than retroactively inserting it into a v2 release section.
+
+- **7 tabs (was 9).** Tweaks folded into Backlog (`TW-*` + `BF-*` + `BL-*`);
+  Grooming tab removed — its filter is the `g` Grooming preset on Milestones.
+  Ideas remains `ID-*` only.
+- **Two-line footer (M183).** Globals on line 1 (quit, help, refresh, lanes,
+  sort, hide-done, filter, …); per-tab keys on line 2.
+- **Milestones table + lifecycle gauge (M185).** Table widget with `REVERSED`
+  row cursor, depends_on indent column, and an 8-segment lifecycle gauge
+  (`draft`→`complete`; cancelled `✗`, remediation `↺`).
+- **Lifecycle filter modal (M185).** Capital `F` opens a multi-select modal
+  (Space toggle, Enter commit, Esc revert). Title chip shows
+  `Milestones · All (N)` or `Milestones · approved, in-progress (N)`.
+  Lowercase `f` remains the annotation open-only toggle — both coexist
+  (see help overlay).
+- **Grooming preset (M185).** `g` on Milestones sets filter to
+  `{approved, in-progress, groomed}`.
+- **Search + cycle-sort (M186).** `/` fuzzy search and `o` cycle-sort land in
+  M186; footer placeholders already surface the keys.
+- **Migration.** Existing configs that reference Tweaks-specific keybind names
+  load without panic; unknown actions are skipped with a diagnostic.
+
+### Verification
+
+- `cargo nextest run -p mp --no-fail-fast` — 3939/3939 + 1 skipped (M233 baseline)
+- `cargo nextest run -p raul --no-fail-fast` — 1487/1487 (M241 baseline)
+- `cargo nextest run -p mp -p raul --no-fail-fast` — 5563/5563 + 1 skipped (full workspace)
+- `cargo fmt --all -- --check` — clean
+- `cargo clippy -p mp -p raul --all-targets --no-deps -- -D warnings` — clean
+- `make consumer-surface-lint` — clean
+- `make ci` (full gate) — green
+
+### Recorded debt
+
+The autopilot chain carries two `--force` bypasses on `mp milestone complete`
+(tooling-timeout, not correctness debt, recorded in the milestone evidence):
+
+- **M241 S1.7** — runs the full ~4 min test suite + clippy + fmt +
+  consumer-surface-lint; exceeds mp's per-verification timeout.
+- **M233 S1.1** — runs the full ~5 min mp test suite (config_cmd_negative +
+  archive_negative + digest_negative + git_negative); exceeds mp's per-
+  verification timeout.
+
+Tracked separately as backlog item **B-88** (`mp verifier: --force debt on
+S1.7-style ACs`). Fix options: (a) raise per-verification timeout in
+`crates/mp/src/commands/milestone.rs`; (b) support per-binary wrapper execution.
+
+### Branch model
+
+Two-branch cut continues:
+
+- **`stable`** — default branch on GitHub. Receives the blessed, reviewed,
+  CI-green history. New release tags cut here.
+- **`wip`** — working branch. Day-to-day commits, milestone batches land
+  here first. CI must be green before merge to `stable`. Auto-bumps the
+  `master-plan-dev` Homebrew formula on every push.
+
+The historical `master` branch is renamed to `wip`; no commits are lost.
+
+---
 
 - **Test coverage gap closure (M233): no behavior change.** Adds direct
   integration tests for `autopilot_detach.rs` (setsid + state-file write
@@ -337,20 +649,6 @@ The historical `master` branch is renamed to `wip`; no commits are lost.
 The previous `2.0.0-rc.X` / `v2.0.0` chain lives on the old `master` ref
 (preserved in the `origin/master` tag archive if needed) — new release
 tags are cut on `stable` only.
-
----
-
-## Unreleased — raul TUI refactor (M183–M186)
-
-### Headline changes
-
-- **7 tabs (was 9).** Tweaks folded into Backlog (`TW-*` + `BF-*` + `BL-*`); Grooming tab removed — its filter is the `g` Grooming preset on Milestones. Ideas remains `ID-*` only.
-- **Two-line footer (M183).** Globals on line 1 (quit, help, refresh, lanes, sort, hide-done, filter, …); per-tab keys on line 2.
-- **Milestones table + lifecycle gauge (M185).** Table widget with `REVERSED` row cursor, depends_on indent column, and an 8-segment lifecycle gauge (`draft`→`complete`; cancelled `✗`, remediation `↺`).
-- **Lifecycle filter modal (M185).** Capital `F` opens a multi-select modal (Space toggle, Enter commit, Esc revert). Title chip shows `Milestones · All (N)` or `Milestones · approved, in-progress (N)`. Lowercase `f` remains the annotation open-only toggle — both coexist (see help overlay).
-- **Grooming preset (M185).** `g` on Milestones sets filter to `{approved, in-progress, groomed}`.
-- **Search + cycle-sort (M186).** `/` fuzzy search and `o` cycle-sort land in M186; footer placeholders already surface the keys.
-- **Migration.** Existing configs that reference Tweaks-specific keybind names load without panic; unknown actions are skipped with a diagnostic.
 
 ---
 
