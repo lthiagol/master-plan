@@ -84,12 +84,18 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
     // the milestone DETAIL screen (the tree view drops it from the
     // list to keep rows one line). This test now exercises the
     // detail screen, which still renders the since cell.
+    // Cache to avoid second-boundary drift under CI load; now_iso
+    // truncates to seconds (see `format_iso` below), so three
+    // independent calls can straddle a second boundary and the
+    // assertion (third call) won't match the value the render
+    // captured (second call). Local runs mask this; CI fails.
+    let now = now_iso();
     let mut app = App::new();
     app.load_milestones(vec![MilestoneSummary {
         id: "01".into(),
         title: "Setup".into(),
         lifecycle: "in-progress".into(),
-        lifecycle_at: Some(now_iso()),
+        lifecycle_at: Some(now.clone()),
         depends_on: vec![],
         priority: "normal".to_string(),
         updated: String::new(),
@@ -107,7 +113,7 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
             "lifecycle": "in-progress",
             "spec_status": "verified",
             "execution_status": "done",
-            "lifecycle_at": now_iso(),
+            "lifecycle_at": now.clone(),
             "updated": "2026-07-08T00:00:00Z"
         }
     }));
@@ -123,7 +129,7 @@ fn since_cell_renders_relative_time_when_lifecycle_at_present() {
         "detail screen missing 'Lifecycle at:' field; got:\n{output}"
     );
     assert!(
-        output.contains(&now_iso()),
+        output.contains(&now),
         "detail screen missing the lifecycle_at timestamp; got:\n{output}"
     );
 }
