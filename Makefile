@@ -46,6 +46,13 @@ mp-flow-lint: ## M120: assert mp-flow SKILL.md matches the 12-stage manifest (st
 # clippy + fmt fail.
 consumer-surface-lint: ## M195: ripgrep guard over the consumer surface
 	@bash $(ROOT)scripts/check-consumer-surface.sh
+# Re-fetch every homebrew-tap formula's url and compare the tarball's sha256
+# against the one the formula declares. Not wired into `make ci`: it hits the
+# network and downloads each archive, so it belongs on demand rather than in
+# the gate every push pays for. Set TAP_DIR=... to check a tap checkout other
+# than brew's lthiagol/tap clone.
+tap-checksums: ## verify every tap formula's sha256 matches the archive its url names
+	@bash $(ROOT)scripts/check-tap-checksums.sh
 # Shared preflight: raul integration tests shell out to `mp`.
 define require_mp
 	@if ! command -v mp >/dev/null 2>&1 && ! { [ -n "$$MP_HOME" ] && [ -x "$$MP_HOME/bin/mp" ]; }; then \
