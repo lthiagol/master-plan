@@ -62,15 +62,26 @@ jobs:
 
       - name: Resolve tag + commit SHA + SHA256
         id: meta
+        # Two DIFFERENT tarballs get their own sha256. master-plan.rb points at
+        # the tag archive; master-plan-dev.rb points at the commit archive. GitHub
+        # names the archive's root directory after the ref vs the sha
+        # (master-plan-1.0.0-rc6/ vs master-plan-f4964f7b/), so the two archives
+        # are never byte-identical and one SHA cannot serve both formulas.
+        # Writing a single SHA into both guarantees `brew upgrade` fails with
+        # "Formula reports different checksum" on every tag bump.
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           COMMIT=$(git rev-list -n 1 "${GITHUB_REF_NAME}")
-          SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" | sha256sum | cut -d ' ' -f1)
+          SHORT_SHA="${COMMIT:0:8}"
+          TAG_SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" | sha256sum | cut -d ' ' -f1)
+          DEV_SHA=$(curl -sL "https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz" | sha256sum | cut -d ' ' -f1)
           DATE=$(date -u +%Y%m%d)
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "commit=${COMMIT}"    >> "$GITHUB_OUTPUT"
-          echo "sha=${SHA}"          >> "$GITHUB_OUTPUT"
-          echo "date=${DATE}"        >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}"       >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}"         >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}"   >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${TAG_SHA}"       >> "$GITHUB_OUTPUT"
+          echo "dev_sha=${DEV_SHA}"       >> "$GITHUB_OUTPUT"
+          echo "date=${DATE}"             >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
@@ -84,10 +95,12 @@ jobs:
         working-directory: homebrew-tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          COMMIT:  ${{ steps.meta.outputs.commit }}
-          SHA:     ${{ steps.meta.outputs.sha }}
-          DATE:    ${{ steps.meta.outputs.date }}
+          VERSION:   ${{ steps.meta.outputs.version }}
+          COMMIT:    ${{ steps.meta.outputs.commit }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          TAG_SHA:   ${{ steps.meta.outputs.tag_sha }}
+          DEV_SHA:   ${{ steps.meta.outputs.dev_sha }}
+          DATE:      ${{ steps.meta.outputs.date }}
         run: |
           BRANCH="bump-master-plan-v${VERSION}"
           git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/lthiagol/homebrew-tap.git"
@@ -99,20 +112,23 @@ jobs:
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
             -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
             -e "s|^  version \".*\"|  version \"${VERSION}\"|" \
-            -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${TAG_SHA}\"|" \
             Formula/master-plan.rb
 
+          # Dev formula: url is the COMMIT archive, so sha256 must be the
+          # commit archive's. Version carries the short sha to match the shape
+          # dev-tap-update.yml writes for a plain wip push.
           sed -i.bak -E \
             -e "s|^  homepage \".*\"|  homepage \"https://github.com/${GITHUB_REPOSITORY}\"|" \
             -e "s|^  url \".*\"|  url \"https://github.com/${GITHUB_REPOSITORY}/archive/${COMMIT}.tar.gz\"|" \
-            -e "s|^  version \".*\"|  version \"${VERSION}-dev.${DATE}\"|" \
-            -e "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" \
+            -e "s|^  version \".*\"|  version \"${VERSION}-dev.${DATE}-${SHORT_SHA}\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${DEV_SHA}\"|" \
             Formula/master-plan-dev.rb
 
           rm -f Formula/*.bak
           git add Formula/master-plan.rb Formula/master-plan-dev.rb
           git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "master-plan: bump to v${VERSION} (and master-plan-dev to ${VERSION}-dev.${DATE})"
+          git commit -m "master-plan: bump to v${VERSION} (and master-plan-dev to ${VERSION}-dev.${DATE}-${SHORT_SHA})"
           git push -u origin "$BRANCH" --force
 
       - name: Open PR against homebrew-tap:main
@@ -122,15 +138,27 @@ jobs:
           BRANCH="bump-master-plan-v${{ steps.meta.outputs.version }}"
           VERSION="${{ steps.meta.outputs.version }}"
           DATE="${{ steps.meta.outputs.date }}"
-          SHA="${{ steps.meta.outputs.sha }}"
+          SHA="${{ steps.meta.outputs.tag_sha }}"
+          DEV_SHA="${{ steps.meta.outputs.dev_sha }}"
           COMMIT="${{ steps.meta.outputs.commit }}"
           cat > /tmp/pr_body.md <<PRBODY
           Auto-bump from ${{ github.repository }} tag v${VERSION}.
 
-          * master-plan.rb -> v${VERSION} tarball
-          * master-plan-dev.rb -> v${VERSION}-dev.${DATE} (tracks the tagged commit ${COMMIT:0:7})
-          * SHA256: ${SHA}
+          * master-plan.rb -> v${VERSION} tag archive, sha256 ${SHA}
+          * master-plan-dev.rb -> ${VERSION}-dev.${DATE}-${{ steps.meta.outputs.short_sha }} (commit archive ${COMMIT:0:7}), sha256 ${DEV_SHA}
 
-          This PR targets main. CI runs brew audit + style on the formulas.
+          The two formulas point at two different archives (tag vs commit), so
+          each carries its own sha256.
+
+          This PR targets main. The tap's stable-ci job runs ruby -c + brew style.
           PRBODY
           gh pr create --repo lthiagol/homebrew-tap --base main --head "$BRANCH" --title "master-plan: bump to v${VERSION}" --body-file /tmp/pr_body.md || echo "PR already exists for this bump"
+          # Same auto-merge contract as dev-tap-update.yml: the tap's own CI
+          # (ruby -c + brew style) is the gate for a formula bump.
+          PR_NUMBER=$(gh pr list --repo lthiagol/homebrew-tap --state open --head "$BRANCH" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+            gh pr merge --auto --squash --repo lthiagol/homebrew-tap "$PR_NUMBER" \
+              || echo "auto-merge setup skipped (PR not mergeable yet)"
+          else
+            echo "no open PR found for branch $BRANCH; skipping auto-merge"
+          fi
