@@ -1,3 +1,20 @@
+## v1.0.0-rc5 — 2026-10-08 — Re-cut over rc4 with stable-ci workflow fix
+
+Re-cuts `v1.0.0-rc4` with the stable `master-plan` formula's `version`
+field correctly bumped (rc4's homebrew-tap PR had `version "1.0.0-rc2"`
+because `.github/workflows/stable-ci.yml` was missing the `-e "s|^  version
+\".*\"|  version \"${VERSION}\"|" \` line in the `master-plan.rb` sed — every
+RC bump since the workflow was authored had a stale version field).
+The dev formula's sed already included the version line; only the
+stable formula was affected. Fix is one extra sed expression in the
+workflow. No code changes vs rc4.
+
+The autopilot chain + WIP CI hardening + two CI flake fixes (M246 →
+M249 → rc4 → tui_lifecycle_column + ensure_mp_snapshot_reuses_existing_path)
+are unchanged from rc4. Workspace version `1.0.0-rc4` → `1.0.0-rc5`
+to drive the new tag and force a fresh homebrew-tap PR with the
+corrected `version` field.
+
 ## v1.0.0-rc4 — 2026-10-08 — Autopilot chain + WIP CI hardening
 
 Second release candidate of the 1.0 line. Lands the full autopilot
