@@ -280,3 +280,40 @@ milestone (or a successor), not by reverting the work that closed them.
 - Proposed durable fix: a lint alongside `scripts/audit-step-tests.sh` that executes each AC's `verification` filter and flags when it matches zero tests, or when the matched set is narrower than the AC's claims imply.
 - Verdict: **spec-gap**.
 - Status: backlog.
+
+---
+
+## Entry — 2026-10-08 — the release tag workflow writes the tag tarball's sha256 into the dev formula  <!-- points-at: M250 -->
+
+- Date / when: 2026-10-08, cutting the `v1.0.0-rc5` release.
+- Command attempted: `brew upgrade lthiagol/tap/master-plan-dev` after the rc5 tap bump (lthiagol/homebrew-tap#61) landed.
+- Observed output: `Error: Formula reports different checksum: ae7b6882b30bab0a8a628140baa3542fd92ea5e47c89543f5f028b43ed0fde63` / `SHA-256 checksum of downloaded file: d9193c0a4224c35d1d855bbc9047b7925a5b3b39241072b544f54a67c3e40170`. Install aborted after fetching 34.7MB. Both formulae declared the *same* sha256 while pointing at *different* tarballs — `master-plan.rb` at `archive/refs/tags/v1.0.0-rc5.tar.gz`, `master-plan-dev.rb` at `archive/f4964f7b….tar.gz`.
+- Suspected cause / code path: `.github/workflows/stable-ci.yml`, job `tap-update`. The `Resolve tag + commit SHA + SHA256` step computes a single `SHA` from the **tag** tarball. The `master-plan.rb` sed block then rewrites that formula's `url` to the tag tarball — consistent. The `master-plan-dev.rb` sed block rewrites that formula's `url` to `archive/${COMMIT}.tar.gz` but writes the same `SHA` into its `sha256` field. GitHub's tag and commit archives differ in the archive's root directory name (`master-plan-1.0.0-rc5/` vs `master-plan-f4964f7b…/`), so the two sha256 values are never equal. Every tag bump therefore writes a guaranteed-wrong checksum into the dev formula — not a slip in #61, a standing defect in the workflow.
+- Contrast: `dev-tap-update.yml` computes its `SHA` from `archive/${COMMIT}.tar.gz`, matching the url it writes. Only the tag path is wrong, which is why every wip push produced a good dev formula and only tag bumps broke one.
+- Workaround: none needed — resolved in M250 by resolving the commit tarball's sha separately. No hand-patch; a hand-patch would leave the next tag bump to reintroduce it.
+- Verdict: **bug**.
+- Status: fixed in M250.
+
+---
+
+## Entry — 2026-10-08 — the homebrew-tap's own formula CI triggers on a branch that no PR targets  <!-- points-at: M250 -->
+
+- Date / when: 2026-10-08, while diagnosing the entry above.
+- Command attempted: read `lthiagol/homebrew-tap/.github/workflows/stable-ci.yml`; `git remote show origin` in the tap clone.
+- Observed output: the workflow declares `on: push: branches: [stable]` and `pull_request: branches: [stable]`, but `git remote show origin` reports `HEAD branch: main` and `origin/HEAD -> origin/main`. Every automation PR targets `main` (`--base main` in both tap-update workflows), and the rename `stable` -> `main` is recorded in `dev-tap-update.yml`'s F-tap-2 comment from 2026-08-25. The rename moved the branch the PRs target but not the branch the CI watches.
+- Suspected cause / code path: `.github/workflows/stable-ci.yml` in lthiagol/homebrew-tap. `ruby -c` and `brew style Formula/*.rb` have not gated a single tap commit since 2026-08-25. This is why a malformed dev formula merged without complaint and the entry above reached `main`.
+- Workaround: none needed — resolved in M250 by triggering on `main`. Any tap commit that landed between the rename and this fix landed ungated.
+- Verdict: **bug**.
+- Status: fixed in M250.
+
+---
+
+## Entry — 2026-10-08 — the tap docs advertise `mp-dev` + `raul-dev` binaries that no formula installs  <!-- points-at: M250 -->
+
+- Date / when: 2026-10-08, same session.
+- Command attempted: `grep -rn 'mp-dev\|raul-dev'` across the tap's `Formula/`, `projects/` and root `README.md`.
+- Observed output: three promises of a side-by-side install that does not exist. `projects/master-plan-dev/README.md:7` ("installs to `mp-dev` + `raul-dev`, both can run side-by-side"), lines 29–30 (`mp-dev --help` / `raul-dev --help`), line 77 ("compared side-by-side (`mp` vs `mp-dev`, `raul` vs `raul-dev`)"), and the root `README.md` formulae table row for `master-plan-dev`.
+- Suspected cause / code path: both formulae run a plain `cargo install --locked --root prefix --path crates/mp` / `crates/raul`, which install `mp` and `raul`. `brew info` corroborates: `Conflicts with: lthiagol/tap/master-plan (because both install mp and raul)`. The `conflicts_with` is deliberate and correct — the README describes an `mp-dev` rename that was designed at some point and never implemented.
+- Workaround: corrected in M250 — docs now name `mp`/`raul` and state that the conflict is intentional. Consumer-surface lint does not catch this class: the leak guard looks for internal milestone IDs and lesson codes, not for docs naming binaries a formula does not install.
+- Verdict: **spec-gap** (docs describe an unimplemented design; the conflict itself is correct and stays).
+- Status: fixed in M250.
